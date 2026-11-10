@@ -34,6 +34,12 @@ All notable changes to this project are documented here. The format follows
   rota are gone from the wall (the home page keeps the river). The strip along the foot keeps three
   figures: monitors up, availability and open alerts. The wall is always Night: the Day theme and
   its button are removed, and a saved or linked `light`/`day` choice reads as Night.
+- **Immich: stale-device check limited to phones and tablets, for every user.** Browsers and
+  computers no longer count in the device metrics, the "Client device stale" rule or the monitor's
+  table; only iOS and Android app sessions do. With an administrator API key (plus the
+  `adminUser.read` and `adminSession.read` permissions), the phones of all users are read, each
+  labelled with its owner; without them the key owner's own devices are read as before. Existing
+  monitors keep working unchanged.
 - **One typeface family everywhere: Inter and JetBrains Mono.** The console, the status pages, the
   topology exports and the documentation now use Inter (headings in semibold) and JetBrains Mono
   for code and figures, replacing Geist and Bricolage Grotesque. Both are open source (SIL OFL 1.1)
