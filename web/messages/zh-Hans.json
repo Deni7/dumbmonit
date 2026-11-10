@@ -134,7 +134,9 @@
 	"alerts_ack_stop_reminding": "在此期间不再提醒",
 	"alerts_ack_unack": "取消确认",
 	"alerts_ack_until_resolved": "直到解决",
+	"alerts_acknowledged_silence_name": "已确认：{name}",
 	"alerts_actions_ack": "确认",
+	"alerts_actions_ack_title": "确认：您已知晓并正在处理。问题解决前不再提醒。",
 	"alerts_bulk_ack": "确认",
 	"alerts_bulk_done": "完成：{count}。",
 	"alerts_bulk_ignore": "对此监控项忽略",
@@ -513,6 +515,7 @@
 	"alerts_schedule_day_of_month": "{day} 日",
 	"alerts_schedule_monthly": "{when} {start}，持续 {duration}，每月 · {zone}",
 	"alerts_schedule_no_day": "未选择日期",
+	"alerts_schedule_recovery": "直到监控项恢复正常",
 	"alerts_schedule_weekly": "{days} {span}，每周 · {zone}",
 	"alerts_scope_all_devices": "所有监控项",
 	"alerts_scope_device": "监控项 {id}",
@@ -1217,7 +1220,7 @@
 	"deviceform_new_desc_relay": "在另一个站点放一个代理，该站点的监控项都通过它上报。",
 	"deviceform_new_desc_scan": "在网段中查找设备和服务，并一键添加。",
 	"deviceform_new_devices": "监控项",
-	"deviceform_new_door_scan_desc": "给出类似 192.168.1.0/24 的网段：所有应答 SNMP 的设备都会列出，随时可添加。",
+	"deviceform_new_door_scan_desc": "给出类似 192.168.1.0/24 的网段：会找出在线设备、检查开放端口并识别产品（网页、横幅、SNMP），随时可添加。不会登录任何设备。",
 	"deviceform_new_empty_lead": "大多数东西仍然可以归入以下几类：",
 	"deviceform_new_guide_hide": "隐藏设置指南",
 	"deviceform_new_guide_label": "设置指南",
@@ -2276,6 +2279,7 @@
 	"devices_silence_submit": "暂停提醒",
 	"devices_silence_until": "直至 {when}",
 	"devices_silence_until_label": "暂停提醒至",
+	"devices_silence_until_recovery": "直到恢复正常",
 	"devices_site_badge_aria": "站点：{name}",
 	"devices_speedtest_ago": "{age}前",
 	"devices_speedtest_below": "低于阈值",
@@ -4804,10 +4808,10 @@
 	"misc_device_tablet": "平板电脑",
 	"misc_device_this": "此显示器",
 	"misc_device_tv": "电视",
-	"misc_dur_d": "{n} 天",
-	"misc_dur_h": "{n} 小时",
-	"misc_dur_min": "{n} 分钟",
-	"misc_dur_s": "{n} 秒",
+	"misc_dur_d": "{n}天",
+	"misc_dur_h": "{n}小时",
+	"misc_dur_min": "{n}分钟",
+	"misc_dur_s": "{n}秒",
 	"misc_just_now": "刚刚",
 	"misc_music_deezer_cut": "此 Deezer 链接似乎不完整。",
 	"misc_music_deezer_kinds": "指向单曲、专辑或播放列表的 Deezer 链接可在墙屏上播放。",
@@ -5440,6 +5444,9 @@
 	"oncall_window_overnight_hint": "结束时间早于开始时间表示跨过午夜到次日;00:00 到 00:00 表示整天。",
 	"oncall_window_remove": "移除",
 	"oncall_window_to": "到",
+	"overview_ack_err": "无法确认此监控项。",
+	"overview_ack_hint": "已知晓并在处理：恢复正常前不再通知。",
+	"overview_ack_item": "确认",
 	"overview_alerts_fired": "触发",
 	"overview_alerts_hint": "触发：{fired}，已解决：{resolved}",
 	"overview_alerts_none": "最近 {days} 天没有触发告警。",
@@ -5459,7 +5466,7 @@
 	"overview_first_done": "已完成",
 	"overview_first_error": "无法保存，请稍后重试。",
 	"overview_first_error_detail": "无法保存：{message}",
-	"overview_first_hurry": "赶时间？扫描一个网段，一次添加所有响应 SNMP 的监控项。",
+	"overview_first_hurry": "赶时间？扫描一个网段：会找出在线设备并识别其产品，一次全部添加。",
 	"overview_first_intro": "三步之后，鸽子就有东西可看了。",
 	"overview_first_scan": "扫描我的网络",
 	"overview_first_skip_guide": "跳过向导",
@@ -5612,20 +5619,6 @@
 			}
 		}
 	],
-	"overview_sky_n_reporting": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "{count} 个在上报"
-			}
-		}
-	],
 	"overview_sky_n_snoozed": [
 		{
 			"declarations": [
@@ -5640,20 +5633,6 @@
 			}
 		}
 	],
-	"overview_sky_n_suppressed": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "{count} 个被上级抑制"
-			}
-		}
-	],
 	"overview_sky_n_unreachable": [
 		{
 			"declarations": [
@@ -5665,20 +5644,6 @@
 			],
 			"match": {
 				"countPlural=other": "{count} 个无法访问"
-			}
-		}
-	],
-	"overview_sky_n_waiting": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "{count} 个在等待"
 			}
 		}
 	],

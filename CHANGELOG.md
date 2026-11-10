@@ -40,6 +40,25 @@ All notable changes to this project are documented here. The format follows
   `adminUser.read` and `adminSession.read` permissions), the phones of all users are read, each
   labelled with its owner; without them the key owner's own devices are read as before. Existing
   monitors keep working unchanged.
+- **Overview, "Needs attention".** Ages read "3d ago", "2h ago" (number glued to the unit, spaced
+  with a non-breaking space where the language does so) and are larger and darker. An alert row has
+  a labelled "Acknowledge" button: it stops the reminders until the alert resolves and takes the row
+  out of the list; the alert stays on the Alerts page, where it can be un-acknowledged.
+- **"Acknowledge" on a monitor row of "Needs attention".** The small cross menu now ends with
+  "Acknowledge": seen, I am on it. The row leaves the list and nothing is sent for that monitor
+  until it answers again; the server then lifts the acknowledgement by itself, so the next outage
+  notifies as usual. While it lasts it shows on the monitor's page ("Snoozed until it is back to
+  normal", with Lift) and in the maintenance windows. New schedule kind `recovery` on
+  `POST /api/alerts/silences`; it is not counted as planned maintenance on public status pages,
+  agent updates or automatic remediation.
+- **The health river fills its card:** strips take the available height, and more of them show when
+  there is room, at any width.
+- The monitor-count lines ("reporting, unreachable, suppressed by parent" and the severity
+  breakdown) are gone from the wall header, next to the problem total; the "suppressed by parent"
+  counter no longer appears anywhere.
+- The "Scan my network" descriptions no longer say it only finds SNMP devices: the scan finds live
+  devices, checks their open ports and recognises products.
+
 - **One typeface family everywhere: Inter and JetBrains Mono.** The console, the status pages, the
   topology exports and the documentation now use Inter (headings in semibold) and JetBrains Mono
   for code and figures, replacing Geist and Bricolage Grotesque. Both are open source (SIL OFL 1.1)

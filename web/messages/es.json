@@ -134,7 +134,9 @@
 	"alerts_ack_stop_reminding": "No recordármelo durante",
 	"alerts_ack_unack": "Quitar reconocimiento",
 	"alerts_ack_until_resolved": "Hasta que se resuelva",
+	"alerts_acknowledged_silence_name": "Reconocido: {name}",
 	"alerts_actions_ack": "Reconocer",
+	"alerts_actions_ack_title": "Reconocer: ya lo sabes y te ocupas de ello. Sin más recordatorios hasta que se resuelva.",
 	"alerts_bulk_ack": "Reconocer",
 	"alerts_bulk_done": "Hecho: {count}.",
 	"alerts_bulk_ignore": "Ignorar para este monitor",
@@ -532,6 +534,7 @@
 	"alerts_schedule_day_of_month": "día {day}",
 	"alerts_schedule_monthly": "{when} {start} durante {duration}, cada mes · {zone}",
 	"alerts_schedule_no_day": "Ningún día",
+	"alerts_schedule_recovery": "Hasta que el monitor vuelva a la normalidad",
 	"alerts_schedule_weekly": "{days} {span}, cada semana · {zone}",
 	"alerts_scope_all_devices": "Todos los monitores",
 	"alerts_scope_device": "Monitor {id}",
@@ -1248,7 +1251,7 @@
 	"deviceform_new_desc_relay": "Un agente en el otro sitio, y sus monitores informan a través de él.",
 	"deviceform_new_desc_scan": "Encuentra dispositivos y servicios en un rango de red y los añade con un clic.",
 	"deviceform_new_devices": "Monitores",
-	"deviceform_new_door_scan_desc": "Indica un rango como 192.168.1.0/24: cada dispositivo que responda por SNMP aparece en la lista, listo para añadir.",
+	"deviceform_new_door_scan_desc": "Indica un rango como 192.168.1.0/24: se encuentran los dispositivos activos, se examinan sus puertos abiertos y se reconocen los productos (páginas web, banners, SNMP), listos para añadir. No se inicia sesión en ninguno.",
 	"deviceform_new_empty_lead": "La mayoría de las cosas siguen encajando en una de estas:",
 	"deviceform_new_guide_hide": "Ocultar la guía de configuración",
 	"deviceform_new_guide_label": "Guía de configuración",
@@ -2308,6 +2311,7 @@
 	"devices_silence_submit": "Posponer",
 	"devices_silence_until": "hasta {when}",
 	"devices_silence_until_label": "Posponer hasta",
+	"devices_silence_until_recovery": "hasta que vuelva a la normalidad",
 	"devices_site_badge_aria": "Sitio: {name}",
 	"devices_speedtest_ago": "hace {age}",
 	"devices_speedtest_below": "Por debajo del umbral",
@@ -4858,10 +4862,10 @@
 	"misc_device_tablet": "una tableta",
 	"misc_device_this": "esta pantalla",
 	"misc_device_tv": "una tele",
-	"misc_dur_d": "{n} d",
-	"misc_dur_h": "{n} h",
-	"misc_dur_min": "{n} min",
-	"misc_dur_s": "{n} s",
+	"misc_dur_d": "{n} d",
+	"misc_dur_h": "{n} h",
+	"misc_dur_min": "{n} min",
+	"misc_dur_s": "{n} s",
 	"misc_just_now": "ahora mismo",
 	"misc_music_deezer_cut": "Este enlace de Deezer parece cortado.",
 	"misc_music_deezer_kinds": "Los enlaces de Deezer a una canción, álbum o lista se pueden reproducir en la pared.",
@@ -5495,6 +5499,9 @@
 	"oncall_window_overnight_hint": "Un fin anterior al inicio pasa de medianoche al día siguiente. De 00:00 a 00:00 es el día completo.",
 	"oncall_window_remove": "Quitar",
 	"oncall_window_to": "Hasta",
+	"overview_ack_err": "No se pudo reconocer este monitor.",
+	"overview_ack_hint": "Visto, me ocupo: en silencio hasta que vuelva a la normalidad.",
+	"overview_ack_item": "Reconocer",
 	"overview_alerts_fired": "Disparadas",
 	"overview_alerts_hint": "Disparadas: {fired}, resueltas: {resolved}",
 	"overview_alerts_none": "No se disparó ninguna alerta en los últimos {days} días.",
@@ -5514,7 +5521,7 @@
 	"overview_first_done": "Hecho",
 	"overview_first_error": "No se pudo guardar. Inténtalo de nuevo en un momento.",
 	"overview_first_error_detail": "No se pudo guardar: {message}",
-	"overview_first_hurry": "¿Con prisa? Escanea un rango de red y añade de una vez todo lo que responda por SNMP.",
+	"overview_first_hurry": "¿Con prisa? Escanea un rango de red: se encuentran los dispositivos activos y se reconocen sus productos, para añadirlos de una vez.",
 	"overview_first_intro": "Tres pasos y la paloma ya tiene algo que vigilar.",
 	"overview_first_scan": "Escanear mi red",
 	"overview_first_skip_guide": "Omitir la guía",
@@ -5675,21 +5682,6 @@
 			}
 		}
 	],
-	"overview_sky_n_reporting": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} informando",
-				"countPlural=other": "{count} informando"
-			}
-		}
-	],
 	"overview_sky_n_snoozed": [
 		{
 			"declarations": [
@@ -5705,21 +5697,6 @@
 			}
 		}
 	],
-	"overview_sky_n_suppressed": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} suprimida por el padre",
-				"countPlural=other": "{count} suprimidas por el padre"
-			}
-		}
-	],
 	"overview_sky_n_unreachable": [
 		{
 			"declarations": [
@@ -5732,21 +5709,6 @@
 			"match": {
 				"countPlural=one": "{count} inaccesible",
 				"countPlural=other": "{count} inaccesibles"
-			}
-		}
-	],
-	"overview_sky_n_waiting": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} en espera",
-				"countPlural=other": "{count} en espera"
 			}
 		}
 	],
