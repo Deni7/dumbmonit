@@ -76,9 +76,6 @@ All notable changes to this project are documented here. The format follows
 - **vSphere goes deeper.** New readings per VM: number of snapshots, age of the oldest one and
   whether disks need consolidation. New built-in rules: a snapshot older than 3 days and a VM
   waiting for consolidation.
-
-### Changed
-
 - **Docs: every built-in rule of ten integrations is now listed, in nine languages.** The pages for
   Proxmox VE, Proxmox Backup Server, TrueNAS, Synology, Unraid, UniFi Network, pfSense, OPNsense,
   Veeam and vSphere each carry the full table of their rules (threshold, delay, severity, reminder)
