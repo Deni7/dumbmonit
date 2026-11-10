@@ -38,7 +38,9 @@ async fn forecast(
     assert_eq!(query["current"], "temperature_2m,weather_code,is_day");
     (
         StatusCode::OK,
-        axum::Json(json!({ "current": { "temperature_2m": 11.6, "weather_code": 61, "is_day": 0 } })),
+        axum::Json(
+            json!({ "current": { "temperature_2m": 11.6, "weather_code": 61, "is_day": 0 } }),
+        ),
     )
 }
 
@@ -81,7 +83,14 @@ async fn harness() -> Harness {
     registry.register(Arc::new(collectors::DummyCollector));
     let victoria = tsdb::Victoria::new(UNREACHABLE_VICTORIA.to_string()).unwrap();
     let sink = tsdb::spawn_writer(victoria.clone(), Duration::from_secs(60));
-    let state = AppState::new(Inner { config, pool: pool.clone(), cipher, victoria, sink, collectors: registry });
+    let state = AppState::new(Inner {
+        config,
+        pool: pool.clone(),
+        cipher,
+        victoria,
+        sink,
+        collectors: registry,
+    });
     let hub = WeatherHub::new(Endpoints { forecast: base.clone(), geocoding: base });
     let app = TestApp {
         router: api::router_with_hubs(state, dumbmonit_server::music::MusicHub::official(), hub),
@@ -153,8 +162,7 @@ async fn un_admin_choisit_le_lieu_et_tout_compte_lit_la_meteo_en_cache() {
 async fn un_service_muet_ne_laisse_aucune_trace_sur_le_mur() {
     let h = harness().await;
     h.fake.down.store(true, Ordering::SeqCst);
-    let reply =
-        h.app.put("/api/wall/weather", json!({ "place": lyon() }), Some(&h.admin)).await;
+    let reply = h.app.put("/api/wall/weather", json!({ "place": lyon() }), Some(&h.admin)).await;
     assert_eq!(reply.status, StatusCode::OK);
     assert_eq!(reply.body["place"]["name"], "Lyon");
     assert_eq!(reply.body["current"], Value::Null);
@@ -186,7 +194,9 @@ async fn le_reglage_voyage_avec_la_sauvegarde() {
     // Rien de choisi : rien n'est exporté.
     let pool = source.pool.clone();
     let cipher = db::init_cipher(&pool, "secret-de-test-suffisamment-long").await.unwrap();
-    assert!(collect(&pool, &cipher, ExportOptions::default()).await.unwrap().wall_weather.is_none());
+    assert!(
+        collect(&pool, &cipher, ExportOptions::default()).await.unwrap().wall_weather.is_none()
+    );
 
     source
         .app
@@ -197,8 +207,7 @@ async fn le_reglage_voyage_avec_la_sauvegarde() {
 
     let dir = tempfile::tempdir().unwrap();
     let target = db::open(&dir.path().join("dumbmonit.db")).await.unwrap();
-    let target_cipher =
-        db::init_cipher(&target, "secret-de-test-suffisamment-long").await.unwrap();
+    let target_cipher = db::init_cipher(&target, "secret-de-test-suffisamment-long").await.unwrap();
     restore(&target, &target_cipher, &lot, true).await.unwrap();
     let restored = dumbmonit_server::weather::load_settings(&target).await.unwrap();
     assert_eq!(restored.place.unwrap().name, "Lyon");

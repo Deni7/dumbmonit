@@ -79,7 +79,8 @@ impl Place {
             return Err("The place needs a name of at most 100 characters.");
         }
         let short = |v: &Option<String>| {
-            v.as_deref().is_none_or(|s| s.chars().count() <= 100 && !s.chars().any(char::is_control))
+            v.as_deref()
+                .is_none_or(|s| s.chars().count() <= 100 && !s.chars().any(char::is_control))
         };
         if !short(&self.region) || !short(&self.country) {
             return Err("The region and the country are at most 100 characters.");
@@ -194,7 +195,8 @@ impl WeatherHub {
     /// n'affiche alors rien. Une requête à la fois : le verrou est tenu pendant
     /// l'appel, pour que dix murs n'en déclenchent qu'un.
     pub async fn current(&self, place: &Place, unit: Unit) -> Option<Current> {
-        let key = ((place.latitude * 100.0).round() as i64, (place.longitude * 100.0).round() as i64);
+        let key =
+            ((place.latitude * 100.0).round() as i64, (place.longitude * 100.0).round() as i64);
         let mut cache = self.0.cache.lock().await;
         if let Some(entry) = cache.as_ref().filter(|e| e.key == key) {
             let ttl = if entry.reading.is_some() { CURRENT_TTL } else { RETRY_AFTER };

@@ -986,10 +986,7 @@ mod tests {
             .route("/api/server/statistics", get(|| async { STATISTICS }))
             .route("/api/jobs", get(|| async { JOBS }))
             .route("/api/server/config", get(|| async { CONFIG }))
-            .route(
-                "/api/admin/users",
-                get(|| async { (axum::http::StatusCode::FORBIDDEN, "{}") }),
-            )
+            .route("/api/admin/users", get(|| async { (axum::http::StatusCode::FORBIDDEN, "{}") }))
             .route("/api/sessions", get(|| async { SESSIONS }))
             .route("/api/users/me", get(|| async { USERS_ME }))
             .route("/api/search/metadata", post(|| async { SEARCH_METADATA }));
