@@ -114,8 +114,8 @@ table of devices (name, type, OS, last connection, last backup, status).
 - **session.read**: Devices and their last connection
 - **asset.read**: Last backup
 - **user.read**: The account that owns the key
-- **adminUser.read**: Administrator key only: the list of accounts
-- **adminSession.read**: Administrator key only: every account's phones and tablets
+- **adminUser.read**: Needs a key from an account with access to Administration: the list of accounts
+- **adminSession.read**: Needs a key from an account with access to Administration: every account's phones and tablets
 
 Vendor documentation: <https://immich.app/docs/api/>
 
@@ -128,7 +128,7 @@ A paused queue is easy to forget: new photos get no thumbnail, no metadata and n
 `session.read`, `asset.read` and `user.read` list every device of the account that owns the key (its phones and tablets; browsers and computers are ignored) with each one's last connection. Immich's API does not record which device uploaded a given photo, so "last backup" is the whole library's most recent upload, shown the same for every device: if only one device stops backing up while the others keep going, its connection will show as stale but the shared backup figure will still look fresh.
 
 !!! warning
-    Create the key from an administrator account: it then covers the phones and tablets of every user, and photo counts and job queues are read. With an ordinary account only its own devices are read. "Last backup" is the whole library's latest upload, the same for every device.
+    Create the key from an account with access to Administration: it then covers the phones and tablets of every user, and photo counts and job queues are read. With an ordinary account only its own devices are read. "Last backup" is the whole library's latest upload, the same for every device.
 
 What each permission opens: `server.about` the version (`/api/server/about`),
 `server.versionCheck` the latest release Immich knows of, `server.storage` the

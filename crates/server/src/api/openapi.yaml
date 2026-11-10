@@ -9533,7 +9533,7 @@ paths:
     put:
       operationId: setWallWeather
       tags: [Wall weather]
-      summary: Choose the place and the unit (`place: null` turns the weather off)
+      summary: "Choose the place and the unit (`place: null` turns the weather off)"
       x-token-scope: write
       requestBody:
         required: true
