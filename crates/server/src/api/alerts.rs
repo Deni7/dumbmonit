@@ -2090,7 +2090,7 @@ mod tests {
 
     #[test]
     fn la_planification_jusqu_au_retablissement_est_acceptee() {
-        let raw = json!({"kind": "recovery", "starts_at": "2026-03-01T10:00:00Z"});
+        let raw = serde_json::json!({"kind": "recovery", "starts_at": "2026-03-01T10:00:00Z"});
         assert!(matches!(accepte(parse_schedule(raw)), Schedule::Recovery { .. }));
     }
 
