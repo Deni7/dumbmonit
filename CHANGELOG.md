@@ -5,6 +5,14 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- **Outside weather on the wall.** An administrator can pick a city (searched by name) and a unit
+  (°C or °F) in Settings → Wall display → Wall weather; the wall then shows a small icon and the
+  outside temperature to the right of the date. The DumbMonit server asks Open-Meteo (free, no key)
+  and caches the answer for ten minutes; browsers never contact it. Off until a city is chosen, and
+  silent when the service does not answer. The setting is part of backups.
+
 ### Changed
 
 - **Public status pages: leaner, in the console's own look.** The page uses the console's tokens,
@@ -22,6 +30,10 @@ All notable changes to this project are documented here. The format follows
   integration shows a **Beta** badge instead of "(beta)" in its name, a line at the top explains it,
   and community packs get their own badge and a short explanation with a link to the docs. The
   catalogue (`GET /api/collectors`) gains a `beta` field.
+- **A leaner wall.** The health river, the mean time to resolve, the response time and the on-call
+  rota are gone from the wall (the home page keeps the river). The strip along the foot keeps three
+  figures: monitors up, availability and open alerts. The wall is always Night: the Day theme and
+  its button are removed, and a saved or linked `light`/`day` choice reads as Night.
 - **One typeface family everywhere: Inter and JetBrains Mono.** The console, the status pages, the
   topology exports and the documentation now use Inter (headings in semibold) and JetBrains Mono
   for code and figures, replacing Geist and Bricolage Grotesque. Both are open source (SIL OFL 1.1)
