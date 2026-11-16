@@ -5,6 +5,16 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- **Kubernetes installation.** A Helm chart (`deploy/helm/dumbmonit`, published as
+  `oci://ghcr.io/selfhostr/charts/dumbmonit` with each release) and equivalent plain manifests
+  (`deploy/kubernetes`). One replica (SQLite has a single writer), a volume for `/data`, a web
+  Service with an optional Ingress, and a separate Service for the mTLS agent channel that never
+  goes through a TLS-terminating proxy. Non-root, read-only root filesystem, HTTPS health probes,
+  optional NetworkPolicy and PodDisruptionBudget, external VictoriaMetrics. CI lints, renders and
+  validates it with kubeconform. See the new Kubernetes page in the installation guide.
+
 ### Changed
 
 - **One typeface family everywhere: Inter and JetBrains Mono.** The console, the status pages, the

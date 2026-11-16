@@ -1,0 +1,180 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "dumbmonit.fullname" . }}
+  labels:
+    {{- include "dumbmonit.labels" . | nindent 4 }}
+spec:
+  # One writer only: SQLite. Never raise this.
+  replicas: 1
+  serviceName: {{ include "dumbmonit.fullname" . }}
+  podManagementPolicy: OrderedReady
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      {{- include "dumbmonit.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "dumbmonit.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "dumbmonit.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+        {{- if .Values.pingSysctl }}
+        sysctls:
+          - name: net.ipv4.ping_group_range
+            value: "0 2147483647"
+        {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      containers:
+        - name: dumbmonit
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: https
+              containerPort: 8080
+              protocol: TCP
+            - name: agents
+              containerPort: 8443
+              protocol: TCP
+          env:
+            {{- if or .Values.secret.existingSecret .Values.secret.value }}
+            - name: DUMBMONIT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "dumbmonit.secretName" . }}
+                  key: {{ .Values.secret.existingSecretKey }}
+            {{- end }}
+            {{- with .Values.publicUrl }}
+            - name: DUMBMONIT_PUBLIC_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.agentPublicUrl }}
+            - name: DUMBMONIT_AGENT_PUBLIC_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.tlsNames }}
+            - name: DUMBMONIT_TLS_NAMES
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.trustedProxies }}
+            - name: DUMBMONIT_TRUSTED_PROXIES
+              value: {{ . | quote }}
+            {{- end }}
+            {{- if .Values.tls.existingSecret }}
+            - name: DUMBMONIT_TLS_CERT
+              value: /certs/tls.crt
+            - name: DUMBMONIT_TLS_KEY
+              value: /certs/tls.key
+            {{- end }}
+            {{- with .Values.victoriametrics.externalUrl }}
+            - name: DUMBMONIT_VM_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.victoriametrics.retention }}
+            - name: DUMBMONIT_VM_RETENTION
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.victoriametrics.memory }}
+            - name: DUMBMONIT_VM_MEMORY
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: https
+              scheme: HTTPS
+            {{- toYaml .Values.probes.startup | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: https
+              scheme: HTTPS
+            {{- toYaml .Values.probes.liveness | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: https
+              scheme: HTTPS
+            {{- toYaml .Values.probes.readiness | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+            {{- if .Values.tls.existingSecret }}
+            - name: tls
+              mountPath: /certs
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- if .Values.tls.existingSecret }}
+        - name: tls
+          secret:
+            secretName: {{ .Values.tls.existingSecret }}
+        {{- end }}
+        {{- if .Values.persistence.existingClaim }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if not .Values.persistence.existingClaim }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        {{- with .Values.persistence.annotations }}
+        annotations:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      spec:
+        accessModes:
+          {{- toYaml .Values.persistence.accessModes | nindent 10 }}
+        {{- with .Values.persistence.storageClassName }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size }}
+  {{- end }}
