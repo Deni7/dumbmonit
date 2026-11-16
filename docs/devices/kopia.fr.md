@@ -27,6 +27,19 @@ l'authentification HTTP Basic (nom d'utilisateur et mot de passe du serveur) :
   son état, sa planification et son dernier instantané (heures de début et de
   fin, taille, fichiers, erreurs). Lue seulement si le dépôt est connecté.
 
+Un serveur lancé normalement exige aussi un jeton CSRF sur ces routes, et
+répond `401 Invalid or missing CSRF token.` sans lui, même avec le bon mot de
+passe. DumbMonit fait comme l'interface web : il ouvre `/` une fois, garde le
+cookie de session (`Kopia-Session-Cookie`) et le jeton trouvé dans la page
+(`<meta name="kopia-csrf-token">`), et les renvoie avec l'en-tête
+`X-Kopia-Csrf-Token`. La session est gardée d'une sonde à l'autre et rouverte
+quand le serveur redémarre. Un serveur lancé avec
+`--disable-csrf-token-checks` est lu sans elle. Les deux refus restent
+distincts : un mauvais mot de passe donne « refused the user name or
+password », un serveur dont l'interface web est désactivée (`/` ne donne alors
+aucun jeton) donne « requires a CSRF token » et cite
+`--disable-csrf-token-checks`.
+
 L'historique des instantanés de chaque source (`/api/v1/snapshots`) n'est pas
 lu : le dernier instantané vient déjà avec la source, et c'est tout ce dont
 les alertes ont besoin. Les sources à l'état `REMOTE` appartiennent à d'autres

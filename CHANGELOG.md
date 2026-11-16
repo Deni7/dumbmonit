@@ -12,6 +12,23 @@ All notable changes to this project are documented here. The format follows
   for code and figures, replacing Geist and Bricolage Grotesque. Both are open source (SIL OFL 1.1)
   and served from DumbMonit itself; the documentation no longer loads anything from Google Fonts.
 
+### Fixed
+
+- **authentik 2025.10 and later: workers and tasks are measured again.** authentik moved them to
+  `/api/v3/tasks/workers/` and `/api/v3/tasks/schedules/`; DumbMonit reads those first and falls
+  back to the old `/api/v3/admin/` routes on older versions, so the "no worker" and "task failed"
+  rules work again. A route missing on both sides, or a web page instead of JSON, now counts as a
+  scrape error instead of passing in silence.
+- **Kopia: a normally started server is read.** DumbMonit now fetches the CSRF token the Kopia
+  server requires (session cookie and `X-Kopia-Csrf-Token`), instead of reporting refused
+  credentials. A wrong password and a missing CSRF token now give two different messages.
+- **Keycloak 26.8.2 and later: the service account is accepted by the admin API.** The setup notice
+  adds the `kc-admin-api` client scope Keycloak now requires, and the error names it when it is
+  missing. `keycloak_admin_readable` is 0 when the admin API refuses the token, a realm whose
+  clients the account cannot see (no `view-clients`) gets no session count and an error instead of
+  a false zero, and the notice lists the per-realm roles and the optional `manage-realm` that the
+  version, uptime and memory need.
+
 ## 0.17.1 — 2026-11-04
 
 ### Changed

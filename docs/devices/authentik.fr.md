@@ -27,14 +27,25 @@ Toutes les métriques sont préfixées `dumbmonit_authentik_`.
 | `version_info` | valeur 1 | `version` |
 | `update_available` | 1 quand une version plus récente existe (absent quand authentik ne peut pas lire la dernière version) | `latest_version` |
 | `workers`, `workers_version_mismatch` | workers qui répondent, et ceux d'une autre version que le serveur |  |
-| `tasks_failed`, `tasks_warning` | tâches système dont la dernière exécution a échoué / s'est terminée avec un avertissement |  |
-| `task_failed` | valeur 1 par tâche en échec, 32 au plus | `task` |
+| `tasks_failed`, `tasks_warning` | tâches planifiées dont la dernière exécution a échoué / s'est terminée avec un avertissement (les planifications en pause sont ignorées) |  |
+| `task_failed` | valeur 1 par tâche en échec, 32 au plus | `task` (`authentik.sources.ldap.tasks.ldap_sync:ldap-corp`) |
 | `outposts_total`, `outposts_disconnected` | avant-postes qui servent au moins un fournisseur, et ceux dont aucune instance n'a été vue en cinq minutes |  |
 | `outpost_instances` | instances vues dans les cinq dernières minutes (10 avant-postes au plus) | `outpost` |
 | `users` | comptes utilisateurs |  |
 | `scrape_errors` | appels qui ont échoué à la dernière sonde |  |
 
 Les [règles intégrées](../alerting/rules.md#self-hosted-applications) qui s'appliquent : authentik not ready, authentik has no worker, authentik task failed, authentik outpost disconnected, authentik update available, plus Appareil inaccessible.
+
+### Workers et tâches selon la version
+
+authentik 2025.10 a déplacé son travail de fond vers de nouvelles routes d'API. DumbMonit lit d'abord les nouvelles, et revient aux anciennes quand authentik répond 404 :
+
+| | authentik 2025.10 et suivants | Versions antérieures |
+|---|---|---|
+| Workers | `/api/v3/tasks/workers/` (`version_matching`) | `/api/v3/admin/workers/` (`version_matches`) |
+| Tâches | `/api/v3/tasks/schedules/` : l'état de la dernière exécution de chaque planification | `/api/v3/admin/system_tasks/` |
+
+Quand aucune des deux routes n'existe, ou qu'une page web revient à la place du JSON (un proxy inverse qui répond pour authentik, par exemple), les métriques des workers ou des tâches manquent et `scrape_errors` compte l'appel, avec la raison dans le journal du serveur : les règles « no worker » et « task failed » ne se taisent jamais sans signe.
 
 ## Créer un jeton d'API dans authentik
 
@@ -51,7 +62,7 @@ Les [règles intégrées](../alerting/rules.md#self-hosted-applications) qui s'a
 4. Dans DumbMonit, saisissez l'adresse d'authentik et collez la clé.
 
 !!! warning
-    authentik n'a pas de rôle en lecture seule pour ses pages système : l'utilisateur du jeton doit pouvoir entrer dans l'interface, gardez donc la clé uniquement dans DumbMonit. Les pages que le jeton ne peut pas lire sont sautées, sans échec.
+    authentik n'a pas de rôle en lecture seule pour ses pages système : l'utilisateur du jeton doit pouvoir entrer dans l'interface, gardez donc la clé uniquement dans DumbMonit. Les pages que le jeton ne peut pas lire sont sautées ; une page que cette version d'authentik n'a pas compte comme une erreur de collecte.
 
 ## Identifiants
 

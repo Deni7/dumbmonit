@@ -11,6 +11,23 @@
 //!   statistiques `stats`). Lue seulement si le dépôt est connecté : Kopia
 //!   répond par une erreur sinon.
 //!
+//! # Le jeton CSRF
+//!
+//! Un serveur lancé normalement refuse ces deux lectures en 401 « Invalid or
+//! missing CSRF token. », même avec les bons identifiants : l'API de
+//! l'interface web attend l'en-tête `X-Kopia-Csrf-Token` et le cookie de
+//! session `Kopia-Session-Cookie` dont ce jeton est la signature HMAC
+//! (`internal/server/server_authz_checks.go`). Le collecteur fait comme un
+//! navigateur : `GET /` pose le cookie et contient le jeton
+//! (`<meta name="kopia-csrf-token" content="…" />`). La session est gardée
+//! par cible et rouverte quand Kopia la refuse (redémarrage du serveur, qui
+//! change la clé de signature). Un serveur lancé avec
+//! `--disable-csrf-token-checks` répond dès le premier appel, sans session.
+//!
+//! Kopia vérifie le mot de passe avant le jeton : un mauvais mot de passe
+//! répond « Access denied. », jamais l'erreur CSRF, et les deux messages
+//! restent distincts.
+//!
 //! `GET /api/v1/snapshots?…` (tous les instantanés d'une source) n'est pas lu :
 //! le dernier instantané de chaque source figure déjà dans `/api/v1/sources`, et
 //! interroger l'historique de chaque source multiplierait les appels sans rien
@@ -37,23 +54,178 @@
 //! | `insecure_tls` | `false` | Accepte le certificat auto-signé de `--tls-generate-cert`. |
 //! | `request_timeout_seconds` | `15` | Délai par requête HTTP. |
 
+use std::time::Duration;
+
 use async_trait::async_trait;
 use base64::Engine;
 use dumbmonit_proto::{Collector, Credential, ProbeError, Sample, Target};
+use reqwest::StatusCode;
 use serde_json::Value;
 
-use crate::rest::{MAX_NAMED, RestClient, age_seconds, flag, gauge, now_ms, number, text};
+use crate::rest::{
+    MAX_NAMED, RestClient, TokenCache, age_seconds, flag, gauge, now_ms, number, text,
+};
 
 pub const DEFAULT_PORT: u16 = 51515;
 const REPO_STATUS: &str = "/api/v1/repo/status";
 const SOURCES: &str = "/api/v1/sources";
 
+/// L'en-tête du jeton CSRF (`apiclient.CSRFTokenHeader` de Kopia).
+pub const CSRF_HEADER: &str = "X-Kopia-Csrf-Token";
+/// Le cookie de la session de l'interface web, que le jeton signe.
+pub const SESSION_COOKIE: &str = "Kopia-Session-Cookie";
+/// Une session vaut jusqu'au redémarrage du serveur : gardée une heure, et
+/// rouverte plus tôt si Kopia la refuse.
+const SESSION_LIFETIME: Duration = Duration::from_secs(3600);
+
+const NO_CSRF_TOKEN: &str = "Kopia requires a CSRF token on its API and hands it out only with \
+                             its web interface, but / gave none. Start the server with \
+                             --disable-csrf-token-checks, or keep its web interface on.";
+const CSRF_STILL_REFUSED: &str = "Kopia refused the CSRF token of a session it had just \
+                                  opened. Start the server with --disable-csrf-token-checks.";
+
+/// Une session de l'interface web : le cookie qui l'identifie et le jeton CSRF
+/// que le serveur en a tiré.
+pub struct Session {
+    pub cookie: String,
+    pub token: String,
+}
+
+impl Session {
+    fn headers(&self) -> Vec<(&'static str, String)> {
+        vec![
+            ("Cookie", format!("{SESSION_COOKIE}={}", self.cookie)),
+            (CSRF_HEADER, self.token.clone()),
+        ]
+    }
+
+    fn encode(&self) -> String {
+        format!("{}\n{}", self.cookie, self.token)
+    }
+
+    fn decode(raw: &str) -> Option<Self> {
+        let (cookie, token) = raw.split_once('\n')?;
+        Some(Self { cookie: cookie.to_string(), token: token.to_string() })
+    }
+}
+
+/// Le jeton CSRF que Kopia glisse dans sa page d'accueil :
+/// `<meta name="kopia-csrf-token" content="…" />`.
+pub fn csrf_token(html: &str) -> Option<&str> {
+    let meta = &html[html.find(r#"name="kopia-csrf-token""#)?..];
+    let content = &meta[meta.find(r#"content=""#)? + r#"content=""#.len()..];
+    Some(&content[..content.find('"')?]).filter(|token| !token.is_empty())
+}
+
+/// La valeur du cookie de session posé par la page d'accueil.
+pub fn session_cookie(headers: &reqwest::header::HeaderMap) -> Option<String> {
+    headers
+        .get_all(reqwest::header::SET_COOKIE)
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .filter_map(|value| value.split(';').next())
+        .filter_map(|pair| pair.trim().strip_prefix(SESSION_COOKIE)?.strip_prefix('='))
+        .find(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+/// Un refus faute de jeton CSRF valable : 401 « Invalid or missing CSRF token. ».
+pub fn csrf_refused(status: StatusCode, body: &str) -> bool {
+    status == StatusCode::UNAUTHORIZED && body.contains("CSRF token")
+}
+
+/// Un vrai refus d'identifiants (« Access denied. », « Missing credentials. »).
+fn credentials_refused(path: &str) -> ProbeError {
+    ProbeError::Auth(format!(
+        "Kopia refused the user name or password on {path} (401): enter the server user \
+         (--server-username) and its password (--server-password)."
+    ))
+}
+
+/// Un `GET` de l'API, avec la session s'il y en a une. `Ok(None)` : Kopia
+/// exige un jeton CSRF que la session n'a pas, ou plus.
+async fn api_get(
+    client: &RestClient,
+    session: Option<&Session>,
+    path: &str,
+) -> Result<Option<Value>, ProbeError> {
+    let extra = session.map(Session::headers).unwrap_or_default();
+    let (status, body) = client.get_with(path, &extra).await?;
+    if csrf_refused(status, &body) {
+        return Ok(None);
+    }
+    if status == StatusCode::UNAUTHORIZED {
+        return Err(credentials_refused(path));
+    }
+    if !status.is_success() {
+        return Err(client.status_error(status, &body, path));
+    }
+    client.decode(&body, path).map(Some)
+}
+
+/// Les deux lectures. `Ok(None)` : refusées faute de jeton CSRF.
+async fn read_with(
+    client: &RestClient,
+    session: Option<&Session>,
+) -> Result<Option<Replies>, ProbeError> {
+    let Some(status) = api_get(client, session, REPO_STATUS).await? else { return Ok(None) };
+    let connected = status.get("connected").and_then(Value::as_bool).unwrap_or(false);
+    let sources = if connected {
+        let Some(sources) = api_get(client, session, SOURCES).await? else { return Ok(None) };
+        Some(sources)
+    } else {
+        None
+    };
+    Ok(Some(Replies { status, sources }))
+}
+
+/// Ouvre une session comme un navigateur : la page d'accueil pose le cookie de
+/// session et contient le jeton CSRF qui en dérive.
+async fn open_session(client: &RestClient) -> Result<Session, ProbeError> {
+    let (status, headers, body) = client.get_with_headers("/").await?;
+    if status == StatusCode::UNAUTHORIZED {
+        return Err(credentials_refused("/"));
+    }
+    if status == StatusCode::FORBIDDEN {
+        return Err(ProbeError::Auth(
+            "Kopia keeps its web interface, and so the CSRF token its API requires, from this \
+             user (403): enter the server user (--server-username)."
+                .to_string(),
+        ));
+    }
+    let token = csrf_token(&body).filter(|_| status.is_success());
+    match (token, session_cookie(&headers)) {
+        (Some(token), Some(cookie)) => Ok(Session { cookie, token: token.to_string() }),
+        _ => Err(ProbeError::Config(NO_CSRF_TOKEN.to_string())),
+    }
+}
+
 #[derive(Default)]
-pub struct KopiaCollector;
+pub struct KopiaCollector {
+    /// Sessions CSRF ouvertes, par cible (`cookie` et jeton, voir [`Session`]).
+    sessions: TokenCache,
+}
 
 impl KopiaCollector {
     pub fn new() -> Self {
-        Self
+        Self::default()
+    }
+
+    /// Les deux lectures, en ouvrant une session CSRF si Kopia l'exige.
+    async fn read(&self, target: &Target) -> Result<Replies, ProbeError> {
+        let client = self.client(target)?;
+        let key = format!("{}|{}", target.id, client.base_url());
+        let cached = self.sessions.get(&key).and_then(|raw| Session::decode(&raw));
+        if let Some(replies) = read_with(&client, cached.as_ref()).await? {
+            return Ok(replies);
+        }
+        self.sessions.forget(&key);
+        let session = open_session(&client).await?;
+        let replies = read_with(&client, Some(&session))
+            .await?
+            .ok_or_else(|| ProbeError::Config(CSRF_STILL_REFUSED.to_string()))?;
+        self.sessions.put(&key, &session.encode(), SESSION_LIFETIME);
+        Ok(replies)
     }
 
     fn client(&self, target: &Target) -> Result<RestClient, ProbeError> {
@@ -80,16 +252,11 @@ impl Collector for KopiaCollector {
     }
 
     async fn probe(&self, target: &Target) -> Result<Vec<Sample>, ProbeError> {
-        let client = self.client(target)?;
-        let status: Value = client.get_json(REPO_STATUS).await?;
-        let connected = status.get("connected").and_then(Value::as_bool).unwrap_or(false);
-        let sources = if connected { Some(client.get_json::<Value>(SOURCES).await?) } else { None };
-        Ok(samples(&Replies { status, sources }, now_ms()))
+        Ok(samples(&self.read(target).await?, now_ms()))
     }
 
     async fn discover(&self, target: &Target) -> Result<Option<String>, ProbeError> {
-        let client = self.client(target)?;
-        let _: Value = client.get_json(REPO_STATUS).await?;
+        self.read(target).await?;
         Ok(Some("kopia".to_string()))
     }
 }
@@ -223,13 +390,31 @@ pub fn samples(r: &Replies, ts_ms: i64) -> Vec<Sample> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
     use axum::Router;
-    use axum::http::{HeaderMap, StatusCode, Uri};
+    use axum::http::{HeaderMap, StatusCode, Uri, header};
+    use axum::response::IntoResponse;
     use axum::routing::get;
 
     use super::*;
     use crate::rest::test_support::{find, serve, value};
     use crate::uptime::tags::test_support::cible;
+
+    // Le jeton CSRF d'un serveur Kopia 0.23.1 lancé sans
+    // `--disable-csrf-token-checks`. `index.html` : la page d'accueil telle que
+    // le serveur la sert, l'`index.html` de kopia/htmlui où
+    // `Server.patchIndexBytes` (`internal/server/server.go`) a ajouté la
+    // version au titre et la balise `kopia-csrf-token` avant `</head>`.
+    // `csrf_refused.txt` et `access_denied.txt` : les corps des deux 401 relevés
+    // sur ce serveur (`requireAuth`, puis `isAuthenticated` pour un mauvais mot
+    // de passe).
+    const INDEX: &str = include_str!("testdata/index.html");
+    const CSRF_REFUSED: &str = include_str!("testdata/csrf_refused.txt");
+    const ACCESS_DENIED: &str = include_str!("testdata/access_denied.txt");
+    const TOKEN: &str = "0b6f9eece14bfe70e83bc5fd9fa4f5588fa78c52d58ad3eab6397f8e76e69a27";
+    const SESSION_ID: &str = "c8a1d5e2-3f4b-4c6d-9e7f-0a1b2c3d4e5f";
 
     // Réponses construites d'après les structures de l'API du serveur Kopia
     // (`serverapi.StatusResponse`, `serverapi.SourceStatus`, `snapshot.Manifest`) :
@@ -342,5 +527,113 @@ mod tests {
         let target = cible("kopia", "http://127.0.0.1:1", &[]);
         let error = collector.probe(&target).await.unwrap_err();
         assert!(error.means_down(), "{error}");
+    }
+
+    #[test]
+    fn le_jeton_csrf_et_le_cookie_se_lisent_comme_kopia_les_pose() {
+        assert_eq!(csrf_token(INDEX), Some(TOKEN));
+        assert_eq!(csrf_token("<html><head></head></html>"), None);
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.append(
+            reqwest::header::SET_COOKIE,
+            "Kopia-Auth=eyJhbGciOiJIUzI1NiJ9.e30.c2ln; Path=/; HttpOnly; SameSite=Strict"
+                .parse()
+                .unwrap(),
+        );
+        headers.append(
+            reqwest::header::SET_COOKIE,
+            format!("{SESSION_COOKIE}={SESSION_ID}; Path=/; HttpOnly; SameSite=Strict")
+                .parse()
+                .unwrap(),
+        );
+        assert_eq!(session_cookie(&headers).as_deref(), Some(SESSION_ID));
+        assert!(csrf_refused(reqwest::StatusCode::UNAUTHORIZED, CSRF_REFUSED));
+        assert!(!csrf_refused(reqwest::StatusCode::UNAUTHORIZED, ACCESS_DENIED));
+        let session = Session { cookie: SESSION_ID.into(), token: TOKEN.into() };
+        let back = Session::decode(&session.encode()).unwrap();
+        assert_eq!((back.cookie.as_str(), back.token.as_str()), (SESSION_ID, TOKEN));
+    }
+
+    /// Un serveur Kopia lancé normalement : les identifiants d'abord
+    /// (« Access denied. »), puis sur l'API le cookie de session et le jeton
+    /// CSRF qui en dérive (« Invalid or missing CSRF token. »). `/` pose le
+    /// cookie et sert la page qui porte le jeton, sauf sans interface (`ui`).
+    fn kopia_with_csrf(ui: bool, pages: Arc<AtomicUsize>) -> Router {
+        let expected =
+            format!("Basic {}", base64::engine::general_purpose::STANDARD.encode(b"kopia:s3cret"));
+        Router::new().fallback(get(move |headers: HeaderMap, uri: Uri| {
+            let expected = expected.clone();
+            let pages = pages.clone();
+            async move {
+                let basic = headers.get("authorization").and_then(|v| v.to_str().ok());
+                if basic != Some(expected.as_str()) {
+                    return (StatusCode::UNAUTHORIZED, ACCESS_DENIED).into_response();
+                }
+                if uri.path() == "/" {
+                    if !ui {
+                        return (StatusCode::NOT_FOUND, "404 page not found\n").into_response();
+                    }
+                    pages.fetch_add(1, Ordering::SeqCst);
+                    let mut response = INDEX.into_response();
+                    let cookies = [
+                        "Kopia-Auth=eyJhbGciOiJIUzI1NiJ9.e30.c2ln; Path=/; HttpOnly".to_string(),
+                        format!("{SESSION_COOKIE}={SESSION_ID}; Path=/; HttpOnly; SameSite=Strict"),
+                    ];
+                    for cookie in cookies {
+                        response.headers_mut().append(header::SET_COOKIE, cookie.parse().unwrap());
+                    }
+                    return response;
+                }
+                let cookie = headers.get(header::COOKIE).and_then(|v| v.to_str().ok());
+                let token = headers.get(CSRF_HEADER).and_then(|v| v.to_str().ok());
+                let session = format!("{SESSION_COOKIE}={SESSION_ID}");
+                if cookie != Some(session.as_str()) || token != Some(TOKEN) {
+                    return (StatusCode::UNAUTHORIZED, CSRF_REFUSED).into_response();
+                }
+                match uri.path() {
+                    REPO_STATUS => (StatusCode::OK, STATUS).into_response(),
+                    SOURCES => (StatusCode::OK, SOURCES_JSON).into_response(),
+                    _ => StatusCode::NOT_FOUND.into_response(),
+                }
+            }
+        }))
+    }
+
+    #[tokio::test]
+    async fn le_jeton_csrf_est_demande_une_fois_puis_garde() {
+        let pages = Arc::new(AtomicUsize::new(0));
+        let address = serve(kopia_with_csrf(true, pages.clone())).await;
+        let collector = KopiaCollector::new();
+        let mut target = cible("kopia", &format!("http://{address}"), &[]);
+        target.credential =
+            Credential::UsernamePassword { username: "kopia".into(), password: "s3cret".into() };
+        let s = collector.probe(&target).await.unwrap();
+        assert_eq!(value(&s, "kopia_repo_connected", &[]), 1.0);
+        assert_eq!(value(&s, "kopia_sources", &[]), 4.0);
+        let s = collector.probe(&target).await.unwrap();
+        assert_eq!(value(&s, "kopia_sources", &[]), 4.0);
+        assert_eq!(pages.load(Ordering::SeqCst), 1, "the session is kept between probes");
+
+        // Un mauvais mot de passe reste un mauvais mot de passe, pas une
+        // affaire de jeton CSRF.
+        target.credential =
+            Credential::UsernamePassword { username: "kopia".into(), password: "wrong".into() };
+        let error = KopiaCollector::new().probe(&target).await.unwrap_err();
+        let ProbeError::Auth(message) = &error else { panic!("{error}") };
+        assert!(message.contains("password") && !message.contains("CSRF"), "{message}");
+    }
+
+    #[tokio::test]
+    async fn sans_interface_web_le_message_nomme_l_option_de_kopia() {
+        let address = serve(kopia_with_csrf(false, Arc::default())).await;
+        let mut target = cible("kopia", &format!("http://{address}"), &[]);
+        target.credential =
+            Credential::UsernamePassword { username: "kopia".into(), password: "s3cret".into() };
+        let error = KopiaCollector::new().probe(&target).await.unwrap_err();
+        assert!(
+            matches!(error, ProbeError::Config(ref m) if m.contains("--disable-csrf-token-checks")),
+            "{error}"
+        );
+        assert!(!error.means_down());
     }
 }
