@@ -204,8 +204,8 @@ baixo.
   próprias métricas); um agente pode, em vez disso, *ligar-se* através do gateway de um
   retransmissor (ver acima). Um retransmissor liga-se sempre diretamente: não há retransmissor
   atrás de um retransmissor.
-- O gateway de um retransmissor aceita por predefinição 64 ligações em simultâneo e 4 MiB/s por
-  túnel e sentido (`gateway_max_connections`, `gateway_rate_kib`); o servidor aceita 256 túneis
+- O gateway de um retransmissor aceita por predefinição 256 ligações em simultâneo e 4 MiB/s por
+  túnel e sentido (`gateway_max_connections`, `gateway_rate_kib`); o servidor aceita 1024 túneis
   por retransmissor.
 - O retransmissor executa no máximo 8 sondas de cada vez; uma sonda é limitada
   pelo tempo limite de sonda do servidor (`DUMBMONIT_PROBE_TIMEOUT_SECS`),

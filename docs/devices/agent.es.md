@@ -622,7 +622,7 @@ usable en un contenedor sin montar un archivo:
 | `DUMBMONIT_AGENT_RELAY` | `true` para ejecutar, por el servidor, las sondas de los monitores asignados a este agente (consulta [Ejecutar el agente en Docker / en otra red](#run-the-agent-in-docker--on-another-network)) |
 | `DUMBMONIT_AGENT_SITE` | Etiqueta de sitio mostrada junto al agente cuando se ofrece como relay |
 | `DUMBMONIT_AGENT_GATEWAY_LISTEN` | Pasarela de un relé para los agentes de su sitio, por ejemplo `0.0.0.0:8443` (`gateway_listen:`); prevalece sobre el puerto fijado en la interfaz (consulta [Instalar agentes detrás del relé](../install/remote-site.md#5-install-agents-behind-the-relay)) |
-| `DUMBMONIT_AGENT_GATEWAY_MAX_CONNECTIONS` | Conexiones que la pasarela mantiene a la vez, 64 por defecto (`gateway_max_connections:`) |
+| `DUMBMONIT_AGENT_GATEWAY_MAX_CONNECTIONS` | Conexiones que la pasarela mantiene a la vez, 256 por defecto (`gateway_max_connections:`) |
 | `DUMBMONIT_AGENT_GATEWAY_RATE_KIB` | Caudal de cada túnel a través de la pasarela, por sentido, en KiB/s, 4096 por defecto (`gateway_rate_kib:`) |
 
 ## Contadores de rendimiento de Windows {#windows-performance-counters}

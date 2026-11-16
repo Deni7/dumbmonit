@@ -1269,7 +1269,7 @@ fn gateway_config(
     max_connections: Option<usize>,
     rate_kib: Option<u32>,
 ) -> Result<crate::gateway::GatewayConfig> {
-    use crate::gateway::{DEFAULT_MAX_CONNECTIONS, DEFAULT_RATE_KIB, GatewayConfig};
+    use crate::gateway::{DEFAULT_MAX_CONNECTIONS, DEFAULT_RATE_KIB, GatewayConfig, MAX_CONNECTIONS};
 
     let listen = match env
         .get("DUMBMONIT_AGENT_GATEWAY_LISTEN")
@@ -1297,6 +1297,9 @@ fn gateway_config(
     };
     if max_connections == 0 {
         bail!("gateway_max_connections must be at least 1");
+    }
+    if max_connections > MAX_CONNECTIONS {
+        bail!("gateway_max_connections must be at most {MAX_CONNECTIONS}");
     }
     if rate_kib == 0 {
         bail!("gateway_rate_kib must be at least 1");
@@ -1491,6 +1494,12 @@ mod tests {
         assert!(Config::merge(bad, env(&[])).is_err(), "une adresse sans port est refusée");
         let zero = env(&[("DUMBMONIT_AGENT_GATEWAY_MAX_CONNECTIONS", "0")]);
         assert!(Config::merge(file_with_url_and_token(), zero).is_err());
+        // Au-delà, la connexion multiplexée vers le serveur pourrait déborder.
+        let most = env(&[("DUMBMONIT_AGENT_GATEWAY_MAX_CONNECTIONS", "2048")]);
+        let config = Config::merge(file_with_url_and_token(), most).expect("configuration");
+        assert_eq!(config.gateway.max_connections, 2048);
+        let beyond = env(&[("DUMBMONIT_AGENT_GATEWAY_MAX_CONNECTIONS", "2049")]);
+        assert!(Config::merge(file_with_url_and_token(), beyond).is_err());
     }
 
     #[test]

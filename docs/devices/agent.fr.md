@@ -860,7 +860,7 @@ utilisable dans un conteneur sans monter un fichier :
 | `DUMBMONIT_AGENT_RELAY` | `true` pour faire tourner, pour le serveur, les sondes des surveillances assignées à cet agent (voir [Faire tourner l'agent dans Docker / sur un autre réseau](#run-the-agent-in-docker--on-another-network)) |
 | `DUMBMONIT_AGENT_SITE` | Libellé de site montré à côté de l'agent quand il est proposé comme relais |
 | `DUMBMONIT_AGENT_GATEWAY_LISTEN` | Passerelle d'un relais pour les agents de son site, par exemple `0.0.0.0:8443` (`gateway_listen:`) ; prime sur le port réglé dans l'interface (voir [Installer des agents derrière le relais](../install/remote-site.fr.md#5-installer-des-agents-derriere-le-relais)) |
-| `DUMBMONIT_AGENT_GATEWAY_MAX_CONNECTIONS` | Connexions tenues à la fois par la passerelle, 64 par défaut (`gateway_max_connections:`) |
+| `DUMBMONIT_AGENT_GATEWAY_MAX_CONNECTIONS` | Connexions tenues à la fois par la passerelle, 256 par défaut, 2048 au plus (`gateway_max_connections:`) |
 | `DUMBMONIT_AGENT_GATEWAY_RATE_KIB` | Débit de chaque tunnel de la passerelle, par sens, en Kio/s, 4096 par défaut (`gateway_rate_kib:`) |
 
 ## Compteurs de performance Windows {#windows-performance-counters}

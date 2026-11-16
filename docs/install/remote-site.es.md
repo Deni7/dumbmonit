@@ -206,8 +206,8 @@ conserva su rol y gana cuando ambos están caídos.
 - Los monitores de agente nunca se sondean a través de un relé (envían sus propias métricas);
   un agente puede en cambio *conectarse* a través de la pasarela de un relé (ver arriba). Un relé
   siempre se conecta directamente: no hay relé detrás de un relé.
-- La pasarela de un relé acepta por defecto 64 conexiones a la vez y 4 MiB/s por túnel y sentido
-  (`gateway_max_connections`, `gateway_rate_kib`); el servidor acepta 256 túneles por relé.
+- La pasarela de un relé acepta por defecto 256 conexiones a la vez y 4 MiB/s por túnel y sentido
+  (`gateway_max_connections`, `gateway_rate_kib`); el servidor acepta 1024 túneles por relé.
 - El relay ejecuta como máximo 8 sondas a la vez; una sonda está acotada
   por el tiempo de espera de sonda del servidor
   (`DUMBMONIT_PROBE_TIMEOUT_SECS`), limitado a 120 s en el agente.

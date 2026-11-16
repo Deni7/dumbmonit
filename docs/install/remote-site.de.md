@@ -203,8 +203,8 @@ behält seine Rolle und hat Vorrang, wenn beide ausgefallen sind.
 - Agent-Monitore werden nie über ein Relay geprüft (sie senden ihre eigenen Metriken); ein
   Agent kann sich stattdessen über das Gateway eines Relays *verbinden* (siehe oben). Ein Relay
   verbindet sich immer direkt: Es gibt kein Relay hinter einem Relay.
-- Das Gateway eines Relays nimmt standardmäßig 64 Verbindungen gleichzeitig und 4 MiB/s pro
-  Tunnel und Richtung an (`gateway_max_connections`, `gateway_rate_kib`); der Server nimmt 256
+- Das Gateway eines Relays nimmt standardmäßig 256 Verbindungen gleichzeitig und 4 MiB/s pro
+  Tunnel und Richtung an (`gateway_max_connections`, `gateway_rate_kib`); der Server nimmt 1024
   Tunnel pro Relay an.
 - Das Relay führt höchstens 8 Prüfungen gleichzeitig aus; eine Prüfung wird durch das
   Prüf-Timeout des Servers (`DUMBMONIT_PROBE_TIMEOUT_SECS`) begrenzt, auf dem Agenten auf

@@ -47,6 +47,17 @@ All notable changes to this project are documented here. The format follows
   8443 stay open and remain the default: agents older than this release do not announce the
   protocol and keep using 8443, and new agents talking to an older server fall back to HTTP/1.1.
   The configuration reference and the network ports page have the Compose lines.
+- **Multiplexed relays and HTTP/2 agents.** A relay now carries all the tunnels of its site in one
+  outbound connection to the server (`Upgrade: dumbmonit-mux/1`, one yamux stream per agent
+  connection) instead of one TCP + TLS connection each; every stream still holds the site agent's
+  own TLS session, end to end. On the encrypted channel, agents negotiate HTTP/2, so batches, the
+  command long poll and the relay long poll share a single connection (about a third of the
+  sockets per agent). Limits are now settings: `DUMBMONIT_RELAY_MAX_TUNNELS` on the server (1024 by
+  default, was a fixed 256, up to 4096) and `gateway_max_connections` on the relay (256 by default,
+  was 64, up to 2048). Mixed versions keep working: an older server answers `426` and the relay
+  falls back to one tunnel per connection (retried hourly); an older relay keeps opening tunnels,
+  which the server still serves; the server offers HTTP/2 only to clients that announce the agent
+  protocol, so installers and older agents still get HTTP/1.1.
 
 ### Changed
 

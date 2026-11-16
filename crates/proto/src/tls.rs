@@ -83,6 +83,23 @@ pub const RELAY_TUNNEL_PATH: &str = "/api/agent/relay/tunnel";
 /// Protocole de la mise à niveau HTTP d'un tunnel de relais.
 pub const RELAY_TUNNEL_PROTOCOL: &str = "dumbmonit-tunnel/1";
 
+/// Protocole de la mise à niveau HTTP qui ouvre la connexion multiplexée d'un
+/// relais.
+///
+/// Même route que [`RELAY_TUNNEL_PATH`], autre `Upgrade:` : au lieu d'un
+/// tunnel par connexion d'agent du site, le relais garde une seule connexion
+/// vers le serveur et y ouvre un flux [yamux] par connexion. Chaque flux est
+/// ensuite traité exactement comme un tunnel : poignée de main TLS de l'agent
+/// du site, de bout en bout, et le relais ne voit que du chiffré.
+///
+/// Négociation : un serveur antérieur répond `426` à ce protocole ; le relais
+/// revient alors aux tunnels [`RELAY_TUNNEL_PROTOCOL`] et réessaie plus tard.
+/// Un relais antérieur ne demande que des tunnels, que le serveur sert
+/// toujours.
+///
+/// [yamux]: https://github.com/hashicorp/yamux/blob/master/spec.md
+pub const RELAY_MUX_PROTOCOL: &str = "dumbmonit-mux/1";
+
 /// Port d'écoute par défaut de la passerelle d'un relais (côté site).
 pub const DEFAULT_RELAY_GATEWAY_PORT: u16 = 8443;
 

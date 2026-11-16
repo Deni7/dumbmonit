@@ -26,9 +26,10 @@
 //!
 //! **Aiguillage par ALPN** : un agent à jour propose
 //! [`dumbmonit_proto::AGENT_ALPN`] dans son ClientHello. Il reçoit alors une
-//! configuration qui accepte cette marque. Tout autre client (`curl`,
-//! PowerShell, agent antérieur) voit ce port exactement comme avant :
-//! `http/1.1` seul. Le port unique (`DUMBMONIT_SINGLE_PORT`,
+//! configuration qui offre `h2` (le long-poll des commandes, celui du relais
+//! et les lots partagent une seule connexion), sinon `http/1.1`. Tout autre
+//! client (`curl`, PowerShell, agent antérieur) voit ce port exactement comme
+//! avant : `http/1.1` seul. Le port unique (`DUMBMONIT_SINGLE_PORT`,
 //! [`crate::single_port`]) s'appuie sur la même marque pour séparer les agents
 //! de l'interface.
 //!
@@ -45,6 +46,7 @@ mod routes;
 mod tunnel;
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
 use anyhow::{Context, Result};
@@ -76,9 +78,11 @@ pub const SETTING_LEGACY_SINCE: &str = "agent_legacy_since";
 /// Groupe d'échange de clés que l'agent propose, seul.
 pub const POST_QUANTUM_GROUP: &str = "X25519MLKEM768";
 
-/// Protocoles ALPN servis à un agent qui s'est désigné : `http/1.1`, et la
-/// marque elle-même en dernier recours.
-pub const AGENT_PROTOCOLS: [&[u8]; 2] = [b"http/1.1", AGENT_ALPN];
+/// Protocoles ALPN servis à un agent qui s'est désigné : `h2` d'abord, pour
+/// qu'une seule connexion porte toutes ses requêtes, `http/1.1` pour un
+/// client qui ne parle pas HTTP/2 (le tunnel d'un relais, mis à niveau), et
+/// la marque elle-même en dernier recours.
+pub const AGENT_PROTOCOLS: [&[u8]; 3] = [b"h2", b"http/1.1", AGENT_ALPN];
 
 /// Les deux configurations TLS du canal, sous le même certificat.
 #[derive(Clone)]
@@ -119,6 +123,8 @@ pub struct AgentTls {
     ready: Mutex<Option<listener::Ready>>,
     /// Tunnels ouverts, par agent relais.
     tunnels: Arc<Mutex<HashMap<TargetId, usize>>>,
+    /// Plafond de tunnels par relais (`DUMBMONIT_RELAY_MAX_TUNNELS`).
+    max_tunnels: AtomicUsize,
 }
 
 impl Default for AgentTls {
@@ -136,6 +142,7 @@ impl AgentTls {
             limits: Mutex::new(Buckets::new()),
             ready: Mutex::new(None),
             tunnels: Arc::new(Mutex::new(HashMap::new())),
+            max_tunnels: AtomicUsize::new(tunnel::DEFAULT_MAX_TUNNELS_PER_RELAY),
         }
     }
 
@@ -148,6 +155,16 @@ impl AgentTls {
     /// Les deux configurations TLS du canal, une fois l'autorité chargée.
     pub fn configs(&self) -> Option<Configs> {
         self.configs.read().ok().and_then(|configs| configs.clone())
+    }
+
+    /// Plafond de tunnels par relais en vigueur.
+    pub fn max_tunnels(&self) -> usize {
+        self.max_tunnels.load(Ordering::Relaxed)
+    }
+
+    /// Pose le plafond de tunnels par relais (au moins un).
+    pub fn set_max_tunnels(&self, max: usize) {
+        self.max_tunnels.store(max.max(1), Ordering::Relaxed);
     }
 
     /// Empreintes à épingler.
@@ -180,7 +197,7 @@ impl AgentTls {
     /// Réserve une place de tunnel pour ce relais, ou `None` s'il a atteint
     /// son plafond. La place se libère quand la connexion se ferme.
     fn reserve_tunnel(&self, relay: TargetId) -> Option<tunnel::Slot> {
-        tunnel::Slot::reserve(&self.tunnels, relay, tunnel::MAX_TUNNELS_PER_RELAY)
+        tunnel::Slot::reserve(&self.tunnels, relay, self.max_tunnels())
     }
 
     /// Tunnels ouverts par un relais en ce moment.
@@ -234,6 +251,7 @@ pub fn provider() -> Arc<CryptoProvider> {
 /// Prépare le canal au démarrage : autorité (créée au premier lancement),
 /// réglage d'exigence par défaut, certificat du serveur.
 pub async fn init(state: &AppState) -> Result<()> {
+    state.agent_tls().set_max_tunnels(state.config.relay_max_tunnels);
     let created = pki::ensure_active(&state.pool, &state.cipher).await?;
     if created {
         tracing::info!("agent channel: internal certificate authority created");

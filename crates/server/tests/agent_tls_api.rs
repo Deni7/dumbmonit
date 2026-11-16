@@ -1207,3 +1207,145 @@ async fn install_commands_from_the_single_port_use_it_for_everything() {
         .await;
     assert_eq!(reply.body["agent_url"], "https://monit.example.com:8443");
 }
+
+// ------------------------------------- HTTP/2 et connexion multiplexée
+
+/// Protocole ALPN que le port des agents choisit pour cette offre.
+async fn negotiated(addr: SocketAddr, alpn: &[&[u8]]) -> Option<Vec<u8>> {
+    let provider = agent_tls::provider();
+    let seen = Arc::new(Seen(std::sync::Mutex::new(None), provider.clone()));
+    let mut config = rustls::ClientConfig::builder_with_provider(provider)
+        .with_protocol_versions(&[&rustls::version::TLS13])
+        .expect("TLS 1.3")
+        .dangerous()
+        .with_custom_certificate_verifier(seen)
+        .with_no_client_auth();
+    config.alpn_protocols = alpn.iter().map(|protocol| protocol.to_vec()).collect();
+    let connector = tokio_rustls::TlsConnector::from(Arc::new(config));
+    let tcp = tokio::net::TcpStream::connect(addr).await.expect("connexion");
+    let name = rustls::pki_types::ServerName::try_from("localhost").unwrap();
+    let tls = connector.connect(name, tcp).await.expect("poignée de main");
+    tls.get_ref().1.alpn_protocol().map(|protocol| protocol.to_vec())
+}
+
+#[tokio::test]
+async fn only_an_agent_is_offered_http2_on_the_agent_port() {
+    let (lab, _admin) = lab().await;
+    let agent = dumbmonit_proto::AGENT_ALPN;
+    // Un agent à jour : HTTP/2, une seule connexion pour toutes ses requêtes.
+    let offer: [&[u8]; 3] = [b"h2", agent, b"http/1.1"];
+    assert_eq!(negotiated(lab.addr, &offer).await.as_deref(), Some(&b"h2"[..]));
+    // Une connexion à mettre à niveau (tunnel du relais) : HTTP/1.1.
+    let offer: [&[u8]; 2] = [agent, b"http/1.1"];
+    assert_eq!(negotiated(lab.addr, &offer).await.as_deref(), Some(&b"http/1.1"[..]));
+    // `curl`, PowerShell, un agent antérieur : HTTP/1.1, comme toujours.
+    let offer: [&[u8]; 2] = [b"h2", b"http/1.1"];
+    assert_eq!(negotiated(lab.addr, &offer).await.as_deref(), Some(&b"http/1.1"[..]));
+    assert_eq!(negotiated(lab.addr, &[]).await, None);
+}
+
+/// Passerelle multiplexée, comme celle d'un relais à jour : une seule
+/// connexion mise à niveau vers le serveur, un flux yamux par connexion
+/// acceptée, recopié octet pour octet.
+async fn mux_gateway(lab: &Lab, relay: &Enrolled) -> SocketAddr {
+    use std::task::Poll;
+
+    use tokio::sync::{mpsc, oneshot};
+    use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("port");
+    let addr = listener.local_addr().expect("adresse");
+    let ca = authority(lab).await;
+    let response =
+        client_at(lab.addr, &ca, Some((relay.certificate.as_slice(), relay.key.as_slice())))
+            .get(url(lab, dumbmonit_proto::RELAY_TUNNEL_PATH))
+            .header(reqwest::header::CONNECTION, "upgrade")
+            .header(reqwest::header::UPGRADE, dumbmonit_proto::RELAY_MUX_PROTOCOL)
+            .send()
+            .await
+            .expect("connexion multiplexée");
+    assert_eq!(response.status(), StatusCode::SWITCHING_PROTOCOLS);
+    assert_eq!(response.headers()[reqwest::header::UPGRADE], dumbmonit_proto::RELAY_MUX_PROTOCOL);
+    let upgraded = response.upgrade().await.expect("mise à niveau");
+    let socket = TokioAsyncReadCompatExt::compat(upgraded);
+    let mut connection =
+        yamux::Connection::new(socket, yamux::Config::default(), yamux::Mode::Client);
+    let (asks, mut asked) = mpsc::channel::<oneshot::Sender<yamux::Stream>>(16);
+    tokio::spawn(async move {
+        let mut waiting = std::collections::VecDeque::new();
+        std::future::poll_fn(|cx| {
+            while let Poll::Ready(Some(reply)) = asked.poll_recv(cx) {
+                waiting.push_back(reply);
+            }
+            while !waiting.is_empty() {
+                match connection.poll_new_outbound(cx) {
+                    Poll::Ready(Ok(stream)) => {
+                        let _ = waiting.pop_front().expect("demande").send(stream);
+                    }
+                    Poll::Ready(Err(_)) => return Poll::Ready(()),
+                    Poll::Pending => break,
+                }
+            }
+            loop {
+                match connection.poll_next_inbound(cx) {
+                    Poll::Ready(Some(Ok(_))) => {}
+                    Poll::Ready(_) => return Poll::Ready(()),
+                    Poll::Pending => return Poll::Pending,
+                }
+            }
+        })
+        .await;
+    });
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener.accept().await {
+            let (reply, stream) = oneshot::channel();
+            asks.send(reply).await.expect("connexion multiplexée menée");
+            let stream = stream.await.expect("flux");
+            tokio::spawn(async move {
+                let mut stream = FuturesAsyncReadCompatExt::compat(stream);
+                let _ = tokio::io::copy_bidirectional(&mut socket, &mut stream).await;
+            });
+        }
+    });
+    addr
+}
+
+#[tokio::test]
+async fn agents_behind_a_relay_share_its_one_multiplexed_connection_end_to_end() {
+    let (lab, admin) = lab().await;
+    let relay = enrolled(&lab, &relay_token(&lab.app, &admin).await, "id-relais", None).await;
+    let relay_id = target_of(&lab, "id-relais").await;
+    let through = mux_gateway(&lab, &relay).await;
+
+    // Deux machines du site, deux flux de la même connexion : chacune s'enrôle
+    // de bout en bout (sa poignée de main, l'autorité épinglée), et le relais
+    // est retenu comme leur parent.
+    let enrolment = token(&lab.app, &admin).await;
+    for machine in ["id-site-1", "id-site-2"] {
+        let (response, _) = enrol_through(&lab, through, &enrolment, machine).await;
+        assert_eq!(response.status(), StatusCode::OK, "{machine}");
+        let site = target_of(&lab, machine).await;
+        assert_eq!(via_agent(&lab, site).await, Some(relay_id), "{machine}");
+    }
+    // La connexion multiplexée elle-même tient une place de tunnel.
+    assert!(lab.state.agent_tls().tunnels_of(relay_id) >= 1);
+}
+
+#[tokio::test]
+async fn a_relay_without_a_certificate_cannot_open_a_multiplexed_connection() {
+    let (lab, admin) = lab().await;
+    let ca = authority(&lab).await;
+    let ask = |identity: Option<(&[u8], &[u8])>| {
+        client_at(lab.addr, &ca, identity)
+            .get(url(&lab, dumbmonit_proto::RELAY_TUNNEL_PATH))
+            .header(reqwest::header::CONNECTION, "upgrade")
+            .header(reqwest::header::UPGRADE, dumbmonit_proto::RELAY_MUX_PROTOCOL)
+            .send()
+    };
+    assert_eq!(ask(None).await.expect("réponse").status(), StatusCode::UNAUTHORIZED);
+    let plain = enrolled(&lab, &token(&lab.app, &admin).await, "id-ordinaire", None).await;
+    let refused = ask(Some((plain.certificate.as_slice(), plain.key.as_slice())))
+        .await
+        .expect("réponse");
+    assert_eq!(refused.status(), StatusCode::FORBIDDEN, "un agent ordinaire n'est pas un relais");
+}

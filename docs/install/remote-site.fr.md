@@ -271,9 +271,14 @@ Un moniteur n'a pas à choisir entre le serveur et un relais : il peut être son
   envoient leurs propres métriques) ; un agent peut en revanche se *connecter*
   par la passerelle d'un relais (voir plus haut). Un relais se connecte
   toujours en direct : pas de relais derrière un relais.
-- La passerelle d'un relais accepte 64 connexions à la fois et 4 Mio/s par
+- La passerelle d'un relais accepte 256 connexions à la fois et 4 Mio/s par
   tunnel et par sens par défaut (`gateway_max_connections`,
-  `gateway_rate_kib`) ; le serveur accepte 256 tunnels par relais.
+  `gateway_rate_kib`) ; le serveur accepte 1024 tunnels par relais
+  (`DUMBMONIT_RELAY_MAX_TUNNELS`, jusqu'à 4096). À jour, le relais les porte
+  tous dans **une seule** connexion multiplexée vers le serveur (un flux yamux
+  par connexion d'agent, chacun toujours chiffré de bout en bout par l'agent),
+  et chaque agent ne garde qu'une connexion (HTTP/2). Face à un serveur
+  antérieur, c'est un tunnel par connexion, comme avant.
 - Le relais fait tourner 8 sondes à la fois au plus ; une sonde est bornée
   par le délai de sonde du serveur (`DUMBMONIT_PROBE_TIMEOUT`), plafonné à
   120 s sur l'agent.

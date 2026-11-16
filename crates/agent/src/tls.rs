@@ -14,6 +14,10 @@
 //! - L'agent se désigne par ALPN ([`AGENT_ALPN`]) : sur le port unique d'un
 //!   serveur (`DUMBMONIT_SINGLE_PORT`, 443), c'est ce qui le mène au canal des
 //!   agents plutôt qu'à l'interface. Un serveur antérieur l'ignore.
+//! - HTTP/2 (`h2`) quand le serveur le propose : lots, commandes et attente
+//!   longue du relais partagent alors une seule connexion. Les mises à niveau
+//!   (tunnel, connexion multiplexée du relais) restent en HTTP/1.1, sur une
+//!   connexion à part ([`upgrade_config`]).
 //!
 //! Tout est rangé dans `agent-tls.json`, à côté du secret de liaison, lisible
 //! par le seul propriétaire (0600 sous Unix ; sous Windows, le dossier de
@@ -163,13 +167,31 @@ pub fn provider() -> Arc<CryptoProvider> {
     })
 }
 
-/// Protocoles ALPN proposés sur le canal chiffré : la marque des agents, puis
-/// HTTP/1.1 (qu'un serveur antérieur, qui ne connaît pas la marque, choisit).
-pub const CHANNEL_PROTOCOLS: [&[u8]; 2] = [AGENT_ALPN, b"http/1.1"];
+/// Protocoles ALPN proposés sur le canal chiffré : HTTP/2, la marque des
+/// agents, puis HTTP/1.1 (qu'un serveur antérieur, qui ne connaît ni l'une ni
+/// l'autre sur ce port, choisit).
+pub const CHANNEL_PROTOCOLS: [&[u8]; 3] = [b"h2", AGENT_ALPN, b"http/1.1"];
+
+/// Protocoles ALPN d'une connexion qui sera mise à niveau (tunnel, connexion
+/// multiplexée du relais) : une mise à niveau n'existe qu'en HTTP/1.1.
+pub const UPGRADE_PROTOCOLS: [&[u8]; 2] = [AGENT_ALPN, b"http/1.1"];
 
 /// Configuration TLS du canal : TLS 1.3, autorité épinglée, certificat client
 /// s'il y en a un.
 pub fn client_config(pins: Pins, identity: Option<(Vec<u8>, Vec<u8>)>) -> Result<ClientConfig> {
+    configured(pins, identity, &CHANNEL_PROTOCOLS)
+}
+
+/// Comme [`client_config`], pour une connexion mise à niveau : HTTP/1.1 seul.
+pub fn upgrade_config(pins: Pins, identity: Option<(Vec<u8>, Vec<u8>)>) -> Result<ClientConfig> {
+    configured(pins, identity, &UPGRADE_PROTOCOLS)
+}
+
+fn configured(
+    pins: Pins,
+    identity: Option<(Vec<u8>, Vec<u8>)>,
+    protocols: &[&[u8]],
+) -> Result<ClientConfig> {
     let provider = provider();
     let verifier = Arc::new(PinnedVerifier { pins, provider: provider.clone() });
     let builder = ClientConfig::builder_with_provider(provider)
@@ -186,7 +208,7 @@ pub fn client_config(pins: Pins, identity: Option<(Vec<u8>, Vec<u8>)>) -> Result
             .context("agent certificate")?,
         None => builder.with_no_client_auth(),
     };
-    config.alpn_protocols = CHANNEL_PROTOCOLS.iter().map(|protocol| protocol.to_vec()).collect();
+    config.alpn_protocols = protocols.iter().map(|protocol| protocol.to_vec()).collect();
     Ok(config)
 }
 
@@ -439,9 +461,13 @@ mod tests {
         let groups: Vec<String> =
             config.crypto_provider().kx_groups.iter().map(|g| format!("{:?}", g.name())).collect();
         assert_eq!(groups, ["X25519MLKEM768"]);
-        // La marque des agents (port unique), puis ce qu'un serveur antérieur
-        // choisit.
-        assert_eq!(config.alpn_protocols, vec![AGENT_ALPN.to_vec(), b"http/1.1".to_vec()]);
+        // HTTP/2, la marque des agents (port unique), puis ce qu'un serveur
+        // antérieur choisit.
+        let offered = vec![b"h2".to_vec(), AGENT_ALPN.to_vec(), b"http/1.1".to_vec()];
+        assert_eq!(config.alpn_protocols, offered);
+        // Une connexion mise à niveau ne propose pas HTTP/2.
+        let upgrade = upgrade_config(Arc::new(RwLock::new(Vec::new())), None).unwrap();
+        assert_eq!(upgrade.alpn_protocols, vec![AGENT_ALPN.to_vec(), b"http/1.1".to_vec()]);
         // L'ancien canal, lui, ne se désigne pas : sur un port unique, il
         // reçoit le certificat de l'interface qu'il épingle.
         let key = rcgen::KeyPair::generate_for(&rcgen::PKCS_ECDSA_P256_SHA256).unwrap();

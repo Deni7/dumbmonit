@@ -586,7 +586,7 @@ libvirt знает только его настроенный максимум. 
 | `DUMBMONIT_AGENT_RELAY` | `true` — выполнять для сервера проверки мониторов, назначенных этому агенту (см. [Запуск агента в Docker / в другой сети](#run-the-agent-in-docker--on-another-network)) |
 | `DUMBMONIT_AGENT_SITE` | Метка площадки, показываемая рядом с агентом, когда он предлагается как ретранслятор |
 | `DUMBMONIT_AGENT_GATEWAY_LISTEN` | Шлюз ретранслятора для агентов его площадки, например `0.0.0.0:8443` (`gateway_listen:`); важнее порта, заданного в интерфейсе (см. [Установка агентов за ретранслятором](../install/remote-site.md#5-install-agents-behind-the-relay)) |
-| `DUMBMONIT_AGENT_GATEWAY_MAX_CONNECTIONS` | Соединений, одновременно удерживаемых шлюзом, по умолчанию 64 (`gateway_max_connections:`) |
+| `DUMBMONIT_AGENT_GATEWAY_MAX_CONNECTIONS` | Соединений, одновременно удерживаемых шлюзом, по умолчанию 256 (`gateway_max_connections:`) |
 | `DUMBMONIT_AGENT_GATEWAY_RATE_KIB` | Скорость каждого туннеля через шлюз, в каждом направлении, в КиБ/с, по умолчанию 4096 (`gateway_rate_kib:`) |
 
 ## Счётчики производительности Windows {#windows-performance-counters}

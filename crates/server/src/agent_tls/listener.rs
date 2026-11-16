@@ -8,7 +8,7 @@
 //!
 //! Le ClientHello est lu avant de choisir la configuration TLS
 //! ([`super::Configs::for_hello`]) : un agent qui se désigne par ALPN reçoit
-//! celle des agents, tout autre client garde `http/1.1` seul.
+//! celle des agents (`h2` offert), tout autre client garde `http/1.1` seul.
 
 use std::net::SocketAddr;
 use std::sync::Arc;

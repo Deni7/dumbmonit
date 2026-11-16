@@ -197,6 +197,11 @@ pub struct Config {
     /// 8080 et 8443 comme avant — et ils restent ouverts, un agent antérieur
     /// continuant par le port des agents.
     pub single_listen: Option<SocketAddr>,
+    /// Tunnels simultanés au plus par agent relais
+    /// (`DUMBMONIT_RELAY_MAX_TUNNELS`, 1024 par défaut, de 1 à 4096) : une
+    /// connexion d'agent du site, qu'elle passe par son propre tunnel ou par un
+    /// flux de la connexion multiplexée du relais.
+    pub relay_max_tunnels: usize,
     /// Certificat fourni (`DUMBMONIT_TLS_CERT`, chaîne PEM) et sa clé
     /// (`DUMBMONIT_TLS_KEY`). Absents : un certificat autosigné est créé au
     /// premier démarrage et gardé, clé chiffrée, dans la base.
@@ -341,6 +346,8 @@ impl Config {
                 })
                 .transpose()?,
             single_listen,
+            relay_max_tunnels: env_parsed::<usize>("DUMBMONIT_RELAY_MAX_TUNNELS", "1024")?
+                .clamp(1, MAX_RELAY_TUNNELS),
             agent_legacy_days: env_var("DUMBMONIT_AGENT_LEGACY_DAYS")
                 .map(|raw| {
                     raw.trim().parse::<u32>().with_context(|| {
@@ -455,6 +462,11 @@ fn parse_agent_listen(raw: Option<&str>) -> Result<Option<SocketAddr>> {
         format!("DUMBMONIT_AGENT_LISTEN: invalid address '{raw}' (e.g. 0.0.0.0:8443)")
     })
 }
+
+/// Plafond de `DUMBMONIT_RELAY_MAX_TUNNELS` : au-delà, la connexion
+/// multiplexée d'un relais (yamux) réserverait plus d'un gibioctet de fenêtres
+/// de réception.
+pub const MAX_RELAY_TUNNELS: usize = 4096;
 
 /// Lit `DUMBMONIT_SINGLE_PORT` : absente, `off` (ou `none`, `0`, vide) : pas
 /// d'écoute unique ; un port seul (`443`) écoute sur toutes les adresses IPv4 ;

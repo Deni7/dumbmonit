@@ -200,8 +200,8 @@ entrambi sono inattivi.
 - I monitor agent non vengono mai sondati tramite un relay (inviano le proprie metriche); un
   agent può invece *collegarsi* tramite il gateway di un relay (vedi sopra). Un relay si collega
   sempre direttamente: non esiste un relay dietro un relay.
-- Il gateway di un relay accetta per impostazione predefinita 64 connessioni alla volta e 4 MiB/s
-  per tunnel e direzione (`gateway_max_connections`, `gateway_rate_kib`); il server accetta 256
+- Il gateway di un relay accetta per impostazione predefinita 256 connessioni alla volta e 4 MiB/s
+  per tunnel e direzione (`gateway_max_connections`, `gateway_rate_kib`); il server accetta 1024
   tunnel per relay.
 - L'agente relè esegue al massimo 8 probe per volta; un probe è limitato dal
   timeout del probe del server (`DUMBMONIT_PROBE_TIMEOUT_SECS`), limitato a 120 s su
