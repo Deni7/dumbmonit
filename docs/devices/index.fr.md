@@ -113,7 +113,7 @@ surveillance**. Voir [Ajouter votre première surveillance](../install/first-dev
 | [Sonarr (bêta)](sonarr.md) | `sonarr` | clé d'API | Séries : santé, clients et indexeurs en échec, erreurs de file, disque, mises à jour |
 | [Radarr (bêta)](radarr.md) | `radarr` | clé d'API | Films : santé, clients et indexeurs en échec, erreurs de file, disque, mises à jour |
 | [Lidarr (bêta)](lidarr.md) | `lidarr` | clé d'API | Musique : santé, clients et indexeurs en échec, erreurs de file, disque, mises à jour |
-| [Prowlarr (bêta)](prowlarr.md) | `prowlarr` | clé d'API | Indexeurs : santé, indexeurs désactivés après des échecs, disque, mises à jour |
+| [Prowlarr (bêta)](prowlarr.md) | `prowlarr` | clé d'API | Indexeurs : santé, indexeurs désactivés après des échecs, mises à jour |
 | [qBittorrent (bêta)](qbittorrent.md) | `qbittorrent` | nom d'utilisateur et mot de passe, ou aucun | Client torrent : torrents en erreur, connectivité perdue, vitesses, espace libre |
 | [UniFi Protect (bêta)](unifiprotect.md) | `unifiprotect` | nom d'utilisateur et mot de passe locaux | Caméras : hors ligne ou sans enregistrement, disques et stockage du NVR |
 | [Frigate NVR (bêta)](frigate.md) | `frigate` | aucun ou jeton porteur | NVR : caméras sans images, détecteurs bloqués, débits, stockage des enregistrements |

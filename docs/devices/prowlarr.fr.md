@@ -1,6 +1,6 @@
 # Prowlarr (beta)
 
-Si Prowlarr sert encore ses indexeurs : erreurs de santé, indexeurs désactivés après des échecs, espace disque et mises à jour.
+Si Prowlarr sert encore ses indexeurs : erreurs de santé, indexeurs désactivés après des échecs et mises à jour.
 
 !!! note "Bêta"
     Écrit d'après la documentation d'API de l'éditeur et testé sur des réponses réalistes enregistrées, pas encore sur une instance réelle. Dites-nous ce que vous observez.
@@ -27,10 +27,9 @@ Toutes les métriques sont préfixées `dumbmonit_prowlarr_`.
 | `health_errors`, `health_warnings` | contrôles de la page System → Status qui signalent une erreur ou un avertissement |  |
 | `health_issue` | valeur 1 par erreur ou avertissement, 32 au plus | `source`, `level` |
 | `indexers_disabled` | indexeurs encore désactivés après des échecs répétés |  |
-| `disk_used_percent`, `disk_free_bytes` | chaque disque que Prowlarr signale (dossiers racine, dossier de téléchargement), 32 au plus | `path` |
 | `scrape_errors` | appels qui ont échoué à la dernière sonde |  |
 
-Les [règles intégrées](../alerting/rules.md#self-hosted-applications) qui s'appliquent : Prowlarr health error, Prowlarr indexers disabled, Prowlarr disk almost full, Prowlarr update available, plus Appareil inaccessible.
+Les [règles intégrées](../alerting/rules.md#self-hosted-applications) qui s'appliquent : Prowlarr health error, Prowlarr indexers disabled, Prowlarr update available, plus Appareil inaccessible.
 
 ## Lire la clé d'API dans Prowlarr
 

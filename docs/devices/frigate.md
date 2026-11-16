@@ -30,7 +30,7 @@ All metrics are prefixed `dumbmonit_frigate_`.
 | `camera_process_fps`, `camera_skipped_fps`, `camera_detection_fps` | frames processed, dropped for lack of time, and sent to detection | `camera` |
 | `detector_inference_ms` | inference time of each detector | `detector` |
 | `detector_busy_seconds` | how long a detector has been on the same inference (0 when idle) | `detector` |
-| `storage_used_percent`, `storage_free_bytes` | recording disks (in-memory mounts are left out) | `path` |
+| `storage_used_percent`, `storage_free_bytes` | recording disks (in-memory mounts are left out); the free space is in bytes (Frigate reports megabytes, converted) | `path` |
 
 The [built-in rules](../alerting/rules.md#self-hosted-applications) that apply: Frigate camera offline, Frigate detector stuck, Frigate storage almost full, Frigate update available, plus Monitor unreachable.
 
@@ -54,6 +54,6 @@ The [built-in rules](../alerting/rules.md#self-hosted-applications) that apply: 
 | Credential | Fields |
 |---|---|
 | No authentication | Port 5000, the internal API. |
-| Bearer token | Sent as `Authorization: Bearer …`, for a proxy that expects it. |
+| Bearer token | Sent as `Authorization: Bearer …`, for a proxy that expects it, or the session token of the authenticated port (8971), obtained with `POST /api/login`. Frigate session tokens expire after 24 hours and cannot be refreshed: the monitor then reports an authentication error (401), and you must paste a new token. Prefer port 5000 on a trusted network. |
 
 Address: a host name (`frigate.lan`), `host:port`, or a full URL with a path prefix. Options: protocol (HTTP by default), port (5000), certificate check and request timeout (15 s).

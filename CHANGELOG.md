@@ -5,6 +5,30 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Fixed
+
+- **Vaultwarden 1.37.** Disabled accounts and accounts without two-step login are counted again
+  (the admin user list now uses `userEnabled` and `twoFactorEnabled`; both spellings are read).
+  The item count, which Vaultwarden no longer lists, is left out instead of showing a false 0. The
+  version shown is Vaultwarden's own (`/api/version`), not the Bitwarden compatibility version. A
+  saved admin session is dropped as soon as the admin token changes or Vaultwarden refuses it,
+  instead of staying in use for up to 15 minutes.
+- **Frigate.** Free storage was published in megabytes under a name ending in `_bytes`; it is now in
+  bytes. An expired session token (they last 24 hours) now gets a message that says so and points
+  to port 5000, which needs none.
+- **Prowlarr.** The monitor no longer calls `/api/v1/diskspace`, which Prowlarr does not have: no
+  more warning in the log and a permanent `scrape_errors` of 1 on a healthy Prowlarr. The disk
+  figures and the "Prowlarr disk almost full" rule, which could never have data, are gone
+  (Sonarr, Radarr and Lidarr keep theirs). An already installed instance keeps the unused rule
+  until you delete it.
+- **MinIO.** The uptime comes back on recent releases (they publish it on the cluster page instead
+  of the node page), and the `commit` label of `version_info` is left out when empty.
+- **Omada.** The controller's error message in a refused-client error no longer ends with a doubled
+  full stop.
+- **Misleading authentication messages.** A refused request (HTTP 403) no longer claims the
+  "credentials were accepted": it says the token or key is wrong or expired, or lacks permission.
+  qBittorrent now asks for the WebUI user name and password instead of "the token".
+
 ### Changed
 
 - **One typeface family everywhere: Inter and JetBrains Mono.** The console, the status pages, the

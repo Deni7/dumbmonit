@@ -23,11 +23,11 @@ Toutes les métriques sont préfixées `dumbmonit_vaultwarden_`.
 | Métrique | Quoi | Labels |
 |---|---|---|
 | `up` | valeur 1 tant que `/alive` répond |  |
-| `version_info` | valeur 1 | `version` |
+| `version_info` | valeur 1 ; la version de Vaultwarden (lue sur `/api/version`), pas la version de compatibilité Bitwarden de `/api/config` | `version` |
 | `signups_open` | 1 quand n'importe qui peut créer un compte |  |
 | `admin_readable` | 1 quand la page d'administration a été lue (absent sans le jeton d'administration) |  |
 | `users`, `users_disabled`, `users_without_2fa` | comptes ; comptes désactivés ; comptes actifs sans connexion en deux étapes |  |
-| `items` | éléments de coffre, tous comptes confondus |  |
+| `items` | éléments de coffre, tous comptes confondus (absent à partir de Vaultwarden 1.37, qui ne les liste plus) |  |
 | `scrape_errors` | appels qui ont échoué à la dernière sonde |  |
 
 Les [règles intégrées](../alerting/rules.md#self-hosted-applications) qui s'appliquent : Vaultwarden sign-ups open, plus Appareil inaccessible.
@@ -51,7 +51,7 @@ Les [règles intégrées](../alerting/rules.md#self-hosted-applications) qui s'a
 
 | Identifiant | Champs |
 |---|---|
-| Sans jeton d'administration | Contrôles publics seulement : `/alive` et `/api/config`. |
-| Jeton d'administration | L'ADMIN_TOKEN en clair. Vaultwarden n'a pas de clé d'API d'administration : le jeton ouvre une session sur `/admin` (cookie valable 20 minutes), que DumbMonit garde 15 minutes entre deux sondes, car la connexion est limitée en débit. |
+| Sans jeton d'administration | Contrôles publics seulement : `/alive`, `/api/version` et `/api/config`. |
+| Jeton d'administration | L'ADMIN_TOKEN en clair. Vaultwarden n'a pas de clé d'API d'administration : le jeton ouvre une session sur `/admin` (cookie valable 20 minutes), que DumbMonit garde 15 minutes entre deux sondes, car la connexion est limitée en débit. La session gardée est abandonnée dès que le jeton change ou que Vaultwarden la refuse (401, 403). |
 
 Adresse : un nom d'hôte (`vault.example.com`), `host:port`, ou une URL complète avec préfixe de chemin. Options : protocole (HTTPS par défaut), port (443), vérification du certificat et délai de requête (15 s).

@@ -118,6 +118,9 @@ pub fn samples(version: &str, body: &Value, ts_ms: i64) -> Vec<Sample> {
 
 // ------------------------------------------------------------------ sonde
 
+const WRONG_LOGIN: &str = "qBittorrent refused the user name or password on \
+    /api/v2/auth/login. Check the WebUI user name and password.";
+
 /// Ouvre la session si des identifiants sont configurés, et rend le client
 /// qui porte le cookie.
 async fn session(target: &Target) -> Result<HttpClient, ProbeError> {
@@ -142,11 +145,13 @@ async fn session(target: &Target) -> Result<HttpClient, ProbeError> {
                 .to_string(),
         ));
     }
+    // qBittorrent 5 répond 401 à un mauvais mot de passe (les versions
+    // précédentes, 200 « Fails. ») : c'est un compte, pas un jeton.
+    if status == StatusCode::UNAUTHORIZED || body.trim().eq_ignore_ascii_case("fails.") {
+        return Err(ProbeError::Auth(WRONG_LOGIN.to_string()));
+    }
     if !status.is_success() {
         return Err(anonymous.status_error(status, &body, path));
-    }
-    if body.trim().eq_ignore_ascii_case("fails.") {
-        return Err(ProbeError::Auth("qBittorrent refused the user name or password.".to_string()));
     }
     let cookie = cookies_of(&headers);
     if cookie.is_empty() {
@@ -155,12 +160,26 @@ async fn session(target: &Target) -> Result<HttpClient, ProbeError> {
     http_client(target, "http", DEFAULT_PORT, Auth::header("Cookie", cookie), PRODUCT)
 }
 
+/// qBittorrent répond 403 (parfois 401) à toute requête sans session valable :
+/// il n'y a pas de jeton à vérifier, c'est le compte du WebUI qu'il faut.
+fn refusal(client: &HttpClient, status: StatusCode, body: &str, path: &str) -> ProbeError {
+    if matches!(status, StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN) {
+        return ProbeError::Auth(format!(
+            "qBittorrent refused {path} ({}): log in with the WebUI user name and password, or \
+             allow DumbMonit's address under Tools → Options → Web UI → Bypass authentication \
+             for clients in whitelisted IP subnets.",
+            status.as_u16()
+        ));
+    }
+    client.status_error(status, body, path)
+}
+
 pub async fn probe(client: &HttpClient, ts_ms: i64) -> Result<Vec<Sample>, ProbeError> {
     // La preuve de vie et d'authentification : le seul appel qui condamne.
     let path = "/api/v2/app/version";
     let (status, body) = client.get(path).await?;
     if !status.is_success() {
-        return Err(client.status_error(status, &body, path));
+        return Err(refusal(client, status, &body, path));
     }
     let version = body.trim().trim_matches('"');
     let maindata: Value = client.get_json("/api/v2/sync/maindata?rid=0").await?;
@@ -192,7 +211,7 @@ impl Collector for QbittorrentCollector {
         let client = session(target).await?;
         let (status, body) = client.get("/api/v2/app/version").await?;
         if !status.is_success() {
-            return Err(client.status_error(status, &body, "/api/v2/app/version"));
+            return Err(refusal(&client, status, &body, "/api/v2/app/version"));
         }
         Ok(Some("qbittorrent".to_string()))
     }
@@ -361,11 +380,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn qbittorrent_5_repond_401_a_un_mauvais_mot_de_passe_et_le_message_parle_de_compte() {
+        // Observé sur qBittorrent 5.3.0 : le login échoué rend 401 (et non
+        // 200 « Fails. » comme les versions 4.x).
+        let app = Router::new().route(
+            "/api/v2/auth/login",
+            post(|| async { (axum::http::StatusCode::UNAUTHORIZED, "") }),
+        );
+        let base = serve(app).await;
+        let error = QbittorrentCollector::new()
+            .probe(&target(base, login("admin", "mauvais")))
+            .await
+            .unwrap_err();
+        assert!(matches!(error, ProbeError::Auth(_)));
+        assert!(!error.means_down());
+        let message = error.to_string();
+        assert!(message.contains("user name and password"), "{message}");
+        assert!(!message.contains("token"), "{message}");
+    }
+
+    #[tokio::test]
     async fn sans_identifiants_et_sans_contournement_l_acces_est_refuse() {
         let base = serve(app()).await;
         let error =
             QbittorrentCollector::new().probe(&target(base, Credential::None)).await.unwrap_err();
         assert!(matches!(error, ProbeError::Auth(_)));
+        // Un compte à saisir, pas un jeton à vérifier.
+        let message = error.to_string();
+        assert!(message.contains("user name and password"), "{message}");
+        assert!(!message.contains("token"), "{message}");
     }
 
     #[tokio::test]

@@ -232,8 +232,8 @@ impl HttpClient {
                 "{product} refused the credentials on {path} (401). Check the token."
             )),
             StatusCode::FORBIDDEN => ProbeError::Auth(format!(
-                "{product} accepted the credentials but refused {path} (403): the account or \
-                 key lacks the permission to read it."
+                "{product} refused {path} (403): the token or key is wrong or expired, or the \
+                 account lacks the permission to read it."
             )),
             StatusCode::NOT_FOUND => ProbeError::Protocol(format!(
                 "{product} has no {path} at {}: check the address, the port, and the path \
@@ -295,6 +295,9 @@ mod tests {
         assert!(!error.means_down());
         let error = client().status_error(StatusCode::FORBIDDEN, "", "/api/jobs");
         assert!(matches!(error, ProbeError::Auth(ref m) if m.contains("permission")));
+        // Un jeton inexistant donne aussi un 403 : on ne prétend pas qu'il a été accepté.
+        assert!(matches!(error, ProbeError::Auth(ref m)
+            if m.contains("wrong or expired") && !m.contains("accepted")));
     }
 
     #[test]

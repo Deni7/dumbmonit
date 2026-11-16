@@ -249,8 +249,8 @@ impl HttpClient {
                  password or the token."
             )),
             StatusCode::FORBIDDEN => ProbeError::Auth(format!(
-                "{product} accepted the credentials but refused {path} (403): the account lacks \
-                 the permission to read it."
+                "{product} refused {path} (403): the credentials are wrong or expired, or the \
+                 account lacks the permission to read it."
             )),
             StatusCode::NOT_FOUND => ProbeError::Protocol(format!(
                 "{product} has no {path} at {}: check the address, the port, and the path \

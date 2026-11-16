@@ -22307,7 +22307,7 @@
   {
     "kind": "prowlarr",
     "label": "Prowlarr (beta)",
-    "summary": "Health warnings, indexers disabled after failures, disk space, updates.",
+    "summary": "Health warnings, indexers disabled after failures, updates.",
     "examples": [
       "Prowlarr"
     ],
@@ -22447,22 +22447,6 @@
         "kind": "gauge"
       },
       {
-        "name": "prowlarr_disk_used_percent",
-        "label": "Disk used",
-        "unit": "%",
-        "kind": "gauge",
-        "better": "lower",
-        "min": 0.0,
-        "max": 100.0
-      },
-      {
-        "name": "prowlarr_disk_free_bytes",
-        "label": "Disk free",
-        "unit": "B",
-        "kind": "gauge",
-        "better": "higher"
-      },
-      {
         "name": "prowlarr_indexers_disabled",
         "label": "Indexers disabled",
         "kind": "gauge"
@@ -22497,8 +22481,6 @@
           "prowlarr_health_errors",
           "prowlarr_health_warnings",
           "prowlarr_health_issue",
-          "prowlarr_disk_used_percent",
-          "prowlarr_disk_free_bytes",
           "prowlarr_indexers_disabled",
           "prowlarr_update_available",
           "prowlarr_version_info"
