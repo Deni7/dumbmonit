@@ -217,6 +217,13 @@
 						{#if host.gateway_port != null}
 							{m.devicesb_relay_panel_gateway_listening({ port: String(host.gateway_port) })}
 							<span class="text-ink-2">— {m.devicesb_relay_panel_gateway_tunnels({ count: host.gateway_tunnels ?? 0 })}</span>
+							{#if host.gateway_check}
+								<span class={`block break-words ${host.gateway_check.ok ? 'text-ink-2' : 'text-warning-ink'}`}>
+									{host.gateway_check.ok
+										? m.devicesb_relay_panel_gateway_check_ok({ address: host.gateway_check.address })
+										: m.devicesb_relay_panel_gateway_check_failed({ address: host.gateway_check.address, error: host.gateway_check.error ?? '' })}
+								</span>
+							{/if}
 						{:else if host.gateway_wanted != null}
 							{m.devicesb_relay_panel_gateway_opening()}
 						{:else}

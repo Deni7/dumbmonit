@@ -46,7 +46,10 @@ l'écran le dit, avec la ligne `ports:` exacte et les commandes de pare-feu
 (firewalld, ufw, Windows), au lieu de la commande ; *Afficher la commande quand
 même* couvre un réseau où le serveur ne peut pas se joindre lui-même (NAT sans
 « hairpin »). À travers un relais, l'écran attend que le relais annonce que sa
-passerelle écoute, et rappelle le port à ouvrir sur le relais. Les scripts
+passerelle écoute et que son propre essai de la passerelle, à l'adresse que
+compose le site, a joint le serveur ; un essai raté est affiché avec sa cause à
+la place de la commande. Il rappelle aussi le port à ouvrir sur le relais (la
+commande d'installation d'un relais l'ouvre, au seul sous-réseau local). Les scripts
 d'installation font le même diagnostic quand leur envoi de test échoue, plutôt
 qu'un simple « serveur injoignable ».
 

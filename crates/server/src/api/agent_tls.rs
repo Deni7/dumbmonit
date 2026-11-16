@@ -47,6 +47,12 @@ pub struct RelayCheck {
     pub port: u16,
     /// Le relais dit écouter sur ce port (`AgentIdentity.relay_gateway`).
     pub listening: bool,
+    /// Le relais essaie lui-même sa passerelle (binaire à jour).
+    pub self_check: bool,
+    /// Issue de son dernier essai à cette adresse ; `None` : pas encore.
+    pub reachable: Option<bool>,
+    /// Ce qui a échoué, tel que le relais le rapporte.
+    pub check_error: Option<String>,
 }
 
 /// Ce que l'écran d'ajout montre avant la commande d'installation.
@@ -106,6 +112,9 @@ async fn check(
             host: route.host,
             port: route.port,
             listening: route.listening,
+            self_check: route.self_check,
+            reachable: route.reachable,
+            check_error: route.check_error,
         }),
     }))
 }

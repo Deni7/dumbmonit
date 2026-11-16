@@ -454,6 +454,9 @@ la même chose.
 | `--sha256=LIST` | `-Sha256` | SHA-256 attendu du téléchargement, comme des paires `platform-arch:hex` séparées par des virgules (une valeur hex seule fonctionne aussi). Inclus dans la commande que DumbMonit montre ; requis sauf si l'option suivante est donnée. |
 | `--insecure-skip-checksum` | `-InsecureSkipChecksum` | Installer un binaire téléchargé sans le vérifier, avec un avertissement. Seulement pour les configurations isolées ou manuelles. |
 | `--no-start` | | Tout installer, mais ne pas contacter le serveur ni démarrer le service (image de machine, test). |
+| `--open-gateway` | `-OpenGateway` | Relais : ouvrir le port de la passerelle sur le pare-feu local (firewalld, ufw, pare-feu Windows), au seul sous-réseau local. Implicite avec `--relay` ; la commande d'un jeton de relais le porte. `--uninstall` retire la règle. |
+| `--gateway-port=N` | `-GatewayPort N` | Port de la passerelle ouvert sur le pare-feu (8443 par défaut). |
+| `--no-firewall` | `-NoFirewall` | Ne pas toucher au pare-feu local. |
 | `--uninstall` | `-Uninstall` | Désinstaller l'agent et supprimer sa configuration. |
 | `--help` | | Montrer l'aide. |
 

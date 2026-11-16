@@ -142,14 +142,28 @@ ohne die Seite zu verlassen. Von einem Standort in *Nach Standort hinzufügen* a
 mit dem Agenten** das Relay dieses Standorts vor; die Seite des Relays selbst hat **Agenten
 darüber installieren**.
 
-Ein Relay für eine Installation zu wählen, bittet es, bei seiner nächsten Meldung sein Gateway zu
-öffnen (standardmäßig auf Port 8443). Das Panel *Relay* auf der Seite des Relays zeigt das Gateway
-— *Lauscht auf Port 8443 — 3 Agenten verbunden* — und lässt Sie Port und Adresse ändern oder es
-schließen. Öffnen Sie diesen Port in der Firewall des Relays selbst, **nur für das Netz des
-Standorts**. Bei einem Docker-Relay veröffentlichen Sie den Port (`-p 8443:8443`, oder die
-auskommentierten `ports:` von `docker-compose.agent.yml`). `gateway_listen: 0.0.0.0:9443` in der
-`agent.yaml` des Relays (`DUMBMONIT_AGENT_GATEWAY_LISTEN`) hat Vorrang vor der Einstellung in der
-Oberfläche.
+Ein Relay öffnet sein Gateway (standardmäßig Port 8443), sobald es sich
+verbindet, und sofort, wenn Sie es für eine Installation wählen oder das Gateway
+ändern: Der Server beendet das Long Polling des Relays, es muss keine Meldung
+abgewartet werden. Danach testet das Relay sein Gateway selbst, unter der
+Adresse, die der Standort verwendet, so wie es ein Rechner des Standorts tun
+würde, und meldet das Ergebnis: Die Hinzufügen-Seite zeigt den Befehl, sobald
+der Test bestanden ist, oder sagt, was fehlgeschlagen ist. Eine Firewall
+zwischen den Rechnern des Standorts und dem Relay sieht der Test nicht (das
+Relay durchquert sie nicht, um sich selbst zu erreichen). Das Panel *Relay* auf
+der Seite des Relays zeigt das Gateway — *Lauscht auf Port 8443 — 3 Agenten
+verbunden* — und lässt Sie Port und Adresse ändern oder es schließen. Der
+Installationsbefehl eines Relays öffnet diesen Port in der Firewall des Relays,
+**nur für das Netzwerk des Standorts** (firewalld oder ufw unter Linux, die
+Windows-Firewall mit `LocalSubnet`), meldet das auf dem Bildschirm, und
+`--uninstall` (`-Uninstall`) entfernt die Regel wieder; `--no-firewall`
+(`-NoFirewall`) lässt die Firewall unangetastet. Bei einem Docker-Relay
+veröffentlicht `docker-compose.agent.yml` den Port 8443
+(`DUMBMONIT_AGENT_GATEWAY_PUBLISH=192.168.10.5:8443` beschränkt ihn auf die
+LAN-Adresse). `gateway_listen: 0.0.0.0:9443` in der `agent.yaml` des Relays
+(`DUMBMONIT_AGENT_GATEWAY_LISTEN`) hat Vorrang vor der Einstellung in der
+Oberfläche. Relays, die vor diesem Verhalten installiert wurden, lassen ein nie
+geöffnetes Gateway geschlossen.
 
 Was durch das Relay läuft:
 

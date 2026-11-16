@@ -12,10 +12,12 @@ use std::sync::LazyLock;
 use std::time::Duration;
 
 use axum::extract::{Extension, Path, Query, State};
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use dumbmonit_proto::{AgentCommand, ProbeOutcome, RELAY_POLL_HOLD_SECS, TargetId};
+use dumbmonit_proto::{
+    AgentCommand, ProbeOutcome, RELAY_POLL_HOLD_SECS, RELAY_RESYNC_HEADER, TargetId,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::agent_tls::AgentCert;
@@ -70,12 +72,16 @@ async fn authenticate(
 /// La réponse est retenue jusqu'à `wait` secondes s'il n'y a rien à donner :
 /// l'agent renvoie aussitôt une nouvelle demande, et une sonde échue est
 /// remise en quelques millisecondes sans que le serveur ne soit martelé.
+///
+/// Quand le réglage du relais vient de changer dans l'interface, l'attente
+/// est rendue aussitôt avec l'en-tête [`RELAY_RESYNC_HEADER`] : le relais
+/// envoie alors un lot, dont l'accusé porte le nouveau réglage.
 async fn pending(
     State(state): State<AppState>,
     headers: HeaderMap,
     cert: Option<Extension<AgentCert>>,
     Query(query): Query<KeyQuery>,
-) -> Result<Json<Vec<AgentCommand>>, Rejection> {
+) -> Result<(HeaderMap, Json<Vec<AgentCommand>>), Rejection> {
     let (token_id, agent_id) = authenticate(&state, &headers, &query.key, cert.as_deref()).await?;
     match state.relay().note_poll(agent_id, tokio::time::Instant::now()) {
         relay::PollGap::First => tracing::info!(agent = agent_id, "relay agent connected"),
@@ -95,7 +101,11 @@ async fn pending(
     let mut jobs = state.relay().take(agent_id, hold).await;
     jobs.append(&mut discovery);
     agent::touch_token(&state.pool, token_id).await?;
-    Ok(Json(jobs))
+    let mut answer = HeaderMap::new();
+    if state.relay().take_resync(agent_id) {
+        answer.insert(RELAY_RESYNC_HEADER, HeaderValue::from_static("1"));
+    }
+    Ok((answer, Json(jobs)))
 }
 
 /// `POST /api/agent/relay/{id}?key=…` : mesures et verdict d'une sonde.

@@ -440,6 +440,9 @@ Windows) in place of its other flags does the same.
 | `--sha256=LIST` | `-Sha256` | Expected SHA-256 of the download, as `platform-arch:hex` pairs separated by commas (a bare hex value also works). Included in the command DumbMonit shows; required unless the next flag is given. |
 | `--insecure-skip-checksum` | `-InsecureSkipChecksum` | Install a downloaded binary without verifying it, with a warning. Only for air-gapped or manual setups. |
 | `--no-start` | | Install everything, but do not contact the server or start the service (machine image, testing). |
+| `--open-gateway` | `-OpenGateway` | Relay: open the gateway port on the local firewall (firewalld, ufw, Windows firewall), to the local subnet only. Implied by `--relay`; the command shown for a relay token carries it. `--uninstall` removes the rule. |
+| `--gateway-port=N` | `-GatewayPort N` | Port of the relay gateway opened on the firewall (default 8443). |
+| `--no-firewall` | `-NoFirewall` | Leave the local firewall alone. |
 | `--uninstall` | `-Uninstall` | Uninstall the agent and delete its configuration. |
 | `--help` | | Show the help. |
 

@@ -13,6 +13,16 @@ All notable changes to this project are documented here. The format follows
   `https://<server>:8443`, pinned by the key of its certificate and the SHA-256 of each binary, so
   the web port can stay private. Deployment tools get the same command with
   `GET /api/agent/install?agent_port_only=true` (or `agent_port_only` when creating a token).
+- **Reliable relay gateway.** A relay opens its gateway (8443) as soon as it connects, and at once
+  when it is chosen for an install or its gateway is changed: the server ends its long poll and the
+  relay reports right away, instead of at its next batch. The relay then tests its own gateway at
+  the address the site dials, through its tunnel to the server, and reports the result: the add
+  screen shows the command for the site's machines once that test passes, or explains what failed
+  (retried every minute). The relay install command opens the gateway port on the local firewall,
+  to the local subnet only (firewalld or ufw, Windows firewall with `LocalSubnet`), says so, and
+  `--uninstall` (or a remote uninstall) removes the rule; `--no-firewall` opts out.
+  `docker-compose.agent.yml` now publishes 8443 for relays (`DUMBMONIT_AGENT_GATEWAY_PUBLISH` to
+  bind it to one address). Relays installed earlier keep a gateway they never opened closed.
 
 ### Changed
 

@@ -224,6 +224,9 @@ docker buildx build --target agent-dist --output type=local,dest=dist/agent .
 | `--sha256=LIST` | `-Sha256` | 下载的预期 SHA-256，如 `platform-arch:hex` 对，以逗号分隔（裸十六进制值也有效）。包括在 DumbMonit 显示的命令中；除非给出下一个标志，否则必需。 |
 | `--insecure-skip-checksum` | `-InsecureSkipChecksum` | 未验证安装一个下载的二进制文件，带警告。仅对气隙或手动设置。 |
 | `--no-start` | | 安装所有东西，但不接触服务器或启动服务（机器映像，测试）。 |
+| `--open-gateway` | `-OpenGateway` | 中继：在本地防火墙（firewalld、ufw、Windows 防火墙）上开放网关端口，仅对本地子网开放。使用 `--relay` 时自动启用；中继令牌的命令已包含此选项。`--uninstall` 会删除该规则。 |
+| `--gateway-port=N` | `-GatewayPort N` | 在防火墙上开放的中继网关端口（默认 8443）。 |
+| `--no-firewall` | `-NoFirewall` | 不改动本地防火墙。 |
 | `--uninstall` | `-Uninstall` | 卸载代理并删除其配置。 |
 | `--help` | | 显示帮助。 |
 

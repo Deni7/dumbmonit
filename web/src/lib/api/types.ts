@@ -1372,7 +1372,19 @@ export interface AgentChannelCheck {
 	listen_port: number | null;
 	/** Absent through a relay (the server cannot see the site's network) or when the channel is off. */
 	outcome: AgentChannelOutcome | null;
-	relay: { relay_id: number; relay_name: string; host: string; port: number; listening: boolean } | null;
+	relay: {
+		relay_id: number;
+		relay_name: string;
+		host: string;
+		port: number;
+		listening: boolean;
+		/** The relay tests its own gateway (up-to-date agent): wait for `reachable`. */
+		self_check?: boolean;
+		/** Outcome of its last test at `host:port`; `null`: not tested there yet. */
+		reachable?: boolean | null;
+		/** What failed, as the relay reports it (English). */
+		check_error?: string | null;
+	} | null;
 }
 
 export interface CreateUserPayload {
@@ -1902,6 +1914,20 @@ export interface AgentHost {
 	gateway_port?: number | null;
 	gateway_host?: string | null;
 	gateway_tunnels?: number;
+	/** The relay's last test of its own gateway. Mirrors `GatewayCheck` in `crates/proto/src/push.rs`. */
+	gateway_check?: GatewayCheck | null;
+}
+
+/**
+ * A relay's test of its own gateway: it connected to `address` as a machine of
+ * its site would, and reached this server through it (or not, and why).
+ */
+export interface GatewayCheck {
+	/** `host:port` tested. */
+	address: string;
+	ok: boolean;
+	error?: string | null;
+	checked_at_ms: number;
 }
 
 /** Response of `POST /api/targets/{id}/agent/rebind`. */

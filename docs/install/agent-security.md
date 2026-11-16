@@ -43,8 +43,10 @@ does not resolve, or leads to another service, the screen says so with the
 exact `ports:` line and firewall commands (firewalld, ufw, Windows) instead of
 the command; *Show the command anyway* covers a network where the server cannot
 reach itself (NAT without hairpin). Through a relay, the screen waits until the
-relay reports that its gateway listens, and reminds which port to open on the
-relay. The install scripts run the same diagnosis when their test send fails,
+relay reports that its gateway listens and that its own test of the gateway, at
+the address the site dials, reached the server; a failed test is shown with its
+cause instead of the command. It also reminds which port to open on the relay
+(the install command of a relay opens it, to the local subnet only). The install scripts run the same diagnosis when their test send fails,
 rather than a bare "server unreachable".
 
 ## What protects the channel

@@ -326,6 +326,9 @@ eingeschlossen.
 | `--sha256=LIST` | `-Sha256` | Erwartete SHA-256 des Downloads, als durch Kommas getrennte Paare `platform-arch:hex` (ein nackter Hex-Wert funktioniert auch). Im von DumbMonit gezeigten Befehl enthalten; erforderlich, sofern nicht das nächste Flag gegeben ist. |
 | `--insecure-skip-checksum` | `-InsecureSkipChecksum` | Installiert ein heruntergeladenes Binary ohne Verifizierung, mit einer Warnung. Nur für Air-Gap- oder manuelle Setups. |
 | `--no-start` | | Installiert alles, kontaktiert aber den Server nicht und startet den Dienst nicht (Maschinen-Image, Tests). |
+| `--open-gateway` | `-OpenGateway` | Relay: den Gateway-Port in der lokalen Firewall öffnen (firewalld, ufw, Windows-Firewall), nur für das lokale Subnetz. Implizit mit `--relay`; der Befehl eines Relay-Tokens enthält es. `--uninstall` entfernt die Regel. |
+| `--gateway-port=N` | `-GatewayPort N` | Port des Relay-Gateways, der in der Firewall geöffnet wird (Standard 8443). |
+| `--no-firewall` | `-NoFirewall` | Die lokale Firewall nicht anfassen. |
 | `--uninstall` | `-Uninstall` | Deinstalliert den Agenten und löscht seine Konfiguration. |
 | `--help` | | Zeigt die Hilfe. |
 

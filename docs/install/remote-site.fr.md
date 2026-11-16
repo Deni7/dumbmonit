@@ -189,15 +189,26 @@ site dans *Ajouter par site*, **Serveur avec l'agent** présélectionne le
 relais de ce site ; la page du relais propose **Installer un agent à travers
 lui**.
 
-Choisir un relais pour une installation lui demande d'ouvrir sa passerelle
-(port 8443 par défaut) à son prochain envoi. Le panneau *Relais* de sa page
-montre la passerelle — *À l'écoute sur le port 8443 — 3 agents connectés* — et
-permet d'en changer le port et l'adresse, ou de la fermer. Ouvrez ce port sur
-le pare-feu du relais lui-même, **pour le réseau du site seulement**. Pour un
-relais Docker, publiez le port (`-p 8443:8443`, ou les `ports:` commentés de
-`docker-compose.agent.yml`). `gateway_listen: 0.0.0.0:9443` dans l'`agent.yaml`
-du relais (`DUMBMONIT_AGENT_GATEWAY_LISTEN`) prime sur le réglage de
-l'interface.
+Un relais ouvre sa passerelle (port 8443 par défaut) dès qu'il se connecte, et
+aussitôt quand vous le choisissez pour une installation ou changez sa
+passerelle : le serveur met fin à l'attente longue du relais, il n'y a pas
+d'envoi à attendre. Le relais essaie ensuite lui-même sa passerelle, à
+l'adresse qu'utilise le site, comme le ferait une machine du site, et en rend
+compte : l'écran d'ajout affiche la commande une fois cet essai réussi, ou dit
+ce qui a échoué. L'essai ne voit pas un pare-feu placé entre les machines du
+site et le relais (le relais ne le traverse pas pour se joindre lui-même). Le
+panneau *Relais* de sa page montre la passerelle — *À l'écoute sur le port 8443
+— 3 agents connectés* — et permet d'en changer le port et l'adresse, ou de la
+fermer. La commande d'installation d'un relais ouvre ce port sur le pare-feu du
+relais, **au seul réseau du site** (firewalld ou ufw sous Linux, le pare-feu
+Windows avec `LocalSubnet`), le dit à l'écran, et `--uninstall` (`-Uninstall`)
+retire la règle ; `--no-firewall` (`-NoFirewall`) laisse le pare-feu tel quel.
+Sur un relais Docker, `docker-compose.agent.yml` publie 8443
+(`DUMBMONIT_AGENT_GATEWAY_PUBLISH=192.168.10.5:8443` le limite à l'adresse du
+LAN). `gateway_listen: 0.0.0.0:9443` dans l'`agent.yaml` du relais
+(`DUMBMONIT_AGENT_GATEWAY_LISTEN`) prime sur le réglage de l'interface. Les
+relais installés avant ce fonctionnement gardent fermée une passerelle qu'ils
+n'avaient jamais ouverte.
 
 Ce qui passe par le relais :
 
@@ -250,7 +261,7 @@ Un moniteur n'a pas à choisir entre le serveur et un relais : il peut être son
 | La page de l'agent n'indique pas *Relais* | L'interrupteur relais est éteint. Ouvrez la surveillance, utilisez la **roue crantée**, activez *Relais pour un site distant*, indiquez le site, enregistrez. C'est pris en compte au prochain envoi. |
 | Une surveillance affiche *Timed out: relay agent … did not pick up the probe* (message du serveur, en anglais) | Le relais est arrêté ou pas en mode relais. Vérifiez le service sur la machine relais et que `relay: true` est défini. |
 | Une surveillance affiche un message rouge sous son adresse | Le relais ne joint pas l'équipement. L'adresse doit être celle **vue depuis le site distant**, et le relais a besoin des mêmes accès que le serveur. |
-| Les agents installés derrière le relais n'apparaissent pas | Lancez la commande copiée depuis la page *Installer un agent derrière ce relais*, pas la commande directe. Le relais ouvre sa passerelle à son prochain envoi, en moins d'une minute. |
+| Les agents installés derrière le relais n'apparaissent pas | Lancez la commande copiée depuis la page *Installer un agent derrière ce relais*, pas la commande directe. Le relais ouvre sa passerelle en quelques secondes ; l'écran d'ajout dit s'il a pu la joindre à l'adresse du site. |
 
 ## Limites
 

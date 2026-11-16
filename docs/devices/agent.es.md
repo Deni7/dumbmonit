@@ -366,6 +366,9 @@ incluido, en cada sistema.
 | `--sha256=LIST` | `-Sha256` | SHA-256 esperado de la descarga, como pares `plataforma-arch:hex` separados por comas (un valor hex sin más también funciona). Incluido en el comando que muestra DumbMonit; obligatorio a menos que se dé el siguiente flag. |
 | `--insecure-skip-checksum` | `-InsecureSkipChecksum` | Instala un binario descargado sin verificarlo, con un aviso. Solo para configuraciones aisladas o manuales. |
 | `--no-start` | | Instala todo, pero no contacta al servidor ni inicia el servicio (imagen de máquina, pruebas). |
+| `--open-gateway` | `-OpenGateway` | Relé: abre el puerto de la pasarela en el cortafuegos local (firewalld, ufw, cortafuegos de Windows), solo para la subred local. Implícito con `--relay`; el comando de un token de relé lo incluye. `--uninstall` retira la regla. |
+| `--gateway-port=N` | `-GatewayPort N` | Puerto de la pasarela del relé abierto en el cortafuegos (8443 por defecto). |
+| `--no-firewall` | `-NoFirewall` | No tocar el cortafuegos local. |
 | `--uninstall` | `-Uninstall` | Desinstala el agente y elimina su configuración. |
 | `--help` | | Muestra la ayuda. |
 

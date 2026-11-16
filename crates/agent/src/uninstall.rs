@@ -59,6 +59,9 @@ case `uname -s` in
             rc-update del ezymonit-agent default 2>/dev/null || true
             rm -f /etc/init.d/dumbmonit-agent /etc/init.d/ezymonit-agent
         fi
+        if [ -f /etc/dumbmonit/firewall-undo.sh ]; then
+            sh /etc/dumbmonit/firewall-undo.sh || true
+        fi
         rm -rf /etc/dumbmonit /etc/ezymonit
         ;;
     Darwin)
@@ -97,6 +100,7 @@ for ($i = 0; ($i -lt 15) -and (Test-Path $InstallDir); $i++) {
     if (Test-Path $InstallDir) { Start-Sleep -Seconds 1 }
 }
 Remove-Item -Path $ConfigDir -Recurse -Force -ErrorAction SilentlyContinue
+& netsh.exe advfirewall firewall delete rule name=DumbMonit-relay-gateway | Out-Null
 if (Get-Service -Name 'EzyMonitAgent' -ErrorAction SilentlyContinue) {
     Stop-Service -Name 'EzyMonitAgent' -Force -ErrorAction SilentlyContinue
     & sc.exe delete 'EzyMonitAgent' | Out-Null
@@ -315,6 +319,8 @@ mod tests {
             "systemctl disable --now dumbmonit-agent",
             "launchctl bootout system/com.dumbmonit.agent",
             "sysrc -x dumbmonit_agent_enable",
+            // Les règles de pare-feu de la passerelle, posées par install.sh.
+            "sh /etc/dumbmonit/firewall-undo.sh",
         ] {
             assert!(UNIX_SCRIPT.contains(needle), "{needle} manque");
         }
@@ -328,7 +334,13 @@ mod tests {
 
     #[test]
     fn the_windows_script_mirrors_the_installer_and_never_downloads() {
-        for needle in ["'DumbMonitAgent'", "sc.exe delete", "'DumbMonit'", "$env:ProgramData"] {
+        for needle in [
+            "'DumbMonitAgent'",
+            "sc.exe delete",
+            "'DumbMonit'",
+            "$env:ProgramData",
+            "delete rule name=DumbMonit-relay-gateway",
+        ] {
             assert!(WINDOWS_SCRIPT.contains(needle), "{needle} manque");
         }
         assert!(WINDOWS_SCRIPT.contains(&format!("Start-Sleep -Seconds {HELPER_DELAY_SECS}\n")));

@@ -11,7 +11,7 @@
 //! clair sur disque ; ici, il n'existe que le temps d'un aller-retour, et une
 //! sonde que personne n'est venu chercher s'évapore avec son échéance.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -104,6 +104,9 @@ struct Inner {
     wakers: HashMap<TargetId, Arc<Notify>>,
     /// Dernière demande de chaque agent relais, pour journaliser ses retours.
     last_poll: HashMap<TargetId, Instant>,
+    /// Relais dont le réglage vient de changer : leur attente longue est
+    /// rendue aussitôt, avec l'en-tête qui leur fait envoyer un lot.
+    resync: HashSet<TargetId>,
 }
 
 /// Absence au-delà de laquelle un relais qui revient demander ses sondes est
@@ -215,6 +218,9 @@ impl RelayHub {
                     }
                     return commands;
                 }
+                if inner.resync.contains(&agent_id) {
+                    return Vec::new();
+                }
                 inner.waker(agent_id)
             };
             let remaining = until.saturating_duration_since(Instant::now());
@@ -225,6 +231,21 @@ impl RelayHub {
                 return Vec::new();
             }
         }
+    }
+
+    /// Le réglage de ce relais vient de changer (passerelle, adresse du site) :
+    /// son attente longue en cours, ou la prochaine, est rendue aussitôt, et
+    /// [`RelayHub::take_resync`] le dit à la route, qui le signale au relais.
+    pub fn nudge(&self, agent_id: TargetId) {
+        let mut inner = self.lock();
+        inner.resync.insert(agent_id);
+        inner.waker(agent_id).notify_one();
+    }
+
+    /// Vrai, une seule fois, si le réglage de ce relais a changé depuis sa
+    /// dernière demande.
+    pub fn take_resync(&self, agent_id: TargetId) -> bool {
+        self.lock().resync.remove(&agent_id)
     }
 
     /// Note qu'un relais vient chercher ses sondes, et dit s'il revient de loin.
@@ -508,6 +529,27 @@ mod tests {
         let commands = waiter.await.expect("tâche");
         assert_eq!(commands.len(), 1);
         assert!(started.elapsed() < Duration::from_secs(2), "réveil immédiat attendu");
+    }
+
+    #[tokio::test]
+    async fn a_changed_setting_ends_the_long_poll_once_and_says_so() {
+        let hub = Arc::new(RelayHub::new());
+        let waiter = {
+            let hub = hub.clone();
+            tokio::spawn(async move { hub.take(9, Duration::from_secs(5)).await })
+        };
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        let started = Instant::now();
+        hub.nudge(9);
+        assert!(waiter.await.expect("tâche").is_empty());
+        assert!(started.elapsed() < Duration::from_secs(2), "réveil immédiat attendu");
+        assert!(!hub.take_resync(8), "un autre relais n'est pas concerné");
+        assert!(hub.take_resync(9));
+        assert!(!hub.take_resync(9), "une seule fois");
+        // L'attente suivante dure de nouveau.
+        let started = Instant::now();
+        assert!(hub.take(9, Duration::from_millis(200)).await.is_empty());
+        assert!(started.elapsed() >= Duration::from_millis(150));
     }
 
     #[tokio::test]

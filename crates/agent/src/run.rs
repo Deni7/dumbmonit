@@ -48,6 +48,17 @@ use crate::tls::TlsState;
 /// canal chiffré, après un échec.
 const TLS_RETRY: Duration = Duration::from_secs(60);
 
+/// Période de l'essai de la passerelle par le relais, une fois ouverte et
+/// essayée : un pare-feu, une publication de port ou une adresse peuvent
+/// changer sans que rien ne le dise à l'agent.
+const GATEWAY_RECHECK: Duration = Duration::from_secs(3600);
+
+/// Période de l'essai tant qu'il échoue.
+const GATEWAY_RETRY: Duration = Duration::from_secs(60);
+
+/// Essai de la passerelle partagé avec la tâche qui le mène.
+type GatewayCheckSlot = std::sync::Arc<std::sync::Mutex<Option<dumbmonit_proto::GatewayCheck>>>;
+
 /// Première temporisation après un échec d'envoi.
 const BACKOFF_BASE: Duration = Duration::from_secs(2);
 
@@ -149,6 +160,13 @@ pub struct Agent {
     /// Dernière adresse que la passerelle n'a pas pu ouvrir : l'échec n'est
     /// journalisé qu'une fois, la tentative reprend à chaque lot.
     gateway_failed: Option<std::net::SocketAddr>,
+    /// Dernier essai de la passerelle à l'adresse du site, rempli par sa tâche
+    /// et joint aux lots ([`AgentIdentity::relay_gateway_check`]).
+    gateway_check: GatewayCheckSlot,
+    /// Essai en cours, s'il y en a un.
+    gateway_check_task: Option<tokio::task::JoinHandle<()>>,
+    /// Adresse du dernier essai lancé, et quand.
+    gateway_checked: Option<(String, Instant)>,
     /// Collecte de journaux de cette machine, et le réglage que le dernier accusé
     /// de réception portait (`None` : serveur antérieur, rien n'est collecté).
     logs: LogRunner,
@@ -288,6 +306,9 @@ impl Agent {
             server_relay: None,
             gateway: None,
             gateway_failed: None,
+            gateway_check: GatewayCheckSlot::default(),
+            gateway_check_task: None,
+            gateway_checked: None,
             logs,
             server_logs: None,
             sentinel,
@@ -493,6 +514,9 @@ impl Agent {
         // Toute réponse favorable du serveur, y compris sur le canal du relais,
         // met fin à la temporisation : inutile d'attendre qu'elle expire.
         let reachable = self.client.reachable();
+        // Lot demandé sans attendre la période (réglage du relais changé côté
+        // serveur, passerelle ouverte ou essayée).
+        let report_now = self.client.report_requested();
 
         loop {
             tokio::select! {
@@ -541,6 +565,14 @@ impl Agent {
 
                 _ = reachable.notified(), if self.outage.is_some() && !self.buffer.is_empty() => {
                     debug!("server answered on another channel, sending now");
+                    next_send = Instant::now();
+                }
+
+                _ = report_now.notified() => {
+                    // Une mesure fraîche, puis un lot : son accusé de réception
+                    // porte le nouveau réglage, et le serveur voit la passerelle.
+                    debug!("report requested, collecting and sending now");
+                    next_collect = Instant::now();
                     next_send = Instant::now();
                 }
 
@@ -713,7 +745,69 @@ impl Agent {
                 }
             }
         }
-        self.identity.relay_gateway = self.gateway.as_ref().map(|gateway| gateway.addr.port());
+        let port = self.gateway.as_ref().map(|gateway| gateway.addr.port());
+        if port != self.identity.relay_gateway {
+            // Passerelle ouverte, déplacée ou fermée : le serveur (et l'écran
+            // d'ajout qui attend qu'elle écoute) l'apprend par un lot immédiat,
+            // pas à la période suivante.
+            self.client.request_report();
+        }
+        self.identity.relay_gateway = port;
+        self.sync_gateway_check();
+    }
+
+    /// Essaie la passerelle à l'adresse que le site compose, comme le ferait
+    /// une de ses machines : quand elle s'ouvre, quand l'adresse change, puis
+    /// toutes les heures. Le résultat part avec un lot envoyé aussitôt.
+    fn sync_gateway_check(&mut self) {
+        if self.gateway_check_task.as_ref().is_some_and(|task| task.is_finished()) {
+            self.gateway_check_task = None;
+        }
+        let Some(port) = self.gateway.as_ref().map(|gateway| gateway.addr.port()) else {
+            if let Some(task) = self.gateway_check_task.take() {
+                task.abort();
+            }
+            self.gateway_checked = None;
+            if let Ok(mut held) = self.gateway_check.lock() {
+                *held = None;
+            }
+            self.identity.relay_gateway_check = None;
+            return;
+        };
+        let host = self.server_relay.as_ref().and_then(|relay| relay.gateway_host.as_deref());
+        let address = crate::gateway::check_address(host, port);
+        // Un essai raté se refait chaque minute : l'écran d'ajout attend de voir
+        // la correction (port publié, adresse) sans patienter une heure.
+        let failed = self
+            .gateway_check
+            .lock()
+            .ok()
+            .and_then(|held| held.as_ref().map(|check| !check.ok))
+            .unwrap_or(false);
+        let period = if failed { GATEWAY_RETRY } else { GATEWAY_RECHECK };
+        let due = match &self.gateway_checked {
+            Some((last, at)) => *last != address || at.elapsed() >= period,
+            None => true,
+        };
+        // Sans canal chiffré, pas de tunnel : rien à essayer encore.
+        let pins = self.client.pins();
+        if !due
+            || self.gateway_check_task.is_some()
+            || !self.client.is_encrypted()
+            || pins.is_empty()
+        {
+            return;
+        }
+        self.gateway_checked = Some((address.clone(), Instant::now()));
+        let slot = self.gateway_check.clone();
+        let client = self.client.clone();
+        self.gateway_check_task = Some(tokio::spawn(async move {
+            let check = crate::gateway::self_check(&address, pins).await;
+            if let Ok(mut held) = slot.lock() {
+                *held = Some(check);
+            }
+            client.request_report();
+        }));
     }
 
     /// Envoie un lot prélevé dans le tampon.
@@ -731,6 +825,10 @@ impl Agent {
             return FlushOutcome::Idle;
         }
         let count = samples.len();
+        if self.gateway.is_some() {
+            self.identity.relay_gateway_check =
+                self.gateway_check.lock().ok().and_then(|held| held.clone());
+        }
         let mut batch =
             PushBatch::new(self.identity.clone(), samples, chrono::Utc::now().timestamp_millis());
         if self.wants_inventory() {
@@ -1336,7 +1434,12 @@ mod tests {
     }
 
     fn setting(enabled: bool, site: Option<&str>) -> Option<RelaySetting> {
-        Some(RelaySetting { enabled, site: site.map(str::to_string), gateway_port: None })
+        Some(RelaySetting {
+            enabled,
+            site: site.map(str::to_string),
+            gateway_port: None,
+            gateway_host: None,
+        })
     }
 
     #[tokio::test]
@@ -1385,21 +1488,36 @@ mod tests {
             enabled: false,
             site: None,
             gateway_port: Some(port),
+            gateway_host: None,
         }));
         agent.sync_gateway(&shutdown).await;
         assert!(agent.gateway.is_none());
         assert_eq!(agent.identity.relay_gateway, None);
 
+        let report = agent.client.report_requested();
         agent.adopt_relay(Some(RelaySetting {
             enabled: true,
             site: None,
             gateway_port: Some(port),
+            gateway_host: Some("192.168.10.5".into()),
         }));
         agent.sync_gateway(&shutdown).await;
         assert_eq!(agent.identity.relay_gateway, Some(port), "le port est annoncé au serveur");
+        // … tout de suite, par un lot demandé sans attendre la période.
+        tokio::time::timeout(Duration::from_millis(100), report.notified())
+            .await
+            .expect("lot immédiat demandé");
+        // Pas de canal chiffré dans ce test : pas d'essai, rien d'inventé.
+        assert!(agent.gateway_check_task.is_none());
+        assert_eq!(agent.identity.relay_gateway_check, None);
 
         // Relais sans passerelle : elle se ferme, le relais continue.
-        agent.adopt_relay(Some(RelaySetting { enabled: true, site: None, gateway_port: None }));
+        agent.adopt_relay(Some(RelaySetting {
+            enabled: true,
+            site: None,
+            gateway_port: None,
+            gateway_host: None,
+        }));
         agent.sync_gateway(&shutdown).await;
         assert!(agent.gateway.is_none());
         assert_eq!(agent.identity.relay_gateway, None);

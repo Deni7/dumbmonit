@@ -291,11 +291,104 @@ impl Pace {
     }
 }
 
+/// Délai de l'essai de la passerelle par le relais lui-même : connexion,
+/// tunnel jusqu'au serveur et poignée de main TLS.
+pub const SELF_CHECK_TIMEOUT: Duration = Duration::from_secs(15);
+
+/// Adresse que le relais essaie : celle que les machines du site composent
+/// (réglée dans l'interface), à défaut la boucle locale, qui prouve au moins
+/// l'écoute et le tunnel.
+pub fn check_address(host: Option<&str>, port: u16) -> String {
+    let host = host.map(str::trim).filter(|host| !host.is_empty()).unwrap_or("127.0.0.1");
+    format!("{host}:{port}")
+}
+
+/// Le relais essaie sa propre passerelle comme le ferait une machine du site :
+/// `HEAD /install.sh` en HTTPS à `address`, le serveur reconnu à l'empreinte
+/// de son autorité (`pins`), sans certificat client et sans mandataire (c'est
+/// le réseau du site). N'importe quelle réponse HTTP prouve le chemin entier :
+/// écoute, publication du port d'un conteneur, tunnel, serveur.
+///
+/// Ce que l'essai ne voit pas : un pare-feu entre les machines du site et le
+/// relais, que celui-ci ne traverse pas pour se joindre lui-même.
+pub async fn self_check(address: &str, pins: Vec<String>) -> dumbmonit_proto::GatewayCheck {
+    let checked_at_ms = chrono::Utc::now().timestamp_millis();
+    let outcome: Result<(), String> = async {
+        let config = crate::tls::client_config(Arc::new(std::sync::RwLock::new(pins)), None)
+            .map_err(|error| format!("{error:#}"))?;
+        let http = reqwest::Client::builder()
+            .tls_backend_preconfigured(config)
+            .https_only(true)
+            .redirect(reqwest::redirect::Policy::none())
+            .no_proxy()
+            .timeout(SELF_CHECK_TIMEOUT)
+            .build()
+            .map_err(|error| format!("{error:#}"))?;
+        http.head(format!("https://{address}/install.sh"))
+            .send()
+            .await
+            .map(|_| ())
+            .map_err(|error| crate::client::describe(&error))
+    }
+    .await;
+    let limit = dumbmonit_proto::MAX_GATEWAY_CHECK_ERROR;
+    let error = outcome.err().map(|error| error.chars().take(limit).collect::<String>());
+    match &error {
+        None => debug!(address, "relay gateway answers at the site's address"),
+        Some(error) => warn!(address, error, "relay gateway not reachable at the site's address"),
+    }
+    dumbmonit_proto::GatewayCheck {
+        address: address.to_string(),
+        ok: error.is_none(),
+        error,
+        checked_at_ms,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use super::*;
+
+    #[test]
+    fn the_relay_tries_its_gateway_where_the_site_dials_it() {
+        assert_eq!(check_address(Some("192.168.10.5"), 8443), "192.168.10.5:8443");
+        assert_eq!(check_address(Some("[fd00::5]"), 9443), "[fd00::5]:9443");
+        assert_eq!(check_address(Some("  "), 8443), "127.0.0.1:8443", "à défaut, la boucle");
+        assert_eq!(check_address(None, 8443), "127.0.0.1:8443");
+    }
+
+    #[tokio::test]
+    async fn a_gateway_that_does_not_answer_is_reported_with_its_cause() {
+        // Un port qui vient de se libérer : rien n'y écoute.
+        let port = {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("port");
+            listener.local_addr().expect("adresse").port()
+        };
+        let address = check_address(None, port);
+        let check = self_check(&address, vec!["a".repeat(64)]).await;
+        assert_eq!(check.address, address);
+        assert!(!check.ok);
+        let error = check.error.expect("cause");
+        assert!(error.contains("cannot connect"), "{error}");
+        assert!(check.checked_at_ms > 0);
+    }
+
+    #[tokio::test]
+    async fn something_else_than_dumbmonit_on_the_port_fails_the_check() {
+        // Un service qui répond en clair : la poignée de main TLS échoue.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("port");
+        let port = listener.local_addr().expect("adresse").port();
+        tokio::spawn(async move {
+            while let Ok((mut socket, _)) = listener.accept().await {
+                let _ = socket.write_all(b"HTTP/1.1 400 Bad Request\r\n\r\n").await;
+            }
+        });
+        let check = self_check(&check_address(None, port), vec!["a".repeat(64)]).await;
+        assert!(!check.ok);
+        assert!(check.error.is_some());
+    }
 
     #[test]
     fn the_first_byte_tells_tls_from_http_from_anything_else() {

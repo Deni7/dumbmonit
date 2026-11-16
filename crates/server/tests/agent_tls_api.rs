@@ -869,3 +869,79 @@ async fn a_relay_install_command_uses_the_agent_port_only() {
     assert_eq!(web.body["agent_port_only"], false);
     assert_eq!(web.body["base_url"], "https://monit.example.com:8080");
 }
+
+#[tokio::test]
+async fn a_relay_learns_of_an_install_at_once_and_its_own_gateway_test_gates_the_command() {
+    let (lab, admin) = lab().await;
+    let enrolment = relay_token(&lab.app, &admin).await;
+    let relay = enrolled(&lab, &enrolment, "id-relais", None).await;
+    let relay_id = target_of(&lab, "id-relais").await;
+    let check = || {
+        lab.app.post(
+            "/api/agent/tls/check",
+            json!({ "base_url": "https://monit.example.com", "relay_id": relay_id,
+                    "relay_host": "192.168.10.5" }),
+            Some(&admin),
+        )
+    };
+
+    // Une installation à travers ce relais : il en est prévenu sur-le-champ
+    // (fin de son attente longue), pas à son prochain lot.
+    let reply = lab
+        .app
+        .post(
+            "/api/agent/tokens",
+            json!({ "relay_id": relay_id, "relay_host": "192.168.10.5" }),
+            Some(&admin),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::CREATED, "{}", reply.body);
+    assert!(lab.state.relay().take_resync(relay_id), "le relais est prévenu aussitôt");
+
+    // Avant tout essai : ni joignable ni injoignable.
+    let before = check().await;
+    assert_eq!(before.status, StatusCode::OK, "{}", before.body);
+    assert_eq!(before.body["relay"]["self_check"], false);
+    assert_eq!(before.body["relay"]["reachable"], Value::Null);
+
+    // Le relais écoute et rapporte l'essai de sa passerelle à une adresse.
+    let report = |ok: bool, address: &str| {
+        let error = if ok { Value::Null } else { json!("cannot connect: refused") };
+        let mut body = batch("id-relais");
+        let identity = body["identity"].as_object_mut().unwrap();
+        identity.insert("relay".into(), json!(true));
+        identity.insert("relay_gateway".into(), json!(8443));
+        identity.insert(
+            "relay_gateway_check".into(),
+            json!({ "address": address, "ok": ok, "error": error, "checked_at_ms": 1 }),
+        );
+        body
+    };
+    let ca = authority(&lab).await;
+    let secret = relay.secret.clone().expect("secret de liaison");
+    let send = |body: Value| {
+        client(&lab, &ca, Some((relay.certificate.as_slice(), relay.key.as_slice())))
+            .post(url(&lab, "/api/ingest"))
+            .bearer_auth(&enrolment)
+            .header("x-dumbmonit-agent-secret", secret.as_str())
+            .json(&body)
+            .send()
+    };
+    let sent = send(report(false, "192.168.10.5:8443")).await.expect("lot");
+    assert_eq!(sent.status(), StatusCode::OK);
+    let failed = check().await;
+    assert_eq!(failed.body["relay"]["listening"], true, "{}", failed.body);
+    assert_eq!(failed.body["relay"]["self_check"], true);
+    assert_eq!(failed.body["relay"]["reachable"], false);
+    assert_eq!(failed.body["relay"]["check_error"], "cannot connect: refused");
+
+    // Un essai à une autre adresse ne dit rien de celle-ci.
+    send(report(true, "127.0.0.1:8443")).await.expect("lot");
+    assert_eq!(check().await.body["relay"]["reachable"], Value::Null);
+
+    send(report(true, "192.168.10.5:8443")).await.expect("lot");
+    let passed = check().await;
+    assert_eq!(passed.body["relay"]["reachable"], true, "{}", passed.body);
+    let view = lab.app.get(&format!("/api/targets/{relay_id}/agent"), Some(&admin)).await;
+    assert_eq!(view.body["gateway_check"]["ok"], true, "{}", view.body);
+}

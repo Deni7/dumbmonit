@@ -50,7 +50,10 @@ the Internet, but it still deserves a source filter. Change it with
 - **Open on the Internet:** anyone can try a TLS handshake, but without an
   agent certificate they get nothing. Restrict it to your agents' IPs anyway.
 - **Relay gateway:** a relay agent opens its own gateway, also on 8443 by
-  default. Open it on the relay's firewall to the site's network only.
+  default, as soon as it connects. Its install command opens that port on the
+  relay's firewall (firewalld, ufw or the Windows firewall) to the local subnet
+  only, and `--uninstall` closes it again. A relay in Docker publishes it
+  through `docker-compose.agent.yml`.
 
 See [Agent channel security](agent-security.md).
 

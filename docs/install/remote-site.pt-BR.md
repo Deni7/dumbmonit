@@ -140,13 +140,25 @@ conexão e deixa você nomear a máquina, colocá-la em uma pasta e em um local 
 A partir de um site em *Adicionar por site*, **Servidor com o agente** pré-seleciona o relay
 desse site; a página do próprio relay tem **Instalar um agente por meio dele**.
 
-Escolher um relay para uma instalação pede que ele abra o gateway (na porta 8443 por padrão) no
-próximo envio. O painel *Relay* da página do relay mostra o gateway — *Escutando na porta 8443 —
-3 agentes conectados* — e permite mudar a porta e o endereço, ou fechá-lo. Abra essa porta no
-firewall do próprio relay, **só para a rede do site**. Em um relay Docker, publique a porta
-(`-p 8443:8443`, ou os `ports:` comentados de `docker-compose.agent.yml`).
-`gateway_listen: 0.0.0.0:9443` no `agent.yaml` do relay (`DUMBMONIT_AGENT_GATEWAY_LISTEN`) tem
-prioridade sobre a configuração na interface.
+Um relay abre o gateway (porta 8443 por padrão) assim que se conecta, e na hora
+quando você o escolhe para uma instalação ou muda o gateway: o servidor encerra
+a espera longa do relay, não há envio a aguardar. Em seguida o relay testa ele
+mesmo o gateway, no endereço que o local usa, como faria uma máquina do local, e
+informa o resultado: a tela de adição mostra o comando quando o teste passa, ou
+diz o que falhou. O teste não enxerga um firewall entre as máquinas do local e o
+relay (o relay não o atravessa para chegar a si mesmo). O painel *Relay* da
+página do relay mostra o gateway — *Escutando na porta 8443 — 3 agentes
+conectados* — e permite mudar a porta e o endereço, ou fechá-lo. O comando de
+instalação de um relay abre essa porta no firewall do próprio relay, **apenas
+para a rede do local** (firewalld ou ufw no Linux, o firewall do Windows com
+`LocalSubnet`), avisa na tela, e `--uninstall` (`-Uninstall`) remove a regra;
+`--no-firewall` (`-NoFirewall`) deixa o firewall como está. Em um relay Docker,
+o `docker-compose.agent.yml` publica a 8443
+(`DUMBMONIT_AGENT_GATEWAY_PUBLISH=192.168.10.5:8443` a limita ao endereço da
+LAN). `gateway_listen: 0.0.0.0:9443` no `agent.yaml` do relay
+(`DUMBMONIT_AGENT_GATEWAY_LISTEN`) tem prioridade sobre a configuração na
+interface. Relays instalados antes desse comportamento mantêm fechado um gateway
+que nunca tinham aberto.
 
 O que passa pelo relay:
 

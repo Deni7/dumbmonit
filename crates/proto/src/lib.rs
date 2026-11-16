@@ -26,7 +26,7 @@ pub use command::{
     AgentCommand, CMD_AGENT_UNINSTALL, CMD_CONTAINER_RESTART, CMD_CONTAINER_UPDATE, CMD_PROBE,
     COMMAND_MAX_AGE_SECS, COMMAND_RESULT_MAX_BYTES, COMMAND_RESULT_TRUNCATED, COMMANDS_PATH,
     CommandReport, CommandStatus, NetconfigCapture, ProbeJob, ProbeOutcome, RELAY_PATH,
-    RELAY_POLL_HOLD_SECS, truncate_result,
+    RELAY_POLL_HOLD_SECS, RELAY_RESYNC_HEADER, truncate_result,
 };
 pub use credential::{
     Credential, CredentialInput, Resolved, SnmpV3Auth, SnmpV3AuthInput, SnmpV3AuthProtocol,
@@ -54,9 +54,10 @@ pub use logs::{
 };
 pub use push::{
     AGENT_KEY_HEADER, AGENT_SECRET_HEADER, AGENT_SECRET_PREFIX, AgentIdentity, BINDING_MISMATCH,
-    DeclaredMonitor, ENROLMENT_PENDING, ENROLMENT_REJECTED, INGEST_PATH, InstalledPackage,
-    MAX_BATCH_SAMPLES, MAX_DECLARED_MONITORS, MAX_INVENTORY_PACKAGES, PUSH_PROTOCOL_VERSION,
-    PushAck, PushBatch, RelaySetting, SoftwareInventory, TOKEN_PREFIX,
+    DeclaredMonitor, ENROLMENT_PENDING, ENROLMENT_REJECTED, GatewayCheck, INGEST_PATH,
+    InstalledPackage, MAX_BATCH_SAMPLES, MAX_DECLARED_MONITORS, MAX_GATEWAY_CHECK_ERROR,
+    MAX_INVENTORY_PACKAGES, PUSH_PROTOCOL_VERSION, PushAck, PushBatch, RelaySetting,
+    SoftwareInventory, TOKEN_PREFIX,
 };
 pub use remediation::{CMD_SCRIPT_RUN, CMD_SERVICE_RESTART, DeclaredScript, RemediationInfo};
 pub use sample::{MetricKind, Sample};

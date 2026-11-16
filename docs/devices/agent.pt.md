@@ -334,6 +334,9 @@ todos os sistemas.
 | `--sha256=LIST` | `-Sha256` | SHA-256 esperado do download, como pares `platform-arch:hex` separados por vírgulas (um valor hex simples também serve). Incluído no comando que o DumbMonit mostra; obrigatório a menos que a flag seguinte seja dada. |
 | `--insecure-skip-checksum` | `-InsecureSkipChecksum` | Instalar um binário descarregado sem o verificar, com um aviso. Apenas para configurações isoladas da rede ou manuais. |
 | `--no-start` | | Instalar tudo, mas não contactar o servidor nem iniciar o serviço (imagem de máquina, testes). |
+| `--open-gateway` | `-OpenGateway` | Retransmissor: abrir a porta do gateway na firewall local (firewalld, ufw, firewall do Windows), apenas para a sub-rede local. Implícito com `--relay`; o comando de um token de retransmissor inclui-o. `--uninstall` retira a regra. |
+| `--gateway-port=N` | `-GatewayPort N` | Porta do gateway do retransmissor aberta na firewall (8443 por omissão). |
+| `--no-firewall` | `-NoFirewall` | Não mexer na firewall local. |
 | `--uninstall` | `-Uninstall` | Desinstalar o agente e apagar a sua configuração. |
 | `--help` | | Mostrar a ajuda. |
 

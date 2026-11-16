@@ -470,9 +470,11 @@ pub async fn create_token(
     let policy = payload.policy()?;
     if let Some(route) = &route {
         // Choisir ce relais pour une installation, c'est lui demander d'ouvrir
-        // sa passerelle : il l'ouvre à son prochain lot.
+        // sa passerelle à cette adresse : il en reçoit le réglage aussitôt
+        // (fin de son attente longue), l'ouvre, l'essaie et le rapporte.
         agent::set_relay_gateway(&state.pool, route.relay_id, Some(route.port), Some(&route.host))
             .await?;
+        state.relay().nudge(route.relay_id);
     }
     let (mut record, secret) = agent::create_token(&state.pool, policy).await?;
     clients::assign(&state.pool, clients::Kind::AgentToken, &[record.id], Some(client))
@@ -488,7 +490,7 @@ pub async fn create_token(
     // Un relais est posé sur un site distant : sa commande n'utilise que le
     // port des agents, le seul qu'un site distant ait à joindre.
     let agent_port_only = payload.relay || payload.agent_port_only;
-    let params = install_parameters_probed(
+    let mut params = install_parameters_probed(
         &state,
         payload.base_url.as_deref(),
         route,
@@ -496,6 +498,10 @@ pub async fn create_token(
         agent_port_only,
     )
     .await;
+
+    // Un relais ouvre sa passerelle d'office : l'installateur ouvre aussi le
+    // port sur son pare-feu, au seul sous-réseau local.
+    params.open_gateway = payload.relay;
 
     let mut token = TokenView::from(record);
     token.client_id = client;
@@ -540,6 +546,10 @@ pub struct InstallParams {
     /// Relais par lequel passent ces commandes, s'il y en a un : `base_url` et
     /// `agent_url` sont alors ceux de sa passerelle.
     pub via_relay: Option<RelayRoute>,
+    /// La machine installée sera un relais : l'installateur ouvre le port de sa
+    /// passerelle sur son pare-feu (firewalld, ufw, pare-feu Windows), au seul
+    /// sous-réseau local (`--open-gateway`, `-OpenGateway`).
+    pub open_gateway: bool,
     /// Clé publique épinglée (`sha256//…`) du certificat que présente
     /// `base_url`, quand il n'est pas d'une autorité de confiance : celle du
     /// certificat autosigné de l'interface, ou celle du canal des agents à
@@ -568,6 +578,15 @@ pub struct RelayRoute {
     pub port: u16,
     /// Vrai si le relais déclare déjà écouter sur ce port.
     pub listening: bool,
+    /// Vrai si le relais rapporte des essais de sa passerelle (binaire à
+    /// jour) : l'interface attend alors le résultat de l'essai avant d'afficher
+    /// la commande.
+    pub self_check: bool,
+    /// Issue du dernier essai du relais à cette adresse (`hôte:port`) :
+    /// `Some(true)`, le serveur a répondu à travers la passerelle ;
+    /// `Some(false)`, voir `check_error` ; `None`, pas encore essayée là.
+    pub reachable: Option<bool>,
+    pub check_error: Option<String>,
 }
 
 /// Résout le passage par `relay` : un agent en mode relais, du client donné
@@ -613,11 +632,19 @@ pub async fn relay_route(
         .fetch_one(&state.pool)
         .await
         .map_err(anyhow::Error::from)?;
+    let address = format!("{host}:{port}");
+    let check = info
+        .relay_gateway_check
+        .as_ref()
+        .filter(|check| check.address.eq_ignore_ascii_case(&address));
     Ok(RelayRoute {
         relay_id: relay,
         relay_name,
         site: info.site.clone().or(info.relay_wanted_site.clone()),
         listening: info.relay_gateway_port == Some(port),
+        self_check: info.relay_gateway_check.is_some(),
+        reachable: check.map(|check| check.ok),
+        check_error: check.and_then(|check| check.error.clone()),
         host,
         port,
     })
@@ -648,6 +675,9 @@ impl InstallParams {
         if let (Some(url), Some(pin)) = (&self.agent_url, &self.ca_pin) {
             command.push_str(&format!(" --tls-url={url} --ca-pin={pin}"));
         }
+        if self.open_gateway {
+            command.push_str(" --open-gateway");
+        }
         command
     }
 
@@ -657,6 +687,9 @@ impl InstallParams {
             install_windows(&self.base_url, token, &self.pairs(true), self.https_pin.as_deref());
         if let (Some(url), Some(pin)) = (&self.agent_url, &self.ca_pin) {
             command.push_str(&format!(" -TlsUrl {url} -CaPin {pin}"));
+        }
+        if self.open_gateway {
+            command.push_str(" -OpenGateway");
         }
         command
     }
@@ -741,6 +774,7 @@ pub async fn install_parameters_probed(
         https_pin,
         pin_source,
         via_relay: route,
+        open_gateway: false,
     };
     params.linux_template = params.linux_command(TOKEN_PLACEHOLDER);
     params.windows_template = params.windows_command(TOKEN_PLACEHOLDER);
@@ -1053,6 +1087,7 @@ mod tests {
             via_relay: None,
             https_pin: None,
             pin_source: None,
+            open_gateway: false,
         };
         let linux = params.linux_command("dmon_abc");
         assert!(linux.ends_with(&format!(" --tls-url=https://s:8443 --ca-pin={pin}")), "{linux}");
@@ -1060,6 +1095,11 @@ mod tests {
         let windows = params.windows_command(TOKEN_PLACEHOLDER);
         assert!(windows.contains("-Token {TOKEN}"), "{windows}");
         assert!(windows.ends_with(&format!(" -TlsUrl https://s:8443 -CaPin {pin}")));
+
+        // Un relais : l'installateur ouvre le port de sa passerelle.
+        let relay = InstallParams { open_gateway: true, ..params };
+        assert!(relay.linux_command("dmon_abc").ends_with(" --open-gateway"));
+        assert!(relay.windows_command("dmon_abc").ends_with(" -OpenGateway"));
     }
 
     #[test]
@@ -1075,6 +1115,7 @@ mod tests {
             via_relay: None,
             https_pin: Some(PIN.into()),
             pin_source: None,
+            open_gateway: false,
         };
         let linux = params.linux_command("dmon_abc");
         assert!(

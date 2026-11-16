@@ -146,13 +146,26 @@ nombrar la máquina, archivarla en una carpeta y situarla en un sitio sin salir 
 un sitio en *Añadir por sitio*, **Servidor con el agente** preselecciona el relé de ese sitio; la
 página del propio relé tiene **Instalar un agente a través de él**.
 
-Elegir un relé para una instalación le pide que abra su pasarela (en el puerto 8443 por defecto)
-en su próximo envío. El panel *Relay* de la página del relé muestra la pasarela — *Escuchando en el
-puerto 8443 — 3 agentes conectados* — y permite cambiar el puerto y la dirección, o cerrarla. Abre
-ese puerto en el cortafuegos del propio relé, **solo hacia la red del sitio**. En un relé Docker,
-publica el puerto (`-p 8443:8443`, o los `ports:` comentados de `docker-compose.agent.yml`).
-`gateway_listen: 0.0.0.0:9443` en el `agent.yaml` del relé (`DUMBMONIT_AGENT_GATEWAY_LISTEN`)
-prevalece sobre el ajuste de la interfaz.
+Un relé abre su pasarela (puerto 8443 por defecto) en cuanto se conecta, y al
+instante cuando lo eliges para una instalación o cambias la pasarela: el
+servidor termina la espera larga del relé, no hay que esperar a su próximo
+envío. Después, el relé prueba él mismo su pasarela, en la dirección que usa el
+sitio, como lo haría una máquina del sitio, e informa del resultado: la pantalla
+de alta muestra el comando cuando la prueba sale bien, o dice qué falló. La
+prueba no ve un cortafuegos situado entre las máquinas del sitio y el relé (el
+relé no lo atraviesa para llegar a sí mismo). El panel *Relay* de la página del
+relé muestra la pasarela — *Escuchando en el puerto 8443 — 3 agentes
+conectados* — y permite cambiar el puerto y la dirección, o cerrarla. El comando
+de instalación de un relé abre ese puerto en el cortafuegos del propio relé,
+**solo para la red del sitio** (firewalld o ufw en Linux, el cortafuegos de
+Windows con `LocalSubnet`), lo indica en pantalla, y `--uninstall`
+(`-Uninstall`) retira la regla; `--no-firewall` (`-NoFirewall`) deja el
+cortafuegos como está. En un relé Docker, `docker-compose.agent.yml` publica el
+8443 (`DUMBMONIT_AGENT_GATEWAY_PUBLISH=192.168.10.5:8443` lo limita a la
+dirección de la LAN). `gateway_listen: 0.0.0.0:9443` en el `agent.yaml` del
+relé (`DUMBMONIT_AGENT_GATEWAY_LISTEN`) prevalece sobre el ajuste de la
+interfaz. Los relés instalados antes de este comportamiento mantienen cerrada
+una pasarela que nunca habían abierto.
 
 Lo que pasa por el relé:
 

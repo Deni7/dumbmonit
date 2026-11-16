@@ -329,6 +329,29 @@ mod tests {
         assert!(INSTALL_PS1.contains("$lignes.Add(\"relay: true\")"));
     }
 
+    /// Un relais ouvre le port de sa passerelle sur son pare-feu, au seul
+    /// sous-réseau local, et la désinstallation le referme.
+    #[test]
+    fn the_scripts_open_the_gateway_port_to_the_local_subnet_only_and_undo_it() {
+        assert!(INSTALL_SH.contains("--open-gateway) OPEN_GATEWAY=1 ;;"));
+        assert!(INSTALL_SH.contains("[ \"$RELAY\" -eq 1 ] && OPEN_GATEWAY=1"));
+        assert!(INSTALL_SH.contains("source address=\\\"$reseau\\\""), "firewalld, sous-réseau");
+        assert!(INSTALL_SH.contains("ufw allow from \"$reseau\" to any port"), "ufw, sous-réseau");
+        assert!(INSTALL_SH.contains("--remove-rich-rule="));
+        assert!(INSTALL_SH.contains("ufw delete allow from"));
+        // La désinstallation défait ce qui a été posé, avant d'effacer le dossier.
+        let uninstall = INSTALL_SH.split("if [ \"$UNINSTALL\" -eq 1 ]; then").nth(1).unwrap();
+        let undo = uninstall.find("annuler_pare_feu").expect("règles retirées");
+        assert!(undo < uninstall.find("rm -rf \"$CONFIG_DIR\"").unwrap());
+
+        assert!(INSTALL_PS1.contains("[switch]$OpenGateway"));
+        assert!(INSTALL_PS1.contains("-RemoteAddress LocalSubnet"));
+        assert!(INSTALL_PS1.contains("remoteip=localsubnet"));
+        assert!(INSTALL_PS1.contains("if (-not ($OpenGateway -or $Relay)) { return }"));
+        let uninstall = INSTALL_PS1.split("if ($Uninstall) {").nth(1).unwrap();
+        assert!(uninstall.contains("Remove-RegleParefeu"));
+    }
+
     /// La vérification est obligatoire : sans empreinte, ou sans outil pour la
     /// calculer, rien n'est installé, sauf échappatoire explicite et bruyante.
     #[test]

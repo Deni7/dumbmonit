@@ -179,14 +179,24 @@ file it in a folder and place it at a site, without leaving the page. From a
 site in *Add by site*, **Server with the agent** preselects that site's relay;
 the relay's own page has **Install an agent through it**.
 
-Choosing a relay for an install asks it to open its gateway (on port 8443 by
-default) at its next report. The *Relay* panel of the relay's page shows the
-gateway — *Listening on port 8443 — 3 agents connected* — and lets you change
-the port and the address, or close it. Open that port on the relay's own
-firewall, **to the site's network only**. On a Docker relay, publish the port
-(`-p 8443:8443`, or the commented `ports:` of `docker-compose.agent.yml`).
-`gateway_listen: 0.0.0.0:9443` in the relay's `agent.yaml`
-(`DUMBMONIT_AGENT_GATEWAY_LISTEN`) wins over the setting in the UI.
+A relay opens its gateway (port 8443 by default) as soon as it connects, and
+at once when you choose it for an install or change the gateway: the server
+ends the relay's long poll, so there is no report to wait for. The relay then
+tests its gateway itself, at the address the site uses, as a machine of the site
+would, and reports the outcome: the add screen shows the command once that test
+passes, or says what failed. The test cannot see a firewall between the site's
+machines and the relay (the relay does not cross it to reach itself). The
+*Relay* panel of the relay's page shows the gateway — *Listening on port 8443 —
+3 agents connected* — and lets you change the port and the address, or close it.
+The install command of a relay opens that port on the relay's own firewall,
+**to the site's network only** (firewalld or ufw on Linux, the Windows firewall
+with `LocalSubnet`), says so on screen, and `--uninstall` (`-Uninstall`) removes
+the rule; `--no-firewall` (`-NoFirewall`) leaves the firewall alone. On a Docker
+relay, `docker-compose.agent.yml` publishes 8443
+(`DUMBMONIT_AGENT_GATEWAY_PUBLISH=192.168.10.5:8443` keeps it on the LAN
+address). `gateway_listen: 0.0.0.0:9443` in the relay's `agent.yaml`
+(`DUMBMONIT_AGENT_GATEWAY_LISTEN`) wins over the setting in the UI. Relays
+installed before this behaviour keep a gateway they never opened closed.
 
 What travels through the relay:
 
@@ -236,7 +246,7 @@ A monitor does not have to choose between the server and one relay: it can be pr
 | The agent page does not say *Relay* | The relay switch is off. Open the monitor, use the **gear**, switch on *Relay for a remote site*, give the site, save. It applies at the next report. |
 | A monitor shows *Timed out: relay agent … did not pick up the probe* | The relay is stopped or not in relay mode. Check the service on the relay machine and that `relay: true` is set. |
 | A monitor shows a red message under its address | The relay cannot reach the device. The address must be the one **seen from the remote site**, and the relay needs the same access the server would. |
-| Agents installed behind the relay do not appear | Run the command copied from the relay's *Install an agent behind this relay* page, not the direct one. The relay opens its gateway at its next report, within a minute. |
+| Agents installed behind the relay do not appear | Run the command copied from the relay's *Install an agent behind this relay* page, not the direct one. The relay opens its gateway within seconds; the add screen says whether the relay could reach it at the site's address. |
 
 ## Limits
 

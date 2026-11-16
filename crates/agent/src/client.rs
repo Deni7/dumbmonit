@@ -8,8 +8,8 @@ use anyhow::{Context, Result};
 use dumbmonit_proto::{
     AGENT_KEY_HEADER, AGENT_SECRET_HEADER, AGENT_TLS_HEADER, AgentCommand, CERT_REFUSED,
     COMMANDS_PATH, CommandReport, INGEST_PATH, LOGS_PATH, LogBatch, ProbeOutcome, PushAck,
-    PushBatch, RELAY_PATH, RELAY_TUNNEL_PATH, RELAY_TUNNEL_PROTOCOL, TLS_ENROL_PATH,
-    TLS_RENEW_PATH, TlsCertificate, TlsEnrolRequest, TlsOffer, TlsRenewRequest,
+    PushBatch, RELAY_PATH, RELAY_RESYNC_HEADER, RELAY_TUNNEL_PATH, RELAY_TUNNEL_PROTOCOL,
+    TLS_ENROL_PATH, TLS_RENEW_PATH, TlsCertificate, TlsEnrolRequest, TlsOffer, TlsRenewRequest,
 };
 use tokio::sync::Notify;
 
@@ -102,6 +102,10 @@ pub struct PushClient {
     /// la boucle des mesures en attente de reprise repart aussitôt que le relais
     /// a retrouvé le serveur, et inversement.
     reachable: Arc<Notify>,
+    /// Demande d'un lot sans attendre la période : réglage du relais changé
+    /// côté serveur, passerelle ouverte ou essayée. Un seul jeton en attente
+    /// (`notify_one`) : plusieurs demandes rapprochées donnent un seul lot.
+    report_now: Arc<Notify>,
 }
 
 impl PushClient {
@@ -125,6 +129,7 @@ impl PushClient {
             secret: Arc::new(RwLock::new(secret)),
             legacy_key: Arc::new(AtomicBool::new(false)),
             reachable: Arc::new(Notify::new()),
+            report_now: Arc::new(Notify::new()),
         })
     }
 
@@ -270,6 +275,17 @@ impl PushClient {
     /// Note une réponse favorable et réveille qui attendait le serveur.
     fn mark_reachable(&self) {
         self.reachable.notify_waiters();
+    }
+
+    /// Demande à la boucle des mesures d'envoyer un lot sans attendre sa
+    /// période.
+    pub fn request_report(&self) {
+        self.report_now.notify_one();
+    }
+
+    /// Signal « un lot est demandé », à attendre dans la boucle des mesures.
+    pub fn report_requested(&self) -> Arc<Notify> {
+        self.report_now.clone()
     }
 
     /// Requête vers un canal d'agent (commandes, relais) : jeton, secret de
@@ -454,6 +470,11 @@ impl PushClient {
         let response = self
             .exchange(|| self.keyed(reqwest::Method::GET, &path, key, &query).timeout(timeout))
             .await?;
+        if response.headers().contains_key(RELAY_RESYNC_HEADER) {
+            // Le réglage de ce relais vient de changer : le prochain accusé de
+            // réception le porte, autant l'avoir tout de suite.
+            self.request_report();
+        }
         self.read_json(response).await
     }
 
@@ -641,7 +662,7 @@ fn commands_path(id: Option<i64>) -> String {
 /// Le message brut de `reqwest` commence par l'URL complète : tronqué par
 /// `systemctl status`, il ne montrait jamais la cause, et recopiait la clé de
 /// la machine quand elle voyageait encore dans l'URL.
-fn describe(error: &reqwest::Error) -> String {
+pub(crate) fn describe(error: &reqwest::Error) -> String {
     use std::error::Error as _;
     let nature = if error.is_timeout() {
         "timed out"
@@ -763,6 +784,22 @@ mod tests {
         // Quelqu'un peut ouvrir la fenêtre de réenrôlement pendant qu'on patiente.
         assert!(PushError::Forbidden("rebind me".into()).is_retryable());
         assert!(!PushError::Rejected { status: 400, message: "lot vide".into() }.is_retryable());
+    }
+
+    #[tokio::test]
+    async fn a_requested_report_waits_for_the_loop_and_close_requests_make_one_batch() {
+        let client = PushClient::new("http://serveur:8080", "dmon_x", None, Duration::from_secs(1))
+            .expect("client");
+        let signal = client.report_requested();
+        // Demandé avant que la boucle n'attende (fin de l'attente longue du
+        // relais pendant un envoi) : la demande est gardée.
+        client.clone().request_report();
+        client.request_report();
+        tokio::time::timeout(Duration::from_millis(100), signal.notified())
+            .await
+            .expect("demande gardée");
+        let again = tokio::time::timeout(Duration::from_millis(50), signal.notified()).await;
+        assert!(again.is_err(), "deux demandes rapprochées, un seul lot");
     }
 
     #[test]

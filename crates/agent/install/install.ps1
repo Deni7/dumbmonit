@@ -40,6 +40,13 @@ param(
     [switch]$Relay,
     # Site of this relay, for example "Lyon office".
     [string]$Site,
+    # This machine is a relay: open its gateway port on the Windows firewall, inbound, to the
+    # local subnet only. Implied by -Relay. Undone by -Uninstall.
+    [switch]$OpenGateway,
+    # Port of the relay gateway.
+    [int]$GatewayPort = 8443,
+    # Do not touch the Windows firewall.
+    [switch]$NoFirewall,
     # Optional modules to run (docker, plakar, system_health, sensors, smart, zfs,
     # libvirt, wireguard, ipsec, perf_counters, or none). Omitted: every module detects itself.
     [string[]]$Modules,
@@ -77,6 +84,41 @@ $LegacyInstallDir  = Join-Path $env:ProgramFiles 'EzyMonit'
 $LegacyConfigDir   = Join-Path $env:ProgramData 'EzyMonit'
 
 function Write-Etape($message) { Write-Host "==> $message" }
+
+# Règle du pare-feu Windows pour la passerelle du relais. Le même nom sert de
+# Name et de DisplayName : `netsh advfirewall … name=` vise le second, et c'est
+# lui que la désinstallation (ce script, ou l'agent sur ordre du serveur) retire.
+$RegleParefeu = 'DumbMonit-relay-gateway'
+
+function Remove-RegleParefeu {
+    & netsh.exe advfirewall firewall delete rule name=$RegleParefeu | Out-Null
+}
+
+# Ouvre le port de la passerelle du relais, en entrée, au seul sous-réseau local
+# (`LocalSubnet`), et le dit. Une règle précédente du même nom est remplacée.
+function Open-ParefeuPasserelle {
+    if (-not ($OpenGateway -or $Relay)) { return }
+    Remove-RegleParefeu
+    if ($NoFirewall) {
+        Write-Etape "-NoFirewall: open TCP $GatewayPort on this machine's firewall yourself, to the site's network only"
+        return
+    }
+    try {
+        if (Get-Command New-NetFirewallRule -ErrorAction SilentlyContinue) {
+            New-NetFirewallRule -Name $RegleParefeu -DisplayName $RegleParefeu `
+                -Description 'DumbMonit relay gateway: agents of this site connect here.' `
+                -Direction Inbound -Protocol TCP -LocalPort $GatewayPort `
+                -RemoteAddress LocalSubnet -Action Allow -Profile Any | Out-Null
+        } else {
+            & netsh.exe advfirewall firewall add rule name=$RegleParefeu dir=in action=allow `
+                protocol=TCP localport=$GatewayPort remoteip=localsubnet | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "netsh exited with code $LASTEXITCODE" }
+        }
+        Write-Etape "Windows firewall: TCP $GatewayPort open to the local subnet only, for the relay gateway (rule $RegleParefeu)"
+    } catch {
+        Write-Warning "The Windows firewall rule could not be added ($_). Open TCP $GatewayPort inbound yourself, to the site's network only."
+    }
+}
 
 function Stop-Sur($message) {
     Restore-ValidationTls
@@ -225,6 +267,8 @@ if ($Uninstall) {
     }
     Remove-Item -Path $InstallDir -Recurse -Force -ErrorAction SilentlyContinue
     Remove-Item -Path $ConfigDir -Recurse -Force -ErrorAction SilentlyContinue
+    # La règle du pare-feu de la passerelle, si ce relais en avait une.
+    Remove-RegleParefeu
     # Les restes d'une installation d'avant le renommage partent aussi.
     Remove-AncienAgent | Out-Null
     Remove-Item -Path $LegacyConfigDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -240,6 +284,9 @@ if ($Url -notmatch '^https://') {
 }
 if ($PinnedKey -and $PinnedKey -cnotmatch '^sha256//[A-Za-z0-9+/]{43}=$') {
     Stop-Sur "Invalid -PinnedKey value (expected sha256//<base64>): $PinnedKey"
+}
+if ($GatewayPort -lt 1 -or $GatewayPort -gt 65535) {
+    Stop-Sur "Invalid -GatewayPort value: $GatewayPort"
 }
 Use-ServerTls
 
@@ -370,6 +417,9 @@ $encodage = New-Object System.Text.UTF8Encoding($false)
 # lire. L'héritage est coupé, sinon les droits du dossier parent le rouvriraient.
 & icacls.exe $ConfigPath /inheritance:r /grant:r 'SYSTEM:(R)' 'Administrators:(F)' | Out-Null
 Write-Etape "Configuration written to $ConfigPath"
+
+# Passerelle du relais : son port, au seul réseau du site.
+Open-ParefeuPasserelle
 
 # --------------------------------------------------------------- vérification
 

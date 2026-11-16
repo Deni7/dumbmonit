@@ -39,6 +39,7 @@ pub fn detect(config: &Config) -> AgentIdentity {
         // tentative) : `run::Agent::new`.
         self_update: None,
         relay_gateway: None,
+        relay_gateway_check: None,
         // Relu du disque à chaque démarrage : ajouter un manifeste demande de
         // redémarrer l'agent, comme toute modification de agent.yaml.
         remediation: Some(crate::remediation::describe(&config.actions)),

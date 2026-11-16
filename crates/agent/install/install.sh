@@ -59,6 +59,11 @@ MODULES_SET=0
 PLAKAR_KLOSETS=""
 RELAY=0
 SITE=""
+# Passerelle du relais : ouvrir son port sur le pare-feu de la machine, au seul
+# sous-réseau local (implicite avec --relay).
+OPEN_GATEWAY=0
+GATEWAY_PORT="8443"
+NO_FIREWALL=0
 
 SERVICE_NAME="dumbmonit-agent"
 # Étiquette launchd et nom rc.d : ni l'un ni l'autre n'accepte le nom Linux tel
@@ -104,6 +109,12 @@ OPTIONS:
     --relay             Relay mode: the agent also probes the devices of its
                         network for the server (writes relay: true)
     --site=NAME         Site of this relay, for example "Lyon office"
+    --open-gateway      This machine is a relay: open its gateway port (TCP
+                        8443) on the local firewall, to the local subnet only
+                        (firewalld or ufw, when active). Implied by --relay.
+                        Undone by --uninstall.
+    --gateway-port=N    Port of the relay gateway (default: 8443)
+    --no-firewall       Do not touch the local firewall
     --bin=PATH          Local binary to install instead of downloading it
     --pinned-key=PIN    Public key of the server's HTTPS certificate
                         (sha256//base64, as curl --pinnedpubkey takes it), for
@@ -159,6 +170,9 @@ for argument in "$@"; do
         --hostname=*) HOSTNAME_OVERRIDE="${argument#*=}" ;;
         --relay)      RELAY=1 ;;
         --site=*)     SITE="${argument#*=}" ;;
+        --open-gateway) OPEN_GATEWAY=1 ;;
+        --gateway-port=*) GATEWAY_PORT="${argument#*=}" ;;
+        --no-firewall) NO_FIREWALL=1 ;;
         --bin=*)      LOCAL_BIN="${argument#*=}" ;;
         --sha256=*)   EXPECTED_SHA256="${argument#*=}" ;;
         --insecure-skip-checksum) SKIP_CHECKSUM=1 ;;
@@ -224,6 +238,10 @@ case "$(uname -s)" in
 esac
 
 CONFIG_FILE="$CONFIG_DIR/agent.yaml"
+# Commandes qui retirent les règles de pare-feu posées pour la passerelle du
+# relais, écrites au moment de les poser : la désinstallation (ce script, ou
+# l'agent sur ordre du serveur) n'a qu'à l'exécuter.
+FIREWALL_UNDO="$CONFIG_DIR/firewall-undo.sh"
 # Le binaire vit dans un dossier à lui : c'est le seul que l'agent doit pouvoir
 # écrire pour se mettre à jour lui-même (copie de l'ancien, renommage atomique,
 # registre de l'essai), et l'unité systemd ne lui ouvre que celui-là. Un lien
@@ -342,9 +360,80 @@ arreter_service() {
     esac
 }
 
+# ------------------------------------------------------------ pare-feu
+
+# Retire les règles posées par une installation précédente, s'il y en a.
+annuler_pare_feu() {
+    if [ -f "$FIREWALL_UNDO" ]; then
+        info "removing the firewall rules of the relay gateway"
+        sh "$FIREWALL_UNDO" || true
+        rm -f "$FIREWALL_UNDO"
+    fi
+}
+
+# Sous-réseaux IPv4 de l'interface qui porte la route par défaut : le réseau
+# du site, d'où viennent ses agents. Rien sans `ip`, ou sans route.
+sous_reseaux_locaux() {
+    command -v ip >/dev/null 2>&1 || return 0
+    interface="$(ip -4 route show default 2>/dev/null \
+        | awk '{ for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit } }')"
+    [ -n "$interface" ] || return 0
+    ip -4 route show dev "$interface" scope link 2>/dev/null \
+        | awk '$1 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\/[0-9]+$/ { print $1 }' | sort -u
+}
+
+# Ouvre le port de la passerelle du relais, en entrée, au seul sous-réseau
+# local, sur firewalld ou ufw s'ils sont actifs, et le dit. Les commandes
+# inverses sont rangées dans $FIREWALL_UNDO. Une erreur de pare-feu n'arrête
+# pas l'installation : elle est dite, avec la commande à lancer.
+ouvrir_pare_feu() {
+    [ "$OPEN_GATEWAY" -eq 1 ] || return 0
+    annuler_pare_feu
+    if [ "$NO_FIREWALL" -eq 1 ]; then
+        info "--no-firewall: open TCP $GATEWAY_PORT on this machine's firewall yourself, to the site's network only"
+        return 0
+    fi
+    reseaux="$(sous_reseaux_locaux)"
+    if [ -z "$reseaux" ]; then
+        echo "WARNING: the local subnet could not be found: open TCP $GATEWAY_PORT on this" >&2
+        echo "         machine's firewall yourself, to the site's network only." >&2
+        return 0
+    fi
+    if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+        : > "$FIREWALL_UNDO"
+        chmod 0600 "$FIREWALL_UNDO"
+        for reseau in $reseaux; do
+            regle="rule family=\"ipv4\" source address=\"$reseau\" port port=\"$GATEWAY_PORT\" protocol=\"tcp\" accept"
+            if firewall-cmd --permanent --add-rich-rule="$regle" >/dev/null; then
+                echo "firewall-cmd --permanent --remove-rich-rule='$regle' >/dev/null 2>&1 || true" >> "$FIREWALL_UNDO"
+                info "firewall (firewalld): TCP $GATEWAY_PORT open to $reseau only, for the relay gateway"
+            else
+                echo "WARNING: firewalld refused the rule; run: firewall-cmd --permanent --add-rich-rule='$regle'" >&2
+            fi
+        done
+        firewall-cmd --reload >/dev/null 2>&1 || true
+        echo "firewall-cmd --reload >/dev/null 2>&1 || true" >> "$FIREWALL_UNDO"
+    elif command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+        : > "$FIREWALL_UNDO"
+        chmod 0600 "$FIREWALL_UNDO"
+        for reseau in $reseaux; do
+            if ufw allow from "$reseau" to any port "$GATEWAY_PORT" proto tcp >/dev/null; then
+                echo "ufw delete allow from $reseau to any port $GATEWAY_PORT proto tcp >/dev/null 2>&1 || true" >> "$FIREWALL_UNDO"
+                info "firewall (ufw): TCP $GATEWAY_PORT open to $reseau only, for the relay gateway"
+            else
+                echo "WARNING: ufw refused the rule; run: ufw allow from $reseau to any port $GATEWAY_PORT proto tcp" >&2
+            fi
+        done
+    else
+        info "no active firewalld or ufw: nothing opened. If another firewall filters this machine,"
+        info "open TCP $GATEWAY_PORT to $(echo $reseaux | tr ' ' ',') only, for the relay gateway."
+    fi
+}
+
 if [ "$UNINSTALL" -eq 1 ]; then
     info "stopping the service"
     arreter_service
+    annuler_pare_feu
     rm -f "$UNIT_PATH" "$OPENRC_PATH" "$PLIST_PATH" "$RC_PATH" "$BIN_PATH" "$LINK_PATH"
     # Avec le binaire : sa copie de secours et le registre des mises à jour.
     rm -rf "$BIN_DIR"
@@ -358,6 +447,14 @@ if [ "$UNINSTALL" -eq 1 ]; then
 fi
 
 [ -n "$TOKEN" ] || echec "the enrollment token is required (--token=...)"
+
+# Un relais ouvre sa passerelle d'office : le port suit.
+[ "$RELAY" -eq 1 ] && OPEN_GATEWAY=1
+case "$GATEWAY_PORT" in
+    ''|*[!0-9]*) echec "invalid --gateway-port value: $GATEWAY_PORT" ;;
+esac
+[ "$GATEWAY_PORT" -ge 1 ] && [ "$GATEWAY_PORT" -le 65535 ] \
+    || echec "invalid --gateway-port value: $GATEWAY_PORT"
 
 [ -n "$INIT" ] \
     || echec "neither systemd nor OpenRC found: run the agent by hand or adapt this script"
@@ -842,6 +939,9 @@ diagnostiquer_canal() {
             ;;
     esac
 }
+
+# Passerelle du relais : son port, au seul réseau du site.
+ouvrir_pare_feu
 
 # --------------------------------------------------------- vérification
 
