@@ -23,6 +23,12 @@ All notable changes to this project are documented here. The format follows
   `--uninstall` (or a remote uninstall) removes the rule; `--no-firewall` opts out.
   `docker-compose.agent.yml` now publishes 8443 for relays (`DUMBMONIT_AGENT_GATEWAY_PUBLISH` to
   bind it to one address). Relays installed earlier keep a gateway they never opened closed.
+- **Dedicated address for agents: `DUMBMONIT_AGENT_PUBLIC_URL`.** For example
+  `https://agents.example.com:443` behind an SNI passthrough sharing port 443 with websites. It
+  wins over the browser's host and `DUMBMONIT_AGENT_PUBLIC_PORT` (still supported) in the install
+  commands, and the channel announcement carries it, so agents installed without `--tls-url` use it
+  too. Checked at startup (`https://host[:port]` only). The configuration reference has HAProxy and
+  Traefik examples (TLS passed through, never terminated).
 
 ### Changed
 

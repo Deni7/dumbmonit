@@ -533,7 +533,8 @@ pub struct InstallParams {
     /// chiffré, sur un seul port (site distant). Le serveur y est reconnu à la
     /// clé de son certificat (`https_pin`), comme à travers un relais.
     pub agent_port_only: bool,
-    /// URL du canal chiffré des agents (`https://hôte:8443`), s'il est ouvert.
+    /// URL du canal chiffré des agents (`https://hôte:8443`, ou l'adresse
+    /// dédiée `DUMBMONIT_AGENT_PUBLIC_URL`), s'il est ouvert.
     pub agent_url: Option<String>,
     /// Empreinte SHA-256 de l'autorité du canal, que l'agent épingle.
     pub ca_pin: Option<String>,
@@ -781,10 +782,16 @@ pub async fn install_parameters_probed(
     params
 }
 
-/// URL du canal chiffré pour une installation directe : le même hôte que
-/// l'interface vue par le navigateur, sur le port des agents.
-fn direct_agent_url(_state: &AppState, web_url: &str, port: u16) -> Option<String> {
-    dumbmonit_proto::agent_channel_url(web_url, port)
+/// URL du canal chiffré pour une installation directe : l'adresse dédiée aux
+/// agents (`DUMBMONIT_AGENT_PUBLIC_URL`) quand il y en a une, sinon le même
+/// hôte que l'interface vue par le navigateur, sur le port des agents
+/// (`DUMBMONIT_AGENT_PUBLIC_PORT`, à défaut celui de l'écoute).
+fn direct_agent_url(state: &AppState, web_url: &str, port: u16) -> Option<String> {
+    state
+        .config
+        .agent_public_url
+        .clone()
+        .or_else(|| dumbmonit_proto::agent_channel_url(web_url, port))
 }
 
 /// Clé à épingler pour joindre le port de l'interface : celle du certificat

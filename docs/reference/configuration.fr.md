@@ -170,6 +170,72 @@ service ciblent. Le ping ICMP a besoin du sysctl
 `net.ipv4.ping_group_range` réglé dans le fichier Compose (aucune
 capacité).
 
+### Adresse dédiée aux agents et aiguillage SNI {#dedicated-agent-address}
+
+`DUMBMONIT_AGENT_PUBLIC_URL=https://agents.example.com:443` donne aux agents
+une adresse à eux. Elle prime sur l'hôte ouvert par le navigateur et sur
+`DUMBMONIT_AGENT_PUBLIC_PORT` (toujours pris en charge) dans les commandes
+d'installation (`--tls-url`, et `--url` aussi pour un relais ou avec
+`agent_port_only=true`), et dans l'annonce du canal que les agents reçoivent à
+l'enrôlement et à chaque réponse : un agent installé sans `--tls-url` y passe de
+lui-même. Seul `https://hôte[:port]` est accepté, vérifié au démarrage :
+`http://`, un chemin, un nom d'utilisateur ou un canal des agents fermé
+(`DUMBMONIT_AGENT_LISTEN=off`) arrêtent le serveur avec un message.
+
+Le cas courant : une seule IP publique dont le port 443 sert déjà des sites. Un
+mandataire TCP lit le nom de serveur (SNI) du ClientHello TLS et passe la
+connexion, toujours chiffrée, au port 8443 de DumbMonit. **Ne terminez jamais
+TLS à cet endroit** : le certificat client de l'agent et l'autorité épinglée
+doivent arriver intacts jusqu'à DumbMonit.
+
+HAProxy (`web` désigne ce qui sert déjà le 443) :
+
+```haproxy
+frontend https_in
+    bind :443
+    mode tcp
+    tcp-request inspect-delay 5s
+    tcp-request content accept if { req.ssl_hello_type 1 }
+    use_backend dumbmonit_agents if { req.ssl_sni -i agents.example.com }
+    default_backend web
+
+backend dumbmonit_agents
+    mode tcp
+    server dumbmonit 192.168.1.5:8443
+
+backend web
+    mode tcp
+    server proxy 127.0.0.1:8444
+```
+
+Traefik v3 (fournisseur fichier ; le point d'entrée `websecure` écoute sur 443) :
+
+```yaml
+tcp:
+  routers:
+    dumbmonit-agents:
+      entryPoints: [websecure]
+      rule: "HostSNI(`agents.example.com`)"
+      service: dumbmonit-agents
+      tls:
+        passthrough: true
+  services:
+    dumbmonit-agents:
+      loadBalancer:
+        servers:
+          - address: "192.168.1.5:8443"
+```
+
+- Mettez un nom DNS dans l'URL : le nom voyage dans le SNI, une IP non.
+- Le serveur voit l'adresse du mandataire : les tentatives d'enrôlement
+  manquées sont comptées par adresse, tous les agents derrière le mandataire
+  partagent donc un même compteur.
+- Vérifiez depuis l'extérieur : `curl -k https://agents.example.com/install.sh`
+  renvoie le script d'installation (le port des agents le sert sans certificat
+  client).
+- Cloudflare Tunnel, ou tout mandataire qui termine TLS, ne peut pas porter le
+  canal des agents.
+
 ## Volumes et fichiers
 
 Un volume, `dumbmonit-data`, monté sur `/data`. Son nom est fixé dans le

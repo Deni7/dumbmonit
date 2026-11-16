@@ -20,7 +20,7 @@ segunda instância para vigiar.
 !!! tip "Uma só porta para um site remoto"
     O comando de instalação mostrado para um retransmissor usa **apenas a porta
     dos agentes**: o script de instalação, o binário do agente e o canal cifrado
-    vêm todos de `https://<servidor>:8443`. O comando fixa a chave do certificado
+    vêm todos de `https://<servidor>:8443` (ou `DUMBMONIT_AGENT_PUBLIC_URL`). O comando fixa a chave do certificado
     dessa porta e o SHA-256 de cada binário: a transferência é verificada de
     ponta a ponta sem abrir a porta web (8080) ao site. As ferramentas de
     implementação obtêm o mesmo comando com

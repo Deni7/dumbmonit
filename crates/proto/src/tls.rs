@@ -34,7 +34,8 @@ pub const TLS_ENROL_PATH: &str = "/api/agent/tls/enroll";
 pub const TLS_RENEW_PATH: &str = "/api/agent/tls/renew";
 
 /// En-tête par lequel le serveur annonce son canal chiffré :
-/// `port=8443; pins=<sha256>[,<sha256>]`.
+/// `port=8443; pins=<sha256>[,<sha256>]`, suivi de `; url=https://hôte:port`
+/// quand le serveur a une adresse dédiée aux agents.
 ///
 /// Sur le canal chiffré, il tient à jour les empreintes épinglées par l'agent
 /// (rotation de l'autorité). Sur l'ancien canal en clair, il invite un agent à
@@ -117,12 +118,21 @@ pub struct TlsCertificate {
 pub struct TlsOffer {
     pub port: u16,
     pub pins: Vec<String>,
+    /// Adresse dédiée aux agents (`https://hôte:port`), quand le serveur en a
+    /// une : elle prime sur l'hôte du `server_url` de l'agent. Un agent
+    /// antérieur l'ignore.
+    pub url: Option<String>,
 }
 
 impl TlsOffer {
     /// Valeur de l'en-tête.
     pub fn to_header(&self) -> String {
-        format!("port={}; pins={}", self.port, self.pins.join(","))
+        let mut header = format!("port={}; pins={}", self.port, self.pins.join(","));
+        if let Some(url) = self.url.as_deref().filter(|url| is_offer_url(url)) {
+            header.push_str("; url=");
+            header.push_str(url);
+        }
+        header
     }
 
     /// Lit l'en-tête ; `None` s'il est illisible, sans port ou sans empreinte
@@ -131,6 +141,7 @@ impl TlsOffer {
     pub fn parse(value: &str) -> Option<Self> {
         let mut port = None;
         let mut pins = Vec::new();
+        let mut url = None;
         for part in value.split(';') {
             let Some((key, raw)) = part.split_once('=') else { continue };
             match key.trim() {
@@ -142,6 +153,7 @@ impl TlsOffer {
                         .filter(|pin| is_pin(pin))
                         .collect();
                 }
+                "url" => url = Some(raw.trim().to_string()).filter(|url| is_offer_url(url)),
                 _ => {}
             }
         }
@@ -149,8 +161,17 @@ impl TlsOffer {
         if pins.is_empty() {
             return None;
         }
-        Some(Self { port, pins })
+        Some(Self { port, pins, url })
     }
+}
+
+/// Une adresse d'annonce acceptable : `https://hôte:port`, sans chemin ni
+/// caractère qui sortirait de l'en-tête ou d'une URL ordinaire. Le canal reste
+/// épinglé : une adresse annoncée ne peut mener qu'au même serveur.
+fn is_offer_url(url: &str) -> bool {
+    let Some(rest) = url.strip_prefix("https://") else { return false };
+    let safe = |b: u8| b.is_ascii_alphanumeric() || b"-._:[]".contains(&b);
+    !rest.is_empty() && rest.len() <= 260 && rest.bytes().all(safe)
 }
 
 /// Vrai pour une empreinte SHA-256 en hexadécimal minuscule.
@@ -198,8 +219,27 @@ mod tests {
 
     #[test]
     fn the_offer_round_trips_through_its_header() {
-        let offer = TlsOffer { port: 8443, pins: vec![PIN_A.into(), PIN_B.into()] };
+        let offer = TlsOffer { port: 8443, pins: vec![PIN_A.into(), PIN_B.into()], url: None };
         assert_eq!(TlsOffer::parse(&offer.to_header()), Some(offer));
+        let dedicated = TlsOffer {
+            port: 8443,
+            pins: vec![PIN_A.into()],
+            url: Some("https://agents.example.com:443".into()),
+        };
+        assert!(dedicated.to_header().ends_with("; url=https://agents.example.com:443"));
+        assert_eq!(TlsOffer::parse(&dedicated.to_header()), Some(dedicated));
+    }
+
+    #[test]
+    fn an_announced_address_is_https_host_and_port_or_nothing() {
+        let header = |url: &str| format!("port=8443; pins={PIN_A}; url={url}");
+        for refused in ["http://agents.example.com:80", "https://a.example/p", "https://", "ftp://x"] {
+            assert_eq!(TlsOffer::parse(&header(refused)).unwrap().url, None, "{refused}");
+        }
+        let offer = TlsOffer::parse(&header(" https://[fd00::5]:9443 ")).unwrap();
+        assert_eq!(offer.url.as_deref(), Some("https://[fd00::5]:9443"));
+        // Une annonce antérieure, sans adresse, reste lisible.
+        assert_eq!(TlsOffer::parse(&format!("port=8443; pins={PIN_A}")).unwrap().url, None);
     }
 
     #[test]
@@ -210,7 +250,7 @@ mod tests {
         assert_eq!(TlsOffer::parse(&format!("port=0; pins={PIN_A}")), None);
         // Une empreinte douteuse est écartée, la bonne gardée.
         let offer = TlsOffer::parse(&format!("port=9443; pins=zz,{}", PIN_A.to_uppercase()));
-        assert_eq!(offer, Some(TlsOffer { port: 9443, pins: vec![PIN_A.into()] }));
+        assert_eq!(offer, Some(TlsOffer { port: 9443, pins: vec![PIN_A.into()], url: None }));
     }
 
     #[test]

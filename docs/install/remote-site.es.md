@@ -20,7 +20,7 @@ remoto, sin VPN, sin una segunda instancia que consultar.
 !!! tip "Un solo puerto para un sitio remoto"
     El comando de instalación que se muestra para un relé usa **solo el puerto de
     los agentes**: el script de instalación, el binario del agente y el canal
-    cifrado vienen todos de `https://<servidor>:8443`. El comando fija la clave
+    cifrado vienen todos de `https://<servidor>:8443` (o `DUMBMONIT_AGENT_PUBLIC_URL`). El comando fija la clave
     del certificado de ese puerto y el SHA-256 de cada binario: la descarga se
     verifica de extremo a extremo sin abrir el puerto web (8080) al sitio. Las
     herramientas de despliegue obtienen el mismo comando con

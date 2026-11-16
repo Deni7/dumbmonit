@@ -20,7 +20,7 @@ Instanz, die man im Auge behalten müsste.
 !!! tip "Ein einziger Port für einen entfernten Standort"
     Der für ein Relay angezeigte Installationsbefehl nutzt **nur den
     Agenten-Port**: Installationsskript, Agenten-Binärdatei und verschlüsselter
-    Kanal kommen alle von `https://<server>:8443`. Der Befehl pinnt den Schlüssel
+    Kanal kommen alle von `https://<server>:8443` (oder `DUMBMONIT_AGENT_PUBLIC_URL`). Der Befehl pinnt den Schlüssel
     des Zertifikats dieses Ports und den SHA-256 jeder Binärdatei: Der Download
     wird durchgehend geprüft, ohne den Web-Port (8080) für den Standort zu
     öffnen. Deployment-Werkzeuge erhalten denselben Befehl über

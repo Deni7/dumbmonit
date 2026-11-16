@@ -32,8 +32,17 @@ struct Lab {
 /// préparation du canal chiffré (pour simuler une instance qui avait déjà des
 /// agents au moment de la mise à jour).
 async fn lab_with<T>(before_init: impl AsyncFnOnce(&TestApp, &str) -> T) -> (Lab, String, T) {
+    lab_configured(|_| {}, before_init).await
+}
+
+/// Comme [`lab_with`], avec une configuration retouchée.
+async fn lab_configured<T>(
+    configure: impl FnOnce(&mut dumbmonit_server::config::Config),
+    before_init: impl AsyncFnOnce(&TestApp, &str) -> T,
+) -> (Lab, String, T) {
     let dir = tempfile::tempdir().expect("répertoire temporaire");
-    let config = common::base_config(dir.path());
+    let mut config = common::base_config(dir.path());
+    configure(&mut config);
     let pool = db::open(&config.database_path()).await.expect("base");
     let cipher = db::init_cipher(&pool, "secret-de-test-suffisamment-long").await.expect("chiffre");
     common::accept_enrolments(&pool).await;
@@ -868,6 +877,49 @@ async fn a_relay_install_command_uses_the_agent_port_only() {
     let web = lab.app.get(query, Some(&admin)).await;
     assert_eq!(web.body["agent_port_only"], false);
     assert_eq!(web.body["base_url"], "https://monit.example.com:8080");
+}
+
+#[tokio::test]
+async fn a_dedicated_agent_address_wins_in_commands_and_in_the_channel_announcement() {
+    let public = "https://agents.example.com:443";
+    let (lab, admin, ()) = lab_configured(
+        |config| {
+            config.agent_public_port = Some(18443);
+            config.agent_public_url = Some(public.to_string());
+        },
+        async |_, _| {},
+    )
+    .await;
+    let query = "/api/agent/install?base_url=https://monit.example.com:8080";
+    let reply = lab.app.get(query, Some(&admin)).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(reply.body["agent_url"], public, "prime sur l'hôte et sur le port publié");
+    let linux = reply.body["linux_template"].as_str().unwrap();
+    assert!(linux.contains(&format!(" --tls-url={public} ")), "{linux}");
+    // Un seul port : scripts et binaires viennent aussi de l'adresse dédiée.
+    let single = lab.app.get(&format!("{query}&agent_port_only=true"), Some(&admin)).await;
+    assert_eq!(single.body["base_url"], public);
+
+    // L'annonce du canal (enrôlement, lots) porte l'adresse dédiée.
+    let ca = authority(&lab).await;
+    let enrolment = token(&lab.app, &admin).await;
+    let key = rcgen::KeyPair::generate_for(&rcgen::PKCS_ECDSA_P256_SHA256).expect("clé");
+    let response = client(&lab, &ca, None)
+        .post(url(&lab, "/api/agent/tls/enroll"))
+        .bearer_auth(&enrolment)
+        .json(&json!({ "identity": identity("id-dedie"), "public_key": BASE64.encode(key.public_key_raw()) }))
+        .send()
+        .await
+        .expect("enrôlement");
+    assert_eq!(response.status(), StatusCode::OK);
+    let header = response
+        .headers()
+        .get(dumbmonit_proto::AGENT_TLS_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .expect("annonce");
+    let offer = dumbmonit_proto::TlsOffer::parse(header).expect("annonce lisible");
+    assert_eq!(offer.url.as_deref(), Some(public));
+    assert_eq!(offer.port, 18443, "les agents antérieurs gardent le port publié");
 }
 
 #[tokio::test]

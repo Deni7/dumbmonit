@@ -33,7 +33,11 @@ With Docker, publish the agent port next to the web port:
 ```
 
 If a router or a TCP proxy publishes it under another number, set
-`DUMBMONIT_AGENT_PUBLIC_PORT` so the install commands use that number.
+`DUMBMONIT_AGENT_PUBLIC_PORT` so the install commands use that number. To give
+the agents a name of their own (for example `https://agents.example.com:443`
+behind an SNI passthrough), set `DUMBMONIT_AGENT_PUBLIC_URL`: it wins over both
+the browser's host and the public port (see
+[Dedicated agent address](../reference/configuration.md#dedicated-agent-address)).
 
 Before showing an install command, the add-an-agent screen asks the server to
 dial its own agent channel at the address the command carries, complete the
@@ -260,8 +264,11 @@ the agent's own pinned channel, with its token, binding secret and machine key.
 Do not put a TLS-terminating reverse proxy in front of the agent port: the
 client certificate would stop at the proxy. A TCP pass-through (HAProxy `mode
 tcp`, nginx `stream`, Traefik TCP router with TLS passthrough, port forwarding)
-works. The web port can stay behind your usual reverse proxy, which connects to
-it over HTTPS.
+works. To share port 443 with websites, route on the server name (SNI) with
+`DUMBMONIT_AGENT_PUBLIC_URL` set to that name: HAProxy and Traefik examples in
+[Dedicated agent address](../reference/configuration.md#dedicated-agent-address).
+The web port can stay behind your usual reverse proxy, which connects to it over
+HTTPS.
 
 ## Rotating the certificate authority
 
@@ -280,6 +287,7 @@ In **Settings → Agents → Agent channel → Certificate authority rotation**:
 |----------|---------|---------|
 | `DUMBMONIT_AGENT_LISTEN` | `0.0.0.0:8443` | Listen address of the agent channel; `off` closes it. |
 | `DUMBMONIT_AGENT_PUBLIC_PORT` | listen port | Port written in the install commands. |
+| `DUMBMONIT_AGENT_PUBLIC_URL` | unset | Dedicated address of the agent channel (`https://host[:port]`), written in the install commands and announced to agents; wins over the browser's host and `DUMBMONIT_AGENT_PUBLIC_PORT`. |
 | `DUMBMONIT_AGENT_LEGACY_DAYS` | unset | Close the plain channel N days after the update. |
 
 On the agent (`agent.yaml` or environment): `tls_url` /

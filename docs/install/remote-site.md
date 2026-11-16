@@ -28,7 +28,7 @@ instance to look at.
 !!! tip "One port for a remote site"
     The install command shown for a relay uses the **agent port only**: the
     install script, the agent binary and the encrypted channel all come from
-    `https://<server>:8443`. The command pins the key of the certificate of that
+    `https://<server>:8443` (or `DUMBMONIT_AGENT_PUBLIC_URL`). The command pins the key of the certificate of that
     port and the SHA-256 of each binary, so the download is verified end to end
     without opening the web port (8080) to the site. Deployment tools get the
     same command from `GET /api/agent/install?agent_port_only=true`.

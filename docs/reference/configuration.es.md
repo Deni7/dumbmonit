@@ -117,6 +117,72 @@ apunten tus monitores de servicio. El ping ICMP necesita el sysctl
 `net.ipv4.ping_group_range` definido en el archivo Compose (sin
 capacidad).
 
+### Dirección dedicada a los agentes y paso SNI {#dedicated-agent-address}
+
+`DUMBMONIT_AGENT_PUBLIC_URL=https://agents.example.com:443` da a los agentes una
+dirección propia. Prevalece sobre el host que abrió el navegador y sobre
+`DUMBMONIT_AGENT_PUBLIC_PORT` (que sigue admitido) en los comandos de
+instalación (`--tls-url`, y también `--url` para un relé o con
+`agent_port_only=true`), y en el anuncio del canal que los agentes reciben al
+inscribirse y en cada respuesta: un agente instalado sin `--tls-url` pasa a ella
+por sí solo. Solo se acepta `https://host[:puerto]`, comprobado al arrancar:
+`http://`, una ruta, un nombre de usuario o un canal de agentes cerrado
+(`DUMBMONIT_AGENT_LISTEN=off`) detienen el servidor con un mensaje.
+
+El caso habitual: una sola IP pública cuyo puerto 443 ya sirve sitios web. Un
+proxy TCP lee el nombre de servidor (SNI) del ClientHello TLS y pasa la conexión,
+todavía cifrada, al puerto 8443 de DumbMonit. **Nunca termines TLS ahí**: el
+certificado de cliente del agente y la autoridad fijada deben llegar intactos a
+DumbMonit.
+
+HAProxy (`web` es lo que ya sirve el 443):
+
+```haproxy
+frontend https_in
+    bind :443
+    mode tcp
+    tcp-request inspect-delay 5s
+    tcp-request content accept if { req.ssl_hello_type 1 }
+    use_backend dumbmonit_agents if { req.ssl_sni -i agents.example.com }
+    default_backend web
+
+backend dumbmonit_agents
+    mode tcp
+    server dumbmonit 192.168.1.5:8443
+
+backend web
+    mode tcp
+    server proxy 127.0.0.1:8444
+```
+
+Traefik v3 (proveedor de archivo; el punto de entrada `websecure` escucha en 443):
+
+```yaml
+tcp:
+  routers:
+    dumbmonit-agents:
+      entryPoints: [websecure]
+      rule: "HostSNI(`agents.example.com`)"
+      service: dumbmonit-agents
+      tls:
+        passthrough: true
+  services:
+    dumbmonit-agents:
+      loadBalancer:
+        servers:
+          - address: "192.168.1.5:8443"
+```
+
+- Usa un nombre DNS en la URL: el nombre viaja en el SNI, una IP no.
+- El servidor ve la dirección del proxy: los intentos de inscripción fallidos se
+  cuentan por dirección, así que todos los agentes detrás del proxy comparten un
+  mismo contador.
+- Comprueba desde fuera: `curl -k https://agents.example.com/install.sh`
+  devuelve el script de instalación (el puerto de los agentes lo sirve sin
+  certificado de cliente).
+- Cloudflare Tunnel, o cualquier proxy que termine TLS, no puede llevar el canal
+  de los agentes.
+
 ## Volúmenes y archivos {#volumes-and-files}
 
 Un volumen, `dumbmonit-data`, montado en `/data`. Su nombre está fijo en

@@ -36,6 +36,11 @@ Avec Docker, publiez le port agents à côté du port web :
 
 Si un routeur ou un mandataire TCP le publie sous un autre numéro, réglez
 `DUMBMONIT_AGENT_PUBLIC_PORT` pour que les commandes d'installation l'utilisent.
+Pour donner aux agents un nom à eux (par exemple
+`https://agents.example.com:443` derrière un aiguillage SNI), réglez
+`DUMBMONIT_AGENT_PUBLIC_URL` : elle prime sur l'hôte du navigateur et sur le
+port publié (voir
+[Adresse dédiée aux agents](../reference/configuration.md#dedicated-agent-address)).
 
 Avant d'afficher une commande d'installation, l'écran d'ajout d'un agent demande
 au serveur de composer son propre canal des agents à l'adresse que porte la
@@ -203,8 +208,12 @@ de liaison et sa clé de machine.
 Ne placez pas de mandataire inverse qui termine TLS devant le port agents : le
 certificat client s'arrêterait au mandataire. Un relais TCP transparent
 (HAProxy `mode tcp`, nginx `stream`, routeur TCP Traefik en passthrough,
-redirection de port) fonctionne. Le port web peut rester derrière votre
-mandataire habituel, qui s'y connecte en HTTPS.
+redirection de port) fonctionne. Pour partager le port 443 avec des sites,
+aiguillez sur le nom de serveur (SNI) et réglez `DUMBMONIT_AGENT_PUBLIC_URL` sur
+ce nom : exemples HAProxy et Traefik dans
+[Adresse dédiée aux agents](../reference/configuration.md#dedicated-agent-address).
+Le port web peut rester derrière votre mandataire habituel, qui s'y connecte en
+HTTPS.
 
 ## Rotation de l'autorité de certification
 
@@ -225,6 +234,7 @@ certification** :
 |----------|--------|------|
 | `DUMBMONIT_AGENT_LISTEN` | `0.0.0.0:8443` | Adresse d'écoute du canal des agents ; `off` le ferme. |
 | `DUMBMONIT_AGENT_PUBLIC_PORT` | port d'écoute | Port écrit dans les commandes d'installation. |
+| `DUMBMONIT_AGENT_PUBLIC_URL` | non réglée | Adresse dédiée du canal des agents (`https://hôte[:port]`), écrite dans les commandes d'installation et annoncée aux agents ; prime sur l'hôte du navigateur et sur `DUMBMONIT_AGENT_PUBLIC_PORT`. |
 | `DUMBMONIT_AGENT_LEGACY_DAYS` | absent | Fermer le canal en clair N jours après la mise à jour. |
 
 Sur l'agent (`agent.yaml` ou environnement) : `tls_url` /

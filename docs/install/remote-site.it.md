@@ -20,7 +20,7 @@ istanza da guardare.
 !!! tip "Una sola porta per un sito remoto"
     Il comando di installazione mostrato per un relay usa **solo la porta degli
     agent**: lo script di installazione, il binario dell'agent e il canale
-    cifrato arrivano tutti da `https://<server>:8443`. Il comando fissa la chiave
+    cifrato arrivano tutti da `https://<server>:8443` (o `DUMBMONIT_AGENT_PUBLIC_URL`). Il comando fissa la chiave
     del certificato di quella porta e lo SHA-256 di ogni binario: il download è
     verificato da un capo all'altro senza aprire al sito la porta web (8080). Gli
     strumenti di distribuzione ottengono lo stesso comando con

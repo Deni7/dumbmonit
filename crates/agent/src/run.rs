@@ -955,7 +955,9 @@ impl Agent {
             // agent installé avant migre de lui-même, en épinglant l'autorité
             // annoncée (confiance au premier usage).
             let Some(offer) = self.client.offer() else { return };
-            let url = self.config.tls_url.clone().or_else(|| {
+            // L'adresse dédiée aux agents que le serveur annonce prime sur
+            // l'hôte de `server_url` ; celle de la configuration, sur les deux.
+            let url = self.config.tls_url.clone().or_else(|| offer.url.clone()).or_else(|| {
                 dumbmonit_proto::agent_channel_url(&self.config.server_url, offer.port)
             });
             let Some(url) = url else { return };
@@ -1739,6 +1741,7 @@ mod tests {
         agent.client.set_offer(dumbmonit_proto::TlsOffer {
             port: closed_port(),
             pins: vec![PIN.to_string()],
+            url: None,
         });
         let samples = agent.collect().await;
         agent.buffer.push(samples);
@@ -1750,6 +1753,26 @@ mod tests {
         assert!(!state.locked);
         assert_eq!(calls.count("POST", "/api/ingest"), 1);
         assert!(agent.tls_retry_at.is_some(), "nouvel essai d'enrôlement plus tard");
+    }
+
+    #[tokio::test]
+    async fn the_dedicated_agent_address_announced_by_the_server_is_the_one_dialled() {
+        // Le serveur a une adresse dédiée aux agents : l'agent migre vers elle,
+        // pas vers l'hôte de son `server_url`.
+        let dir = tempfile::tempdir().unwrap();
+        let (url, _calls) = crate::testsupport::fake_http(|_| (200, ACK.to_string())).await;
+        let mut agent = agent_for(&url, &dir);
+        let dedicated = format!("https://localhost:{}", closed_port());
+        agent.client.set_offer(dumbmonit_proto::TlsOffer {
+            port: closed_port(),
+            pins: vec![PIN.to_string()],
+            url: Some(dedicated.clone()),
+        });
+        let samples = agent.collect().await;
+        agent.buffer.push(samples);
+
+        assert!(matches!(agent.flush().await, FlushOutcome::Sent { .. }));
+        assert_eq!(agent.tls.clone().expect("canal adopté").url, dedicated);
     }
 
     #[tokio::test]

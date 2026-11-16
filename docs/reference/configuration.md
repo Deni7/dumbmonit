@@ -27,6 +27,7 @@ configuration file to mount.
 | `DUMBMONIT_RESET_PASSWORD` | *(off)* | `1`, `true`, `yes` or `on`: clear the password and every session at startup. The UI then shows `/setup` again. Remove it afterwards. |
 | `DUMBMONIT_AGENT_LISTEN` | `0.0.0.0:8443` | Listen address of the encrypted agent channel (TLS 1.3, client certificates). `off` closes it. The only port agents on other networks need; see [Agent channel security](../install/agent-security.md). |
 | `DUMBMONIT_AGENT_PUBLIC_PORT` | listen port | Port written in the agent install commands, when a port forward or a TCP proxy publishes another number. |
+| `DUMBMONIT_AGENT_PUBLIC_URL` | *(unset)* | Dedicated address of the agent channel, `https://host[:port]` (for example `https://agents.example.com:443` behind an SNI passthrough). Wins over the browser's host and `DUMBMONIT_AGENT_PUBLIC_PORT` in install commands and in the channel announcement. Checked at startup. See [Dedicated agent address](#dedicated-agent-address). |
 | `DUMBMONIT_AGENT_LEGACY_DAYS` | *(unset)* | Days during which the old plain agent channel stays accepted after an update of an instance that already had agents. Unset: until an administrator turns on *Require the encrypted channel*. |
 | `DUMBMONIT_TLS_CERT` | *(unset)* | PEM certificate chain to serve; see [HTTPS and encryption](../install/https.md). Unset: a self-signed certificate is created at first start, its key stored encrypted. |
 | `DUMBMONIT_TLS_KEY` | *(unset)* | PEM private key (PKCS#8, PKCS#1 or SEC1) of `DUMBMONIT_TLS_CERT`. Both files are re-read within a minute of a change, or on `SIGHUP`. |
@@ -196,6 +197,70 @@ Outbound: SNMP (UDP 161 by default) towards monitors, HTTPS towards Proxmox,
 PBS, Synology and notification services, plus whatever your service monitors
 target. ICMP ping needs the `net.ipv4.ping_group_range` sysctl set in the
 Compose file (no capability).
+
+### Dedicated agent address and SNI passthrough {#dedicated-agent-address}
+
+`DUMBMONIT_AGENT_PUBLIC_URL=https://agents.example.com:443` gives the agents an
+address of their own. It wins over the host the browser opened and over
+`DUMBMONIT_AGENT_PUBLIC_PORT` (still supported) in the install commands
+(`--tls-url`, and `--url` too for a relay or with `agent_port_only=true`), and
+in the channel announcement agents receive at enrolment and with every reply:
+an agent installed without `--tls-url` switches to it by itself. Only
+`https://host[:port]` is accepted, checked at startup: `http://`, a path, a user
+name or a closed agent channel (`DUMBMONIT_AGENT_LISTEN=off`) stop the server
+with a message.
+
+The usual case: one public IP whose port 443 already serves websites. A TCP
+proxy reads the server name (SNI) of the TLS ClientHello and passes the
+connection, still encrypted, to port 8443 of DumbMonit. **Never terminate TLS
+there**: the agent's client certificate and the pinned authority must reach
+DumbMonit untouched.
+
+HAProxy (`web` stands for whatever already serves 443):
+
+```haproxy
+frontend https_in
+    bind :443
+    mode tcp
+    tcp-request inspect-delay 5s
+    tcp-request content accept if { req.ssl_hello_type 1 }
+    use_backend dumbmonit_agents if { req.ssl_sni -i agents.example.com }
+    default_backend web
+
+backend dumbmonit_agents
+    mode tcp
+    server dumbmonit 192.168.1.5:8443
+
+backend web
+    mode tcp
+    server proxy 127.0.0.1:8444
+```
+
+Traefik v3 (file provider; the entry point `websecure` listens on 443):
+
+```yaml
+tcp:
+  routers:
+    dumbmonit-agents:
+      entryPoints: [websecure]
+      rule: "HostSNI(`agents.example.com`)"
+      service: dumbmonit-agents
+      tls:
+        passthrough: true
+  services:
+    dumbmonit-agents:
+      loadBalancer:
+        servers:
+          - address: "192.168.1.5:8443"
+```
+
+- Use a DNS name in the URL: the name travels in the SNI, an IP does not.
+- The server sees the proxy's address: failed enrolment attempts are counted
+  per address, so every agent behind the proxy shares one counter.
+- Check from outside: `curl -k https://agents.example.com/install.sh` returns
+  the install script (the agent port serves it without a client certificate).
+- Cloudflare Tunnel, or any proxy that terminates TLS, cannot carry the agent
+  channel.
 
 ## Volumes and files
 

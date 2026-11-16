@@ -158,11 +158,14 @@ impl AgentTls {
 }
 
 /// Annonce du canal à joindre aux réponses faites aux agents, si le canal est
-/// ouvert et l'autorité chargée.
+/// ouvert et l'autorité chargée. Avec une adresse dédiée aux agents
+/// (`DUMBMONIT_AGENT_PUBLIC_URL`), l'annonce la porte : un agent qui migre ou
+/// s'enrôle sans `tls_url` la compose plutôt que l'hôte de son `server_url`.
 pub fn offer(state: &AppState) -> Option<TlsOffer> {
     let port = state.config.agent_port()?;
     let pins = state.agent_tls().pins();
-    (!pins.is_empty()).then_some(TlsOffer { port, pins })
+    let url = state.config.agent_public_url.clone();
+    (!pins.is_empty()).then_some(TlsOffer { port, pins, url })
 }
 
 /// Fournisseur cryptographique du canal : aws-lc-rs, suites AEAD seules (TLS

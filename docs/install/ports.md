@@ -116,7 +116,11 @@ examples below). If a site has a dynamic IP, use a VPN instead, or a
 DNS-based rule on your firewall.
 
 If the router publishes another number (for example 18443), set
-`DUMBMONIT_AGENT_PUBLIC_PORT=18443`.
+`DUMBMONIT_AGENT_PUBLIC_PORT=18443`. If the agents have a name of their own,
+for example `agents.example.com` on port 443 shared with websites through an
+SNI passthrough, set `DUMBMONIT_AGENT_PUBLIC_URL=https://agents.example.com:443`
+instead (see
+[Dedicated agent address](../reference/configuration.md#dedicated-agent-address)).
 
 ### 3. Public status pages behind a reverse proxy
 

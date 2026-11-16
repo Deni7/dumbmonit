@@ -30,7 +30,7 @@ surveiller.
 !!! tip "Un seul port pour un site distant"
     La commande d'installation affichée pour un relais n'utilise **que le port des
     agents** : le script d'installation, le binaire de l'agent et le canal chiffré
-    viennent tous de `https://<serveur>:8443`. La commande épingle la clé du
+    viennent tous de `https://<serveur>:8443` (ou `DUMBMONIT_AGENT_PUBLIC_URL`). La commande épingle la clé du
     certificat de ce port et l'empreinte SHA-256 de chaque binaire : le
     téléchargement est vérifié de bout en bout sans ouvrir le port de
     l'interface (8080) au site. Les outils de déploiement obtiennent la même
