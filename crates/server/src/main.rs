@@ -321,6 +321,15 @@ async fn run(mut config: Config, startup: Startup) -> Result<()> {
         .context("web port listener")?;
     info!(%bind, "interface available over HTTPS (plain HTTP is redirected, never served)");
 
+    // Port unique (facultatif) : interface et agents sur une seule écoute,
+    // aiguillés par ALPN ; les deux ports ci-dessus restent ouverts.
+    if state.config.single_listen.is_some() && !state.config.demo {
+        let single = dumbmonit_server::single_port::listen(state.clone(), &listener)
+            .await
+            .context("single port")?;
+        info!(bind = %single, "single port: interface and agents (sorted by ALPN)");
+    }
+
     // `ConnectInfo` : l'adresse du client, pour les compteurs de tentatives et
     // le journal d'audit (voir `auth::client_ip`).
     let state_for_shutdown = state.clone();

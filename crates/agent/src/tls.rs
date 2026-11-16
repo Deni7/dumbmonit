@@ -11,6 +11,9 @@
 //!   correspond à aucune empreinte : la connexion est refusée.
 //! - Échange de clés hybride post-quantique **X25519MLKEM768** seul, TLS 1.3
 //!   seul : pas de négociation vers le bas possible.
+//! - L'agent se désigne par ALPN ([`AGENT_ALPN`]) : sur le port unique d'un
+//!   serveur (`DUMBMONIT_SINGLE_PORT`, 443), c'est ce qui le mène au canal des
+//!   agents plutôt qu'à l'interface. Un serveur antérieur l'ignore.
 //!
 //! Tout est rangé dans `agent-tls.json`, à côté du secret de liaison, lisible
 //! par le seul propriétaire (0600 sous Unix ; sous Windows, le dossier de
@@ -22,7 +25,7 @@ use std::sync::{Arc, RwLock};
 use anyhow::{Context, Result};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
-use dumbmonit_proto::{AGENT_TLS_SERVER_NAME, RENEW_BEFORE_DAYS};
+use dumbmonit_proto::{AGENT_ALPN, AGENT_TLS_SERVER_NAME, RENEW_BEFORE_DAYS};
 use rustls::client::WebPkiServerVerifier;
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::crypto::{CryptoProvider, verify_tls12_signature, verify_tls13_signature};
@@ -160,6 +163,10 @@ pub fn provider() -> Arc<CryptoProvider> {
     })
 }
 
+/// Protocoles ALPN proposés sur le canal chiffré : la marque des agents, puis
+/// HTTP/1.1 (qu'un serveur antérieur, qui ne connaît pas la marque, choisit).
+pub const CHANNEL_PROTOCOLS: [&[u8]; 2] = [AGENT_ALPN, b"http/1.1"];
+
 /// Configuration TLS du canal : TLS 1.3, autorité épinglée, certificat client
 /// s'il y en a un.
 pub fn client_config(pins: Pins, identity: Option<(Vec<u8>, Vec<u8>)>) -> Result<ClientConfig> {
@@ -179,7 +186,7 @@ pub fn client_config(pins: Pins, identity: Option<(Vec<u8>, Vec<u8>)>) -> Result
             .context("agent certificate")?,
         None => builder.with_no_client_auth(),
     };
-    config.alpn_protocols = vec![b"http/1.1".to_vec()];
+    config.alpn_protocols = CHANNEL_PROTOCOLS.iter().map(|protocol| protocol.to_vec()).collect();
     Ok(config)
 }
 
@@ -304,6 +311,9 @@ fn subject_public_key_info(cert: &[u8]) -> Option<&[u8]> {
 /// au certificat autosigné : seul le certificat dont la clé publique a cette
 /// épingle est accepté — la poignée de main prouve ensuite que le serveur en
 /// tient la clé privée. TLS 1.3 seul, échange de clés post-quantique.
+///
+/// Sans la marque ALPN des agents : sur un port unique, c'est le certificat de
+/// l'interface qui est épinglé, celui qu'un client ordinaire y reçoit.
 pub fn pinned_key_config(pin: &str) -> Result<ClientConfig> {
     if !is_key_pin(pin) {
         anyhow::bail!("server_pin: a public key pin (sha256//<base64>) is expected, got '{pin}'");
@@ -429,7 +439,16 @@ mod tests {
         let groups: Vec<String> =
             config.crypto_provider().kx_groups.iter().map(|g| format!("{:?}", g.name())).collect();
         assert_eq!(groups, ["X25519MLKEM768"]);
-        assert_eq!(config.alpn_protocols, vec![b"http/1.1".to_vec()]);
+        // La marque des agents (port unique), puis ce qu'un serveur antérieur
+        // choisit.
+        assert_eq!(config.alpn_protocols, vec![AGENT_ALPN.to_vec(), b"http/1.1".to_vec()]);
+        // L'ancien canal, lui, ne se désigne pas : sur un port unique, il
+        // reçoit le certificat de l'interface qu'il épingle.
+        let key = rcgen::KeyPair::generate_for(&rcgen::PKCS_ECDSA_P256_SHA256).unwrap();
+        let params = rcgen::CertificateParams::new(vec!["nas.lan".to_string()]).unwrap();
+        let pin = certificate_key_pin(params.self_signed(&key).unwrap().der()).unwrap();
+        let legacy = pinned_key_config(&pin).unwrap();
+        assert_eq!(legacy.alpn_protocols, vec![b"http/1.1".to_vec()]);
     }
 
     #[test]

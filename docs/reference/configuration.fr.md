@@ -24,6 +24,7 @@ n'y a pas de fichier de configuration à monter.
 | `DUMBMONIT_COOKIE_SECURE` | *(désactivé)* | `1` pour régler l'attribut `Secure` sur le cookie de session. Seulement derrière HTTPS : en HTTP simple le navigateur ne renverrait jamais le cookie. |
 | `DUMBMONIT_TLS_CERT` | *(non défini)* | Chaîne de certificats PEM à servir. Non défini : un certificat autosigné est créé au premier démarrage, sa clé gardée chiffrée. |
 | `DUMBMONIT_TLS_KEY` | *(non défini)* | Clé privée PEM (PKCS#8, PKCS#1 ou SEC1) de `DUMBMONIT_TLS_CERT`. Les deux fichiers sont relus moins d'une minute après un changement, ou sur `SIGHUP`. |
+| `DUMBMONIT_SINGLE_PORT` | *(désactivé)* | Un port d'écoute de plus (`443`, ou une adresse comme `0.0.0.0:443`) qui sert l'interface, l'API **et** le canal des agents, aiguillés connexion par connexion sur le protocole ALPN qu'annoncent les agents. 8080 et 8443 restent ouverts. Demande le canal des agents et un port à lui, vérifiés au démarrage. Voir [Port unique](#single-port). |
 | `DUMBMONIT_TLS_NAMES` | *(vide)* | Noms DNS et adresses IP ajoutés au certificat autosigné, séparés par des virgules (`nas.lan,192.168.1.10`). |
 | `DUMBMONIT_TRUSTED_PROXIES` | *(vide)* | Reverse proxies dont le `X-Forwarded-For` est cru, comme adresses ou plages CIDR séparées par des virgules (`10.0.0.5, 172.16.0.0/12`). Le limiteur de débit de connexion et le journal de sécurité voient alors la vraie adresse client au lieu de celle du proxy ; sans cela, chaque visiteur derrière le proxy partage un seul compartiment. L'en-tête est ignoré depuis toute autre adresse, un client ne peut donc pas choisir son propre compartiment. |
 | `DUMBMONIT_SCAN_SUBNETS` | *(vide)* | Réseaux proposés par le balayage du formulaire de surveillance, comme plages CIDR IPv4 séparées par des virgules (`192.168.1.0/24, 10.0.5.0/24`). En mode pont Docker, le serveur ne voit que le réseau Docker, pas votre réseau local : renseignez-la pour pré-remplir le balayage avec le bon. Non définie : le balayage propose les réseaux /24 des surveillances déjà surveillés, puis les réseaux du serveur (seulement hors conteneur), sinon laisse le champ vide. |
@@ -163,6 +164,7 @@ de l'hôte du VictoriaMetrics embarqué.
 | `1162/udp` | `dumbmonit` | Récepteur de traps SNMP, seulement avec `DUMBMONIT_TRAPS_ENABLED=true`. Commenté dans le fichier Compose. |
 | `8080/tcp` | `dumbmonit` | Interface web, API, installateurs et téléchargements d'agent, ingestion d'agent. Le seul port à publier. |
 | `8428/tcp` | `dumbmonit` | API HTTP du VictoriaMetrics embarqué, sur le loopback du conteneur. Publié seulement par la surcouche de développement. |
+| `443/tcp` | `dumbmonit` | Port unique facultatif (`DUMBMONIT_SINGLE_PORT`) : interface, API et canal des agents sur un seul port. Commenté dans le fichier Compose. |
 
 Sortant : SNMP (UDP 161 par défaut) vers les surveillances, HTTPS vers Proxmox,
 PBS, Synology et les services de notification, plus ce que vos surveillances de
@@ -235,6 +237,49 @@ tcp:
   client).
 - Cloudflare Tunnel, ou tout mandataire qui termine TLS, ne peut pas porter le
   canal des agents.
+
+### Port unique {#single-port}
+
+`DUMBMONIT_SINGLE_PORT=443` ouvre un port de plus, qui sert tout. Chaque
+connexion est aiguillée sur son ClientHello TLS, avant le choix du certificat :
+
+| Le client annonce | Il reçoit |
+|---|---|
+| ALPN `dumbmonit-agent/1` (tout agent et tout relais à jour) | Le canal des agents : autorité interne, certificat client, mêmes routes et mêmes contrôles que sur 8443. L'agent y parle ensuite HTTP/2 quand le serveur le propose. |
+| Autre chose (navigateur, `curl`, PowerShell, TLS 1.2 compris) | L'interface et son certificat (fourni ou autosigné), comme sur 8080. |
+| HTTP en clair | La redirection vers `https://` de 8080, rien d'autre. |
+
+- **Rétrocompatible.** 8080 et 8443 restent ouverts. Un agent antérieur à ce
+  réglage n'annonce pas le protocole : il recevrait le certificat de
+  l'interface, auquel il ne se fie pas, et garde donc 8443. Mettez les agents
+  à jour (depuis l'interface) avant de fermer 8443. Un agent récent face à un
+  serveur antérieur parle simplement HTTP/1.1 : le serveur ignore le nom du
+  protocole.
+- **Commandes d'installation.** Ouvrez l'interface par le port unique (par
+  exemple `https://monit.example.com`, 443 implicite) avant de copier une
+  commande : `--url` et `--tls-url` le visent alors tous deux. Le script et les
+  binaires y sont lus sous le certificat de l'interface : la commande épingle
+  donc celui-là (`--pinned-key` pour un certificat autosigné) et l'autorité du
+  canal des agents (`--ca-pin`), comme d'habitude.
+- **Redirection de port.** Si le conteneur écoute sur un autre numéro que celui
+  que composent les agents (`DUMBMONIT_SINGLE_PORT=8444`, publié en
+  `443:8444`), réglez `DUMBMONIT_AGENT_PUBLIC_URL=https://monit.example.com:443`.
+- La valeur est un port (`443`, toutes les adresses IPv4) ou une adresse
+  (`[::]:443`). Elle doit différer de `DUMBMONIT_BIND` et de
+  `DUMBMONIT_AGENT_LISTEN`, et le canal des agents doit être ouvert : sinon le
+  serveur ne démarre pas.
+- Un mandataire qui termine TLS ne peut toujours pas porter le canal des
+  agents ; un aiguillage SNI sans déchiffrement, si.
+
+```yaml
+    environment:
+      DUMBMONIT_SINGLE_PORT: "443"
+    ports:
+      - "443:443"
+    sysctls:
+      net.ipv4.ping_group_range: "0 2147483647"
+      net.ipv4.ip_unprivileged_port_start: "443"
+```
 
 ## Volumes et fichiers
 

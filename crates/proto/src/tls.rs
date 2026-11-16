@@ -27,6 +27,18 @@ pub const DEFAULT_AGENT_TLS_PORT: u16 = 8443;
 /// sécurité, pas le nom.
 pub const AGENT_TLS_SERVER_NAME: &str = "agents.dumbmonit.internal";
 
+/// Protocole ALPN par lequel un agent se désigne dans son ClientHello.
+///
+/// Un agent à jour le propose à chaque poignée de main, à côté de `h2` et de
+/// `http/1.1` : sur le port unique du serveur (`DUMBMONIT_SINGLE_PORT`), c'est
+/// ce qui aiguille la connexion vers le canal des agents (certificat client,
+/// autorité épinglée) plutôt que vers l'interface. Le protocole effectivement
+/// parlé reste HTTP (`h2` ou `http/1.1`, choisi par le serveur) : la marque ne
+/// sert qu'à l'aiguillage. Un serveur antérieur l'ignore et choisit
+/// `http/1.1` ; un agent antérieur ne la propose pas et passe par le port des
+/// agents (8443).
+pub const AGENT_ALPN: &[u8] = b"dumbmonit-agent/1";
+
 /// Enrôlement : clé publique de l'agent contre un certificat client.
 pub const TLS_ENROL_PATH: &str = "/api/agent/tls/enroll";
 

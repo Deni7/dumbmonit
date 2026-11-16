@@ -997,3 +997,213 @@ async fn a_relay_learns_of_an_install_at_once_and_its_own_gateway_test_gates_the
     let view = lab.app.get(&format!("/api/targets/{relay_id}/agent"), Some(&admin)).await;
     assert_eq!(view.body["gateway_check"]["ok"], true, "{}", view.body);
 }
+
+// ------------------------------------------------------------- port unique
+
+/// Vérificateur qui accepte tout et garde le certificat présenté : le test
+/// regarde *quel* certificat le port unique sert, pas s'il est de confiance.
+#[derive(Debug)]
+struct Seen(std::sync::Mutex<Option<Vec<u8>>>, Arc<rustls::crypto::CryptoProvider>);
+
+impl rustls::client::danger::ServerCertVerifier for Seen {
+    fn verify_server_cert(
+        &self,
+        end_entity: &CertificateDer<'_>,
+        _: &[CertificateDer<'_>],
+        _: &rustls::pki_types::ServerName<'_>,
+        _: &[u8],
+        _: rustls::pki_types::UnixTime,
+    ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
+        *self.0.lock().unwrap() = Some(end_entity.as_ref().to_vec());
+        Ok(rustls::client::danger::ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        let algorithms = &self.1.signature_verification_algorithms;
+        rustls::crypto::verify_tls12_signature(message, cert, dss, algorithms)
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        let algorithms = &self.1.signature_verification_algorithms;
+        rustls::crypto::verify_tls13_signature(message, cert, dss, algorithms)
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
+        self.1.signature_verification_algorithms.supported_schemes()
+    }
+}
+
+/// Poignée de main avec ces protocoles ALPN : le certificat servi, et la
+/// réponse à `GET /api/auth/status`.
+async fn hello_single(
+    addr: SocketAddr,
+    version: &'static rustls::SupportedProtocolVersion,
+    alpn: &[&[u8]],
+) -> (Vec<u8>, String) {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    let provider = dumbmonit_server::web_tls::provider();
+    let seen = Arc::new(Seen(std::sync::Mutex::new(None), provider.clone()));
+    let mut config = rustls::ClientConfig::builder_with_provider(provider)
+        .with_protocol_versions(&[version])
+        .expect("version")
+        .dangerous()
+        .with_custom_certificate_verifier(seen.clone())
+        .with_no_client_auth();
+    config.alpn_protocols = alpn.iter().map(|protocol| protocol.to_vec()).collect();
+    let connector = tokio_rustls::TlsConnector::from(Arc::new(config));
+    let tcp = tokio::net::TcpStream::connect(addr).await.expect("connexion");
+    let name = rustls::pki_types::ServerName::try_from("localhost").unwrap();
+    let mut tls = connector.connect(name, tcp).await.expect("poignée de main");
+    tls.write_all(b"GET /api/auth/status HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+        .await
+        .unwrap();
+    let mut answer = Vec::new();
+    let _ = tls.read_to_end(&mut answer).await;
+    let certificate = seen.0.lock().unwrap().clone().expect("certificat");
+    (certificate, String::from_utf8_lossy(&answer).to_ascii_lowercase())
+}
+
+#[tokio::test]
+async fn the_single_port_serves_agents_by_alpn_and_everything_else_as_the_interface() {
+    use dumbmonit_server::web_tls::{self, WebPeer};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    let (lab, admin, ()) = lab_configured(
+        |config| config.single_listen = Some("127.0.0.1:0".parse().unwrap()),
+        async |_, _| {},
+    )
+    .await;
+    web_tls::load(&lab.state).await.expect("certificat de l'interface");
+    let tcp = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("port");
+    let web = web_tls::listen(lab.state.web_tls().clone(), tcp).expect("écoute de l'interface");
+    let single = dumbmonit_server::single_port::listen(lab.state.clone(), &web)
+        .await
+        .expect("port unique");
+    let router = api::router(lab.state.clone());
+    tokio::spawn(async move {
+        let _ = axum::serve(web, router.into_make_service_with_connect_info::<WebPeer>()).await;
+    });
+    let web_cert = lab.state.web_tls().summary().expect("certificat").der;
+
+    // Un navigateur (`h2`, `http/1.1`) : l'interface, sous son certificat.
+    let (certificate, answer) =
+        hello_single(single, &rustls::version::TLS13, &[b"h2", b"http/1.1"]).await;
+    assert_eq!(certificate, web_cert, "certificat de l'interface");
+    assert!(answer.starts_with("http/1.1 200"), "{answer}");
+    assert!(answer.contains("strict-transport-security"), "{answer}");
+    // PowerShell d'un vieux Windows : TLS 1.2, sans ALPN, l'interface aussi.
+    let (certificate, answer) = hello_single(single, &rustls::version::TLS12, &[]).await;
+    assert_eq!(certificate, web_cert);
+    assert!(answer.starts_with("http/1.1 200"), "{answer}");
+    // En clair : la redirection du port de l'interface, rien d'autre.
+    let mut plain = tokio::net::TcpStream::connect(single).await.unwrap();
+    plain.write_all(b"GET /x HTTP/1.1\r\nHost: monit.example.com\r\n\r\n").await.unwrap();
+    plain.shutdown().await.unwrap();
+    let mut answer = String::new();
+    plain.read_to_string(&mut answer).await.unwrap();
+    assert!(answer.starts_with("HTTP/1.1 308 "), "{answer}");
+    assert!(answer.contains("Location: https://monit.example.com:80/x"), "{answer}");
+
+    // Un agent (marque ALPN) : le canal des agents, sous l'autorité épinglée.
+    let (certificate, _) =
+        hello_single(single, &rustls::version::TLS13, &[dumbmonit_proto::AGENT_ALPN]).await;
+    assert_ne!(certificate, web_cert, "certificat du canal des agents");
+    let ca = authority(&lab).await;
+    let agent = |identity: Option<(&[u8], &[u8])>| {
+        let mut roots = rustls::RootCertStore::empty();
+        roots.add(CertificateDer::from(ca.clone())).expect("racine");
+        let builder = rustls::ClientConfig::builder_with_provider(agent_tls::provider())
+            .with_protocol_versions(&[&rustls::version::TLS13])
+            .expect("TLS 1.3")
+            .with_root_certificates(roots);
+        let mut config = match identity {
+            Some((certificate, key)) => builder
+                .with_client_auth_cert(
+                    vec![CertificateDer::from(certificate.to_vec())],
+                    PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(key.to_vec())),
+                )
+                .expect("certificat client"),
+            None => builder.with_no_client_auth(),
+        };
+        config.alpn_protocols = vec![dumbmonit_proto::AGENT_ALPN.to_vec(), b"http/1.1".to_vec()];
+        reqwest::Client::builder()
+            .tls_backend_preconfigured(config)
+            .resolve(SERVER_NAME, single)
+            .build()
+            .expect("client")
+    };
+    let enrolment = token(&lab.app, &admin).await;
+    let key = rcgen::KeyPair::generate_for(&rcgen::PKCS_ECDSA_P256_SHA256).expect("clé");
+    let response = agent(None)
+        .post(url_at(single, "/api/agent/tls/enroll"))
+        .bearer_auth(&enrolment)
+        .json(&json!({ "identity": identity("id-unique"), "public_key": BASE64.encode(key.public_key_raw()) }))
+        .send()
+        .await
+        .expect("enrôlement par le port unique");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body: Value = response.json().await.expect("corps");
+    let certificate = BASE64.decode(body["certificate"].as_str().unwrap()).unwrap();
+    let secret = body["agent_secret"].as_str().expect("secret").to_string();
+    let key = key.serialize_der();
+    let sent = agent(Some((certificate.as_slice(), key.as_slice())))
+        .post(url_at(single, "/api/ingest"))
+        .bearer_auth(&enrolment)
+        .header("x-dumbmonit-agent-secret", secret)
+        .json(&batch("id-unique"))
+        .send()
+        .await
+        .expect("lot par le port unique");
+    assert_eq!(sent.status(), StatusCode::OK);
+    let channel: Option<String> = sqlx::query_scalar("SELECT tls_group FROM agent_hosts")
+        .fetch_one(&lab.state.pool)
+        .await
+        .unwrap();
+    assert_eq!(channel.as_deref(), Some(agent_tls::POST_QUANTUM_GROUP), "canal mTLS noté");
+}
+
+#[tokio::test]
+async fn install_commands_from_the_single_port_use_it_for_everything() {
+    let (lab, admin, ()) = lab_configured(
+        |config| config.single_listen = Some("0.0.0.0:443".parse().unwrap()),
+        async |_, _| {},
+    )
+    .await;
+    let pin = lab.state.agent_tls().pins()[0].clone();
+    // Le navigateur est sur le port unique (443 implicite) : canal des agents
+    // et scripts au même endroit.
+    let reply =
+        lab.app.get("/api/agent/install?base_url=https://monit.example.com", Some(&admin)).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(reply.body["agent_url"], "https://monit.example.com");
+    assert_eq!(reply.body["base_url"], "https://monit.example.com");
+    let linux = reply.body["linux_template"].as_str().unwrap();
+    assert!(linux.contains(" --tls-url=https://monit.example.com "), "{linux}");
+    assert!(linux.contains(&format!("--ca-pin={pin}")), "{linux}");
+    assert!(!linux.contains(":8443"), "{linux}");
+    // « Un seul port » ne change rien ici : scripts et binaires restent lus
+    // sous le certificat de l'interface, que ce port sert aux installateurs.
+    let query = "/api/agent/install?base_url=https://monit.example.com:443&agent_port_only=true";
+    let single = lab.app.get(query, Some(&admin)).await;
+    assert_eq!(single.body["base_url"], "https://monit.example.com:443");
+    assert_eq!(single.body["agent_port_only"], false);
+    let server_pin = lab.state.agent_tls().server_pin().expect("épingle du port des agents");
+    assert_ne!(single.body["https_pin"], server_pin.as_str());
+    // Par le port de l'interface : comme avant, le port des agents.
+    let reply = lab
+        .app
+        .get("/api/agent/install?base_url=https://monit.example.com:8080", Some(&admin))
+        .await;
+    assert_eq!(reply.body["agent_url"], "https://monit.example.com:8443");
+}

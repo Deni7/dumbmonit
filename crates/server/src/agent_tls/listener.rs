@@ -5,6 +5,10 @@
 //! ports ne retient personne d'autre. Seules les connexions établies sont
 //! remises à axum, avec ce que la poignée de main a appris (certificat client,
 //! groupe d'échange de clés).
+//!
+//! Le ClientHello est lu avant de choisir la configuration TLS
+//! ([`super::Configs::for_hello`]) : un agent qui se désigne par ALPN reçoit
+//! celle des agents, tout autre client garde `http/1.1` seul.
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -13,14 +17,13 @@ use std::time::Duration;
 use axum::extract::connect_info::Connected;
 use axum::serve::{IncomingStream, Listener};
 use dumbmonit_proto::TargetId;
-use rustls::ServerConfig;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpListener;
 use tokio::sync::{Semaphore, mpsc};
-use tokio_rustls::TlsAcceptor;
+use tokio_rustls::LazyConfigAcceptor;
 use tokio_rustls::server::TlsStream;
 
-use super::pki;
+use super::{Configs, pki};
 use crate::state::AppState;
 
 /// Durée maximale d'une poignée de main.
@@ -108,7 +111,7 @@ async fn accept_loop(state: AppState, tcp: TcpListener, ready: Ready) {
                 continue;
             }
         };
-        let Some(config) = state.agent_tls().server_config() else { continue };
+        let Some(configs) = state.agent_tls().configs() else { continue };
         let Ok(permit) = handshakes.clone().try_acquire_owned() else {
             tracing::debug!(%addr, "agent channel: too many handshakes in flight");
             continue;
@@ -116,7 +119,7 @@ async fn accept_loop(state: AppState, tcp: TcpListener, ready: Ready) {
         let ready = ready.clone();
         tokio::spawn(async move {
             let _permit = permit;
-            if let Some(connection) = handshake(config, Box::new(stream), addr, None).await {
+            if let Some(connection) = handshake(configs, Box::new(stream), addr, None).await {
                 let _ = ready.send(connection).await;
             }
         });
@@ -124,15 +127,21 @@ async fn accept_loop(state: AppState, tcp: TcpListener, ready: Ready) {
 }
 
 /// Poignée de main TLS bornée dans le temps, sur une connexion directe ou un
-/// tunnel ; rend la connexion établie et ce qu'elle a appris.
+/// tunnel ; rend la connexion établie et ce qu'elle a appris. La configuration
+/// est choisie sur le ClientHello : celle des agents s'il porte leur marque.
 pub(crate) async fn handshake(
-    config: Arc<ServerConfig>,
+    configs: Configs,
     transport: Box<dyn Transport>,
     addr: SocketAddr,
     via_relay: Option<TargetId>,
 ) -> Option<(AgentIo, AgentPeer)> {
-    let acceptor = TlsAcceptor::from(config);
-    let tls = match tokio::time::timeout(HANDSHAKE_TIMEOUT, acceptor.accept(transport)).await {
+    let accepted = tokio::time::timeout(HANDSHAKE_TIMEOUT, async {
+        let start = LazyConfigAcceptor::new(rustls::server::Acceptor::default(), transport).await?;
+        let config = configs.for_hello(&start.client_hello());
+        start.into_stream(config).await
+    })
+    .await;
+    let tls = match accepted {
         Ok(Ok(tls)) => tls,
         Ok(Err(error)) => {
             tracing::debug!(%addr, ?via_relay, %error, "agent channel: handshake refused");
@@ -140,8 +149,18 @@ pub(crate) async fn handshake(
         }
         Err(_) => return None,
     };
+    let peer = peer_of(&tls, addr, via_relay);
+    Some((tls, peer))
+}
+
+/// Ce qu'une poignée de main menée à son terme dit de son client.
+pub(crate) fn peer_of<T>(
+    tls: &TlsStream<T>,
+    addr: SocketAddr,
+    via_relay: Option<TargetId>,
+) -> AgentPeer {
     let (_, connection) = tls.get_ref();
-    let peer = AgentPeer {
+    AgentPeer {
         addr,
         certificate: connection
             .peer_certificates()
@@ -151,6 +170,5 @@ pub(crate) async fn handshake(
             .negotiated_key_exchange_group()
             .map(|group| format!("{:?}", group.name())),
         via_relay,
-    };
-    Some((tls, peer))
+    }
 }

@@ -24,6 +24,14 @@
 //!   le port l'accepte, suites ECDHE + AEAD seules — un agent, lui, ne
 //!   propose que TLS 1.3.
 //!
+//! **Aiguillage par ALPN** : un agent à jour propose
+//! [`dumbmonit_proto::AGENT_ALPN`] dans son ClientHello. Il reçoit alors une
+//! configuration qui accepte cette marque. Tout autre client (`curl`,
+//! PowerShell, agent antérieur) voit ce port exactement comme avant :
+//! `http/1.1` seul. Le port unique (`DUMBMONIT_SINGLE_PORT`,
+//! [`crate::single_port`]) s'appuie sur la même marque pour séparer les agents
+//! de l'interface.
+//!
 //! L'ancien canal (les mêmes routes sur le port de l'interface, en clair ou
 //! derrière un mandataire) reste accepté tant que le réglage « exiger mTLS »
 //! n'est pas posé — il l'est d'office sur une installation neuve. Ses réponses
@@ -40,13 +48,14 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
 
 use anyhow::{Context, Result};
-use dumbmonit_proto::{TargetId, TlsOffer};
+use dumbmonit_proto::{AGENT_ALPN, TargetId, TlsOffer};
 use rustls::ServerConfig;
 use rustls::crypto::CryptoProvider;
 use rustls::server::WebPkiClientVerifier;
 use sqlx::SqlitePool;
 
 pub use listener::{AgentIo, AgentListener, AgentPeer, Transport, listen};
+pub(crate) use listener::{Ready, peer_of};
 pub use routes::{AgentCert, router};
 
 use crate::auth::rate_limit::Buckets;
@@ -67,11 +76,38 @@ pub const SETTING_LEGACY_SINCE: &str = "agent_legacy_since";
 /// Groupe d'échange de clés que l'agent propose, seul.
 pub const POST_QUANTUM_GROUP: &str = "X25519MLKEM768";
 
+/// Protocoles ALPN servis à un agent qui s'est désigné : `http/1.1`, et la
+/// marque elle-même en dernier recours.
+pub const AGENT_PROTOCOLS: [&[u8]; 2] = [b"http/1.1", AGENT_ALPN];
+
+/// Les deux configurations TLS du canal, sous le même certificat.
+#[derive(Clone)]
+pub struct Configs {
+    /// Pour tout client qui ne se désigne pas comme agent (installateurs,
+    /// agents antérieurs) : `http/1.1` seul, comme toujours.
+    pub legacy: Arc<ServerConfig>,
+    /// Pour un agent qui propose [`dumbmonit_proto::AGENT_ALPN`] :
+    /// [`AGENT_PROTOCOLS`].
+    pub agent: Arc<ServerConfig>,
+}
+
+impl Configs {
+    /// Configuration à servir pour ce ClientHello.
+    pub fn for_hello(&self, hello: &rustls::server::ClientHello<'_>) -> Arc<ServerConfig> {
+        if offers_agent_protocol(hello) { self.agent.clone() } else { self.legacy.clone() }
+    }
+}
+
+/// Vrai si le ClientHello porte la marque des agents.
+pub fn offers_agent_protocol(hello: &rustls::server::ClientHello<'_>) -> bool {
+    hello.alpn().is_some_and(|mut protocols| protocols.any(|protocol| protocol == AGENT_ALPN))
+}
+
 /// État du canal en mémoire, partagé par l'écoute et l'API.
 pub struct AgentTls {
-    /// Configuration TLS courante ; remplacée à chaque nouveau certificat de
-    /// serveur, sans couper les connexions établies.
-    server_config: RwLock<Option<Arc<ServerConfig>>>,
+    /// Configurations TLS courantes ; remplacées à chaque nouveau certificat
+    /// de serveur, sans couper les connexions établies.
+    configs: RwLock<Option<Configs>>,
     /// Empreintes épinglables (autorité active, puis suivante en rotation).
     pins: RwLock<Vec<String>>,
     /// Épingle (`sha256//…`) de la clé du certificat du serveur.
@@ -94,7 +130,7 @@ impl Default for AgentTls {
 impl AgentTls {
     pub fn new() -> Self {
         Self {
-            server_config: RwLock::new(None),
+            configs: RwLock::new(None),
             pins: RwLock::new(Vec::new()),
             server_pin: RwLock::new(None),
             limits: Mutex::new(Buckets::new()),
@@ -103,9 +139,15 @@ impl AgentTls {
         }
     }
 
-    /// Configuration TLS à servir, une fois l'autorité chargée.
+    /// Configuration TLS des clients qui ne se désignent pas comme agents
+    /// (`http/1.1` seul), une fois l'autorité chargée.
     pub fn server_config(&self) -> Option<Arc<ServerConfig>> {
-        self.server_config.read().ok().and_then(|config| config.clone())
+        self.configs().map(|configs| configs.legacy)
+    }
+
+    /// Les deux configurations TLS du canal, une fois l'autorité chargée.
+    pub fn configs(&self) -> Option<Configs> {
+        self.configs.read().ok().and_then(|configs| configs.clone())
     }
 
     /// Empreintes à épingler.
@@ -129,7 +171,9 @@ impl AgentTls {
         }
     }
 
-    fn ready(&self) -> Option<listener::Ready> {
+    /// File des connexions établies du port des agents, que le port unique
+    /// alimente aussi. `None` tant que le port des agents n'écoute pas.
+    pub(crate) fn ready(&self) -> Option<listener::Ready> {
         self.ready.lock().ok().and_then(|slot| slot.clone())
     }
 
@@ -144,9 +188,9 @@ impl AgentTls {
         self.tunnels.lock().map(|open| open.get(&relay).copied().unwrap_or(0)).unwrap_or(0)
     }
 
-    fn install(&self, config: Arc<ServerConfig>, pins: Vec<String>, server_pin: Option<String>) {
-        if let Ok(mut slot) = self.server_config.write() {
-            *slot = Some(config);
+    fn install(&self, configs: Configs, pins: Vec<String>, server_pin: Option<String>) {
+        if let Ok(mut slot) = self.configs.write() {
+            *slot = Some(configs);
         }
         if let Ok(mut slot) = self.pins.write() {
             *slot = pins;
@@ -256,6 +300,9 @@ pub async fn reload(state: &AppState) -> Result<()> {
         .with_single_cert(identity.chain, identity.key)
         .context("agent channel certificate")?;
     config.alpn_protocols = vec![b"http/1.1".to_vec()];
+    let mut agent = config.clone();
+    agent.alpn_protocols = AGENT_PROTOCOLS.iter().map(|protocol| protocol.to_vec()).collect();
+    let configs = Configs { legacy: Arc::new(config), agent: Arc::new(agent) };
 
     let mut pins: Vec<String> = authorities
         .iter()
@@ -265,7 +312,7 @@ pub async fn reload(state: &AppState) -> Result<()> {
     pins.extend(
         authorities.iter().filter(|ca| ca.state == "next").map(|ca| ca.fingerprint.clone()),
     );
-    state.agent_tls().install(Arc::new(config), pins, server_pin);
+    state.agent_tls().install(configs, pins, server_pin);
     Ok(())
 }
 

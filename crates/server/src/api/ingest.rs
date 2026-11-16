@@ -732,10 +732,16 @@ pub async fn install_parameters_probed(
         Some(_) => offer.as_ref().map(|_| web_url.clone()),
         None => offer.as_ref().and_then(|offer| direct_agent_url(state, &web_url, offer.port)),
     };
+    // Le navigateur est sur le port unique : interface et agents y passent
+    // déjà tous deux, la commande n'a qu'un port de toute façon. Scripts et
+    // binaires s'y lisent sous le certificat de l'interface (un client sans la
+    // marque ALPN des agents y voit l'interface) : c'est donc son épingle, pas
+    // celle du port des agents, que la commande porte.
+    let shared = route.is_none() && on_single_port(state, &web_url);
     // Un seul port : il faut le canal ouvert et la clé de son certificat, que
     // les commandes épinglent pour lire scripts et binaires.
     let server_pin = state.agent_tls().server_pin();
-    let single_port = route.is_none() && agent_port_only && server_pin.is_some();
+    let single_port = route.is_none() && agent_port_only && server_pin.is_some() && !shared;
     let (base_url, agent_port_only) = match (&agent_url, single_port) {
         (Some(url), true) => (url.clone(), true),
         _ => (web_url, false),
@@ -783,15 +789,27 @@ pub async fn install_parameters_probed(
 }
 
 /// URL du canal chiffré pour une installation directe : l'adresse dédiée aux
-/// agents (`DUMBMONIT_AGENT_PUBLIC_URL`) quand il y en a une, sinon le même
-/// hôte que l'interface vue par le navigateur, sur le port des agents
+/// agents (`DUMBMONIT_AGENT_PUBLIC_URL`) quand il y en a une ; sinon, si le
+/// navigateur est sur le port unique (`DUMBMONIT_SINGLE_PORT`), cette même
+/// adresse — les agents s'y désignent par ALPN ; sinon le même hôte que
+/// l'interface vue par le navigateur, sur le port des agents
 /// (`DUMBMONIT_AGENT_PUBLIC_PORT`, à défaut celui de l'écoute).
 fn direct_agent_url(state: &AppState, web_url: &str, port: u16) -> Option<String> {
-    state
-        .config
-        .agent_public_url
-        .clone()
-        .or_else(|| dumbmonit_proto::agent_channel_url(web_url, port))
+    if let Some(url) = state.config.agent_public_url.clone() {
+        return Some(url);
+    }
+    if on_single_port(state, web_url) {
+        return Some(web_url.to_string());
+    }
+    dumbmonit_proto::agent_channel_url(web_url, port)
+}
+
+/// Vrai si l'adresse de l'interface vue par le navigateur est celle du port
+/// unique : même numéro de port (443 quand l'adresse n'en dit rien). Derrière
+/// une redirection vers un autre port, `DUMBMONIT_AGENT_PUBLIC_URL` le dit.
+fn on_single_port(state: &AppState, web_url: &str) -> bool {
+    let Some(single) = state.config.single_port() else { return false };
+    reqwest::Url::parse(web_url).ok().and_then(|url| url.port_or_known_default()) == Some(single)
 }
 
 /// Clé à épingler pour joindre le port de l'interface : celle du certificat

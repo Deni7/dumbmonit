@@ -28,6 +28,7 @@ configuration file to mount.
 | `DUMBMONIT_AGENT_LISTEN` | `0.0.0.0:8443` | Listen address of the encrypted agent channel (TLS 1.3, client certificates). `off` closes it. The only port agents on other networks need; see [Agent channel security](../install/agent-security.md). |
 | `DUMBMONIT_AGENT_PUBLIC_PORT` | listen port | Port written in the agent install commands, when a port forward or a TCP proxy publishes another number. |
 | `DUMBMONIT_AGENT_PUBLIC_URL` | *(unset)* | Dedicated address of the agent channel, `https://host[:port]` (for example `https://agents.example.com:443` behind an SNI passthrough). Wins over the browser's host and `DUMBMONIT_AGENT_PUBLIC_PORT` in install commands and in the channel announcement. Checked at startup. See [Dedicated agent address](#dedicated-agent-address). |
+| `DUMBMONIT_SINGLE_PORT` | *(off)* | One more listening port (`443`, or an address such as `0.0.0.0:443`) serving the web interface, the API **and** the agent channel, sorted per connection by the ALPN protocol agents announce. 8080 and 8443 stay open. Needs the agent channel and a port of its own, checked at startup. See [Single port](#single-port). |
 | `DUMBMONIT_AGENT_LEGACY_DAYS` | *(unset)* | Days during which the old plain agent channel stays accepted after an update of an instance that already had agents. Unset: until an administrator turns on *Require the encrypted channel*. |
 | `DUMBMONIT_TLS_CERT` | *(unset)* | PEM certificate chain to serve; see [HTTPS and encryption](../install/https.md). Unset: a self-signed certificate is created at first start, its key stored encrypted. |
 | `DUMBMONIT_TLS_KEY` | *(unset)* | PEM private key (PKCS#8, PKCS#1 or SEC1) of `DUMBMONIT_TLS_CERT`. Both files are re-read within a minute of a change, or on `SIGHUP`. |
@@ -189,6 +190,7 @@ retention and memory, external VictoriaMetrics, password reset, screenshots).
 | `1162/udp` | `dumbmonit` | SNMP trap receiver, only when `DUMBMONIT_TRAPS_ENABLED=true`. Commented out in the Compose file. |
 | `8080/tcp` | `dumbmonit` | Web UI, API, agent installers and downloads, public status pages. HTTPS only. |
 | `8443/tcp` | `dumbmonit` | Encrypted agent channel (TLS 1.3, client certificates): agent ingest, commands, relay tunnels. Publish it when agents run on other networks. |
+| `443/tcp` | `dumbmonit` | Optional single port (`DUMBMONIT_SINGLE_PORT`): web UI, API and agent channel on one port. Commented out in the Compose file. |
 | `8428/tcp`, `8429/tcp`, `9428/tcp` | `dumbmonit` | Embedded VictoriaMetrics, long-term store and VictoriaLogs, on the container's loopback. Never published. |
 
 See [Network ports](../install/ports.md) for who must reach what, or **Settings → System → Network ports** for the list computed from your own configuration.
@@ -261,6 +263,47 @@ tcp:
   the install script (the agent port serves it without a client certificate).
 - Cloudflare Tunnel, or any proxy that terminates TLS, cannot carry the agent
   channel.
+
+### Single port {#single-port}
+
+`DUMBMONIT_SINGLE_PORT=443` opens one more port that serves everything. Each
+connection is sorted on its TLS ClientHello, before any certificate is chosen:
+
+| The client announces | It gets |
+|---|---|
+| ALPN `dumbmonit-agent/1` (every up-to-date agent and relay) | The agent channel: internal authority, client certificate, the same routes and checks as 8443. The agent then speaks HTTP/2 when the server offers it. |
+| Anything else (browser, `curl`, PowerShell, TLS 1.2 included) | The web interface and its certificate (provided or self-signed), as on 8080. |
+| Plain HTTP | The redirect to `https://` of 8080, nothing else. |
+
+- **Backward compatible.** 8080 and 8443 keep listening. An agent older than
+  this option does not announce the protocol: it would get the web
+  certificate, which it does not trust, so it keeps using 8443. Update the
+  agents (from the interface) before you close 8443. A new agent talking to an
+  older server just gets HTTP/1.1, the server ignores the protocol name.
+- **Install commands.** Open the interface through the single port (for
+  example `https://monit.example.com`, 443 implied) before you copy a command:
+  `--url` and `--tls-url` then both point at it. The script and the binaries
+  are read there under the web certificate, so the command pins that one
+  (`--pinned-key` for a self-signed certificate) and the authority of the agent
+  channel (`--ca-pin`), as usual.
+- **Port forward.** If the container listens on another number than the one
+  agents dial (`DUMBMONIT_SINGLE_PORT=8444`, published as `443:8444`), set
+  `DUMBMONIT_AGENT_PUBLIC_URL=https://monit.example.com:443`.
+- The value is a port (`443`, all IPv4 addresses) or an address (`[::]:443`).
+  It must differ from `DUMBMONIT_BIND` and `DUMBMONIT_AGENT_LISTEN`, and the
+  agent channel must be open: otherwise the server does not start.
+- A proxy that terminates TLS still cannot carry the agent channel; an SNI
+  passthrough can.
+
+```yaml
+    environment:
+      DUMBMONIT_SINGLE_PORT: "443"
+    ports:
+      - "443:443"
+    sysctls:
+      net.ipv4.ping_group_range: "0 2147483647"
+      net.ipv4.ip_unprivileged_port_start: "443"
+```
 
 ## Volumes and files
 

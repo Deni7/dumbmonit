@@ -188,6 +188,15 @@ pub struct Config {
     /// (`DUMBMONIT_AGENT_LEGACY_DAYS`). `None` : jusqu'à ce qu'un administrateur
     /// exige mTLS dans l'interface.
     pub agent_legacy_days: Option<u32>,
+    /// Port unique (`DUMBMONIT_SINGLE_PORT`, `443` ou `0.0.0.0:443`) : une
+    /// écoute de plus, qui sert l'interface, l'API **et** le canal des agents.
+    /// Elle aiguille chaque connexion sur le ClientHello TLS : un agent à jour
+    /// y annonce le protocole ALPN [`dumbmonit_proto::AGENT_ALPN`] et passe au
+    /// canal des agents (mTLS, autorité épinglée) ; tout le reste (navigateur,
+    /// `curl`, PowerShell) voit l'interface. `None` (défaut) : rien de plus,
+    /// 8080 et 8443 comme avant — et ils restent ouverts, un agent antérieur
+    /// continuant par le port des agents.
+    pub single_listen: Option<SocketAddr>,
     /// Certificat fourni (`DUMBMONIT_TLS_CERT`, chaîne PEM) et sa clé
     /// (`DUMBMONIT_TLS_KEY`). Absents : un certificat autosigné est créé au
     /// premier démarrage et gardé, clé chiffrée, dans la base.
@@ -252,6 +261,11 @@ impl Config {
             env_var("DUMBMONIT_AGENT_PUBLIC_URL").as_deref(),
             agent_listen.is_some(),
         )?;
+        let single_listen = parse_single_listen(env_var("DUMBMONIT_SINGLE_PORT").as_deref())?;
+        if let Some(single) = single_listen {
+            let bind = env_parsed("DUMBMONIT_BIND", "0.0.0.0:8080")?;
+            check_single_listen(single, agent_listen, bind)?;
+        }
         Ok(Self {
             bind: env_parsed("DUMBMONIT_BIND", "0.0.0.0:8080")?,
             data_dir: PathBuf::from(env_or("DUMBMONIT_DATA_DIR", "/data")),
@@ -326,6 +340,7 @@ impl Config {
                     })
                 })
                 .transpose()?,
+            single_listen,
             agent_legacy_days: env_var("DUMBMONIT_AGENT_LEGACY_DAYS")
                 .map(|raw| {
                     raw.trim().parse::<u32>().with_context(|| {
@@ -354,6 +369,11 @@ impl Config {
             .and_then(|url| url.rsplit_once(':'))
             .and_then(|(_, port)| port.parse::<u16>().ok())
             .or_else(|| self.agent_port())
+    }
+
+    /// Port de l'écoute unique, si elle est ouverte.
+    pub fn single_port(&self) -> Option<u16> {
+        self.single_listen.map(|listen| listen.port())
     }
 
     pub fn database_path(&self) -> PathBuf {
@@ -434,6 +454,48 @@ fn parse_agent_listen(raw: Option<&str>) -> Result<Option<SocketAddr>> {
     raw.parse::<SocketAddr>().map(Some).with_context(|| {
         format!("DUMBMONIT_AGENT_LISTEN: invalid address '{raw}' (e.g. 0.0.0.0:8443)")
     })
+}
+
+/// Lit `DUMBMONIT_SINGLE_PORT` : absente, `off` (ou `none`, `0`, vide) : pas
+/// d'écoute unique ; un port seul (`443`) écoute sur toutes les adresses IPv4 ;
+/// sinon une adresse complète (`0.0.0.0:443`, `[::]:443`).
+fn parse_single_listen(raw: Option<&str>) -> Result<Option<SocketAddr>> {
+    let Some(raw) = raw.map(str::trim) else { return Ok(None) };
+    if matches!(raw.to_ascii_lowercase().as_str(), "" | "off" | "none" | "0" | "false" | "no") {
+        return Ok(None);
+    }
+    if let Ok(port) = raw.parse::<u16>() {
+        return Ok(Some(SocketAddr::from(([0, 0, 0, 0], port))));
+    }
+    raw.parse::<SocketAddr>().map(Some).with_context(|| {
+        format!("DUMBMONIT_SINGLE_PORT: invalid port or address '{raw}' (e.g. 443 or 0.0.0.0:443)")
+    })
+}
+
+/// L'écoute unique s'ajoute aux deux autres : elle a besoin du canal des agents
+/// (son autorité, ses routes) et d'un port qui ne soit ni celui de
+/// l'interface, ni celui des agents.
+fn check_single_listen(
+    single: SocketAddr,
+    agent_listen: Option<SocketAddr>,
+    bind: SocketAddr,
+) -> Result<()> {
+    let Some(agent) = agent_listen else {
+        anyhow::bail!(
+            "DUMBMONIT_SINGLE_PORT needs the agent channel: it is closed \
+             (DUMBMONIT_AGENT_LISTEN=off). Remove one of them."
+        );
+    };
+    for (name, taken) in [("DUMBMONIT_BIND", bind), ("DUMBMONIT_AGENT_LISTEN", agent)] {
+        if taken.port() == single.port() {
+            anyhow::bail!(
+                "DUMBMONIT_SINGLE_PORT uses port {}, already taken by {name}: choose another \
+                 port (443 is the usual one)",
+                single.port()
+            );
+        }
+    }
+    Ok(())
 }
 
 /// Adresse par laquelle joindre un processus local qui écoute sur `listen` :
@@ -635,6 +697,30 @@ mod tests {
         assert_eq!(parse_agent_listen(Some("off")).unwrap(), None);
         assert_eq!(parse_agent_listen(Some("")).unwrap(), None);
         assert!(parse_agent_listen(Some("8443")).is_err(), "une adresse complète est attendue");
+    }
+
+    #[test]
+    fn the_single_port_is_off_unless_asked_and_takes_a_port_or_an_address() {
+        assert_eq!(parse_single_listen(None).unwrap(), None);
+        assert_eq!(parse_single_listen(Some("off")).unwrap(), None);
+        assert_eq!(parse_single_listen(Some(" ")).unwrap(), None);
+        assert_eq!(parse_single_listen(Some("443")).unwrap(), Some("0.0.0.0:443".parse().unwrap()));
+        assert_eq!(
+            parse_single_listen(Some("[::]:8444")).unwrap(),
+            Some("[::]:8444".parse().unwrap())
+        );
+        assert!(parse_single_listen(Some("https://x")).is_err());
+    }
+
+    #[test]
+    fn the_single_port_needs_the_agent_channel_and_a_port_of_its_own() {
+        let single: SocketAddr = "0.0.0.0:443".parse().unwrap();
+        let bind: SocketAddr = "0.0.0.0:8080".parse().unwrap();
+        let agent: SocketAddr = "0.0.0.0:8443".parse().unwrap();
+        assert!(check_single_listen(single, Some(agent), bind).is_ok());
+        assert!(check_single_listen(single, None, bind).is_err(), "canal des agents fermé");
+        assert!(check_single_listen("0.0.0.0:8080".parse().unwrap(), Some(agent), bind).is_err());
+        assert!(check_single_listen("[::]:8443".parse().unwrap(), Some(agent), bind).is_err());
     }
 
     #[test]

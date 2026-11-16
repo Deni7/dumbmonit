@@ -23,6 +23,7 @@ use std::task::{Context, Poll};
 use dumbmonit_proto::TargetId;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
+use super::Configs;
 use super::listener::{self, Transport};
 use crate::state::AppState;
 
@@ -111,16 +112,16 @@ pub enum Refusal {
 pub struct Grant {
     slot: Slot,
     ready: listener::Ready,
-    config: Arc<rustls::ServerConfig>,
+    configs: Configs,
 }
 
 /// Réserve un tunnel pour `relay`, avant de répondre `101` au relais.
 pub fn grant(state: &AppState, relay: TargetId) -> Result<Grant, Refusal> {
     let tls = state.agent_tls();
     let ready = tls.ready().ok_or(Refusal::Closed)?;
-    let config = tls.server_config().ok_or(Refusal::Closed)?;
+    let configs = tls.configs().ok_or(Refusal::Closed)?;
     let slot = tls.reserve_tunnel(relay).ok_or(Refusal::Busy)?;
-    Ok(Grant { slot, ready, config })
+    Ok(Grant { slot, ready, configs })
 }
 
 impl Grant {
@@ -132,7 +133,7 @@ impl Grant {
     {
         let transport: Box<dyn Transport> = Box::new(Guarded { inner: upgraded, _slot: self.slot });
         if let Some(connection) =
-            listener::handshake(self.config, transport, addr, Some(relay)).await
+            listener::handshake(self.configs, transport, addr, Some(relay)).await
         {
             let _ = self.ready.send(connection).await;
         }
