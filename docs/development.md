@@ -105,6 +105,11 @@ bad look.
 `ghcr.io/selfhostr/dumbmonit`: `:edge` on every push to `main`, `:X.Y.Z`,
 `:X.Y`, `:X` and `:latest` on every `v*` tag.
 
+The agent binaries are signed (Ed25519) by `release.yml` with the repository
+secret `AGENT_SIGNING_KEY`; the matching public keys, several during a
+rotation, are in `crates/agent/signing/release-keys.pem`. Maintainer procedure:
+[Signing the agent binaries](development/agent-signing.md).
+
 Integration tests live in `crates/server/tests/`; pure modules (metric
 conversion, option parsing, alert state machine, silences) are tested in place
 without network.

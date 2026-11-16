@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **Agent signing key setup is one step shorter.** `scripts/agent-signing-key.sh` now appends the
+  new public key to the list of accepted keys (rotation keeps the old ones) and prints the exact
+  `gh secret set AGENT_SIGNING_KEY -R selfhostr/dumbmonit` command; a release built without the
+  secret now says so in the job summary as well as in an annotation.
 - **One typeface family everywhere: Inter and JetBrains Mono.** The console, the status pages, the
   topology exports and the documentation now use Inter (headings in semibold) and JetBrains Mono
   for code and figures, replacing Geist and Bricolage Grotesque. Both are open source (SIL OFL 1.1)
