@@ -565,7 +565,6 @@ curl -b cookies.txt -G https://localhost:8080/api/metrics/query \
 | `GET` | `/api/targets/{id}/webchange/pages` | read | Страницы, отслеживаемые наблюдением за сайтом. |
 | `GET` | `/api/targets/{id}/webchange/changes` | read | Изменения, найденные на отслеживаемом сайте, сначала новые. |
 | `GET` | `/api/targets/{id}/webchange/changes/{change_id}` | read | Одно изменение с обеими версиями и построчным diff. |
-| `GET` | `/api/targets/{id}/webchange/snapshots/{snapshot_id}/screenshot` | read | Скриншот снимка. |
 | `POST` | `/api/targets/{id}/webchange/check` | write | Проверить отслеживаемый сайт сейчас. |
 | `GET` | `/api/targets/{id}/opnsense/gateways`, `/traffic`, `/health` | read | OPNsense: шлюзы и WAN-адреса; интерфейсы, межсетевой экран и DHCP; система, службы, туннели и прошивка. |
 | `GET` | `/api/targets/{id}/truenas/storage`, `/protection`, `/health` | read | TrueNAS: пулы, датасеты и диски; scrub и задачи защиты данных; система, оповещения и службы. |

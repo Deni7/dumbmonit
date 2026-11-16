@@ -2,8 +2,7 @@
 	import { withBase } from '#lib/paths.js';
 	/**
 	 * The change selected in the device panel's timeline, shown beside it:
-	 * what moved in the text first (the quickest answer to "what changed?"),
-	 * then the screenshots. The full page (`/targets/{id}/changes/{id}`) stays
+	 * what moved in the text (the quickest answer to "what changed?"). The full page (`/targets/{id}/changes/{id}`) stays
 	 * one link away, for a wider look or a link to share.
 	 */
 	import { getWebchangeChange, type WebchangeChange, type WebchangeChangeDetail } from '#lib/api/index.js';
@@ -11,7 +10,6 @@
 	import { Button, ErrorNotice, Skeleton } from '#lib/ui/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { ExternalLink, Maximize2 } from 'lucide-svelte';
-	import ChangeScreenshots from './ChangeScreenshots.svelte';
 	import DiffView from './DiffView.svelte';
 	import { pagePath, shortenPath } from './format';
 
@@ -21,11 +19,9 @@
 		/** Changes making the same edit on other pages, found by the same check. */
 		sameEdit?: WebchangeChange[];
 		onselect?: (change: WebchangeChange) => void;
-		/** Opened from a row's camera button: the screenshots lead, the text diff follows. */
-		screenshotsFirst?: boolean;
 	}
 
-	let { targetId, changeId, sameEdit = [], onselect, screenshotsFirst = false }: Props = $props();
+	let { targetId, changeId, sameEdit = [], onselect }: Props = $props();
 
 	let detail = $state<WebchangeChangeDetail | null>(null);
 	let error = $state<unknown>(null);
@@ -115,11 +111,6 @@
 		<section class="flex flex-col gap-2">
 			<h4 class="text-sm font-semibold text-ink">{m.app_change_text_changes()}</h4>
 			<DiffView diff={detail.diff} />
-		</section>
-
-		<section class={`flex flex-col gap-2 ${screenshotsFirst ? 'order-first' : ''}`}>
-			<h4 class="text-sm font-semibold text-ink">{m.app_change_screenshots()}</h4>
-			<ChangeScreenshots {targetId} {detail} />
 		</section>
 	</article>
 {/if}

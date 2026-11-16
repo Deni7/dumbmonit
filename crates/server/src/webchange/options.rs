@@ -16,7 +16,6 @@ pub const OPTION_SCOPE: &str = "scope";
 pub const OPTION_MAX_PAGES: &str = "max_pages";
 pub const OPTION_PATH_PREFIX: &str = "path_prefix";
 pub const OPTION_IGNORE: &str = "ignore";
-pub const OPTION_SCREENSHOTS: &str = "screenshots";
 pub const OPTION_CHECK_INTERVAL: &str = "check_interval_minutes";
 pub const OPTION_INSECURE_TLS: &str = "insecure_tls";
 pub const OPTION_ALLOW_PRIVATE: &str = dumbmonit_collectors::uptime::guard::OPTION;
@@ -62,7 +61,6 @@ pub struct Options {
     pub ignore: Vec<Regex>,
     /// Zones de la page dont le texte est comparé.
     pub zones: Zones,
-    pub screenshots: bool,
     pub check_interval: Duration,
     pub insecure_tls: bool,
     pub allow_private: bool,
@@ -154,7 +152,6 @@ impl Options {
             max_pages,
             ignore,
             zones,
-            screenshots: parse_bool(target, OPTION_SCREENSHOTS, true)?,
             check_interval: Duration::from_secs(u64::from(minutes) * 60),
             insecure_tls: parse_bool(target, OPTION_INSECURE_TLS, false)?,
             allow_private: parse_bool(target, OPTION_ALLOW_PRIVATE, false)?,
@@ -277,7 +274,6 @@ mod tests {
         assert_eq!(options.scope.start().as_str(), "https://ex.fr/docs/intro.html");
         assert_eq!(options.scope.prefix(), "/docs/");
         assert_eq!(options.max_pages, 1, "une page seule");
-        assert!(options.screenshots);
         assert!(options.ignore.is_empty());
         assert_eq!(options.check_interval, Duration::from_secs(3600));
         assert!(!options.allow_private && !options.insecure_tls);
@@ -289,6 +285,15 @@ mod tests {
     }
 
     #[test]
+    fn l_ancienne_option_des_captures_est_ignoree() {
+        // Une cible créée avant le retrait des captures, ou restaurée d'une
+        // ancienne sauvegarde, garde cette étiquette : elle ne gêne plus.
+        let ancienne = Options::from_target(&target("https://ex.fr/", &[("screenshots", "maybe")]));
+        let sans = Options::from_target(&target("https://ex.fr/", &[])).unwrap();
+        assert_eq!(ancienne.unwrap().fingerprint, sans.fingerprint);
+    }
+
+    #[test]
     fn les_valeurs_aberrantes_sont_des_erreurs_de_configuration() {
         for (address, tags) in [
             ("ftp://ex.fr/", &[][..]),
@@ -297,7 +302,6 @@ mod tests {
             ("https://ex.fr/", &[("max_pages", "0")][..]),
             ("https://ex.fr/", &[("max_pages", "201")][..]),
             ("https://ex.fr/", &[("check_interval_minutes", "1")][..]),
-            ("https://ex.fr/", &[("screenshots", "peut-être")][..]),
             ("https://ex.fr/", &[("ignore", "(non fermée")][..]),
             ("https://ex.fr/", &[("path_prefix", "https://ex.fr/docs")][..]),
             ("https://ex.fr/", &[("content_selector", "main p")][..]),
@@ -332,10 +336,7 @@ mod tests {
     fn changer_les_exclusions_change_lempreinte() {
         let a = Options::from_target(&target("https://ex.fr/", &[])).unwrap();
         let b = Options::from_target(&target("https://ex.fr/", &[("ignore", "x")])).unwrap();
-        let c =
-            Options::from_target(&target("https://ex.fr/", &[("screenshots", "false")])).unwrap();
         assert_ne!(a.fingerprint, b.fingerprint);
-        assert_eq!(a.fingerprint, c.fingerprint, "les captures ne changent pas la comparaison");
     }
 
     #[test]

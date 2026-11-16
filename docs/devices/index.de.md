@@ -72,7 +72,7 @@ diese Version überwachen kann.
 | [WebSocket](services.md#websocket) | `websocket` | keine, Benutzername/Passwort oder Token | WebSocket-Endpunkt: Handshake, optionaler Nachrichtenaustausch |
 | [NTP-Zeitserver](services.md#ntp) | `ntp` | keine | Router, NAS, interner Zeitserver, öffentlicher Pool-Server |
 | [Heartbeat](push.md) | `push` | keine (geheime URL) | Cronjob, Backup-Skript, Automatisierung, die sich melden muss |
-| [Website-Änderungen](webchange.md) | `webchange` | keine | Eine Seite oder eine ganze Website: Textänderungen, neue und entfernte Seiten, Vorher/Nachher mit Screenshots |
+| [Website-Änderungen](webchange.md) | `webchange` | keine | Eine Seite oder eine ganze Website: Textänderungen, neue und entfernte Seiten, Vorher/Nachher als Text |
 | [Website-Zustand & SEO](website.md) | `website` | keine | Websites in großer Zahl: Ausfall, leere Seite, Weiterleitungen, noindex, robots.txt, Änderungen von Titel/Beschreibung/Canonical, Plattform (CSV-Import) |
 | [Demo-Monitor](demo.md) | `dummy` | keine | Die Oberfläche ohne Hardware erkunden |
 

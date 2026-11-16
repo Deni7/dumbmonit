@@ -66,7 +66,7 @@ docker compose up -d
 会拉取已发布的镜像；只读文件系统、capability、`PUID`/`PGID` 以及 `ping_group_range`
 sysctl 的作用，参见[权限与数据目录](#permissions)和
 [无需 capability 的 ICMP ping](#icmp-ping-without-a-capability)。各项选项（端口、
-密钥、保留期、外部 VictoriaMetrics、截图）都是
+密钥、保留期、外部 VictoriaMetrics）都是
 [由你自己添加的环境变量](#advanced-options)。
 
 !!! tip "自己构建镜像"
@@ -303,33 +303,7 @@ homelab 用 256 MB 就够）：
       DUMBMONIT_RESET_PASSWORD: "1"
 ```
 
-**网站变更截图**：服务器旁的无头 Chromium；见下文[网站变更截图](#website-screenshots)。
-
 更多变量：[配置参考](../reference/configuration.md)。
-
-## 网站变更截图 {#website-screenshots}
-
-[网站变更监视器](../devices/webchange.md)始终会比较页面的可见文本。要为每个新版本保存截图，需要一个浏览器，而 DumbMonit 镜像不含浏览器：无头 Chromium 作为第二个服务运行，`DUMBMONIT_BROWSER_URL` 告诉服务器在哪里找到它。
-
-将以下几行添加到 `docker-compose.yml`，然后运行 `docker compose up -d`：
-
-```yaml
-services:
-  dumbmonit:
-    environment:
-      DUMBMONIT_BROWSER_URL: http://browser:9222
-  browser:
-    image: chromedp/headless-shell:stable
-    shm_size: 256m
-    restart: unless-stopped
-```
-
-- `browser` 是服务名；在 Compose 网络中，`http://browser:9222` 会解析到它。没有任何端口被发布：只有 DumbMonit 与它通信。
-- `shm_size: 256m`：Chromium 在 `/dev/shm` 中渲染，Docker 默认的 64 MB 对于长页面太小。
-- 任何以 `--remote-debugging-port` 启动的 Chromium 都可以；这里使用的镜像是 `chromedp/headless-shell`。
-
-没有浏览器时，其余功能照常工作（文本比较、告警、前后对照副本）；快照只是没有图像。只要服务器连不上浏览器，网站变更监控项的表单就会显示一条包含这些行的提示。
-如果重启后提示仍然存在，请检查 `docker compose logs browser`，确认 `DUMBMONIT_BROWSER_URL` 中的主机名就是服务名，并且两个服务在同一个 Compose 项目中。
 
 ## 反向代理 {#reverse-proxy}
 

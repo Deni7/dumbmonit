@@ -415,7 +415,6 @@ curl -b cookies.txt -G https://localhost:8080/api/metrics/query \
 | `GET` | `/api/targets/{id}/webchange/pages` | read | 网站监视所跟踪的页面。 |
 | `GET` | `/api/targets/{id}/webchange/changes` | read | 在被监视网站上发现的变更，最新的在前。 |
 | `GET` | `/api/targets/{id}/webchange/changes/{change_id}` | read | 一次变更，附两个版本及逐行差异。 |
-| `GET` | `/api/targets/{id}/webchange/snapshots/{snapshot_id}/screenshot` | read | 快照的截图。 |
 | `POST` | `/api/targets/{id}/webchange/check` | write | 立即检查被监视的网站。 |
 | `GET` | `/api/targets/{id}/opnsense/gateways`、`/traffic`、`/health` | read | OPNsense：网关和 WAN 地址；接口、防火墙和 DHCP；系统、服务、隧道和固件。 |
 | `GET` | `/api/targets/{id}/truenas/storage`、`/protection`、`/health` | read | TrueNAS：存储池、数据集和磁盘；清理任务和数据保护任务；系统、告警和服务。 |

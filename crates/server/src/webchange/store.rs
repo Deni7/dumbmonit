@@ -1,18 +1,13 @@
 //! Ce que la surveillance garde : état, pages, instantanés, changements.
 //!
-//! Le texte des instantanés vit dans SQLite ; les captures d'écran, elles,
-//! sont des fichiers sous `<data>/webchange/<cible>/<instantané>.jpg`. Une
-//! capture pèse de 100 à 800 Ko : cent changements sur quelques sites, c'est
-//! déjà une centaine de mégaoctets, qui gonfleraient la base, son journal WAL
-//! et chaque sauvegarde planifiée (`backup::local` copie la base entière, tous
-//! les jours) pour des images que l'on peut perdre sans dommage. Le texte, lui,
-//! est petit, et c'est lui qui fait le diff : il reste dans la base.
+//! Le texte des instantanés vit dans SQLite : il est petit, et c'est lui qui
+//! fait le diff.
 //!
-//! Rétention : par cible, les cent derniers changements ; un instantané est
-//! gardé tant qu'il est le dernier d'une page ou qu'un changement gardé le
-//! cite. Le reste est effacé, fichiers compris, à la fin de chaque vérification.
+//! Rétention : par cible, les derniers changements ([`KEEP_CHANGES`]) ; un
+//! instantané est gardé tant qu'il est le dernier d'une page ou qu'un
+//! changement gardé le cite. Le reste est effacé à la fin de chaque vérification.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{Context, Result};
 use dumbmonit_proto::TargetId;
@@ -25,24 +20,14 @@ const MAX_CONTENT_BYTES: usize = 1024 * 1024;
 /// Un verrou plus vieux que ceci est celui d'une vérification interrompue.
 const STALE_LOCK_MINUTES: i64 = 30;
 
-/// Répertoire des captures d'une cible.
-pub fn target_dir(data_dir: &Path, target: TargetId) -> PathBuf {
-    data_dir.join("webchange").join(target.to_string())
-}
-
-/// Fichier de la capture d'un instantané.
-pub fn screenshot_path(data_dir: &Path, target: TargetId, snapshot: i64) -> PathBuf {
-    target_dir(data_dir, target).join(format!("{snapshot}.jpg"))
-}
-
-/// Efface les captures d'une cible supprimée. Les lignes, elles, partent avec
-/// la cible (`ON DELETE CASCADE`).
-pub async fn forget_files(data_dir: &Path, target: TargetId) {
-    let dir = target_dir(data_dir, target);
+/// Efface `<data>/webchange`, où les anciennes versions rangeaient les captures
+/// d'écran des sites (retirées). Sans effet s'il n'y a rien.
+pub async fn remove_legacy_screenshots(data_dir: &Path) {
+    let dir = data_dir.join("webchange");
     match tokio::fs::remove_dir_all(&dir).await {
-        Ok(()) => {}
+        Ok(()) => tracing::info!(path = %dir.display(), "old website screenshots removed"),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-        Err(error) => tracing::warn!(target = target, %error, "screenshots not removed"),
+        Err(error) => tracing::warn!(path = %dir.display(), %error, "old screenshots not removed"),
     }
 }
 
@@ -342,15 +327,6 @@ pub async fn insert_snapshot(
     Ok(id)
 }
 
-pub async fn mark_screenshot(pool: &SqlitePool, snapshot: i64) -> Result<()> {
-    sqlx::query("UPDATE webchange_snapshots SET has_screenshot = 1 WHERE id = ?")
-        .bind(snapshot)
-        .execute(pool)
-        .await
-        .context("enregistrement d'une capture")?;
-    Ok(())
-}
-
 /// Texte d'un instantané.
 pub async fn snapshot_content(pool: &SqlitePool, snapshot: i64) -> Result<Option<String>> {
     sqlx::query_scalar("SELECT content FROM webchange_snapshots WHERE id = ?")
@@ -366,7 +342,6 @@ pub struct SnapshotRow {
     pub id: i64,
     pub fetched_at: String,
     pub title: Option<String>,
-    pub has_screenshot: bool,
 }
 
 /// Un instantané de la cible ; `None` s'il n'existe pas ou appartient à une
@@ -377,7 +352,7 @@ pub async fn snapshot(
     snapshot: i64,
 ) -> Result<Option<SnapshotRow>> {
     sqlx::query_as(
-        "SELECT id, fetched_at, title, has_screenshot FROM webchange_snapshots
+        "SELECT id, fetched_at, title FROM webchange_snapshots
          WHERE id = ? AND target_id = ?",
     )
     .bind(snapshot)
@@ -496,8 +471,8 @@ pub async fn change(pool: &SqlitePool, target: TargetId, id: i64) -> Result<Opti
     .context("lecture d'un changement")
 }
 
-/// Applique la rétention de la cible, fichiers compris.
-pub async fn prune(pool: &SqlitePool, data_dir: &Path, target: TargetId) -> Result<()> {
+/// Applique la rétention de la cible.
+pub async fn prune(pool: &SqlitePool, target: TargetId) -> Result<()> {
     sqlx::query(
         "DELETE FROM webchange_changes
          WHERE target_id = ?
@@ -511,8 +486,8 @@ pub async fn prune(pool: &SqlitePool, data_dir: &Path, target: TargetId) -> Resu
     .await
     .context("purge des changements anciens")?;
 
-    let orphans: Vec<(i64, bool)> = sqlx::query_as(
-        "SELECT s.id, s.has_screenshot FROM webchange_snapshots s
+    let orphans: Vec<i64> = sqlx::query_as(
+        "SELECT s.id FROM webchange_snapshots s
          WHERE s.target_id = ?
            AND NOT EXISTS (SELECT 1 FROM webchange_pages p
                            WHERE p.target_id = s.target_id AND p.latest_snapshot = s.id)
@@ -524,20 +499,12 @@ pub async fn prune(pool: &SqlitePool, data_dir: &Path, target: TargetId) -> Resu
     .fetch_all(pool)
     .await
     .context("recherche des instantanés à purger")?;
-    for (id, has_screenshot) in orphans {
+    for id in orphans {
         sqlx::query("DELETE FROM webchange_snapshots WHERE id = ?")
             .bind(id)
             .execute(pool)
             .await
             .context("purge d'un instantané")?;
-        if has_screenshot {
-            let path = screenshot_path(data_dir, target, id);
-            if let Err(error) = tokio::fs::remove_file(&path).await
-                && error.kind() != std::io::ErrorKind::NotFound
-            {
-                tracing::warn!(path = %path.display(), %error, "screenshot not removed");
-            }
-        }
     }
     Ok(())
 }

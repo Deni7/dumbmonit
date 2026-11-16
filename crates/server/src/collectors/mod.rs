@@ -143,14 +143,9 @@ pub fn builtin(
     registry.register(Arc::new(AgentServiceCollector::new(pool.clone())));
     // Moniteurs en poussée (heartbeat) : le travail surveillé appelle une URL.
     registry.register(Arc::new(PushCollector::new(pool.clone())));
-    // Changements du contenu d'un site : texte, instantanés et captures, gardés
-    // en base et sous `<data>/webchange`.
+    // Changements du contenu d'un site : texte et instantanés, gardés en base.
     registry.register(Arc::new(crate::webchange::WebchangeCollector::new(
-        crate::webchange::Context {
-            pool: pool.clone(),
-            data_dir: config.data_dir.clone(),
-            browser_url: config.browser_url.clone(),
-        },
+        crate::webchange::Context { pool: pool.clone() },
     )));
     // Sauvegarde des configurations réseau : le collecteur relit l'état en
     // base, les relevés tournent en tâche de fond (`netconfig::spawn`).

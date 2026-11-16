@@ -8,7 +8,7 @@
 |---|---|---|
 | `DUMBMONIT_BIND` | `0.0.0.0:8080` | API 和 web UI 的监听地址，在容器内。 |
 | `PUID` / `PGID` | `65532` | 容器以 root 启动（`user: "0:0"`，如随附的 `docker-compose.yml`）时服务器运行所用的用户和组：启动时数据目录会被移交给它们，随后放弃 root。`0` 会被拒绝。`DUMBMONIT_PUID` / `DUMBMONIT_PGID` 优先。其他情况下被忽略。参见[权限](../install/docker.md#permissions)。 |
-| `DUMBMONIT_DATA_DIR` | `/data` | 持久目录：`dumbmonit.db`（SQLite）、`secret.key`、`vm/`（嵌入式 VictoriaMetrics）和 `webchange/`（网站更改的屏幕截图）。 |
+| `DUMBMONIT_DATA_DIR` | `/data` | 持久目录：`dumbmonit.db`（SQLite）、`secret.key` 和 `vm/`（嵌入式 VictoriaMetrics）。 |
 | `DUMBMONIT_VM_URL` | *(unset)* | 外部 VictoriaMetrics 的基 URL（`http://host:8428`）。当设置时，嵌入式未启动；见[下方](#embedded-victoriametrics)。 |
 | `DUMBMONIT_SECRET` | *(generated)* | 实例秘密。如果空，从 `<data dir>/secret.key` 读，在第一次启动时生成。用 AES-256-GCM 加密监控项凭证、通道秘密和代理令牌。 |
 | `DUMBMONIT_MAX_CONCURRENT_PROBES` | `64` | 最大同步探针，所有收集器结合。 |
@@ -44,7 +44,6 @@
 | `DUMBMONIT_BACKUP_INTERVAL_HOURS` | `24` | 两个备份之间的小时，1 到 8760。第一个发生一个间隔在启动之后，不是启动。 |
 | `DUMBMONIT_DEMO` | *(off)* | `1` 对于只读演示有一个固定虚构地产，签入 `demo` / `demo`。**在每个启动时重新创建数据库**：从不在真实数据卷上。请参阅 [Run a demo instance](../install/demo.md)。 |
 | `DUMBMONIT_BACKUP_KEEP` | `7` | 多少备份被保留，1 到 365。最旧的被移除其 `.key`。 |
-| `DUMBMONIT_BROWSER_URL` | *(unset)* | [website changes](../devices/webchange.md#screenshots) 的屏幕截图用的 Headless Chromium，如 `http://host:9222`（其 DevTools 端口）。在你的 Compose 文件中添加一个 `chromedp/headless-shell` 服务，如 [Screenshots](../devices/webchange.md#screenshots) 所示。未设置：仅文本比较。 |
 
 基线保留（60 天）和 14 天学习周期不可配置。
 
@@ -75,7 +74,7 @@ DumbMonit 被称为 EzyMonit 直到 2026 年 9 月。每个 `DUMBMONIT_*` 变量
 随附的 `docker-compose.yml` 不读取任何变量，也不需要 `.env` 文件。
 一切都在服务的 `environment:` 下设置，或直接编辑该文件；参见
 [高级选项](../install/docker.md#advanced-options)（端口、密钥、保留期与内存、
-外部 VictoriaMetrics、密码重置、截图）。开发覆盖文件 `docker-compose.dev.yml`
+外部 VictoriaMetrics、密码重置）。开发覆盖文件 `docker-compose.dev.yml`
 读取 `DUMBMONIT_VM_PORT`（默认 `8428`），作为内嵌 VictoriaMetrics 的主机端口。
 
 ## Ports {#ports}

@@ -1579,12 +1579,6 @@ const WEBCHANGE_OPTIONS: &[OptionView] = &[
         "Mozilla/5.0 (compatible; DumbMonit)",
         "",
     ),
-    boolean(
-        "screenshots",
-        "Screenshots",
-        "Keep a screenshot of each new version. Needs the optional browser service (DUMBMONIT_BROWSER_URL); without it, only the text is kept.",
-        true,
-    ),
     number(
         "check_interval_minutes",
         "Check every (minutes)",
@@ -4837,18 +4831,6 @@ const NUTANIX_OPTIONS: &[OptionView] = &[
 /// Racine de la documentation en ligne, vers laquelle pointent les prérequis.
 const DOCS_INSTALL: &str = "https://dumbmonit.selfhostr.io/docs/install/docker/";
 
-/// Bloc Compose à ajouter pour les captures d'écran : le navigateur sans tête et
-/// l'adresse que le serveur utilise pour lui parler. Identique à la documentation.
-const BROWSER_SNIPPET: &str = "services:
-  dumbmonit:
-    environment:
-      DUMBMONIT_BROWSER_URL: http://browser:9222
-  browser:
-    image: chromedp/headless-shell:stable
-    shm_size: 256m
-    restart: unless-stopped
-";
-
 /// Bloc Compose qui autorise l'utilisateur non root du conteneur à émettre des
 /// échos ICMP. Identique à la documentation.
 const ICMP_SNIPPET: &str = "services:
@@ -4862,20 +4844,8 @@ const ICMP_SNIPPET: &str = "services:
 ///
 /// Les textes affichés sont ceux de l'interface, par `id` : ici, seulement des
 /// constats et des valeurs à copier.
-async fn requirements(kind: &str, browser_url: Option<&str>) -> Vec<Requirement> {
+fn requirements(kind: &str) -> Vec<Requirement> {
     match kind {
-        "webchange" => {
-            let satisfied = match browser_url {
-                Some(url) => crate::webchange::cdp::available(url).await,
-                None => false,
-            };
-            vec![Requirement {
-                id: "browser".into(),
-                satisfied,
-                doc_url: format!("{DOCS_INSTALL}#website-screenshots").into(),
-                compose_snippet: BROWSER_SNIPPET.into(),
-            }]
-        }
         "ping" => vec![Requirement {
             id: "icmp".into(),
             satisfied: dumbmonit_collectors::uptime::icmp_available(),
@@ -4941,8 +4911,7 @@ pub async fn list(State(state): State<AppState>) -> Json<Vec<KindDescription>> {
         // Les prérequis ne concernent que les types compilés : un paquet
         // d'intégration ne peut pas en déclarer sous le nom d'un type du serveur.
         if compiled(&kind).is_some() {
-            description.requirements =
-                requirements(&kind, state.config.browser_url.as_deref()).await;
+            description.requirements = requirements(&kind);
         }
         kinds.push(description);
     }
@@ -5926,7 +5895,6 @@ fn compiled(kind: &str) -> Option<CollectorView> {
                     "In the address, paste the page to watch, with http:// or https://.",
                     "To follow a whole site or section, set \"Scope\" to \"site\".",
                     "List lines that change at every visit (a clock, a counter) in \"Ignore lines\", as regular expressions.",
-                    "For a screenshot of each version, follow the \"Screenshots\" section of this page.",
                 ],
                 ports: &[
                     to_device!(443, "tcp", "Page fetch over HTTPS (default port)"),
@@ -8805,7 +8773,6 @@ mod tests {
                     "keep_page_chrome",
                     "ignore_query",
                     "user_agent",
-                    "screenshots",
                     "check_interval_minutes",
                     "insecure_tls",
                     "allow_private_targets",
@@ -10089,7 +10056,6 @@ mod tests {
             defaut(o::OPTION_CHECK_INTERVAL),
             Some(o::DEFAULT_CHECK_INTERVAL_MINUTES.to_string().as_str())
         );
-        assert_eq!(defaut(o::OPTION_SCREENSHOTS), Some("true"));
         assert_eq!(defaut(o::OPTION_KEEP_CHROME), Some("false"));
         for cle in [
             o::OPTION_PATH_PREFIX,
@@ -10106,22 +10072,11 @@ mod tests {
         assert_eq!(describe("webchange").credential_types, &["none"]);
     }
 
-    #[tokio::test]
-    async fn les_captures_exigent_un_navigateur_joignable() {
-        let sans = requirements("webchange", None).await;
-        assert_eq!(sans.len(), 1);
-        assert_eq!(sans[0].id, "browser");
-        assert!(!sans[0].satisfied, "pas d'adresse : pas de captures");
-        // Adresse configurée mais personne n'écoute : toujours manquant.
-        let mort = requirements("webchange", Some("http://127.0.0.1:1")).await;
-        assert!(!mort[0].satisfied);
-    }
-
-    #[tokio::test]
-    async fn seuls_les_types_qui_en_ont_besoin_declarent_un_prerequis() {
-        assert_eq!(requirements("ping", None).await[0].id, "icmp");
+    #[test]
+    fn seuls_les_types_qui_en_ont_besoin_declarent_un_prerequis() {
+        assert_eq!(requirements("ping")[0].id, "icmp");
         for kind in ["snmp", "http", "tcp", "proxmox", "agent", "website"] {
-            assert!(requirements(kind, None).await.is_empty(), "« {kind} » n'exige rien");
+            assert!(requirements(kind).is_empty(), "« {kind} » n'exige rien");
         }
     }
 
@@ -10130,10 +10085,10 @@ mod tests {
     #[test]
     fn les_blocs_compose_sont_ceux_de_la_documentation() {
         let doc = include_str!("../../../../docs/install/docker.md");
-        for (nom, bloc) in [("browser", BROWSER_SNIPPET), ("icmp", ICMP_SNIPPET)] {
+        for (nom, bloc) in [("icmp", ICMP_SNIPPET)] {
             assert!(doc.contains(bloc.trim_end()), "le bloc « {nom} » a divergé de docker.md");
         }
-        for ancre in ["{#website-screenshots}", "{#icmp-ping-without-a-capability}"] {
+        for ancre in ["{#icmp-ping-without-a-capability}"] {
             assert!(doc.contains(ancre), "ancre {ancre} absente de docker.md");
         }
     }

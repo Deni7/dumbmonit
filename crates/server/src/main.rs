@@ -101,6 +101,9 @@ async fn run(mut config: Config, startup: Startup) -> Result<()> {
         warn!(?error, "webhook headers could not be moved to secrets");
     }
     info!(database = %config.database_path().display(), "database ready");
+    // Les captures d'écran des sites surveillés ont été retirées : leurs
+    // fichiers ne servent plus.
+    dumbmonit_server::webchange::store::remove_legacy_screenshots(&config.data_dir).await;
     // Journaux du serveur : fichiers quotidiens dans `/data/logs` et
     // destinations configurées. Ce qui a été émis depuis le démarrage attendait
     // en file et y est écrit en premier.

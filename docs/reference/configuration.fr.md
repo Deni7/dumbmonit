@@ -9,7 +9,7 @@ n'y a pas de fichier de configuration à monter.
 |---|---|---|
 | `DUMBMONIT_BIND` | `0.0.0.0:8080` | Adresse d'écoute de l'API et de l'interface web, à l'intérieur du conteneur. |
 | `PUID` / `PGID` | `65532` | Utilisateur et groupe sous lesquels le serveur s'exécute lorsque le conteneur démarre sous root (`user: "0:0"`, comme dans le `docker-compose.yml` fourni) : le répertoire de données leur est transféré au démarrage, puis root est abandonné. `0` est refusé. `DUMBMONIT_PUID` / `DUMBMONIT_PGID` ont la priorité. Ignorés dans les autres cas. Voir [Permissions](../install/docker.md#permissions). |
-| `DUMBMONIT_DATA_DIR` | `/data` | Répertoire persistant : `dumbmonit.db` (SQLite), `secret.key`, `vm/` (VictoriaMetrics embarqué) et `webchange/` (captures d'écran des changements de site). |
+| `DUMBMONIT_DATA_DIR` | `/data` | Répertoire persistant : `dumbmonit.db` (SQLite), `secret.key` et `vm/` (VictoriaMetrics embarqué). |
 | `DUMBMONIT_VM_URL` | *(non défini)* | URL de base d'un VictoriaMetrics externe (`http://host:8428`). Quand elle est définie, celui embarqué n'est pas démarré ; voir [ci-dessous](#embedded-victoriametrics) et [VictoriaMetrics externe](external-victoriametrics.md). |
 | `DUMBMONIT_SECRET` | *(généré)* | Secret de l'instance. Si vide, lu depuis `<répertoire de données>/secret.key`, généré au premier démarrage. Chiffre les identifiants de surveillance, les secrets de canal et les jetons d'agent avec AES-256-GCM. |
 | `DUMBMONIT_MAX_CONCURRENT_PROBES` | `64` | Sondes simultanées maximum, tous collecteurs confondus. |
@@ -41,7 +41,6 @@ n'y a pas de fichier de configuration à monter.
 | `DUMBMONIT_DEMO` | *(désactivé)* | `1` pour une démo en lecture seule, avec un parc fictif fixe, connexion `demo` / `demo`. **Recrée la base de données à chaque démarrage** : jamais sur un vrai volume de données. Voir [Lancer une instance de démonstration](../install/demo.md). |
 | `DUMBMONIT_BACKUP_KEEP` | `7` | Combien de sauvegardes sont conservées, de 1 à 365. Les plus anciennes sont supprimées avec leur `.key`. |
 | `DUMBMONIT_CONFIG_DIR` | vide | Un dossier de fichiers YAML appliqué (avec prune) au démarrage et à chaque changement. Voir [Fichiers de configuration](../using/config-files.md). |
-| `DUMBMONIT_BROWSER_URL` | *(non défini)* | Chromium headless utilisé pour les captures d'écran des [changements de site web](../devices/webchange.md#screenshots), sous la forme `http://host:9222` (son port DevTools). Ajoutez un service `chromedp/headless-shell` à votre fichier Compose, comme montré sous [Captures d'écran](../devices/webchange.md#screenshots). Non défini : comparaison de texte seulement. |
 
 La rétention de référence (60 jours) et la période d'apprentissage de 14
 jours ne sont pas configurables.
@@ -151,7 +150,7 @@ Le `docker-compose.yml` fourni ne lit aucune variable et n'a besoin d'aucun
 fichier `.env`. Tout se règle sous `environment:` du service ou en modifiant
 le fichier ; voir [Options avancées](../install/docker.md#advanced-options)
 (port, secret, rétention et mémoire, VictoriaMetrics externe, réinitialisation
-du mot de passe, captures d'écran). La surcouche de développement
+du mot de passe). La surcouche de développement
 `docker-compose.dev.yml` lit `DUMBMONIT_VM_PORT` (défaut `8428`) pour le port
 de l'hôte du VictoriaMetrics embarqué.
 

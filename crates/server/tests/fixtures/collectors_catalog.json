@@ -33007,8 +33007,7 @@
       "steps": [
         "In the address, paste the page to watch, with http:// or https://.",
         "To follow a whole site or section, set \"Scope\" to \"site\".",
-        "List lines that change at every visit (a clock, a counter) in \"Ignore lines\", as regular expressions.",
-        "For a screenshot of each version, follow the \"Screenshots\" section of this page."
+        "List lines that change at every visit (a clock, a counter) in \"Ignore lines\", as regular expressions."
       ],
       "ports": [
         {
@@ -33129,17 +33128,6 @@
         "default": "",
         "required": false,
         "input": "text",
-        "choices": [],
-        "group": ""
-      },
-      {
-        "key": "screenshots",
-        "label": "Screenshots",
-        "help": "Keep a screenshot of each new version. Needs the optional browser service (DUMBMONIT_BROWSER_URL); without it, only the text is kept.",
-        "placeholder": "",
-        "default": "true",
-        "required": false,
-        "input": "boolean",
         "choices": [],
         "group": ""
       },

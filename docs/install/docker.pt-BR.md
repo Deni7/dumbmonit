@@ -68,7 +68,7 @@ A imagem publicada é baixada; o sistema de arquivos somente leitura, as
 capabilities, `PUID`/`PGID` e o sysctl `ping_group_range` são explicados em
 [Permissões e diretório de dados](#permissions) e
 [Ping ICMP sem capability](#icmp-ping-without-a-capability). As opções (porta,
-segredo, retenção, VictoriaMetrics externo, capturas de tela) são
+segredo, retenção, VictoriaMetrics externo) são
 [variáveis de ambiente que você mesmo adiciona](#advanced-options).
 
 !!! tip "Compilando a imagem você mesmo"
@@ -313,33 +313,7 @@ permanecem), depois remova a linha e execute `docker compose up -d` mais uma vez
       DUMBMONIT_RESET_PASSWORD: "1"
 ```
 
-**Capturas de tela das mudanças de sites**: um Chromium sem interface ao lado do servidor; veja abaixo [Capturas de tela das mudanças de sites](#website-screenshots).
-
 Mais variáveis: [referência de configuração](../reference/configuration.md).
-
-## Capturas de tela das mudanças de sites {#website-screenshots}
-
-O [monitor de mudanças de sites](../devices/webchange.md) sempre compara o texto visível das páginas. Guardar uma captura de tela de cada nova versão exige um navegador, e a imagem do DumbMonit não traz nenhum: um Chromium sem interface roda como segundo serviço, e `DUMBMONIT_BROWSER_URL` diz ao servidor onde encontrá-lo.
-
-Adicione estas linhas ao seu `docker-compose.yml` e execute depois `docker compose up -d`:
-
-```yaml
-services:
-  dumbmonit:
-    environment:
-      DUMBMONIT_BROWSER_URL: http://browser:9222
-  browser:
-    image: chromedp/headless-shell:stable
-    shm_size: 256m
-    restart: unless-stopped
-```
-
-- `browser` é o nome do serviço; na rede do Compose, `http://browser:9222` leva até ele. Nada publica a sua porta: só o DumbMonit fala com ele.
-- `shm_size: 256m`: o Chromium renderiza em `/dev/shm`, e os 64 MB padrão do Docker são pouco para uma página longa.
-- Serve qualquer Chromium iniciado com `--remote-debugging-port`; aqui se usa a imagem `chromedp/headless-shell`.
-
-Sem navegador, todo o resto funciona como de costume (comparação de texto, alertas, cópias antes/depois); os instantâneos apenas não têm imagem. Enquanto o servidor não alcançar um navegador, o formulário de um monitor de mudanças de sites mostra um aviso com estas linhas.
-Se o aviso permanecer após a reinicialização, verifique `docker compose logs browser`, se o nome do host em `DUMBMONIT_BROWSER_URL` é o nome do serviço e se os dois serviços estão no mesmo projeto Compose.
 
 ## Proxy reverso {#reverse-proxy}
 

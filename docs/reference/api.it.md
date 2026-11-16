@@ -559,7 +559,6 @@ che nessun token è accettato (solo sessione).
 | `GET` | `/api/targets/{id}/webchange/pages` | read | Pagine seguite da un controllo di sito web. |
 | `GET` | `/api/targets/{id}/webchange/changes` | read | Modifiche trovate su un sito web sorvegliato, dalla più recente. |
 | `GET` | `/api/targets/{id}/webchange/changes/{change_id}` | read | Una modifica, con entrambe le versioni e il diff per righe. |
-| `GET` | `/api/targets/{id}/webchange/snapshots/{snapshot_id}/screenshot` | read | Lo screenshot di uno snapshot. |
 | `POST` | `/api/targets/{id}/webchange/check` | write | Controlla subito un sito web sorvegliato. |
 | `GET` | `/api/targets/{id}/opnsense/gateways`, `/traffic`, `/health` | read | OPNsense: gateway e indirizzi WAN; interfacce, firewall e DHCP; sistema, servizi, tunnel e firmware. |
 | `GET` | `/api/targets/{id}/truenas/storage`, `/protection`, `/health` | read | TrueNAS: pool, dataset e dischi; scrub e task di protezione dei dati; sistema, avvisi e servizi. |

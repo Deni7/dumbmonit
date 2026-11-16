@@ -69,7 +69,7 @@ DumbMonit 把它监视的所有东西都称为*监控项*（API 说*目标*）�
 | [WebSocket](services.md#websocket) | `websocket` | 无、用户名/密码或令牌 | WebSocket 端点：握手、可选消息交换 |
 | [NTP 时间服务器](services.md#ntp) | `ntp` | 无 | 路由器、NAS、内部时间服务器、公开池服务器 |
 | [心跳](push.md) | `push` | 无（秘密 URL） | Cron 任务、备份脚本、必须调用的自动化 |
-| [网站变化](webchange.md) | `webchange` | 无 | 一个页面或整个网站：文本变化、新增和删除的页面、之前/之后带屏幕截图 |
+| [网站变化](webchange.md) | `webchange` | 无 | 一个页面或整个网站：文本变化、新增和删除的页面、文本的之前/之后对比 |
 | [网站健康和 SEO](website.md) | `website` | 无 | 批量网站：掉线、空白页、重定向、noindex、robots.txt、标题/描述/规范变化、平台（CSV 导入） |
 | [演示监控项](demo.md) | `dummy` | 无 | 无硬件的情况下探索 UI |
 

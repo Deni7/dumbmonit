@@ -69,7 +69,7 @@ DumbMonit chiama tutto quello che controlla un *monitor* (l'API dice *target*), 
 | [WebSocket](services.md#websocket) | `websocket` | nessuno, nome utente/password o token | Endpoint WebSocket: handshake, scambio di messaggi facoltativo |
 | [Server ora NTP](services.md#ntp) | `ntp` | nessuno | Router, NAS, server ora interno, server pool pubblico |
 | [Heartbeat](push.md) | `push` | nessuno (URL segreto) | Lavoro cron, script di backup, automazione che deve richiamare |
-| [Modifiche del sito web](webchange.md) | `webchange` | nessuno | Una pagina o un intero sito: modifiche di testo, pagine nuove e rimosse, prima/dopo con screenshot |
+| [Modifiche del sito web](webchange.md) | `webchange` | nessuno | Una pagina o un intero sito: modifiche di testo, pagine nuove e rimosse, testo prima/dopo |
 | [Salute e SEO del sito web](website.md) | `website` | nessuno | Siti in massa: giù, pagina vuota, reindirizzamenti, noindex, robots.txt, modifiche di titolo/descrizione/canonico, piattaforma (importazione CSV) |
 | [Monitor demo](demo.md) | `dummy` | nessuno | Esplora l'interfaccia web senza hardware |
 

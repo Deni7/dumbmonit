@@ -72,7 +72,7 @@ pelo que o formulário corresponde sempre ao que esta versão pode monitorizar.
 | [WebSocket](services.md#websocket) | `websocket` | nenhuma, utilizador/palavra-passe ou token | Endpoint WebSocket: handshake, troca de mensagens opcional |
 | [Servidor de hora NTP](services.md#ntp) | `ntp` | nenhuma | Router, NAS, servidor de hora interno, servidor de pool público |
 | [Heartbeat](push.md) | `push` | nenhuma (URL secreto) | Tarefa cron, script de cópia de segurança, automação que tem de se anunciar |
-| [Alterações em sites](webchange.md) | `webchange` | nenhuma | Uma página ou um site inteiro: alterações de texto, páginas novas e removidas, antes/depois com capturas de ecrã |
+| [Alterações em sites](webchange.md) | `webchange` | nenhuma | Uma página ou um site inteiro: alterações de texto, páginas novas e removidas, texto antes/depois |
 | [Saúde e SEO de sites](website.md) | `website` | nenhuma | Sites em massa: em baixo, página em branco, redirecionamentos, noindex, robots.txt, alterações de título/descrição/canónico, plataforma (importação CSV) |
 | [Monitor de demonstração](demo.md) | `dummy` | nenhuma | Explorar a interface sem hardware |
 

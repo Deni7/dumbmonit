@@ -1468,7 +1468,6 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "tokio-rustls",
- "tokio-tungstenite",
  "tokio-util",
  "tower",
  "tower-http 0.7.1",

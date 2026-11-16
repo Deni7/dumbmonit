@@ -135,7 +135,7 @@ the type, fill in the form, **Add monitor**. See
 | [RADIUS server](services.md#radius) | `radius` | shared secret and test account | FreeRADIUS, Windows NPS: a real authentication |
 | [gRPC service](services.md#grpc) | `grpc` | none | Microservice, etcd: the standard gRPC health check |
 | [Heartbeat](push.md) | `push` | none (secret URL) | Cron job, backup script, automation that must call in |
-| [Website changes](webchange.md) | `webchange` | none | A page or a whole site: text changes, new and removed pages, before/after with screenshots |
+| [Website changes](webchange.md) | `webchange` | none | A page or a whole site: text changes, new and removed pages, before/after text |
 | [Website health & SEO](website.md) | `website` | none | Sites in bulk: down, blank page, redirects, noindex, robots.txt, title/description/canonical changes, platform (CSV import) |
 | [Demo monitor](demo.md) | `dummy` | none | Explore the UI without hardware |
 

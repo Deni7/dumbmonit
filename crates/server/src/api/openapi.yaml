@@ -155,7 +155,7 @@ tags:
   - name: Heartbeats
     description: Push monitors — the secret URL a job calls.
   - name: Website changes
-    description: Pages, changes, line diffs and screenshots of a `webchange` device.
+    description: Pages, changes and line diffs of a `webchange` device.
   - name: Websites
     description: Last reading, tracked SEO metadata and confirmed changes of a `website` device.
   - name: Network configuration backups
@@ -6558,9 +6558,7 @@ paths:
       summary: Pages followed by a website watch
       description: >-
         Every page seen by the checks of a `webchange` device, removed pages
-        included (with their last error). `screenshots_available` is true when
-        a browser is configured (`DUMBMONIT_BROWSER_URL`) and answers.
-        `404` when the device is not a website watch.
+        included (with their last error). `404` when the device is not a website watch.
       x-token-scope: read
       responses:
         "200":
@@ -6636,32 +6634,6 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/WebchangeChangeDetail" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /api/targets/{id}/webchange/snapshots/{snapshot_id}/screenshot:
-    parameters:
-      - $ref: "#/components/parameters/TargetId"
-      - name: snapshot_id
-        in: path
-        required: true
-        schema: { type: integer, format: int64 }
-    get:
-      operationId: getWebchangeScreenshot
-      tags: [Website changes]
-      summary: The screenshot of a snapshot
-      description: >-
-        A JPEG image, cacheable forever by the browser (a snapshot never
-        changes). `404` when the snapshot has no screenshot or belongs to
-        another device.
-      x-token-scope: read
-      responses:
-        "200":
-          description: The image.
-          content:
-            image/jpeg:
-              schema: { type: string, format: binary }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -11866,8 +11838,8 @@ components:
       properties:
         id:
           type: string
-          description: "Stable identifier: `browser` (headless Chromium for website-change screenshots) or `icmp` (ICMP echo sockets for ping)."
-        satisfied: { type: boolean, description: "True when the server found the requirement met (browser answering, ICMP socket opened)." }
+          description: "Stable identifier: `icmp` (ICMP echo sockets for ping)."
+        satisfied: { type: boolean, description: "True when the server found the requirement met (ICMP socket opened)." }
         doc_url: { type: string, description: Documentation section that explains it. }
         compose_snippet: { type: string, description: YAML to add to docker-compose.yml, as is. }
     SetupDescription:
@@ -14073,9 +14045,8 @@ components:
 
     WebchangePages:
       type: object
-      required: [screenshots_available, found, pages]
+      required: [found, pages]
       properties:
-        screenshots_available: { type: boolean }
         found:
           type: [integer, "null"]
           description: "Pages found (read and still queued) when **Max pages** stopped the last crawl; null when the crawl was not stopped by it, or when the last check failed."
@@ -14114,12 +14085,11 @@ components:
 
     WebchangeSnapshot:
       type: object
-      required: [id, fetched_at, title, has_screenshot]
+      required: [id, fetched_at, title]
       properties:
         id: { type: integer, format: int64 }
         fetched_at: { type: string, description: "UTC, without suffix." }
         title: { type: [string, "null"] }
-        has_screenshot: { type: boolean }
 
     WebchangeDiffLine:
       type: object

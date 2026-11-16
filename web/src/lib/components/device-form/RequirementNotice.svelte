@@ -23,14 +23,12 @@
 	const missing = $derived(requirements.filter((requirement) => !requirement.satisfied));
 
 	function title(id: string): string {
-		if (id === 'browser') return m.deviceform_requirement_browser_title();
 		if (id === 'icmp') return m.deviceform_requirement_icmp_title();
 		return m.deviceform_requirement_unknown_title();
 	}
 
 	/** The consequence of leaving it out, in one sentence. */
 	function consequence(id: string): string {
-		if (id === 'browser') return m.deviceform_requirement_browser_consequence();
 		if (id === 'icmp') return m.deviceform_requirement_icmp_consequence();
 		return m.deviceform_requirement_unknown_consequence();
 	}
