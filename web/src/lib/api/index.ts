@@ -209,11 +209,6 @@ export function getWebchangeChange(
 	return request<WebchangeChangeDetail>(`/targets/${id}/webchange/changes/${changeId}`, { signal });
 }
 
-/** Image URL of a snapshot's screenshot, for use as an `<img src>`. */
-export function webchangeScreenshotUrl(id: TargetId, snapshotId: number): string {
-	return `/api/targets/${id}/webchange/snapshots/${snapshotId}/screenshot`;
-}
-
 /** Asks for an immediate check of every page of this device. Fire-and-forget: 202. */
 export function checkWebchangeNow(id: TargetId): Promise<void> {
 	return request<void>(`/targets/${id}/webchange/check`, { method: 'POST' });

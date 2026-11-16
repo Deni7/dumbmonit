@@ -9,7 +9,7 @@ configuration file to mount.
 |---|---|---|
 | `DUMBMONIT_BIND` | `0.0.0.0:8080` | Listen address of the API and the web UI, inside the container. The port only speaks HTTPS: a plain HTTP request gets a redirect to `https://`. There is no switch to turn HTTPS off. |
 | `PUID` / `PGID` | `65532` | User and group the server runs as when the container starts as root (`user: "0:0"`, as in the shipped `docker-compose.yml`): the data directory is handed to them at startup, then root is dropped. `0` is refused. `DUMBMONIT_PUID` / `DUMBMONIT_PGID` take precedence. Ignored otherwise. See [Permissions](../install/docker.md#permissions). |
-| `DUMBMONIT_DATA_DIR` | `/data` | Persistent directory: `dumbmonit.db` (SQLite), `secret.key`, `vm/` (embedded VictoriaMetrics) and `webchange/` (screenshots of website changes). |
+| `DUMBMONIT_DATA_DIR` | `/data` | Persistent directory: `dumbmonit.db` (SQLite), `secret.key` and `vm/` (embedded VictoriaMetrics). |
 | `DUMBMONIT_VM_URL` | *(unset)* | Base URL of an external VictoriaMetrics (`http://host:8428`). When set, the embedded one is not started; see [below](#embedded-victoriametrics) and [External VictoriaMetrics](external-victoriametrics.md). |
 | `DUMBMONIT_SECRET` | *(generated)* | Instance secret. If empty, read from `<data dir>/secret.key`, generated on first start. Encrypts monitor credentials, channel secrets and agent tokens with AES-256-GCM. |
 | `DUMBMONIT_MAX_CONCURRENT_PROBES` | `64` | Maximum simultaneous probes, all collectors combined. |
@@ -75,7 +75,6 @@ configuration file to mount.
 | `DUMBMONIT_DEMO` | *(off)* | `1` for a read-only demo with a fixed fictional estate, sign-in `demo` / `demo`. **Recreates the database at every start**: never on a real data volume. See [Run a demo instance](../install/demo.md). |
 | `DUMBMONIT_BACKUP_KEEP` | `7` | How many backups are kept, 1 to 365. The oldest are removed with their `.key`. |
 | `DUMBMONIT_CONFIG_DIR` | empty | A folder of YAML files applied (with prune) at startup and on every change. See [Configuration files](../using/config-files.md). |
-| `DUMBMONIT_BROWSER_URL` | *(unset)* | Headless Chromium used for the screenshots of [website changes](../devices/webchange.md#screenshots), as `http://host:9222` (its DevTools port). Add a `chromedp/headless-shell` service to your Compose file, as shown in [Screenshots](../devices/webchange.md#screenshots). Unset: text comparison only. |
 
 Baseline retention (60 days) and the 14-day learning period are not
 configurable.
@@ -178,7 +177,7 @@ there whatever the server asks.
 The shipped `docker-compose.yml` reads no variable and needs no `.env` file.
 Everything is set under `environment:` of the service or by editing the file;
 see [Advanced options](../install/docker.md#advanced-options) (port, secret,
-retention and memory, external VictoriaMetrics, password reset, screenshots).
+retention and memory, external VictoriaMetrics, password reset).
 
 ## Ports
 

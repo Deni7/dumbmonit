@@ -577,7 +577,6 @@ response shapes. *read* and *write* are the token scope needed; *none* means no 
 | `GET` | `/api/targets/{id}/webchange/pages` | read | Pages followed by a website watch. |
 | `GET` | `/api/targets/{id}/webchange/changes` | read | Changes found on a watched website, newest first. |
 | `GET` | `/api/targets/{id}/webchange/changes/{change_id}` | read | One change, with both versions and the line diff. |
-| `GET` | `/api/targets/{id}/webchange/snapshots/{snapshot_id}/screenshot` | read | The screenshot of a snapshot. |
 | `POST` | `/api/targets/{id}/webchange/check` | write | Check a watched website now. |
 | `GET` | `/api/targets/{id}/opnsense/gateways`, `/traffic`, `/health` | read | OPNsense: gateways and WAN addresses; interfaces, firewall and DHCP; system, services, tunnels and firmware. |
 | `GET` | `/api/targets/{id}/truenas/storage`, `/protection`, `/health` | read | TrueNAS: pools, datasets and disks; scrubs and data protection tasks; system, alerts and services. |

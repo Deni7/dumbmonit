@@ -158,10 +158,6 @@ pub struct Config {
     /// Les mots de passe des utilisateurs passeraient en clair sur le réseau ;
     /// ce n'est acceptable que pour un annuaire de test.
     pub ldap_allow_plain: bool,
-    /// Chromium sans interface qui fait les captures d'écran de la
-    /// surveillance des sites (`DUMBMONIT_BROWSER_URL`, `http://browser:9222`).
-    /// `None` : pas de capture, la comparaison de texte fonctionne seule.
-    pub browser_url: Option<String>,
     /// Bornes des sondes de santé des sites (`website`), pour qu'une liste de
     /// centaines de sites ne parte jamais d'un bloc. Voir
     /// [`crate::website::throttle`].
@@ -301,9 +297,6 @@ impl Config {
             ldap: LdapEnv::from_env(),
             saml_hooks: Default::default(),
             ldap_allow_plain: env_flag("DUMBMONIT_LDAP_ALLOW_PLAIN"),
-            browser_url: env_var("DUMBMONIT_BROWSER_URL")
-                .map(|url| url.trim().trim_end_matches('/').to_string())
-                .filter(|url| !url.is_empty()),
             website: WebsiteLimits::from_env()?,
             agent_listen: parse_agent_listen(env_var("DUMBMONIT_AGENT_LISTEN").as_deref())?,
             agent_public_port: env_var("DUMBMONIT_AGENT_PUBLIC_PORT")

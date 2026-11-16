@@ -4,8 +4,7 @@ Surveillez le *contenu* d'une page web, ou d'un site entier, et soyez
 informé quand il change : une page de tarifs ou de conditions, un site de
 documentation, l'avis de maintenance d'un fournisseur, une page d'annonce
 publique, ou votre propre site après un déploiement. Chaque changement est
-conservé avec le texte avant et après, un diff ligne par ligne et, quand un
-navigateur est disponible, une capture d'écran de chaque version.
+conservé avec le texte avant et après, un diff ligne par ligne.
 
 Ce qui est comparé est le **texte visible** de chaque page, pas son HTML :
 scripts, styles, commentaires, blocs `noscript`, `svg` et `template` sont
@@ -172,51 +171,13 @@ toute autre règle, ou augmentez sa gravité, dans **Alertes → Règles**. Voir
 
 Les métriques apparaissent une fois la première vérification faite.
 
-## Captures d'écran {#screenshots}
-
-L'image DumbMonit n'a pas de navigateur : les captures d'écran viennent
-d'un Chromium headless optionnel, piloté via le protocole Chrome DevTools.
-Ajoutez-en un comme service `browser` à côté de DumbMonit dans
-`docker-compose.yml`, et pointez le serveur vers lui :
-
-```yaml
-services:
-  dumbmonit:
-    environment:
-      DUMBMONIT_BROWSER_URL: http://browser:9222
-  browser:
-    image: chromedp/headless-shell:stable
-    shm_size: 256m
-    restart: unless-stopped
-```
-
-Lancez ensuite `docker compose up -d`. Rien ne publie le port du navigateur :
-seul le serveur DumbMonit lui parle, via le réseau Compose.
-
-`DUMBMONIT_BROWSER_URL` pointe DumbMonit vers le navigateur (tout Chromium
-démarré avec `--remote-debugging-port`, par exemple
-`chromedp/headless-shell` ; le serveur lit `/json/version` et parle à
-l'adresse que le nom d'hôte résout).
-
-Une capture n'est prise que quand une page obtient un nouvel instantané
-(la référence, et chaque changement), jamais sur une vérification sans
-changement : une fenêtre de 1366 × 900, la page complète jusqu'à 5000
-pixels, en JPEG. L'option **Captures d'écran** les désactive pour une surveillance. Sans navigateur, ou quand il ne répond pas, la comparaison de
-texte fonctionne pareil et les instantanés n'ont simplement pas d'image ;
-la page de la surveillance le dit.
-
-Le navigateur charge la page comme le ferait un visiteur, avec ses
-scripts : ce qu'il montre peut différer du texte que DumbMonit a comparé,
-qui est le HTML envoyé par le serveur.
-
 ## Stockage
 
 Le texte de chaque instantané est gardé dans la base de données (1 Mo au
-plus par page) ; les captures d'écran sont des fichiers sous
-`/data/webchange/<id de la surveillance>/`. Par surveillance, les 500 derniers
+plus par page). Par surveillance, les 500 derniers
 changements sont gardés ; un instantané est gardé tant qu'il est le plus
-récent d'une page ou qu'un changement gardé s'y réfère, et tout le reste,
-fichiers inclus, est supprimé après chaque vérification. Supprimer
+récent d'une page ou qu'un changement gardé s'y réfère, et tout le reste
+est supprimé après chaque vérification. Supprimer
 la surveillance retire tout cela.
 
 ## Surveiller un site web pour des changements
@@ -228,8 +189,6 @@ Les étapes ci-dessous sont celles que montre l'avis à côté du formulaire.
 2. Pour suivre un site entier ou une section, réglez « Portée » sur « site ».
 
 3. Listez les lignes qui changent à chaque visite (une horloge, un compteur) dans « Ignorer les lignes », sous forme d'expressions régulières.
-
-4. Pour une capture d'écran de chaque version, suivez la section « Captures d'écran » de cette page.
 
 !!! warning
     Seul le texte envoyé par le serveur est comparé : les pages dessinées par JavaScript ou derrière une connexion ne sont pas suivies.
@@ -253,7 +212,6 @@ relais.
 | Comparer menus, en-tête et pied de page (`keep_page_chrome`) | `false` | Comparer aussi la navigation, l'en-tête, le pied de page et les encadrés du site. |
 | Ignorer les paramètres d'URL (`ignore_query`) | `false` | Portée site : les adresses qui ne diffèrent que par leur partie `?…` sont une même page. |
 | User agent (`user_agent`) | — | Envoyé à la place de `DumbMonit/<version>`. |
-| Captures d'écran (`screenshots`) | `true` | Garder une capture d'écran de chaque nouvelle version, quand un navigateur est configuré. |
 | Vérifier toutes les (`check_interval_minutes`) | `60` | Minutes entre deux vérifications, de 5 à 10080. |
 | Accepter un certificat non vérifiable (`insecure_tls`) | `false` | Pour un site propre derrière un certificat autosigné. |
 | Autoriser les cibles loopback et link-local (`allow_private_targets`) | `false` | Atteindre un site servi par l'hôte DumbMonit lui-même. |

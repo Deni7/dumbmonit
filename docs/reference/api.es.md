@@ -598,7 +598,6 @@ que no se acepta ningún token (solo sesión).
 | `GET` | `/api/targets/{id}/webchange/pages` | read | Páginas seguidas por una vigilancia de sitio web. |
 | `GET` | `/api/targets/{id}/webchange/changes` | read | Cambios encontrados en un sitio web vigilado, el más reciente primero. |
 | `GET` | `/api/targets/{id}/webchange/changes/{change_id}` | read | Un cambio, con ambas versiones y el diff por líneas. |
-| `GET` | `/api/targets/{id}/webchange/snapshots/{snapshot_id}/screenshot` | read | La captura de pantalla de una instantánea. |
 | `POST` | `/api/targets/{id}/webchange/check` | write | Comprueba ahora un sitio web vigilado. |
 | `GET` | `/api/targets/{id}/opnsense/gateways`, `/traffic`, `/health` | read | OPNsense: pasarelas y direcciones WAN; interfaces, cortafuegos y DHCP; sistema, servicios, túneles y firmware. |
 | `GET` | `/api/targets/{id}/truenas/storage`, `/protection`, `/health` | read | TrueNAS: pools, datasets y discos; scrubs y tareas de protección de datos; sistema, alertas y servicios. |

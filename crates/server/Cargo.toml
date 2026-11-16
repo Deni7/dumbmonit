@@ -125,12 +125,10 @@ saml-rs = { version = "0.6", default-features = false, features = ["crypto-aws-l
 ldap3 = { version = "0.12", default-features = false, features = ["tls-rustls-ring"] }
 
 # Surveillance des changements de sites (`webchange`) : expressions d'exclusion
-# saisies par l'utilisateur, plans de site XML, et le protocole DevTools d'un
-# Chromium externe pour les captures d'écran. Les trois sont déjà dans le
-# verrou de dépendances (agent et paquets, collecteurs, axum `ws`).
+# saisies par l'utilisateur et plans de site XML. Les deux sont déjà dans le
+# verrou de dépendances (agent et paquets, collecteurs).
 regex = "1"
 roxmltree = "0.20"
-tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect"] }
 
 # Notifications Web Push (RFC 8030/8291/8188) : chiffrement `aes128gcm` du
 # message pour le navigateur, en RustCrypto pur (pas d'OpenSSL, compatible musl),

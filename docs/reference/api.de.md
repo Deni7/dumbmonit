@@ -544,7 +544,6 @@ akzeptiert wird (nur Sitzung).
 | `GET` | `/api/targets/{id}/webchange/pages` | read | Von einer Website-Überwachung verfolgte Seiten. |
 | `GET` | `/api/targets/{id}/webchange/changes` | read | Auf einer überwachten Website gefundene Änderungen, neueste zuerst. |
 | `GET` | `/api/targets/{id}/webchange/changes/{change_id}` | read | Eine Änderung, mit beiden Versionen und dem Zeilen-Diff. |
-| `GET` | `/api/targets/{id}/webchange/snapshots/{snapshot_id}/screenshot` | read | Der Screenshot eines Snapshots. |
 | `POST` | `/api/targets/{id}/webchange/check` | write | Eine überwachte Website jetzt prüfen. |
 | `GET` | `/api/targets/{id}/opnsense/gateways`, `/traffic`, `/health` | read | OPNsense: Gateways und WAN-Adressen; Schnittstellen, Firewall und DHCP; System, Dienste, Tunnel und Firmware. |
 | `GET` | `/api/targets/{id}/truenas/storage`, `/protection`, `/health` | read | TrueNAS: Pools, Datasets und Platten; Scrubs und Datensicherungs-Tasks; System, Alarme und Dienste. |

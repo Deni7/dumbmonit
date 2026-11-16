@@ -3,7 +3,7 @@
 监控一个网页、或整个网站的*内容*,并在它发生变化时被告知:一个
 价格或条款页面、一个文档站点、某个供应商的维护公告、一个公开
 公告页面,或你自己网站在一次部署之后的状态。每一次变化都会保留
-前后的文本、逐行差异,以及在浏览器可用时,每个版本的一张截图。
+前后的文本和逐行差异。
 
 被比较的是每个页面的**可见文本**,而不是它的 HTML:脚本、样式、
 注释、`noscript`、`svg` 和 `template` 块都会被去掉,空白会被
@@ -138,46 +138,11 @@ Updated \d+ minutes ago|Visitors: \d+|© \d{4}
 
 这些指标会在首次检查完成后出现。
 
-## 截图 {#screenshots}
-
-DumbMonit 镜像没有浏览器:截图来自一个可选的无头 Chromium,通过
-Chrome DevTools 协议驱动。在 `docker-compose.yml` 中把它作为 `browser`
-服务添加到 DumbMonit 旁边,并让服务器指向它:
-
-```yaml
-services:
-  dumbmonit:
-    environment:
-      DUMBMONIT_BROWSER_URL: http://browser:9222
-  browser:
-    image: chromedp/headless-shell:stable
-    shm_size: 256m
-    restart: unless-stopped
-```
-
-然后执行 `docker compose up -d`。没有任何东西发布浏览器的端口:只有
-DumbMonit 服务器通过 Compose 网络与它通信。
-
-`DUMBMONIT_BROWSER_URL` 指向该浏览器(任何以
-`--remote-debugging-port` 启动的 Chromium,例如
-`chromedp/headless-shell`;服务器会读取 `/json/version`,并连接
-到该主机名解析出的地址)。
-
-截图只会在某个页面产生新快照时拍摄(参照版本,以及每次变化),
-从不在无变化的检查时拍摄:一个 1366 × 900 的窗口,完整页面最多
-到 5000 像素,以 JPEG 格式保存。**截图**选项可以为单个监控项关闭
-它。没有浏览器,或浏览器没有应答时,文本比较照常进行,快照只是
-没有图片;监控项页面会说明这一点。
-
-浏览器会像访客一样加载页面,并运行其脚本:它显示的内容可能与
-DumbMonit 比较的文本(服务器发送的 HTML)不同。
-
 ## 存储 {#storage}
 
-每份快照的文本会保存在数据库中(每个页面最多 1 MB);截图是
-`/data/webchange/<device id>/` 下的文件。按监控项,最近 500 次变化
+每份快照的文本会保存在数据库中(每个页面最多 1 MB)。按监控项,最近 500 次变化
 会被保留;一份快照只要仍是某个页面的最新版本、或被某次保留的
-变化引用,就会被保留,其余的内容(包括文件)都会在每次检查后
+变化引用,就会被保留,其余的内容都会在每次检查后
 被删除。删除该监控项会移除全部这些内容。
 
 ## 监控一个网站的变化 {#watch-a-website-for-changes}
@@ -192,11 +157,6 @@ DumbMonit 比较的文本(服务器发送的 HTML)不同。
 3. 第一次检查只会记录参照版本,不会报告任何内容。从那之后,
    每次检查都会逐页比较可见文本,并为每次变化保留一份前后对比,
    显示在监控项页面上;"网站已变化"告警会告知你。
-4. 若要为每个版本生成截图,请在你的 Compose 文件中添加一个无头浏览器;
-   具体的配置行见文档("高级选项",
-   "网站变更截图")。
-   参见[网站变更截图](../install/docker.md#website-screenshots)。
-
 !!! warning "警告"
     只会比较服务器发送的文本:一个完全由 JavaScript 绘制的页面,
     在检查中显示的内容很少甚至没有。登录后才能看到的页面同样
@@ -218,7 +178,6 @@ DumbMonit 比较的文本(服务器发送的 HTML)不同。
 | 比较菜单、页眉和页脚(`keep_page_chrome`) | `false` | 同时比较网站的导航、页眉、页脚和侧边栏。 |
 | 忽略查询字符串(`ignore_query`) | `false` | 网站范围:仅 `?…` 部分不同的地址视为同一个页面。 |
 | 用户代理(`user_agent`) | —— | 发送它来代替 `DumbMonit/<version>`。 |
-| 截图(`screenshots`) | `true` | 在配置了浏览器时,为每个新版本保留一张截图。 |
 | 检查间隔(`check_interval_minutes`) | `60` | 两次检查之间的分钟数,5 到 10080。 |
 | 接受无法验证的证书(`insecure_tls`) | `false` | 用于你自己使用自签名证书的站点。 |
 | 允许回环和链路本地目标(`allow_private_targets`) | `false` | 访问由 DumbMonit 主机自身提供服务的站点。 |

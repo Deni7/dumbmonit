@@ -4,8 +4,7 @@ Vigila el *contenido* de una página web, o de un sitio entero, y entérate
 cuando cambie: una página de precios o condiciones, un sitio de
 documentación, un aviso de mantenimiento de un proveedor, una página de
 anuncios públicos, o tu propio sitio tras un despliegue. Cada cambio se
-guarda con el texto antes y después, un diff de líneas y, cuando hay un
-navegador disponible, una captura de cada versión.
+guarda con el texto antes y después, un diff de líneas.
 
 Lo que se compara es el **texto visible** de cada página, no su HTML:
 los scripts, estilos, comentarios, bloques `noscript`, `svg` y
@@ -163,52 +162,13 @@ Consulta [Reglas integradas](../alerting/rules.md#website-changes).
 
 Las métricas aparecen una vez hecha la primera comprobación.
 
-## Capturas de pantalla {#screenshots}
-
-La imagen de DumbMonit no tiene navegador: las capturas vienen de un
-Chromium sin interfaz opcional, controlado a través del Chrome DevTools
-Protocol. Añade uno como servicio `browser` junto a DumbMonit en
-`docker-compose.yml` y apunta el servidor hacia él:
-
-```yaml
-services:
-  dumbmonit:
-    environment:
-      DUMBMONIT_BROWSER_URL: http://browser:9222
-  browser:
-    image: chromedp/headless-shell:stable
-    shm_size: 256m
-    restart: unless-stopped
-```
-
-Después ejecuta `docker compose up -d`. Nada publica el puerto del navegador:
-solo el servidor de DumbMonit habla con él, a través de la red de Compose.
-
-`DUMBMONIT_BROWSER_URL` apunta DumbMonit hacia el navegador (cualquier
-Chromium iniciado con `--remote-debugging-port`, por ejemplo
-`chromedp/headless-shell`; el servidor lee `/json/version` y habla con
-la dirección a la que resuelve el nombre de host).
-
-Una captura se toma solo cuando una página obtiene una nueva captura (la
-referencia, y cada cambio), nunca en una comprobación sin cambios: una
-ventana de 1366 × 900, la página completa hasta 5000 píxeles, como JPEG.
-La opción **Screenshots** las desactiva para un monitor. Sin
-navegador, o cuando no responde, la comparación de texto funciona igual
-y las capturas simplemente no tienen imagen; la página del monitor
-lo indica.
-
-El navegador carga la página como lo haría un visitante, con sus
-scripts: lo que muestra puede diferir del texto que comparó DumbMonit,
-que es el HTML que envió el servidor.
-
 ## Almacenamiento {#storage}
 
 El texto de cada captura se guarda en la base de datos (1 MB como
-máximo por página); las capturas de pantalla son archivos bajo
-`/data/webchange/<id del monitor>/`. Por monitor, se conservan
+máximo por página). Por monitor, se conservan
 los últimos 500 cambios; una captura se conserva mientras sea la más
 reciente de una página o un cambio conservado la referencia, y todo lo
-demás, archivos incluidos, se elimina tras cada comprobación. Eliminar
+demás se elimina tras cada comprobación. Eliminar
 el monitor lo elimina todo.
 
 ## Vigilar un sitio web por cambios {#watch-a-website-for-changes}
@@ -227,11 +187,6 @@ Los pasos de abajo son los que muestra el aviso junto al formulario.
    visible página por página y guarda una copia antes/después de cada
    cambio, mostrada en la página del monitor; la alerta «Website
    changed» te avisa.
-4. Para una captura de cada versión, añade un navegador sin interfaz a tu
-   archivo Compose; las líneas exactas están en la documentación (Advanced
-   options, «Screenshots of website changes»).
-   Consulta [Capturas de pantalla de cambios en sitios web](../install/docker.md#website-screenshots).
-
 !!! warning
     Solo se compara el texto que envía el servidor: una página dibujada
     enteramente por JavaScript muestra poco o nada a la comprobación.
@@ -254,7 +209,6 @@ agente relay.
 | Compare menus, header and footer (`keep_page_chrome`) | `false` | Comparar también la navegación, la cabecera, el pie y las barras laterales del sitio. |
 | Ignore query strings (`ignore_query`) | `false` | Alcance de sitio: las direcciones que solo difieren en su parte `?…` son una sola página. |
 | User agent (`user_agent`) | — | Se envía en lugar de `DumbMonit/<version>`. |
-| Screenshots (`screenshots`) | `true` | Guardar una captura de cada versión nueva, cuando hay un navegador configurado. |
 | Check every (`check_interval_minutes`) | `60` | Minutos entre dos comprobaciones, de 5 a 10080. |
 | Accept an unverifiable certificate (`insecure_tls`) | `false` | Para un sitio propio detrás de un certificado autofirmado. |
 | Allow loopback and link-local targets (`allow_private_targets`) | `false` | Alcanzar un sitio servido por el propio host de DumbMonit. |

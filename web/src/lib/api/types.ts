@@ -277,8 +277,8 @@ export interface ProbeReport {
  *
  * `error` is set when the last fetch of this page failed (page unreachable,
  * removed…); `status` is the HTTP status of that attempt, or `null` before
- * the first check. `latest_snapshot` is the id to pass to the screenshot
- * route for the most recent capture, or `null` when none was ever taken.
+ * the first check. `latest_snapshot` is the id of its most recent stored text,
+ * or `null` when none was ever taken.
  */
 export interface WebchangePage {
 	url: string;
@@ -293,8 +293,6 @@ export interface WebchangePage {
 
 /** `GET /api/targets/{id}/webchange/pages`. */
 export interface WebchangePagesResponse {
-	/** False when the server has no headless browser configured: text diffing still works. */
-	screenshots_available: boolean;
 	/** Pages found when Max pages stopped the last crawl (read and still queued); `null` when the whole site was read. */
 	found: number | null;
 	pages: WebchangePage[];
@@ -323,7 +321,6 @@ export interface WebchangeSnapshot {
 	id: number;
 	fetched_at: string;
 	title: string | null;
-	has_screenshot: boolean;
 }
 
 export type WebchangeDiffOp = 'equal' | 'insert' | 'delete' | 'skip';
@@ -792,14 +789,14 @@ export interface CollectorSetup {
 
 /**
  * Something the server's deployment must provide for a device type to work
- * fully (not something to do on the device): a headless browser, ICMP rights.
+ * fully (not something to do on the device): ICMP rights.
  *
  * The server only sends the identifier, whether it found the requirement in
  * place and the exact YAML to copy; the sentences are written by the interface
  * from `id` (see `RequirementNotice.svelte`), and an unknown `id` still renders.
  */
 export interface CollectorRequirement {
-	/** Stable identifier: `browser`, `icmp`, or one a later server adds. */
+	/** Stable identifier: `icmp`, or one a later server adds. */
 	id: string;
 	/** True when the server found the requirement met; the notice is then hidden. */
 	satisfied: boolean;

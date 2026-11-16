@@ -6,8 +6,7 @@
 //! fournisseur. Le collecteur lit le texte visible de chaque page (pas le
 //! HTML, qui change à chaque déploiement), retire les lignes que l'utilisateur
 //! a déclarées sans intérêt (horodatages, compteurs), et compare. Chaque texte
-//! nouveau est gardé comme instantané, avec une capture d'écran si un
-//! navigateur est configuré, et chaque différence devient un changement daté
+//! nouveau est gardé comme instantané, et chaque différence devient un changement daté
 //! que l'interface montre en « avant / après ».
 //!
 //! # Rythme
@@ -50,10 +49,9 @@
 //!
 //! Absentes tant qu'aucune vérification n'a abouti.
 //!
-//! Le type ne tourne que sur le serveur : il écrit en base et sur le disque,
-//! ce qu'un agent relais ne peut pas faire (`api/targets.rs` refuse le relais).
+//! Le type ne tourne que sur le serveur : il écrit en base, ce qu'un agent
+//! relais ne peut pas faire (`api/targets.rs` refuse le relais).
 
-pub mod cdp;
 pub mod crawl;
 pub mod diff;
 pub mod html;
@@ -65,7 +63,6 @@ pub mod store;
 pub mod zones;
 
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
@@ -87,13 +84,8 @@ pub const KIND: &str = "webchange";
 /// même identité.
 pub const ALERT_RULE: &str = "webchange_detected";
 
-/// Durée maximale d'une vérification, captures comprises.
+/// Durée maximale d'une vérification.
 const CHECK_BUDGET: Duration = Duration::from_secs(20 * 60);
-/// Temps consacré au plus aux captures d'une vérification. Au-delà, les
-/// instantanés restants n'ont que leur texte.
-const SCREENSHOT_BUDGET: Duration = Duration::from_secs(8 * 60);
-/// Délai d'une capture.
-const SCREENSHOT_TIMEOUT: Duration = Duration::from_secs(60);
 /// Erreur d'une page qu'un parcours complet n'atteint plus.
 const NO_LONGER_LINKED: &str = "No longer linked";
 
@@ -101,26 +93,11 @@ const NO_LONGER_LINKED: &str = "No longer linked";
 #[derive(Clone)]
 pub struct Context {
     pub pool: SqlitePool,
-    pub data_dir: PathBuf,
-    /// Navigateur des captures d'écran (`DUMBMONIT_BROWSER_URL`).
-    pub browser_url: Option<String>,
 }
 
 impl Context {
     pub fn from_state(state: &AppState) -> Self {
-        Self {
-            pool: state.pool.clone(),
-            data_dir: state.config.data_dir.clone(),
-            browser_url: state.config.browser_url.clone(),
-        }
-    }
-
-    /// Les captures sont-elles possibles en ce moment ?
-    pub async fn screenshots_available(&self) -> bool {
-        match &self.browser_url {
-            Some(url) => cdp::available(url).await,
-            None => false,
-        }
+        Self { pool: state.pool.clone() }
     }
 }
 
@@ -315,11 +292,6 @@ async fn run_check(context: &Context, target: &Target) -> anyhow::Result<i64> {
         // les nouveaux n'atteignent plus n'en fait plus partie.
         let urls: Vec<String> = crawl.pages.iter().map(|p| p.url.to_string()).collect();
         store::forget_pages_except(pool, id, &urls).await?;
-        if state.fingerprint.is_none() {
-            // Jamais de référence : d'éventuels fichiers sous ce numéro sont
-            // ceux d'une cible supprimée dont le numéro a été repris.
-            store::forget_files(&context.data_dir, id).await;
-        }
     }
 
     let known: HashMap<String, store::PageRow> =
@@ -327,7 +299,6 @@ async fn run_check(context: &Context, target: &Target) -> anyhow::Result<i64> {
     let mut changes = 0i64;
     // Adresses des pages changées, dans l'ordre du parcours, pour le résumé.
     let mut changed: Vec<String> = Vec::new();
-    let mut to_capture: Vec<(i64, String)> = Vec::new();
     let mut seen = HashSet::new();
 
     for page in &crawl.pages {
@@ -407,7 +378,6 @@ async fn run_check(context: &Context, target: &Target) -> anyhow::Result<i64> {
 
         let snapshot =
             store::insert_snapshot(pool, id, url, page.title.as_deref(), &hash, &content).await?;
-        to_capture.push((snapshot, url.to_string()));
         let mut recorded = false;
         if !baseline {
             if reappeared {
@@ -520,13 +490,7 @@ async fn run_check(context: &Context, target: &Target) -> anyhow::Result<i64> {
         }
     }
 
-    if options.screenshots
-        && let Some(browser) = &context.browser_url
-    {
-        capture_all(context, id, browser, options.allow_private, &to_capture).await;
-    }
-
-    store::prune(pool, &context.data_dir, id).await?;
+    store::prune(pool, id).await?;
     // Une page de départ qui refuse l'accès (401, 403…) est une erreur de
     // réglage à montrer. Une page de départ disparue (404, 410), elle, est un
     // changement comme un autre : il est déjà compté, et une erreur de sonde
@@ -556,63 +520,6 @@ async fn line_count(pool: &SqlitePool, snapshot: Option<i64>) -> anyhow::Result<
     let Some(snapshot) = snapshot else { return Ok(0) };
     let content = store::snapshot_content(pool, snapshot).await?.unwrap_or_default();
     Ok(content.lines().count() as i64)
-}
-
-/// Capture les pages des nouveaux instantanés, une à la fois. Le premier
-/// échec arrête la série : un navigateur absent ne coûte qu'un délai, pas un
-/// par page.
-async fn capture_all(
-    context: &Context,
-    target: dumbmonit_proto::TargetId,
-    browser: &str,
-    allow_private: bool,
-    snapshots: &[(i64, String)],
-) {
-    let started = Instant::now();
-    for (snapshot, url) in snapshots {
-        if started.elapsed() > SCREENSHOT_BUDGET {
-            debug!(
-                target = target,
-                "screenshot budget spent, remaining snapshots keep their text only"
-            );
-            return;
-        }
-        let image = match tokio::time::timeout(
-            SCREENSHOT_TIMEOUT,
-            cdp::capture(browser, url, allow_private),
-        )
-        .await
-        {
-            Ok(Ok(image)) => image,
-            Ok(Err(error)) => {
-                warn!(target = target, url = %url, %error, "screenshot failed");
-                return;
-            }
-            Err(_) => {
-                warn!(target = target, url = %url, "screenshot timed out");
-                return;
-            }
-        };
-        let path = store::screenshot_path(&context.data_dir, target, *snapshot);
-        let written = async {
-            if let Some(dir) = path.parent() {
-                tokio::fs::create_dir_all(dir).await?;
-            }
-            tokio::fs::write(&path, &image).await
-        }
-        .await;
-        match written {
-            Ok(()) => {
-                if let Err(error) = store::mark_screenshot(&context.pool, *snapshot).await {
-                    warn!(target = target, ?error, "screenshot saved but not recorded");
-                }
-            }
-            Err(error) => {
-                warn!(target = target, path = %path.display(), %error, "screenshot not saved");
-                return;
-            }
-        }
-    }
 }
 
 #[cfg(test)]

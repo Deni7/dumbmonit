@@ -4,8 +4,7 @@ Osserva il *contenuto* di una pagina web, o di un intero sito, e sii
 avvisato quando cambia: una pagina di prezzi o condizioni, un sito di
 documentazione, l'avviso di manutenzione di un fornitore, una pagina di
 annunci pubblici, oppure il tuo stesso sito dopo un deployment. Ogni
-modifica viene conservata con il testo prima e dopo, un diff per riga e,
-quando un browser è disponibile, uno screenshot di ogni versione.
+modifica viene conservata con il testo prima e dopo, un diff per riga.
 
 Ciò che viene confrontato è il **testo visibile** di ogni pagina, non il
 suo HTML: script, stili, commenti, blocchi `noscript`, `svg` e `template`
@@ -163,51 +162,12 @@ canale come qualsiasi altra regola, oppure alza la sua severità, in
 
 Le metriche appaiono una volta eseguito il primo controllo.
 
-## Screenshot {#screenshots}
-
-L'immagine DumbMonit non ha un browser: gli screenshot provengono da un
-Chromium headless opzionale, guidato tramite il Chrome DevTools Protocol.
-Aggiungine uno come servizio `browser` accanto a DumbMonit in
-`docker-compose.yml` e punta il server verso di esso:
-
-```yaml
-services:
-  dumbmonit:
-    environment:
-      DUMBMONIT_BROWSER_URL: http://browser:9222
-  browser:
-    image: chromedp/headless-shell:stable
-    shm_size: 256m
-    restart: unless-stopped
-```
-
-Poi esegui `docker compose up -d`. Nulla pubblica la porta del browser: solo il
-server DumbMonit gli parla, sulla rete Compose.
-
-`DUMBMONIT_BROWSER_URL` punta DumbMonit verso il browser (qualsiasi
-Chromium avviato con `--remote-debugging-port`, per esempio
-`chromedp/headless-shell`; il server legge `/json/version` e parla con
-l'indirizzo a cui risolve il nome host).
-
-Uno screenshot viene preso solo quando una pagina riceve un nuovo
-snapshot (il riferimento, e ogni modifica), mai su un controllo invariato:
-una finestra 1366 × 900, la pagina intera fino a 5000 pixel, come JPEG.
-L'opzione **Screenshots** li disattiva per un monitor. Senza un
-browser, oppure quando non risponde, il confronto di testo funziona lo
-stesso e gli snapshot semplicemente non hanno un'immagine; la pagina del
-monitor lo dice.
-
-Il browser carica la pagina come farebbe un visitatore, con i suoi
-script: ciò che mostra può differire dal testo che DumbMonit ha
-confrontato, che è l'HTML che il server ha inviato.
-
 ## Storage
 
 Il testo di ogni snapshot viene conservato nel database (1 MB al massimo
-per pagina); gli screenshot sono file sotto `/data/webchange/<device
-id>/`. Per monitor, vengono conservate le ultime 500 modifiche; uno
+per pagina). Per monitor, vengono conservate le ultime 500 modifiche; uno
 snapshot viene conservato mentre è il più recente di una pagina o una
-modifica conservata lo referenzia, e tutto il resto, file inclusi, viene
+modifica conservata lo referenzia, e tutto il resto viene
 rimosso dopo ogni controllo. Eliminare il monitor rimuove tutto
 quanto.
 
@@ -218,8 +178,6 @@ I passaggi seguenti sono quelli mostrati dalla nota accanto al modulo.
 1. Nell'indirizzo, incolla la pagina da osservare, con http:// o https://. Per osservare un intero sito o una delle sue sezioni, incolla la sua pagina iniziale e imposta "Scope" su "site": ogni pagina sotto la stessa cartella viene seguita, fino a "Max pages".
 2. Le righe che cambiano a ogni visita (un orologio, un contatore di visitatori, "aggiornato 5 minuti fa") verrebbero segnalate ogni volta: elencale in "Ignore lines" come espressioni regolari.
 3. Il primo controllo registra solo il riferimento, nulla viene segnalato. Da quel momento, ogni controllo confronta il testo visibile pagina per pagina e conserva una copia prima/dopo di ogni modifica, mostrata sulla pagina del monitor; l'avviso "Website changed" te lo dice.
-4. Per uno screenshot di ogni versione, aggiungi un browser headless al tuo file Compose; le righe esatte sono nella documentazione (Advanced options, "Screenshots of website changes"). Vedi [Screenshots of website changes](../install/docker.md#website-screenshots).
-
 !!! warning
     Viene confrontato solo il testo che il server invia: una pagina
     disegnata interamente da JavaScript mostra poco o nulla al controllo.
@@ -242,7 +200,6 @@ agent relay.
 | Compare menus, header and footer (`keep_page_chrome`) | `false` | Confronta anche navigazione, intestazione, piè di pagina e barre laterali del sito. |
 | Ignore query strings (`ignore_query`) | `false` | Ambito sito: gli indirizzi che differiscono solo per la parte `?…` sono una sola pagina. |
 | User agent (`user_agent`) | — | Inviato al posto di `DumbMonit/<version>`. |
-| Screenshots (`screenshots`) | `true` | Conserva uno screenshot di ogni nuova versione, quando un browser è configurato. |
 | Check every (`check_interval_minutes`) | `60` | Minuti tra due controlli, da 5 a 10080. |
 | Accept an unverifiable certificate (`insecure_tls`) | `false` | Per un sito tuo dietro un certificato autofirmato. |
 | Allow loopback and link-local targets (`allow_private_targets`) | `false` | Raggiungi un sito servito dall'host DumbMonit stesso. |

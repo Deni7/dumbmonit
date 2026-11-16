@@ -72,7 +72,7 @@ formulario siempre coincide con lo que esta versión puede monitorear.
 | [WebSocket](services.md#websocket) | `websocket` | ninguno, nombre de usuario/contraseña o token | Punto final WebSocket: apretón de manos, intercambio de mensajes opcional |
 | [Servidor de tiempo NTP](services.md#ntp) | `ntp` | ninguno | Enrutador, NAS, servidor de tiempo interno, servidor de grupo público |
 | [Latido del corazón](push.md) | `push` | ninguno (URL secreta) | Trabajo cron, script de copia de seguridad, automatización que debe llamar |
-| [Cambios del sitio web](webchange.md) | `webchange` | ninguno | Una página o un sitio completo: cambios de texto, páginas nuevas y eliminadas, antes/después con capturas de pantalla |
+| [Cambios del sitio web](webchange.md) | `webchange` | ninguno | Una página o un sitio completo: cambios de texto, páginas nuevas y eliminadas, antes/después en texto |
 | [Salud y SEO del sitio web](website.md) | `website` | ninguno | Sitios en masa: abajo, página en blanco, redireccionamientos, noindex, robots.txt, cambios de título/descripción/canónica, plataforma (importación CSV) |
 | [Monitor de demostración](demo.md) | `dummy` | ninguno | Explora la interfaz de usuario sin hardware |
 

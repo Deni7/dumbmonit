@@ -86,6 +86,14 @@ All notable changes to this project are documented here. The format follows
   for code and figures, replacing Geist and Bricolage Grotesque. Both are open source (SIL OFL 1.1)
   and served from DumbMonit itself; the documentation no longer loads anything from Google Fonts.
 
+### Removed
+
+- **Screenshots of website changes.** The website-change monitor no longer takes screenshots, and
+  the optional headless Chromium (`DUMBMONIT_BROWSER_URL`, the `browser` service of the Compose
+  examples) is no longer used: you can remove both from your `docker-compose.yml`. Text and HTML
+  comparison, the before/after line diff and alerts are unchanged. Screenshots already stored are
+  deleted at startup, and their database column is dropped.
+
 ## 0.17.1 — 2026-11-04
 
 ### Changed

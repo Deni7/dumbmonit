@@ -68,7 +68,7 @@ docker compose up -d
 capabilities, `PUID`/`PGID` и sysctl `ping_group_range` объяснены в разделах
 [Права доступа и каталог данных](#permissions) и
 [Ping ICMP без capability](#icmp-ping-without-a-capability). Параметры (порт,
-секрет, срок хранения, внешняя VictoriaMetrics, снимки экрана) —
+секрет, срок хранения, внешняя VictoriaMetrics) —
 [переменные окружения, которые вы добавляете сами](#advanced-options).
 
 !!! tip "Сборка образа самостоятельно"
@@ -313,33 +313,7 @@ docker compose start
       DUMBMONIT_RESET_PASSWORD: "1"
 ```
 
-**Снимки экрана при изменениях сайтов**: безголовый Chromium рядом с сервером; см. ниже [Снимки экрана при изменениях сайтов](#website-screenshots).
-
 Другие переменные: [справочник по конфигурации](../reference/configuration.md).
-
-## Снимки экрана при изменениях сайтов {#website-screenshots}
-
-[Монитор изменений сайтов](../devices/webchange.md) всегда сравнивает видимый текст страниц. Для снимка экрана каждой новой версии нужен браузер, а в образе DumbMonit его нет: безголовый Chromium запускается как второй сервис, а `DUMBMONIT_BROWSER_URL` сообщает серверу, где его искать.
-
-Добавьте эти строки в `docker-compose.yml`, затем выполните `docker compose up -d`:
-
-```yaml
-services:
-  dumbmonit:
-    environment:
-      DUMBMONIT_BROWSER_URL: http://browser:9222
-  browser:
-    image: chromedp/headless-shell:stable
-    shm_size: 256m
-    restart: unless-stopped
-```
-
-- `browser` — имя сервиса; в сети Compose `http://browser:9222` ведёт к нему. Его порт никуда не публикуется: с ним общается только DumbMonit.
-- `shm_size: 256m`: Chromium рисует в `/dev/shm`, а 64 МБ по умолчанию в Docker слишком мало для длинной страницы.
-- Подойдёт любой Chromium, запущенный с `--remote-debugging-port`; здесь используется образ `chromedp/headless-shell`.
-
-Без браузера всё остальное работает как обычно (сравнение текста, оповещения, копии «до/после»); у снимков просто нет изображения. Пока сервер не достаёт до браузера, в форме монитора для изменений сайта показывается заметка с этими строками.
-Если заметка остаётся после перезапуска, проверьте `docker compose logs browser`, что имя хоста в `DUMBMONIT_BROWSER_URL` совпадает с именем сервиса и что оба сервиса входят в один проект Compose.
 
 ## Обратный прокси {#reverse-proxy}
 

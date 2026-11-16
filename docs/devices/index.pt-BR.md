@@ -68,7 +68,7 @@ versão pode monitorar.
 | [Certificado TLS](services.md#tls) | `tls` | nenhuma | IMAPS, LDAPS, proxy reverso |
 | [Servidor de hora NTP](services.md#ntp) | `ntp` | nenhuma | Roteador, NAS, servidor de hora interno, servidor de pool público |
 | [Heartbeat](push.md) | `push` | nenhuma (URL secreta) | Job cron, script de backup, automação que precisa dar sinal |
-| [Mudanças no site](webchange.md) | `webchange` | nenhuma | Uma página ou um site inteiro: mudanças de texto, páginas novas e removidas, antes/depois com capturas de tela |
+| [Mudanças no site](webchange.md) | `webchange` | nenhuma | Uma página ou um site inteiro: mudanças de texto, páginas novas e removidas, texto antes/depois |
 | [Monitor de demonstração](demo.md) | `dummy` | nenhuma | Explorar a interface sem hardware |
 
 ## Como um monitor é lido {#how-a-device-is-read}

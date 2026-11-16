@@ -1,5 +1,5 @@
 //! Changements d'un site web : pages suivies, changements constatés, diff
-//! « avant / après » et captures d'écran (`crate::webchange`).
+//! « avant / après » (`crate::webchange`).
 //!
 //! Tout est en lecture, sauf `POST …/check` qui lance une vérification sans
 //! attendre la prochaine échéance. Une cible qui n'est pas de type
@@ -8,8 +8,7 @@
 use axum::Json;
 use axum::Router;
 use axum::extract::{Path, Query, State};
-use axum::http::{HeaderValue, StatusCode, header};
-use axum::response::{IntoResponse, Response};
+use axum::http::StatusCode;
 use axum::routing::{get, post};
 use dumbmonit_proto::{Target, TargetId};
 use serde::{Deserialize, Serialize};
@@ -17,14 +16,13 @@ use serde::{Deserialize, Serialize};
 use crate::api::{ApiError, ApiResult};
 use crate::db;
 use crate::state::AppState;
-use crate::webchange::{self, Context, cdp, diff, store};
+use crate::webchange::{self, Context, diff, store};
 
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/targets/{id}/webchange/pages", get(pages))
         .route("/targets/{id}/webchange/changes", get(changes))
         .route("/targets/{id}/webchange/changes/{change_id}", get(change))
-        .route("/targets/{id}/webchange/snapshots/{snapshot_id}/screenshot", get(screenshot))
         .route("/targets/{id}/webchange/check", post(check))
 }
 
@@ -33,9 +31,6 @@ const MAX_LIMIT: i64 = 200;
 
 #[derive(Serialize)]
 struct PagesView {
-    /// Un navigateur est configuré et répond : les nouveaux instantanés
-    /// auront une capture.
-    screenshots_available: bool,
     /// Pages trouvées quand « Max pages » a arrêté le dernier parcours ; absent
     /// quand tout le site a été lu.
     found: Option<i64>,
@@ -90,17 +85,11 @@ struct SnapshotView {
     id: i64,
     fetched_at: String,
     title: Option<String>,
-    has_screenshot: bool,
 }
 
 impl From<store::SnapshotRow> for SnapshotView {
     fn from(row: store::SnapshotRow) -> Self {
-        Self {
-            id: row.id,
-            fetched_at: row.fetched_at,
-            title: row.title,
-            has_screenshot: row.has_screenshot,
-        }
+        Self { id: row.id, fetched_at: row.fetched_at, title: row.title }
     }
 }
 
@@ -147,9 +136,8 @@ async fn pages(
             latest_snapshot: page.latest_snapshot,
         })
         .collect();
-    let screenshots_available = Context::from_state(&state).screenshots_available().await;
     let found = store::state(&state.pool, id).await?.and_then(|state| state.last_check_found);
-    Ok(Json(PagesView { screenshots_available, found, pages }))
+    Ok(Json(PagesView { found, pages }))
 }
 
 /// `GET /api/targets/{id}/webchange/changes?url=…&kind=…&before=…&limit=…`
@@ -207,35 +195,6 @@ async fn change(
         after_snapshot: after_snapshot.map(SnapshotView::from),
         diff: diff::render(&edits, diff::CONTEXT),
     }))
-}
-
-/// `GET /api/targets/{id}/webchange/snapshots/{snapshot_id}/screenshot`
-async fn screenshot(
-    State(state): State<AppState>,
-    Path((id, snapshot_id)): Path<(TargetId, i64)>,
-) -> ApiResult<Response> {
-    load(&state, id).await?;
-    let missing = || ApiError::NotFound(format!("Snapshot {snapshot_id} has no screenshot."));
-    let snapshot = store::snapshot(&state.pool, id, snapshot_id).await?.ok_or_else(missing)?;
-    if !snapshot.has_screenshot {
-        return Err(missing());
-    }
-    let path = store::screenshot_path(&state.config.data_dir, id, snapshot_id);
-    let bytes = match tokio::fs::read(&path).await {
-        Ok(bytes) => bytes,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Err(missing()),
-        Err(error) => return Err(ApiError::Internal(error.into())),
-    };
-    let mut response = bytes.into_response();
-    let headers = response.headers_mut();
-    headers.insert(header::CONTENT_TYPE, HeaderValue::from_static(cdp::CONTENT_TYPE));
-    // Un instantané ne change jamais : son numéro n'est jamais réutilisé. Mais
-    // l'image n'est servie qu'à une session : aucun cache partagé ne la garde.
-    headers.insert(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static("private, max-age=31536000, immutable"),
-    );
-    Ok(response)
 }
 
 #[derive(Serialize)]

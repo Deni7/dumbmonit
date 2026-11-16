@@ -589,7 +589,6 @@ Rotas não detalhadas acima; o documento OpenAPI dá os seus parâmetros e forma
 | `GET` | `/api/targets/{id}/webchange/pages` | read | Páginas seguidas por uma vigilância de site. |
 | `GET` | `/api/targets/{id}/webchange/changes` | read | Alterações encontradas num site vigiado, as mais recentes primeiro. |
 | `GET` | `/api/targets/{id}/webchange/changes/{change_id}` | read | Uma alteração, com ambas as versões e a diferença por linhas. |
-| `GET` | `/api/targets/{id}/webchange/snapshots/{snapshot_id}/screenshot` | read | A captura de ecrã de um snapshot. |
 | `POST` | `/api/targets/{id}/webchange/check` | write | Verificar agora um site vigiado. |
 | `GET` | `/api/targets/{id}/opnsense/gateways`, `/traffic`, `/health` | read | OPNsense: gateways e endereços WAN; interfaces, firewall e DHCP; sistema, serviços, túneis e firmware. |
 | `GET` | `/api/targets/{id}/truenas/storage`, `/protection`, `/health` | read | TrueNAS: pools, datasets e discos; scrubs e tarefas de proteção de dados; sistema, alertas e serviços. |

@@ -5,8 +5,7 @@ lassen Sie sich benachrichtigen, wenn er sich ändert: eine Preis- oder
 AGB-Seite, eine Dokumentations-Site, der Wartungshinweis eines
 Lieferanten, eine öffentliche Ankündigungsseite, oder Ihre eigene Site
 nach einem Deployment. Jede Änderung wird mit dem Text davor und
-danach gehalten, einem Zeilen-Diff und, wenn ein Browser verfügbar
-ist, einem Screenshot jeder Version.
+danach gehalten, zusammen mit einem Zeilen-Diff.
 
 Was verglichen wird, ist der **sichtbare Text** jeder Seite, nicht ihr
 HTML: Skripte, Stile, Kommentare, `noscript`-, `svg`- und
@@ -162,52 +161,13 @@ ihren Schweregrad an, unter **Alerts → Rules**. Siehe
 
 Die Metriken erscheinen, sobald die erste Prüfung erledigt ist.
 
-## Screenshots
-
-Das DumbMonit-Image hat keinen Browser: Screenshots stammen von einem
-optionalen Headless-Chromium, über das Chrome DevTools Protocol
-gesteuert. Fügen Sie in `docker-compose.yml` neben DumbMonit einen
-`browser`-Dienst hinzu und richten Sie den Server darauf:
-
-```yaml
-services:
-  dumbmonit:
-    environment:
-      DUMBMONIT_BROWSER_URL: http://browser:9222
-  browser:
-    image: chromedp/headless-shell:stable
-    shm_size: 256m
-    restart: unless-stopped
-```
-
-Führen Sie dann `docker compose up -d` aus. Nichts veröffentlicht den Port des
-Browsers: Nur der DumbMonit-Server spricht mit ihm, über das Compose-Netzwerk.
-
-`DUMBMONIT_BROWSER_URL` richtet DumbMonit auf den Browser (jedes mit
-`--remote-debugging-port` gestartete Chromium, zum Beispiel
-`chromedp/headless-shell`; der Server liest `/json/version` und
-spricht mit der Adresse, zu der der Hostname aufgelöst wird).
-
-Ein Screenshot wird nur aufgenommen, wenn eine Seite einen neuen
-Snapshot erhält (die Referenz, und jede Änderung), nie bei einer
-unveränderten Prüfung: ein 1366 × 900-Fenster, die ganze Seite bis zu
-5000 Pixel, als JPEG. Die Option **Screenshots** schaltet sie für einen
-Monitor aus. Ohne Browser, oder wenn er nicht antwortet, funktioniert
-der Textvergleich genauso, und die Snapshots haben einfach kein Bild;
-die Monitorseite sagt das.
-
-Der Browser lädt die Seite, wie ein Besucher es täte, mit ihren
-Skripten: Was er zeigt, kann sich vom Text unterscheiden, den
-DumbMonit verglichen hat, was das vom Server gesendete HTML ist.
-
 ## Speicherung
 
 Der Text jedes Snapshots wird in der Datenbank gehalten (höchstens
-1 MB pro Seite); Screenshots sind Dateien unter
-`/data/webchange/<device id>/`. Pro Monitor werden die letzten 500
+1 MB pro Seite). Pro Monitor werden die letzten 500
 Änderungen behalten; ein Snapshot wird behalten, während er der
 neueste einer Seite ist oder eine behaltene Änderung auf ihn verweist,
-und alles andere, Dateien eingeschlossen, wird nach jeder Prüfung
+und alles andere wird nach jeder Prüfung
 entfernt. Das Löschen des Monitors entfernt alles davon.
 
 ## Eine Website auf Änderungen beobachten
@@ -227,11 +187,6 @@ Die Schritte unten sind die, die der Hinweis neben dem Formular zeigt.
    Seite für Seite und behält eine Vorher/Nachher-Kopie jeder
    Änderung, auf der Monitorseite angezeigt; der Alarm "Website
    changed" sagt es Ihnen.
-4. Für einen Screenshot jeder Version fügen Sie Ihrer Compose-Datei einen
-   Headless-Browser-Dienst hinzu; die genauen Zeilen stehen in der Dokumentation
-   (Advanced options, "Screenshots of website changes").
-   Siehe [Screenshots von Website-Änderungen](../install/docker.md#website-screenshots).
-
 !!! warning
     Nur der vom Server gesendete Text wird verglichen: Eine komplett
     von JavaScript gezeichnete Seite zeigt der Prüfung wenig oder
@@ -253,7 +208,6 @@ Eine Website-Beobachtung kann nicht über einen Relay-Agent laufen.
 | Compare menus, header and footer (`keep_page_chrome`) | `false` | Navigation, Kopf, Fuß und Seitenleisten der Site ebenfalls vergleichen. |
 | Ignore query strings (`ignore_query`) | `false` | Site-Scope: Adressen, die sich nur im `?…`-Teil unterscheiden, sind eine Seite. |
 | User agent (`user_agent`) | — | Wird statt `DumbMonit/<version>` gesendet. |
-| Screenshots (`screenshots`) | `true` | Einen Screenshot jeder neuen Version behalten, wenn ein Browser konfiguriert ist. |
 | Check every (`check_interval_minutes`) | `60` | Minuten zwischen zwei Prüfungen, 5 bis 10080. |
 | Accept an unverifiable certificate (`insecure_tls`) | `false` | Für eine eigene Site hinter einem selbstsignierten Zertifikat. |
 | Allow loopback and link-local targets (`allow_private_targets`) | `false` | Eine vom DumbMonit-Host selbst bediente Site erreichen. |

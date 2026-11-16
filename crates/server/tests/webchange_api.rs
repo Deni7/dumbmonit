@@ -9,16 +9,13 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use axum::Router;
-use axum::body::Body;
 use axum::extract::{Request, State};
 use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use dumbmonit_server::webchange::{self, WebchangeCollector};
 use dumbmonit_server::{collectors, db};
-use http_body_util::BodyExt;
 use serde_json::{Value, json};
 use sqlx::SqlitePool;
-use tower::ServiceExt;
 
 use common::TestApp;
 
@@ -94,26 +91,20 @@ fn page_a(middle: &str, stamp: u32) -> String {
 struct Setup {
     app: TestApp,
     pool: SqlitePool,
-    data_dir: std::path::PathBuf,
     cookie: String,
 }
 
 async fn setup() -> Setup {
     let dir = tempfile::tempdir().expect("répertoire temporaire");
     let config = common::base_config(dir.path());
-    let data_dir = config.data_dir.clone();
     let pool = db::open(&config.database_path()).await.expect("base");
     let mut registry = collectors::Registry::new();
     registry.register(Arc::new(collectors::DummyCollector));
-    registry.register(Arc::new(WebchangeCollector::new(webchange::Context {
-        pool: pool.clone(),
-        data_dir: data_dir.clone(),
-        browser_url: None,
-    })));
+    registry.register(Arc::new(WebchangeCollector::new(webchange::Context { pool: pool.clone() })));
     let app = common::build_with_registry(dir, config, pool.clone(), registry).await;
     app.create_admin().await;
     let cookie = app.admin_cookie().await;
-    Setup { app, pool, data_dir, cookie }
+    Setup { app, pool, cookie }
 }
 
 impl Setup {
@@ -157,18 +148,6 @@ impl Setup {
         let reply = self.app.get(uri, Some(&self.cookie)).await;
         assert_eq!(reply.status, StatusCode::OK, "{uri} : {}", reply.body);
         reply.body
-    }
-
-    async fn raw(&self, uri: &str) -> (StatusCode, header::HeaderMap, Vec<u8>) {
-        let request = axum::http::Request::get(uri)
-            .header(header::COOKIE, &self.cookie)
-            .body(Body::empty())
-            .unwrap();
-        let response = self.app.router.clone().oneshot(request).await.unwrap();
-        let status = response.status();
-        let headers = response.headers().clone();
-        let body = response.into_body().collect().await.unwrap().to_bytes().to_vec();
-        (status, headers, body)
     }
 }
 
@@ -219,7 +198,6 @@ async fn reference_puis_changements_pages_nouvelles_et_disparues() {
     // Référence : trois pages, aucune nouvelle.
     s.check(id).await;
     let pages = s.get(&format!("/api/targets/{id}/webchange/pages")).await;
-    assert_eq!(pages["screenshots_available"], false);
     assert_eq!(
         urls(&pages),
         [format!("{base}/docs/"), format!("{base}/docs/a.html"), format!("{base}/docs/b.html")],
@@ -316,7 +294,6 @@ async fn reference_puis_changements_pages_nouvelles_et_disparues() {
     assert_eq!(detail["before_snapshot"]["id"], changed["before"]);
     assert_eq!(detail["after_snapshot"]["id"], changed["after"]);
     assert_eq!(detail["after_snapshot"]["title"], "Page A");
-    assert_eq!(detail["after_snapshot"]["has_screenshot"], false);
     let diff: Vec<(String, String, Value)> = detail["diff"]
         .as_array()
         .unwrap()
@@ -410,38 +387,9 @@ async fn reference_puis_changements_pages_nouvelles_et_disparues() {
     assert_eq!(c["status"], 404, "une page disparue s'affiche « Removed »");
     assert_eq!(c["error"], "No longer linked");
 
-    // Pas de navigateur : aucune capture.
-    let snapshot = changed["after"].as_i64().unwrap();
-    let (status, _, _) =
-        s.raw(&format!("/api/targets/{id}/webchange/snapshots/{snapshot}/screenshot")).await;
-    assert_eq!(status, StatusCode::NOT_FOUND);
-
-    // Une capture présente est servie telle quelle, en cache immuable ; elle
-    // n'est servie qu'à travers sa propre cible.
-    sqlx::query("UPDATE webchange_snapshots SET has_screenshot = 1 WHERE id = ?")
-        .bind(snapshot)
-        .execute(&s.pool)
-        .await
-        .unwrap();
-    let path = webchange::store::screenshot_path(&s.data_dir, id, snapshot);
-    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-    std::fs::write(&path, b"\xFF\xD8\xFFjpeg").unwrap();
-    let (status, headers, body) =
-        s.raw(&format!("/api/targets/{id}/webchange/snapshots/{snapshot}/screenshot")).await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(headers[header::CONTENT_TYPE], "image/jpeg");
-    assert!(headers[header::CACHE_CONTROL].to_str().unwrap().contains("immutable"));
-    assert_eq!(body, b"\xFF\xD8\xFFjpeg");
-    let other =
-        s.create(&format!("{base}/autre/"), json!({ "allow_private_targets": "true" })).await;
-    let (status, _, _) =
-        s.raw(&format!("/api/targets/{other}/webchange/snapshots/{snapshot}/screenshot")).await;
-    assert_eq!(status, StatusCode::NOT_FOUND, "l'instantané d'une autre cible");
-
-    // Supprimer la cible efface tout, fichiers compris.
+    // Supprimer la cible efface tout.
     let reply = s.app.delete(&format!("/api/targets/{id}"), Some(&s.cookie)).await;
     assert_eq!(reply.status, StatusCode::NO_CONTENT);
-    assert!(!path.exists(), "capture effacée");
     let left: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM webchange_snapshots WHERE target_id = ?")
             .bind(id)

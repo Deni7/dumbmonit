@@ -8,7 +8,7 @@ Tutto passa attraverso variabili di ambiente; nessuna è richiesta. Non c'è alc
 |---|---|---|
 | `DUMBMONIT_BIND` | `0.0.0.0:8080` | Indirizzo di ascolto dell'API e dell'interfaccia web, dentro il contenitore. |
 | `PUID` / `PGID` | `65532` | Utente e gruppo con cui gira il server quando il container parte come root (`user: "0:0"`, come nel `docker-compose.yml` fornito): la directory dei dati viene ceduta a loro all'avvio, poi root viene abbandonato. `0` viene rifiutato. `DUMBMONIT_PUID` / `DUMBMONIT_PGID` hanno la precedenza. Altrimenti vengono ignorati. Vedi [Permessi](../install/docker.md#permissions). |
-| `DUMBMONIT_DATA_DIR` | `/data` | Directory persistente: `dumbmonit.db` (SQLite), `secret.key`, `vm/` (VictoriaMetrics incorporato) e `webchange/` (screenshot delle modifiche del sito web). |
+| `DUMBMONIT_DATA_DIR` | `/data` | Directory persistente: `dumbmonit.db` (SQLite), `secret.key` e `vm/` (VictoriaMetrics incorporato). |
 | `DUMBMONIT_VM_URL` | *(non impostato)* | URL di base di un'istanza VictoriaMetrics esterna (`http://host:8428`). Se impostato, quella incorporata non viene avviata; vedi [sotto](#embedded-victoriametrics). |
 | `DUMBMONIT_SECRET` | *(generato)* | Segreto dell'istanza. Se vuoto, leggi da `<data dir>/secret.key`, generato al primo avvio. Crittografa le credenziali del monitor, i segreti del canale e i token dell'agente con AES-256-GCM. |
 | `DUMBMONIT_MAX_CONCURRENT_PROBES` | `64` | Massimo numero di sonde simultanee, tutti i collezionisti combinati. |
@@ -44,7 +44,6 @@ Tutto passa attraverso variabili di ambiente; nessuna è richiesta. Non c'è alc
 | `DUMBMONIT_BACKUP_INTERVAL_HOURS` | `24` | Ore tra due backup, da 1 a 8760. Il primo avviene un intervallo dopo l'avvio, non all'avvio. |
 | `DUMBMONIT_DEMO` | *(disattivato)* | `1` per una demo di sola lettura con una proprietà fittizia fissa, accedi `demo` / `demo`. **Ricrea il database ad ogni avvio**: mai su un volume dati reale. Vedi [Esegui un'istanza demo](../install/demo.md). |
 | `DUMBMONIT_BACKUP_KEEP` | `7` | Quanti backup vengono mantenuti, da 1 a 365. I più vecchi vengono rimossi con il loro `.key`. |
-| `DUMBMONIT_BROWSER_URL` | *(non impostato)* | Chromium headless utilizzato per gli screenshot di [modifiche del sito web](../devices/webchange.md#screenshots), come `http://host:9222` (porta DevTools). Aggiungi un servizio `chromedp/headless-shell` al tuo file Compose, come mostrato in [Screenshot](../devices/webchange.md#screenshots). Non impostato: confronto solo del testo. |
 
 La conservazione della linea di base (60 giorni) e il periodo di apprendimento di 14 giorni non sono configurabili.
 
@@ -73,7 +72,7 @@ Il `docker-compose.yml` fornito non legge alcuna variabile e non richiede un fil
 `.env`. Tutto si imposta sotto `environment:` del servizio o modificando il
 file; vedi [Opzioni avanzate](../install/docker.md#advanced-options) (porta,
 segreto, retention e memoria, VictoriaMetrics esterno, reimpostazione della
-password, screenshot). L'overlay di sviluppo `docker-compose.dev.yml` legge
+password). L'overlay di sviluppo `docker-compose.dev.yml` legge
 `DUMBMONIT_VM_PORT` (predefinito `8428`) per la porta host del VictoriaMetrics
 incorporato.
 

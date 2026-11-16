@@ -890,13 +890,9 @@ pub async fn delete(
 /// Éteint sans bruit les alertes d'une cible qui vient d'être supprimée ou
 /// mise en pause. Un échec ne fait pas échouer la requête : le moteur d'alerting
 /// écarte de toute façon ces alertes à son prochain cycle.
-/// Ce qui reste d'une cible supprimée hors de sa ligne : alertes, captures,
-/// séries.
+/// Ce qui reste d'une cible supprimée hors de sa ligne : alertes, séries.
 pub(crate) async fn forget(state: &AppState, id: TargetId) {
     forget_alerts(state, id).await;
-    // Les captures d'écran d'une surveillance de site sont des fichiers : la
-    // cascade de la base ne les atteint pas.
-    crate::webchange::store::forget_files(&state.config.data_dir, id).await;
     spawn_series_deletion(state.clone(), id);
 }
 

@@ -132,7 +132,7 @@ surveillance**. Voir [Ajouter votre première surveillance](../install/first-dev
 | [Serveur RADIUS](services.md#radius) | `radius` | secret partagé et compte de test | FreeRADIUS, Windows NPS : une vraie authentification |
 | [Service gRPC](services.md#grpc) | `grpc` | aucun | Microservice, etcd : le contrôle de santé gRPC standard |
 | [Battement de cœur](push.md) | `push` | aucun (URL secrète) | Tâche cron, script de sauvegarde, automatisation qui doit appeler |
-| [Changements de site web](webchange.md) | `webchange` | aucun | Une page ou tout un site : changements de texte, pages ajoutées et supprimées, avant/après avec captures d'écran |
+| [Changements de site web](webchange.md) | `webchange` | aucun | Une page ou tout un site : changements de texte, pages ajoutées et supprimées, texte avant/après |
 | [Surveillance de démonstration](demo.md) | `dummy` | aucun | Explorer l'interface sans matériel |
 
 ## Comment une surveillance est lue
