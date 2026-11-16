@@ -5,7 +5,34 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- **Your first alert, in the setup wizard.** The wizard now opens on one screen with the whole
+  road to a first alert: type one address (an URL becomes a website check, a host a ping,
+  `host:port` a TCP port), pick where alerts go in one click (ntfy with a private topic already
+  filled in, Discord, Telegram, email, webhook, or any other channel), then **Send a test alert**.
+  It replaces the separate "Get notified" step. New docs page:
+  [First alert in five minutes](https://dumbmonit.selfhostr.io/docs/install/quickstart/).
+- **First-run stopwatch.** The instance records, once, when it started without an account, when
+  the administrator was created, the first monitor, the first channel, the first message delivered
+  (a test counts) and the first real alert delivered. Shown in Settings → System → About → First
+  run and in `GET /api/onboarding` (`first_run`). Kept on the instance only, never sent anywhere,
+  not part of backups; instances set up by an older version stay empty.
+
 ### Changed
+
+- **A new monitor is probed at once.** Creating, editing or resuming a monitor wakes the scheduler,
+  and a monitor added while the server runs gets its first probe right away instead of after up
+  to 15 s of reload plus up to a whole interval. Large imports keep the usual spreading after the
+  first twenty.
+- **Shorter waits before the first message, same protection against false alarms.** On new
+  instances, *Service down* fires after two minutes of failed checks instead of three (still at
+  least three failures in a row at the default interval) and *Monitor unreachable* confirms its
+  three-minute threshold on the next 30 s cycle instead of waiting one more minute. Rules already
+  in place keep their delays. The default grouping window drops from 60 s to 30 s (one evaluation
+  cycle) for instances that never changed it. A website that goes down is now reported in under
+  4 minutes, a silent device in under 4.5 minutes (5.5 minutes before).
+- **Notification channels:** a new channel left unnamed takes the name of its kind.
 
 - **One typeface family everywhere: Inter and JetBrains Mono.** The console, the status pages, the
   topology exports and the documentation now use Inter (headings in semibold) and JetBrains Mono

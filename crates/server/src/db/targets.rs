@@ -146,7 +146,11 @@ pub async fn create_in(
         }
         anyhow::bail!("unknown client {client}");
     };
-    row.try_get("id").context("identifiant de la cible créée")
+    let id: TargetId = row.try_get("id").context("identifiant de la cible créée")?;
+    crate::first_run::record(pool, crate::first_run::Milestone::FirstTarget).await;
+    // Sondé tout de suite, pas au prochain rechargement du planificateur.
+    crate::scheduler::wake();
+    Ok(id)
 }
 
 pub async fn update(
@@ -207,6 +211,9 @@ pub async fn update(
     }
     .context("mise à jour de la cible")?;
 
+    // Nouvelle adresse, nouvelle période ou remise en service : pris en compte
+    // au tour suivant du planificateur.
+    crate::scheduler::wake();
     Ok(result.rows_affected() > 0)
 }
 
@@ -350,6 +357,7 @@ pub async fn set_enabled(pool: &SqlitePool, id: TargetId, enabled: bool) -> Resu
     .execute(pool)
     .await
     .context("activation de la cible")?;
+    crate::scheduler::wake();
     Ok(result.rows_affected() > 0)
 }
 

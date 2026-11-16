@@ -15,7 +15,7 @@ su ogni istanza.
 
 | Regola | Cosa | Soglia predefinita | Mantenimento | Gravità | Promemoria |
 |---|---|---|---|---|---|
-| Monitor irraggiungibile | Nessuna misura ricevuta da più di tre minuti. `bottomk by (target) (1, time() - tlast_over_time(dumbmonit_up[7d]))` | > 180 s | 1 min | Avvertenza (`critical`) | 6 h |
+| Monitor irraggiungibile | Nessuna misura ricevuta da più di tre minuti. `bottomk by (target) (1, time() - tlast_over_time(dumbmonit_up[7d]))` | > 180 s | 30 s | Avvertenza (`critical`) | 6 h |
 | CPU elevata | Carico CPU sostenuto sopra il 90%, mediato per monitor tra sorgenti SNMP, Proxmox e agent; rientra sotto l'85 %. | > 90 % | 10 min | Avviso (`warning`), escalation dopo 1 h | 6 h |
 | CPU inusuale | Carico CPU sensibilmente diverso dal solito a quest'ora e in questo giorno della settimana (baseline stagionale). | score > 3.5 | 15 min | Informazioni (`info`) | 6 h |
 | Disco quasi pieno | Filesystem pieno al 90% o più, per punto di mount (SNMP, storage Proxmox e filesystem root); rientra sotto l'88 %. | ≥ 90 % | 15 min | Avviso (`warning`), escalation dopo 24 h | 6 h |
@@ -52,7 +52,7 @@ Le serie di salute valgono 0 (OK), 1 (Avviso) o 2 (Critico). Uno slot vuoto (`Ab
 
 | Regola | Cosa | Soglia predefinita | Mantenimento | Gravità | Promemoria |
 |---|---|---|---|---|---|
-| Servizio non disponibile | Il servizio non risponde correttamente da tre minuti (`dumbmonit_probe_success{probe!="push"} == bool 0`). | > 0 | 3 min | Avvertenza (`critical`) | 30 min |
+| Servizio non disponibile | Il servizio non risponde correttamente da due minuti (`dumbmonit_probe_success{probe!="push"} == bool 0`). | > 0 | 2 min | Avvertenza (`critical`) | 30 min |
 | Heartbeat mancato | Il job non si è fatto sentire entro l'intervallo previsto più il periodo di tolleranza, oppure ha segnalato esso stesso un fallimento (`dumbmonit_probe_success{probe="push"} == bool 0`; il ritardo è impostato per monitor, vedi [Heartbeat](../devices/push.md)). | > 0 | 2 min | Avviso (`warning`) | 6 h |
 | Servizio instabile (flapping) | Il servizio ha cambiato stato più di sei volte in trenta minuti (`changes(dumbmonit_probe_success{probe!="push"}[30m])`). | > 6 | 5 min | Avviso (`warning`) | 1 h |
 | Servizio lento | Il servizio impiega più di tre secondi a rispondere; i controlli falliti sono esclusi (`dumbmonit_probe_duration_seconds and dumbmonit_probe_success == 1`). | > 3 s | 10 min | Avviso (`warning`) | 6 h |

@@ -122,6 +122,9 @@ async fn run(mut config: Config, startup: Startup) -> Result<()> {
     let setup_code = config.setup_code.get_or_insert_with(auth::setup_code::generate).clone();
     if !config.demo && auth::users::count(&pool).await? == 0 {
         auth::setup_code::announce(&setup_code);
+        // Départ du chronomètre du premier lancement (Réglages → À propos).
+        let boot = dumbmonit_server::first_run::Milestone::FirstBoot;
+        dumbmonit_server::first_run::record(&pool, boot).await;
     }
 
     let victoria_url = config.effective_victoria_url();

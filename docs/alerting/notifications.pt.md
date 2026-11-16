@@ -28,7 +28,7 @@ evaluate (hysteresis, per-device overrides)
 | Horas de silêncio | Canal → Delivery options | desligado |
 | Filtro de encaminhamento (etiquetas, tipo, regra) | Canal → Delivery options → *Only some alerts* | desligado (o canal ouve tudo) |
 | Escalonamento se ninguém confirmar | Settings → Notifications & reports → Notification policy | desligado |
-| Janela de lote | Settings → Notifications & reports → Notification policy | 60 s |
+| Janela de lote | Settings → Notifications & reports → Notification policy | 30 s |
 | Mensagens por canal por hora | Settings → Notifications & reports → Notification policy | 20 |
 | URL público (ligações diretas) | Settings → Notifications & reports → Notification policy, ou `DUMBMONIT_PUBLIC_URL` | vazio |
 

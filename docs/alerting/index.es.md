@@ -179,7 +179,7 @@ nadie reciba spam. El camino completo de una alerta, en orden:
    silencio (una alerta que se limpia entretanto solo se menciona como
    «resolved during quiet hours»).
 9. **Agrupamiento por lotes** — las alertas dentro de la ventana de
-   lote (60 s por defecto) salen como un mensaje por canal: «3 alerts
+   lote (30 s por defecto) salen como un mensaje por canal: «3 alerts
    on 2 devices, 1 resolved».
 10. **Límite por hora** — más allá de `max_per_hour` mensajes en un
     canal, las alertas esperan y llegan como un resumen («…and 7 more

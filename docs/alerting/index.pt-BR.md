@@ -173,7 +173,7 @@ inundado de mensagens. O caminho completo de um alerta, em ordem:
    o resto espera por um resumo quando as horas de silêncio terminam (um
    alerta que limpa nesse meio tempo é apenas mencionado como "resolvido
    durante horas de silêncio").
-9. **Lotes** — alertas dentro da janela de lote (60 s por padrão) saem
+9. **Lotes** — alertas dentro da janela de lote (30 s por padrão) saem
    como uma mensagem por canal: "3 alertas em 2 monitores, 1
    resolvido".
 10. **Limite por hora** — passado `max_per_hour` mensagens em um canal,

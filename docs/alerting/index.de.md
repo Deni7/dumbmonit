@@ -184,7 +184,7 @@ Reihenfolge:
    endet (ein Alarm, der sich währenddessen löst, wird nur als „während
    der Ruhezeit behoben“ erwähnt).
 9. **Bündelung** — Alarme innerhalb des Bündelungsfensters (standardmäßig
-   60 s) verlassen das System als eine Nachricht pro Kanal: „3 Alarme auf
+   30 s) verlassen das System als eine Nachricht pro Kanal: „3 Alarme auf
    2 Monitoren, 1 behoben“.
 10. **Stündliches Limit** — über `max_per_hour` Nachrichten auf einem
     Kanal hinaus warten Alarme und kommen als eine Zusammenfassung an

@@ -31,6 +31,7 @@ use sqlx::{Row, SqlitePool};
 use crate::api::{ApiError, ApiResult};
 use crate::auth::middleware::AdminIdentity;
 use crate::auth::settings;
+use crate::first_run;
 use crate::state::AppState;
 
 /// Clé du réglage persistant, dans la table `settings`.
@@ -77,6 +78,8 @@ pub struct OnboardingState {
     /// Un message est réellement parti sur un canal — test compris. C'est la
     /// seule preuve que la troisième étape a abouti.
     pub notification_confirmed: bool,
+    /// Heures des étapes du premier lancement (voir [`crate::first_run`]).
+    pub first_run: first_run::Timings,
 }
 
 /// Modification envoyée par l'interface. Chaque champ absent conserve sa valeur.
@@ -110,7 +113,8 @@ pub async fn get(State(state): State<AppState>) -> ApiResult<Json<OnboardingStat
         settings::set(&state.pool, KEY, &stored).await?;
     }
 
-    Ok(Json(render(stored, facts)))
+    let timings = first_run::load(&state.pool).await?;
+    Ok(Json(render(stored, facts, timings)))
 }
 
 /// `PUT /api/onboarding` — écarte une étape, ou le guide entier.
@@ -148,7 +152,8 @@ pub async fn put(
 
     settings::set(&state.pool, KEY, &stored).await?;
     let facts = read_facts(&state.pool).await?;
-    Ok(Json(render(stored, facts)))
+    let timings = first_run::load(&state.pool).await?;
+    Ok(Json(render(stored, facts, timings)))
 }
 
 // --------------------------------------------------------------------------
@@ -199,7 +204,7 @@ async fn read_facts(pool: &SqlitePool) -> ApiResult<Facts> {
     })
 }
 
-fn render(stored: Stored, facts: Facts) -> OnboardingState {
+fn render(stored: Stored, facts: Facts, timings: first_run::Timings) -> OnboardingState {
     OnboardingState {
         skipped: stored.skipped,
         complete: stored.completed_at.is_some(),
@@ -208,6 +213,7 @@ fn render(stored: Stored, facts: Facts) -> OnboardingState {
         has_target: facts.has_target,
         has_channel: facts.has_channel,
         notification_confirmed: facts.notification_confirmed,
+        first_run: timings,
     }
 }
 
@@ -221,7 +227,7 @@ mod tests {
 
     #[test]
     fn a_fresh_instance_shows_the_guide() {
-        let state = render(Stored::default(), facts(false, false, false));
+        let state = render(Stored::default(), facts(false, false, false), Default::default());
         assert!(!state.complete);
         assert!(!state.skipped);
         assert!(state.dismissed.is_empty());
@@ -232,7 +238,7 @@ mod tests {
         // Le canal a disparu depuis, le guide ne revient pas.
         let stored =
             Stored { completed_at: Some("2026-09-22 10:00:00".into()), ..Stored::default() };
-        let state = render(stored, facts(true, false, false));
+        let state = render(stored, facts(true, false, false), Default::default());
         assert!(state.complete);
         assert!(!state.has_channel);
     }

@@ -35,11 +35,17 @@ serveur, un NAS, un commutateur ou un site web.
 
 Juste après la connexion, un court assistant peut vous guider. Chaque étape peut
 être passée et tout se change plus tard dans les **Réglages**. Utilisez
-**Continuer**, **Passer cette étape** ou **Passer la configuration**. Il couvre :
-le nom de l'instance, la langue et le fuseau horaire ; un agent ; vos premières
-surveillances ; un canal de notification ; une astreinte (facultatif) ; la
-connexion unique (facultatif) ; la durée de conservation des données. Vous le
-rouvrez depuis **Réglages → Système**.
+**Continuer**, **Passer cette étape** ou **Passer la configuration**.
+
+Il s'ouvre sur **Votre première alerte** : saisissez une adresse à surveiller
+(une URL, un hôte ou `hôte:port`), choisissez où vont les alertes en un clic
+(ntfy, Discord, Telegram, e-mail, webhook ou tout autre canal), puis **Envoyer
+une alerte de test**. Le moniteur est sondé aussitôt et le test prouve la chaîne
+de bout en bout, en deux minutes environ : voir [Première alerte en cinq
+minutes](quickstart.md). Les étapes suivantes couvrent le nom de l'instance, la
+langue et le fuseau horaire ; d'autres surveillances ; un agent ; une astreinte
+(facultatif) ; la connexion unique (facultatif) ; la durée de conservation des
+données. Vous le rouvrez depuis **Réglages → Système**.
 
 ## Les trois premières étapes {#the-three-first-steps}
 
@@ -211,9 +217,12 @@ configurer. Elles ne vous atteignent qu'une fois un canal créé.
    Discord, Telegram, PagerDuty, etc. Remplissez les champs demandés.
 3. Cliquez sur **Envoyer un test**. Le message doit arriver. Les règles
    intégrées notifient tous les canaux activés.
-4. Pour voir une vraie alerte, mettez l'appareil surveillé en pause ou
-   débranchez-le. Après le délai de la règle, l'alerte apparaît dans **Alertes →
-   Maintenant** et le canal reçoit le message.
+4. Pour voir une vraie alerte, arrêtez l'appareil surveillé ou débranchez-le
+   (mettre la surveillance en pause dans DumbMonit coupe aussi ses alertes).
+   Après le délai de la règle, l'alerte apparaît dans **Alertes → Maintenant** et
+   le canal reçoit le message : moins de 4 minutes pour un site, un ping ou un
+   port, moins de 4,5 minutes pour un appareil qui cesse de remonter (voir
+   [Quand arrive une vraie alerte ?](quickstart.md#quand-arrive-une-vraie-alerte)).
 
 Tous les types de canaux : [Notifications](../notifications.md). La page des
 alertes : [Alertes](../using/alerts.md).

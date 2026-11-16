@@ -15,7 +15,7 @@ ci-dessous est donc livrée activée sur chaque instance.
 
 | Règle | Quoi | Seuil par défaut | Maintien | Gravité | Rappel |
 |---|---|---|---|---|---|
-| Surveillance inaccessible | Aucune mesure reçue depuis plus de trois minutes. `time() - tlast_over_time(dumbmonit_up[7d])` | > 180 s | 1 min | Avertissement (`critical`) | 6 h |
+| Surveillance inaccessible | Aucune mesure reçue depuis plus de trois minutes. `time() - tlast_over_time(dumbmonit_up[7d])` | > 180 s | 30 s | Avertissement (`critical`) | 6 h |
 | CPU élevé | Charge CPU soutenue au-dessus de 90 %, moyennée par surveillance à travers les sources SNMP, Proxmox et agent ; se résout sous 85 %. | > 90 % | 10 min | Avis (`warning`), escalade après 1 h | 6 h |
 | CPU inhabituel | Charge CPU sensiblement différente de l'habituel à cette heure et ce jour de la semaine (référence saisonnière). | score > 3,5 | 15 min | Info (`info`) | 6 h |
 | Disque presque plein | Système de fichiers plein à 90 % ou plus, par point de montage (SNMP, stockages Proxmox et systèmes de fichiers racine) ; se résout sous 88 %. | ≥ 90 % | 15 min | Avis (`warning`), escalade après 24 h | 6 h |
@@ -54,7 +54,7 @@ livré avec une alimentation sur deux ne se déclenche donc jamais.
 
 | Règle | Quoi | Seuil par défaut | Maintien | Gravité | Rappel |
 |---|---|---|---|---|---|
-| Service en panne | Le service n'a pas répondu correctement depuis trois minutes (`dumbmonit_probe_success{probe!="push"} == bool 0`). | > 0 | 3 min | Avertissement (`critical`) | 30 min |
+| Service en panne | Le service n'a pas répondu correctement depuis deux minutes (`dumbmonit_probe_success{probe!="push"} == bool 0`). | > 0 | 2 min | Avertissement (`critical`) | 30 min |
 | Battement de cœur manqué | La tâche n'a pas appelé dans son intervalle attendu plus la période de grâce, ou a rapporté un échec elle-même (`dumbmonit_probe_success{probe="push"} == bool 0` ; le délai est réglé par surveillance, voir [Battement de cœur](../devices/push.md)). | > 0 | 2 min | Avis (`warning`) | 6 h |
 | Service instable | Le service a changé d'état plus de six fois en trente minutes (`changes(dumbmonit_probe_success{probe!="push"}[30m])`). | > 6 | 5 min | Avis (`warning`) | 1 h |
 | Service lent | Le service prend plus de trois secondes pour répondre. | > 3 s | 10 min | Avis (`warning`) | 6 h |

@@ -28,7 +28,7 @@ avaliar (histerese, substituições por monitor)
 | Horas de silêncio | Canal → Opções de entrega | desligado |
 | Filtro de roteamento (tags, tipo, regra) | Canal → Opções de entrega → *Apenas alguns alertas* | desligado (o canal ouve tudo) |
 | Escalonamento se ninguém reconhecer | Configurações → Notificações e relatórios → Política de notificação | desligado |
-| Janela de lote | Configurações → Notificações e relatórios → Política de notificação | 60 s |
+| Janela de lote | Configurações → Notificações e relatórios → Política de notificação | 30 s |
 | Mensagens por canal por hora | Configurações → Notificações e relatórios → Política de notificação | 20 |
 | URL pública (links profundos) | Configurações → Notificações e relatórios → Política de notificação, ou `DUMBMONIT_PUBLIC_URL` | vazia |
 

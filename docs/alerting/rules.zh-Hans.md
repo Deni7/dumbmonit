@@ -14,7 +14,7 @@
 
 | 规则 | 什么 | 默认阈值 | 保持 | 严重级别 | 提醒 |
 |---|---|---|---|---|---|
-| 监控项不可达 | 三分钟内没有收到测量。`time() - tlast_over_time(dumbmonit_up[7d])` | > 180 s | 1 分钟 | 警告 (`critical`) | 6 小时 |
+| 监控项不可达 | 三分钟内没有收到测量。`time() - tlast_over_time(dumbmonit_up[7d])` | > 180 s | 30 秒 | 警告 (`critical`) | 6 小时 |
 | CPU 高 | CPU 负载维持在 90% 以上,跨 SNMP、Proxmox 和代理源平均每个监控项;在 85% 下清除。 | > 90 % | 10 分钟 | 通知 (`warning`),1 小时后升级 | 6 小时 |
 | 异常 CPU | CPU 负载明显不同于通常在这个时间和星期几(季节基线)。 | 分数 > 3.5 | 15 分钟 | 信息 (`info`) | 6 小时 |
 | 磁盘即将满 | 文件系统 90% 或更多,每个挂载点(SNMP、Proxmox 存储和根文件系统);在 88% 下清除。 | ≥ 90 % | 15 分钟 | 通知 (`warning`),24 小时后升级 | 6 小时 |
@@ -51,7 +51,7 @@
 
 | 规则 | 什么 | 默认阈值 | 保持 | 严重级别 | 提醒 |
 |---|---|---|---|---|---|
-| 服务关闭 | 服务在三分钟内没有正确响应(`dumbmonit_probe_success{probe!="push"} == bool 0`)。 | > 0 | 3 分钟 | 警告 (`critical`) | 30 分钟 |
+| 服务关闭 | 服务在两分钟内没有正确响应(`dumbmonit_probe_success{probe!="push"} == bool 0`)。 | > 0 | 2 分钟 | 警告 (`critical`) | 30 分钟 |
 | 心跳错过 | 工作在其预期间隔加宽限期内没有调用,或报告了故障本身(`dumbmonit_probe_success{probe="push"} == bool 0`;延迟按监控项设置,见[心跳](../devices/push.md))。 | > 0 | 2 分钟 | 通知 (`warning`) | 6 小时 |
 | 服务飘动 | 服务在 30 分钟内改变状态超过 6 次(`changes(dumbmonit_probe_success{probe!="push"}[30m])`)。 | > 6 | 5 分钟 | 通知 (`warning`) | 1 小时 |
 | 缓慢服务 | 服务需要超过三秒来响应;失败的检查不计入(`dumbmonit_probe_duration_seconds and dumbmonit_probe_success == 1`)。 | > 3 秒 | 10 分钟 | 通知 (`warning`) | 6 小时 |

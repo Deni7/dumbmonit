@@ -14,6 +14,7 @@ pub mod config;
 pub mod crypto;
 pub mod db;
 pub mod demo;
+pub mod first_run;
 pub mod geoip;
 pub mod gitops;
 pub mod healthcheck;

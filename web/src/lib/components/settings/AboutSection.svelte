@@ -1,11 +1,15 @@
 <script lang="ts">
 	/**
 	 * Settings → About: version and the health of the two stores behind the
-	 * server. Polled every 15 s while the page is open.
+	 * server. Polled every 15 s while the page is open. Below, discreet, the
+	 * first-run stopwatch: when this instance passed each step of the road to
+	 * its first alert, kept on the instance only.
 	 */
 	import { BookOpen } from 'lucide-svelte';
 	import { m } from '#lib/paraglide/messages.js';
-	import { getHealth, type ComponentHealth, type Health } from '#lib/api/index.js';
+	import { getHealth, getOnboarding, type ComponentHealth, type FirstRunTimings, type Health } from '#lib/api/index.js';
+	import { formatDateTime, formatDuration, parseServerDate } from '#lib/format.js';
+	import { firstRunSteps } from '#lib/components/wizard/quickstart.js';
 	import { Button, ErrorNotice, Panel, Plate, Skeleton } from '#lib/ui/index.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import { upgradeNotes } from '#lib/stores/upgradenotes.svelte.js';
@@ -45,6 +49,27 @@
 	$effect(() => {
 		if (upgradeNotesShown) upgradeNotes.load({ quiet: true }).catch(() => {});
 	});
+
+	// The first-run stopwatch, read once: it only ever moves forward on a new step.
+	let firstRun = $state<FirstRunTimings | null>(null);
+	$effect(() => {
+		const controller = new AbortController();
+		getOnboarding(controller.signal)
+			.then((state) => (firstRun = state.first_run ?? null))
+			.catch(() => {});
+		return () => controller.abort();
+	});
+	const firstRunLines = $derived(firstRunSteps(firstRun, parseServerDate));
+	/** Seconds stay exact for the first ten minutes: that is the range the measure is about. */
+	const elapsedLabel = (seconds: number) => (seconds < 600 ? m.misc_dur_s({ n: seconds }) : formatDuration(seconds));
+	const FIRST_RUN_LABEL: Record<keyof FirstRunTimings, () => string> = {
+		first_boot_at: () => m.settings_about_first_run_boot(),
+		setup_at: () => m.settings_about_first_run_setup(),
+		first_target_at: () => m.settings_about_first_run_target(),
+		first_channel_at: () => m.settings_about_first_run_channel(),
+		first_notification_at: () => m.settings_about_first_run_notification(),
+		first_alert_at: () => m.settings_about_first_run_alert()
+	};
 
 	const COMPONENTS: { key: 'database' | 'victoria'; name: () => string; role: () => string }[] = [
 		{ key: 'database', name: () => m.settings_about_database(), role: () => m.settings_about_database_role() },
@@ -87,6 +112,22 @@
 	{/if}
 
 	<UpdateNotice onSeeWhatsNew={() => whatsNew.reopen()} />
+
+	{#if firstRunLines.length > 0}
+		<details class="mt-5 border-t border-line pt-4 text-sm" data-testid="first-run">
+			<summary class="flex min-h-10 cursor-pointer items-center font-semibold text-ink">{m.settings_about_first_run_title()}</summary>
+			<p class="mt-1 max-w-[65ch] text-ink-2">{m.settings_about_first_run_text()}</p>
+			<ol class="mt-3 grid gap-2">
+				{#each firstRunLines as line, i (line.key)}
+					<li class="grid gap-x-6 sm:grid-cols-[minmax(0,16rem)_8rem_minmax(0,1fr)]">
+						<span class="text-ink">{FIRST_RUN_LABEL[line.key]()}</span>
+						<span class="tnum text-ink-2">{i === 0 ? m.settings_about_first_run_start() : m.settings_about_first_run_after({ span: elapsedLabel(line.elapsed) })}</span>
+						<time class="tnum text-ink-3" datetime={line.at.toISOString()}>{formatDateTime(line.at)}</time>
+					</li>
+				{/each}
+			</ol>
+		</details>
+	{/if}
 
 	{#if upgradeNotesShown && upgradeNotes.overview}
 		<div class="mt-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-t border-line pt-4 text-sm" data-testid="upgrade-notes-link">

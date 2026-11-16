@@ -29,7 +29,7 @@ evaluate (hysteresis, per-monitor overrides)
 | Ruhezeiten | Kanal → Delivery options | aus |
 | Routing-Filter (Tags, Art, Regel) | Kanal → Delivery options → *Only some alerts* | aus (der Kanal hört alles) |
 | Eskalation, falls niemand bestätigt | Settings → Notifications & reports → Notification policy | aus |
-| Bündelungsfenster | Settings → Notifications & reports → Notification policy | 60 s |
+| Bündelungsfenster | Settings → Notifications & reports → Notification policy | 30 s |
 | Nachrichten pro Kanal und Stunde | Settings → Notifications & reports → Notification policy | 20 |
 | Öffentliche URL (Deep Links) | Settings → Notifications & reports → Notification policy, oder `DUMBMONIT_PUBLIC_URL` | leer |
 

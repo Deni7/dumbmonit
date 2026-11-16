@@ -181,7 +181,7 @@ ordine:
    passano; il resto attende un digest quando le ore silenziose
    terminano (un avviso che si azzera nel frattempo viene solo
    menzionato come "resolved during quiet hours").
-9. **Batching** — gli avvisi entro la finestra di batch (60 s per
+9. **Batching** — gli avvisi entro la finestra di batch (30 s per
    impostazione predefinita) uscono come un messaggio per canale: "3
    alerts on 2 devices, 1 resolved".
 10. **Limite orario** — oltre `max_per_hour` messaggi su un canale, gli
