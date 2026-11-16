@@ -315,12 +315,9 @@ fn assign(waves: &[Wave], members: &[Member]) -> Vec<Vec<usize>> {
     }
     for (k, wave) in waves.iter().enumerate() {
         let picked: Vec<usize> = match wave {
-            Wave::Count { value } => order
-                .iter()
-                .copied()
-                .filter(|&index| !taken[index])
-                .take(*value as usize)
-                .collect(),
+            Wave::Count { value } => {
+                order.iter().copied().filter(|&index| !taken[index]).take(*value as usize).collect()
+            }
             Wave::Percent { value } => {
                 let wanted = (members.len() * *value as usize).div_ceil(100);
                 let need = wanted.saturating_sub(total_taken);

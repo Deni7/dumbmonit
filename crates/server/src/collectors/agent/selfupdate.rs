@@ -1319,11 +1319,8 @@ mod tests {
 
     #[test]
     fn waves_pause_and_halt_hold_the_offer_unless_asked() {
-        let cases = [
-            (Gate::Wave, "waiting_wave"),
-            (Gate::Paused, "paused"),
-            (Gate::Halted, "halted"),
-        ];
+        let cases =
+            [(Gate::Wave, "waiting_wave"), (Gate::Paused, "paused"), (Gate::Halted, "halted")];
         for (gate, status) in cases {
             let verdict = decide(&Settings::default(), &host(), &gate);
             assert_eq!((verdict.status, verdict.offer), (status, false));
