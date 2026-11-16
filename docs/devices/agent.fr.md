@@ -566,6 +566,31 @@ manuel, attend la fenêtre, attend les canaris, plus récent que le serveur,
 ancien, conteneur, lecture seule, désactivé localement, non pris en charge,
 aucun binaire.
 
+### Déploiement par vagues {#automatic-updates-waves}
+
+Par défaut, les agents marqués **canari** se mettent à jour en premier et les autres suivent (voir le tableau ci-dessus) : rien à configurer pour un homelab. Pour un parc plus important, **Réglages → Agents → Mises à jour automatiques des agents → Déploiement → Vagues de déploiement** ordonne le parc en vagues successives. Les mêmes réglages existent via `PUT /api/agent/updates/rollout`, `POST /api/agent/updates/rollout/pause` et `POST /api/agent/updates/rollout/resume`.
+
+Chaque vague prend des agents parmi ceux que les vagues précédentes n'ont pas pris :
+
+| Vague | Prend |
+|---|---|
+| Un nombre d'agents | Autant d'agents de plus : un canari d'une ou deux machines. |
+| Part du parc (%) | Assez d'agents pour que les vagues jusqu'ici couvrent cette part (cumulatif : 5, puis 25, puis 100). Ce sont toujours les mêmes agents qui passent en premier. |
+| Site | Les agents qui déclarent ce site (`site` dans la configuration de l'agent). |
+| Dossier | Les agents dont l'équipement est dans ce dossier de la page Équipements. |
+| Étiquette | Les agents dont l'équipement porte cette étiquette, avec cette valeur si elle est donnée. |
+
+Les agents qu'aucune vague ne prend forment une dernière vague. Les agents marqués **canari** sont toujours dans la première. Les noms se comparent sans tenir compte de la casse.
+
+- Une vague s'ouvre quand la précédente n'a plus d'agent à mettre à jour et que son dernier agent exécute le nouveau build depuis le **délai entre les vagues** (60 minutes par défaut). Une vague vide est sautée.
+- **Arrêt automatique** : si, dans une vague, la part des agents en échec (échec, retour arrière ou refus) parmi ceux qui ont tenté la mise à jour atteint le seuil (20 % par défaut, 0 : ne jamais s'arrêter), plus aucun agent ne reçoit d'offre automatique et leur état indique *Arrêté*. La page dit dans quelle vague. **Reprendre le déploiement** pardonne les échecs déjà rapportés, pour que l'arrêt ne se redéclenche pas aussitôt ; les agents en échec gardent leur version jusqu'à **Mettre à jour maintenant**.
+- **Pause** : *Mettre le déploiement en pause* retient toutes les offres automatiques jusqu'à *Reprendre le déploiement*.
+- **Épingler une version** : un agent dont les mises à jour sont sur *Off* (réglage par agent) n'est dans aucune vague et garde sa version.
+- **Mettre à jour maintenant** et **Tout mettre à jour maintenant** ignorent les vagues, la pause et l'arrêt.
+- Les agents qu'on n'a pas vus depuis une semaine sont écartés des vagues : une machine retirée ne bloque jamais le déploiement.
+- Rien ne change côté agent : les agents rapportent déjà l'issue de chaque tentative (version, succès, échec, retour arrière) à chaque lot. Sans vague configurée, le déploiement est exactement celui décrit plus haut.
+- Les vagues, le délai, le seuil et la pause font partie de la [sauvegarde](../install/backup.md).
+
 ### Sécurité {#automatic-updates-security}
 
 - **Intégrité** : le SHA-256 vient du serveur.

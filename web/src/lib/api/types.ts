@@ -6480,6 +6480,12 @@ export type AgentUpdateStatus =
 	| 'manual'
 	| 'waiting_window'
 	| 'waiting_canary'
+	/** Rollout waves: its wave is not open yet. */
+	| 'waiting_wave'
+	/** The rollout is paused. */
+	| 'paused'
+	/** The rollout stopped: too many agents failed in a wave. */
+	| 'halted'
 	| 'newer'
 	| 'legacy'
 	| 'container'
@@ -6489,6 +6495,44 @@ export type AgentUpdateStatus =
 	| 'no_binary'
 	/** The shipped build has no signature and unsigned builds are not accepted. */
 	| 'unsigned';
+/** One rollout wave: how it picks agents among those the previous waves left. */
+export type AgentUpdateWave =
+	| { by: 'count'; value: number }
+	/** Cumulative: enough agents for the waves so far to cover this share of the fleet. */
+	| { by: 'percent'; value: number }
+	| { by: 'site'; value: string }
+	/** The folder of the device. */
+	| { by: 'group'; value: string }
+	| { by: 'tag'; key: string; value?: string | null };
+export interface AgentUpdateWaveView {
+	/** `null`: the implicit last wave, every agent the others did not take. */
+	select: AgentUpdateWave | null;
+	members: number;
+	updated: number;
+	failed: number;
+	state: 'done' | 'active' | 'waiting' | 'upcoming';
+}
+export interface AgentUpdateRolloutPolicy {
+	waves: AgentUpdateWave[];
+	delay_minutes: number;
+	/** Share of failed agents in a wave that stops the rollout; 0 never stops. */
+	max_failure_percent: number;
+}
+export interface AgentUpdateRollout {
+	canaries: number;
+	canaries_updated: number;
+	open: boolean;
+	reason: string | null;
+	policy: AgentUpdateRolloutPolicy;
+	paused: boolean;
+	halted: { wave: number; failed: number; attempted: number } | null;
+	/** Empty without waves (canary agents first). */
+	waves: AgentUpdateWaveView[];
+	/** Rank, from 1, of the wave being updated. */
+	current_wave: number | null;
+	/** UTC, no suffix; only when the delay alone holds the next wave back. */
+	next_wave_at: string | null;
+}
 export interface AgentUpdateOutcome {
 	outcome: 'succeeded' | 'failed' | 'rolled_back' | 'refused';
 	version: string | null;
@@ -6506,6 +6550,8 @@ export interface AgentUpdateAgent {
 	enabled: boolean | null;
 	canary: boolean;
 	requested: boolean;
+	/** Rank, from 1, of its rollout wave; `null` without waves. */
+	wave: number | null;
 	status: AgentUpdateStatus;
 	reason: string | null;
 	last: AgentUpdateOutcome | null;
@@ -6519,7 +6565,7 @@ export interface AgentUpdates {
 	/** Updates are blocked: a shipped build is unsigned and unsigned builds are not accepted. */
 	blocked_unsigned: boolean;
 	binaries: { platform: string; sha256: string; signed: boolean }[];
-	rollout: { canaries: number; canaries_updated: number; open: boolean; reason: string | null };
+	rollout: AgentUpdateRollout;
 	agents: AgentUpdateAgent[];
 }
 

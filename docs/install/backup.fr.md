@@ -74,6 +74,7 @@ récupération** : un paquet dont la phrase de passe est perdue est perdu.
 | `incidents` | Incidents et annonces de maintenance, avec leurs mises à jour. |
 | `users` | Comptes : nom d'utilisateur, nom d'affichage, rôle, lien SSO, activé ou non. |
 | `agent_tokens` | Jetons d'enrôlement d'agent, comme des hashs. Les agents installés continuent d'envoyer après une restauration. |
+| `agent_update_rollout` | Les vagues de déploiement des mises à jour automatiques des agents : vagues, délai, seuil d'échec et pause. |
 | `api_tokens` | Jetons d'API, comme des hashs. Les jetons existants continuent de fonctionner. |
 | `push_monitors` | Jetons de battement de cœur, pour que les URL que vos tâches cron appellent déjà restent les mêmes. |
 | `locations` | Emplacements de la carte du monde (nom, adresse, endroit, site) ; chaque moniteur garde son emplacement. |

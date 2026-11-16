@@ -776,6 +776,31 @@ sin nada que abrir del lado remoto.
 Cómo configurarlo, paso a paso, está en [Monitorizar un sitio
 remoto](../install/remote-site.md).
 
+## Despliegue de las actualizaciones del agente por oleadas {#automatic-updates-waves}
+
+Los agentes se actualizan solos: el servidor ofrece su propio binario firmado. Por defecto, los agentes marcados como **canario** se actualizan primero y los demás les siguen: no hay nada que configurar en un homelab. Para una flota mayor, **Ajustes → Agentes → Actualizaciones de agentes → Despliegue → Oleadas de despliegue** ordena la flota en oleadas sucesivas. Los mismos ajustes existen en `PUT /api/agent/updates/rollout`, `POST /api/agent/updates/rollout/pause` y `POST /api/agent/updates/rollout/resume`.
+
+Cada oleada toma agentes entre los que las oleadas anteriores no tomaron:
+
+| Oleada | Toma |
+|---|---|
+| Un número de agentes | Tantos agentes más: un canario de una o dos máquinas. |
+| Parte de la flota (%) | Los agentes necesarios para que las oleadas hasta ahora cubran esa parte (acumulativo: 5, luego 25, luego 100). Siempre pasan primero los mismos agentes. |
+| Sitio | Los agentes que declaran este sitio (`site` en la configuración del agente). |
+| Carpeta | Los agentes cuyo equipo está en esta carpeta de la página de equipos. |
+| Etiqueta | Los agentes cuyo equipo lleva esta etiqueta, con este valor si se indica. |
+
+Los agentes que ninguna oleada toma forman una última oleada. Los agentes marcados como **canario** están siempre en la primera. Los nombres se comparan sin distinguir mayúsculas de minúsculas.
+
+- Una oleada se abre cuando la anterior no tiene ya agentes por actualizar y su último agente ejecuta el nuevo build desde hace la **espera entre oleadas** (60 minutos por defecto). Una oleada vacía se omite.
+- **Parada automática**: si, en una oleada, la parte de agentes que fallaron (fallo, retroceso o rechazo) entre los que lo intentaron alcanza el umbral (20 % por defecto, 0 no se detiene nunca), ningún agente recibe ya ofertas automáticas y su estado indica *Detenido*. La página dice en qué oleada. **Reanudar el despliegue** perdona los fallos ya notificados para que la parada no vuelva a saltar enseguida; los agentes que fallaron conservan su versión hasta **Actualizar ahora**.
+- **Pausa**: *Pausar el despliegue* retiene todas las ofertas automáticas hasta *Reanudar el despliegue*.
+- **Fijar una versión**: un agente con las actualizaciones en *Desactivadas* (ajuste por agente) no está en ninguna oleada y conserva su versión.
+- **Actualizar ahora** y **Actualizar todos ahora** ignoran las oleadas, la pausa y la parada.
+- Los agentes no vistos desde hace una semana quedan fuera de las oleadas: una máquina retirada nunca bloquea el despliegue.
+- Nada cambia en el agente: los agentes ya notifican el resultado de cada intento (versión, éxito, fallo, retroceso) en cada envío. Sin oleadas configuradas, el despliegue es el de siempre.
+- Las oleadas, la espera, el umbral y la pausa forman parte de la copia de seguridad.
+
 ## Vinculación: una máquina, un agente {#binding-one-machine-one-agent}
 
 Un token de inscripción dice *esta máquina puede hablar*. No dice

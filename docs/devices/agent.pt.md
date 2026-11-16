@@ -685,6 +685,31 @@ no único DumbMonit que já tem, sem VPN e sem nada a abrir do lado remoto.
 Como o configurar, passo a passo, está em
 [Monitorizar um site remoto](../install/remote-site.md).
 
+## Implementação das atualizações do agente por vagas {#automatic-updates-waves}
+
+Os agentes atualizam-se sozinhos: o servidor oferece o seu próprio binário assinado. Por omissão, os agentes marcados como **canário** atualizam-se primeiro e os restantes seguem-nos: num homelab não há nada a configurar. Para uma frota maior, **Definições → Agentes → Atualizações dos agentes → Implementação → Vagas de implementação** ordena a frota em vagas sucessivas. As mesmas definições existem em `PUT /api/agent/updates/rollout`, `POST /api/agent/updates/rollout/pause` e `POST /api/agent/updates/rollout/resume`.
+
+Cada vaga escolhe agentes entre os que as vagas anteriores não escolheram:
+
+| Vaga | Escolhe |
+|---|---|
+| Um número de agentes | Esse número de agentes a mais: um canário de uma ou duas máquinas. |
+| Parte da frota (%) | Os agentes necessários para que as vagas até aqui cubram essa parte (cumulativo: 5, depois 25, depois 100). Passam sempre primeiro os mesmos agentes. |
+| Site | Os agentes que declaram este site (`site` na configuração do agente). |
+| Pasta | Os agentes cujo equipamento está nesta pasta da página de equipamentos. |
+| Etiqueta | Os agentes cujo equipamento tem esta etiqueta, com este valor se indicado. |
+
+Os agentes que nenhuma vaga escolhe formam uma última vaga. Os agentes marcados como **canário** estão sempre na primeira. Os nomes comparam-se sem distinguir maiúsculas de minúsculas.
+
+- Uma vaga abre quando a anterior já não tem agentes por atualizar e o seu último agente executa a nova versão há pelo menos a **espera entre vagas** (60 minutos por omissão). Uma vaga vazia é ignorada.
+- **Paragem automática**: se, numa vaga, a parte de agentes que falharam (falha, reversão ou recusa) entre os que tentaram atingir o limite (20 % por omissão, 0 nunca pára), nenhum agente recebe mais ofertas automáticas e o seu estado indica *Parado*. A página diz em que vaga. **Retomar a implementação** perdoa as falhas já comunicadas, para que a paragem não volte a disparar de imediato; os agentes que falharam mantêm a versão até **Atualizar agora**.
+- **Pausa**: *Pausar a implementação* retém todas as ofertas automáticas até *Retomar a implementação*.
+- **Fixar uma versão**: um agente com as atualizações em *Desativadas* (definição por agente) não está em nenhuma vaga e mantém a versão.
+- **Atualizar agora** e **Atualizar todos agora** ignoram as vagas, a pausa e a paragem.
+- Os agentes não vistos há uma semana ficam fora das vagas: uma máquina desativada nunca bloqueia a implementação.
+- Nada muda no agente: os agentes já comunicam o resultado de cada tentativa (versão, sucesso, falha, reversão) em cada envio. Sem vagas configuradas, a implementação é a de sempre.
+- As vagas, a espera, o limite e a pausa fazem parte da cópia de segurança.
+
 ## Associação: uma máquina, um agente {#binding-one-machine-one-agent}
 
 Um token de registo diz *esta máquina tem permissão para falar*. Não diz *qual*

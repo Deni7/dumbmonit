@@ -2,11 +2,21 @@
 	/**
 	 * Settings → Agents → Agent updates: the DumbMonit agent updating its own
 	 * binary (not the Docker container `auto_update` policies). Global switches,
-	 * the rollout (canaries first), then one card per agent. Administrators only.
+	 * the rollout (canaries first, or ordered waves with a pause and an automatic
+	 * stop on failures), then one card per agent. Administrators only.
 	 */
 	import { m } from '#lib/paraglide/messages.js';
-	import { getAgentUpdates, setAgentUpdatePolicy, setAgentUpdateSettings, updateAgentNow, updateAllAgentsNow } from '#lib/api/agent_updates.js';
-	import type { AgentUpdateAgent, AgentUpdates, AgentUpdateSettings, AgentUpdateStatus } from '#lib/api/types.js';
+	import {
+		getAgentUpdates,
+		pauseAgentUpdateRollout,
+		resumeAgentUpdateRollout,
+		setAgentUpdatePolicy,
+		setAgentUpdateRollout,
+		setAgentUpdateSettings,
+		updateAgentNow,
+		updateAllAgentsNow
+	} from '#lib/api/agent_updates.js';
+	import type { AgentUpdateAgent, AgentUpdates, AgentUpdateSettings, AgentUpdateStatus, AgentUpdateWave } from '#lib/api/types.js';
 	import { formatDateTime } from '#lib/format.js';
 	import { ShieldAlert } from 'lucide-svelte';
 	import { Button, Confirm, Disclosure, DocLink, ErrorNotice, Plate, Skeleton, Toggle, type Tone } from '#lib/ui/index.js';
@@ -17,11 +27,35 @@
 	let error = $state<unknown>(null);
 	let busy = $state(false);
 	let open = $state(false);
+	let wavesOpen = $state(false);
 	let canaryInput = $state('0');
+
+	// Wave editor: what is typed stays until saved, whatever else the page refreshes.
+	type WaveKind = 'count' | 'percent' | 'site' | 'group' | 'tag';
+	interface DraftWave {
+		kind: WaveKind;
+		value: string;
+		key: string;
+	}
+	let draft = $state<DraftWave[]>([]);
+	let delayInput = $state('60');
+	let thresholdInput = $state('20');
+	let wavesDirty = $state(false);
+	let wavesInvalid = $state(false);
+
+	function draftOf(wave: AgentUpdateWave): DraftWave {
+		if (wave.by === 'tag') return { kind: 'tag', key: wave.key, value: wave.value ?? '' };
+		return { kind: wave.by, key: '', value: String(wave.value) };
+	}
 
 	function adopt(next: AgentUpdates) {
 		data = next;
 		canaryInput = String(next.settings.canary_minutes);
+		if (!wavesDirty) {
+			draft = next.rollout.policy.waves.map(draftOf);
+			delayInput = String(next.rollout.policy.delay_minutes);
+			thresholdInput = String(next.rollout.policy.max_failure_percent);
+		}
 	}
 
 	$effect(() => {
@@ -62,6 +96,90 @@
 
 	const unsignedBuild = $derived(data?.binaries.some((b) => !b.signed) ?? false);
 
+	function touch() {
+		wavesDirty = true;
+		wavesInvalid = false;
+	}
+	function addWave() {
+		draft.push({ kind: 'percent', value: '', key: '' });
+		touch();
+	}
+	function removeWave(index: number) {
+		draft = draft.filter((_, k) => k !== index);
+		touch();
+	}
+	function moveWave(index: number, by: -1 | 1) {
+		const target = index + by;
+		if (target < 0 || target >= draft.length) return;
+		const next = [...draft];
+		[next[index], next[target]] = [next[target], next[index]];
+		draft = next;
+		touch();
+	}
+	function waveOf(item: DraftWave): AgentUpdateWave | null {
+		// A number input binds a number (or null when empty), not the string typed.
+		const value = String(item.value ?? '').trim();
+		if (item.kind === 'site' || item.kind === 'group') return value ? { by: item.kind, value } : null;
+		if (item.kind === 'tag') {
+			const key = item.key.trim();
+			return key ? { by: 'tag', key, value: value || null } : null;
+		}
+		const count = Math.round(Number(value));
+		if (!value || !Number.isFinite(count) || count < 1) return null;
+		return item.kind === 'count' ? { by: 'count', value: count } : { by: 'percent', value: count };
+	}
+	function saveWaves() {
+		const waves: AgentUpdateWave[] = [];
+		for (const item of draft) {
+			const wave = waveOf(item);
+			if (!wave) {
+				wavesInvalid = true;
+				return;
+			}
+			waves.push(wave);
+		}
+		const delay = Math.round(Number(delayInput));
+		const threshold = Math.round(Number(thresholdInput));
+		if (!Number.isFinite(delay) || delay < 0 || delay > 10080 || !Number.isFinite(threshold) || threshold < 0 || threshold > 100) {
+			wavesInvalid = true;
+			return;
+		}
+		wavesInvalid = false;
+		void act(async () => {
+			const next = await setAgentUpdateRollout({ waves, delay_minutes: delay, max_failure_percent: threshold });
+			wavesDirty = false;
+			return next;
+		});
+	}
+
+	function waveLabel(select: AgentUpdateWave | null): string {
+		if (!select) return m.settings_agentupdates_wave_select_rest();
+		switch (select.by) {
+			case 'count':
+				return m.settings_agentupdates_wave_select_count({ count: select.value });
+			case 'percent':
+				return m.settings_agentupdates_wave_select_percent({ percent: select.value });
+			case 'site':
+				return m.settings_agentupdates_wave_select_site({ name: select.value });
+			case 'group':
+				return m.settings_agentupdates_wave_select_group({ name: select.value });
+			case 'tag':
+				return m.settings_agentupdates_wave_select_tag({ tag: select.value ? `${select.key}=${select.value}` : select.key });
+		}
+	}
+	const KIND_LABEL: Record<WaveKind, () => string> = {
+		count: m.settings_agentupdates_waves_kind_count,
+		percent: m.settings_agentupdates_waves_kind_percent,
+		site: m.settings_agentupdates_waves_kind_site,
+		group: m.settings_agentupdates_waves_kind_group,
+		tag: m.settings_agentupdates_waves_kind_tag
+	};
+	const KINDS: WaveKind[] = ['count', 'percent', 'site', 'group', 'tag'];
+
+	const currentWave = $derived(data && data.rollout.current_wave !== null ? data.rollout.waves[data.rollout.current_wave - 1] : undefined);
+	/** The wave that only waits for its delay, when no wave is being updated. */
+	const nextWave = $derived(data ? data.rollout.waves.findIndex((wave) => wave.state === 'waiting') + 1 : 0);
+
 	const TONE: Record<AgentUpdateStatus, Tone> = {
 		up_to_date: 'signal',
 		pending: 'info',
@@ -72,6 +190,9 @@
 		manual: 'ghost',
 		waiting_window: 'ghost',
 		waiting_canary: 'ghost',
+		waiting_wave: 'ghost',
+		paused: 'advisory',
+		halted: 'warning',
 		newer: 'ghost',
 		legacy: 'ghost',
 		container: 'ghost',
@@ -91,6 +212,9 @@
 		manual: m.settings_agentupdates_status_manual,
 		waiting_window: m.settings_agentupdates_status_waiting_window,
 		waiting_canary: m.settings_agentupdates_status_waiting_canary,
+		waiting_wave: m.settings_agentupdates_status_waiting_wave,
+		paused: m.settings_agentupdates_status_paused,
+		halted: m.settings_agentupdates_status_halted,
 		newer: m.settings_agentupdates_status_newer,
 		legacy: m.settings_agentupdates_status_legacy,
 		container: m.settings_agentupdates_status_container,
@@ -110,6 +234,9 @@
 		manual: m.settings_agentupdates_hint_manual,
 		waiting_window: m.settings_agentupdates_hint_waiting_window,
 		waiting_canary: m.settings_agentupdates_hint_waiting_canary,
+		waiting_wave: m.settings_agentupdates_hint_waiting_wave,
+		paused: m.settings_agentupdates_hint_paused,
+		halted: m.settings_agentupdates_hint_halted,
 		newer: m.settings_agentupdates_hint_newer,
 		legacy: m.settings_agentupdates_hint_legacy,
 		container: m.settings_agentupdates_hint_container,
@@ -172,10 +299,12 @@
 							<option value="manual">{m.settings_agentupdates_window_manual()}</option>
 						</select>
 					</div>
-					<div class="grid content-start gap-1.5">
-						<label for="agent-upd-canary" class="text-sm font-semibold text-ink">{m.settings_agentupdates_canary_minutes()}</label>
-						<input id="agent-upd-canary" type="number" inputmode="numeric" min="0" max="10080" step="1" class="input tnum" disabled={busy} bind:value={canaryInput} onchange={saveCanary} />
-					</div>
+					{#if data.rollout.waves.length === 0}
+						<div class="grid content-start gap-1.5">
+							<label for="agent-upd-canary" class="text-sm font-semibold text-ink">{m.settings_agentupdates_canary_minutes()}</label>
+							<input id="agent-upd-canary" type="number" inputmode="numeric" min="0" max="10080" step="1" class="input tnum" disabled={busy} bind:value={canaryInput} onchange={saveCanary} />
+						</div>
+					{/if}
 				</div>
 
 				<div class="rounded-[var(--radius-card)] border border-warning/50 bg-warning-soft px-3 py-3">
@@ -200,17 +329,113 @@
 				</div>
 
 				<div class="grid gap-2 rounded-[var(--radius-card)] border border-line bg-surface-2 px-3 py-3">
-					<h4 class="text-sm font-semibold text-ink">{m.settings_agentupdates_rollout_title()}</h4>
-					<p class="tnum text-sm text-ink-2">
-						{m.settings_agentupdates_rollout_canaries({ updated: data.rollout.canaries_updated, total: data.rollout.canaries })}
-					</p>
-					<p class="text-sm text-ink-2">{data.rollout.open ? m.settings_agentupdates_rollout_open() : m.settings_agentupdates_rollout_held()}</p>
-					{#if data.rollout.reason}<p class="text-sm text-ink-2">{data.rollout.reason}</p>{/if}
-					<div>
+					<div class="flex flex-wrap items-center justify-between gap-2">
+						<h4 class="text-sm font-semibold text-ink">{m.settings_agentupdates_rollout_title()}</h4>
+						{#if data.rollout.paused}
+							<Plate tone="advisory" label={m.settings_agentupdates_status_paused()} />
+						{:else if data.rollout.halted}
+							<Plate tone="warning" label={m.settings_agentupdates_status_halted()} />
+						{/if}
+					</div>
+					{#if data.rollout.waves.length === 0}
+						<p class="tnum text-sm text-ink-2">
+							{m.settings_agentupdates_rollout_canaries({ updated: data.rollout.canaries_updated, total: data.rollout.canaries })}
+						</p>
+						<p class="text-sm text-ink-2">{data.rollout.open ? m.settings_agentupdates_rollout_open() : m.settings_agentupdates_rollout_held()}</p>
+						{#if data.rollout.reason}<p class="text-sm text-ink-2">{data.rollout.reason}</p>{/if}
+					{:else}
+						{#if currentWave && data.rollout.current_wave !== null}
+							<p class="tnum text-sm text-ink-2">
+								{m.settings_agentupdates_wave_current({
+									current: data.rollout.current_wave,
+									total: data.rollout.waves.length,
+									what: waveLabel(currentWave.select),
+									updated: currentWave.updated,
+									members: currentWave.members
+								})}
+							</p>
+						{:else if data.rollout.next_wave_at && nextWave > 0}
+							<p class="tnum text-sm text-ink-2">{m.settings_agentupdates_wave_next({ wave: nextWave, date: formatDateTime(data.rollout.next_wave_at) })}</p>
+						{:else}
+							<p class="text-sm text-ink-2">{m.settings_agentupdates_wave_done()}</p>
+						{/if}
+						{#if data.rollout.halted}
+							<p class="tnum max-w-prose text-sm font-semibold text-warning-ink">
+								{m.settings_agentupdates_wave_halted({ wave: data.rollout.halted.wave, failed: data.rollout.halted.failed, attempted: data.rollout.halted.attempted })}
+							</p>
+						{/if}
+					{/if}
+					<div class="flex flex-wrap items-center gap-2">
+						{#if data.rollout.paused || data.rollout.halted}
+							<Button variant="secondary" size="sm" disabled={busy} onclick={() => act(resumeAgentUpdateRollout)}>{m.settings_agentupdates_resume()}</Button>
+						{:else}
+							<Button variant="secondary" size="sm" disabled={busy} onclick={() => act(pauseAgentUpdateRollout)}>{m.settings_agentupdates_pause()}</Button>
+						{/if}
 						<Confirm variant="secondary" size="sm" confirmLabel={m.settings_agentupdates_update_all_confirm()} loading={busy} disabled={data.agents.length === 0} onconfirm={() => act(updateAllAgentsNow)}>
 							{m.settings_agentupdates_update_all()}
 						</Confirm>
 					</div>
+
+					<Disclosure title={m.settings_agentupdates_waves_title()} bind:open={wavesOpen} class="mt-1">
+						<div class="grid gap-3">
+							<p class="max-w-prose text-sm text-ink-2">{m.settings_agentupdates_waves_hint()}</p>
+							{#if draft.length === 0}
+								<p class="text-sm text-ink-2">{m.settings_agentupdates_waves_empty()}</p>
+							{/if}
+							<ol class="grid gap-3">
+								{#each draft as item, index (index)}
+									<li class="grid gap-2 rounded-[var(--radius-card)] border border-line p-3">
+										<div class="grid gap-2 sm:grid-cols-2">
+											<label class="grid gap-1 text-sm font-semibold text-ink">
+												<span>{m.settings_agentupdates_waves_kind({ wave: index + 1 })}</span>
+												<select class="input" disabled={busy} bind:value={item.kind} onchange={touch}>
+													{#each KINDS as kind (kind)}
+														<option value={kind}>{KIND_LABEL[kind]()}</option>
+													{/each}
+												</select>
+											</label>
+											{#if item.kind === 'tag'}
+												<label class="grid gap-1 text-sm font-semibold text-ink">
+													<span>{m.settings_agentupdates_waves_tag_key()}</span>
+													<input type="text" maxlength="80" class="input" disabled={busy} bind:value={item.key} oninput={touch} />
+												</label>
+											{/if}
+											<label class="grid gap-1 text-sm font-semibold text-ink">
+												<span>{item.kind === 'tag' ? m.settings_agentupdates_waves_tag_value() : m.settings_agentupdates_waves_value()}</span>
+												{#if item.kind === 'count' || item.kind === 'percent'}
+													<input type="number" inputmode="numeric" min="1" max={item.kind === 'percent' ? 100 : 100000} step="1" class="input tnum" disabled={busy} bind:value={item.value} oninput={touch} />
+												{:else}
+													<input type="text" maxlength="80" class="input" disabled={busy} bind:value={item.value} oninput={touch} />
+												{/if}
+											</label>
+										</div>
+										<div class="flex flex-wrap items-center gap-2">
+											<Button variant="ghost" size="sm" disabled={busy || index === 0} onclick={() => moveWave(index, -1)}>{m.settings_agentupdates_waves_up()}</Button>
+											<Button variant="ghost" size="sm" disabled={busy || index === draft.length - 1} onclick={() => moveWave(index, 1)}>{m.settings_agentupdates_waves_down()}</Button>
+											<Button variant="ghost" size="sm" disabled={busy} onclick={() => removeWave(index)}>{m.settings_agentupdates_waves_remove()}</Button>
+										</div>
+									</li>
+								{/each}
+							</ol>
+							<div>
+								<Button variant="secondary" size="sm" disabled={busy || draft.length >= 20} onclick={addWave}>{m.settings_agentupdates_waves_add()}</Button>
+							</div>
+							<div class="grid gap-4 sm:grid-cols-2">
+								<div class="grid content-start gap-1.5">
+									<label for="agent-upd-delay" class="text-sm font-semibold text-ink">{m.settings_agentupdates_waves_delay()}</label>
+									<input id="agent-upd-delay" type="number" inputmode="numeric" min="0" max="10080" step="1" class="input tnum" disabled={busy} bind:value={delayInput} oninput={touch} />
+								</div>
+								<div class="grid content-start gap-1.5">
+									<label for="agent-upd-threshold" class="text-sm font-semibold text-ink">{m.settings_agentupdates_waves_threshold()}</label>
+									<input id="agent-upd-threshold" type="number" inputmode="numeric" min="0" max="100" step="1" class="input tnum" disabled={busy} bind:value={thresholdInput} oninput={touch} />
+								</div>
+							</div>
+							{#if wavesInvalid}<p role="alert" class="text-sm font-semibold text-warning-ink">{m.settings_agentupdates_waves_invalid()}</p>{/if}
+							<div>
+								<Button variant="primary" size="sm" disabled={busy || !wavesDirty} onclick={saveWaves}>{m.settings_agentupdates_waves_save()}</Button>
+							</div>
+						</div>
+					</Disclosure>
 				</div>
 
 				<div>
@@ -226,7 +451,7 @@
 											<p class="truncate font-semibold text-ink">{agent.name}</p>
 											{#if agent.hostname && agent.hostname !== agent.name}<p class="truncate text-sm text-ink-2">{agent.hostname}</p>{/if}
 											<p class="tnum text-sm text-ink-2">
-												{m.settings_agentupdates_version({ version: agent.version })}{#if agent.platform} · {agent.platform}{/if}
+												{m.settings_agentupdates_version({ version: agent.version })}{#if agent.platform} · {agent.platform}{/if}{#if agent.wave !== null} · {m.settings_agentupdates_wave_agent({ wave: agent.wave })}{/if}
 											</p>
 										</div>
 										<Plate tone={TONE[agent.status]} label={LABEL[agent.status]()} />

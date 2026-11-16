@@ -107,6 +107,9 @@ pub async fn collect(pool: &SqlitePool, cipher: &Cipher, options: ExportOptions)
             settings if settings.place.is_some() => Some(serde_json::to_value(settings)?),
             _ => None,
         },
+        agent_update_rollout: Some(serde_json::to_value(
+            crate::collectors::agent::rollout::load(pool).await?,
+        )?),
     })
 }
 

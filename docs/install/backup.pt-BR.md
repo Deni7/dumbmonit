@@ -72,6 +72,7 @@ pacote cuja frase secreta se perde está perdido.
 | `incidents` | Incidentes e anúncios de manutenção, com suas atualizações. |
 | `users` | Contas: nome de usuário, nome de exibição, papel, link SSO, ativado ou não. |
 | `agent_tokens` | Tokens de cadastro de agente, como hashes. Agentes instalados continuam enviando depois de uma restauração. |
+| `agent_update_rollout` | As ondas de implantação das atualizações automáticas dos agentes: ondas, espera, limite de falhas e pausa. |
 | `api_tokens` | Tokens de API, como hashes. Tokens existentes continuam funcionando. |
 | `push_monitors` | Tokens de heartbeat, então as URLs que seus jobs cron já chamam permanecem as mesmas. |
 

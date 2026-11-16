@@ -757,6 +757,31 @@ abrir do lado remoto.
 Como configurar isso, passo a passo, está em
 [Monitorar um site remoto](../install/remote-site.md).
 
+## Implantação das atualizações do agente em ondas {#automatic-updates-waves}
+
+Os agentes se atualizam sozinhos: o servidor oferece o próprio binário assinado. Por padrão, os agentes marcados como **canário** se atualizam primeiro e os demais vêm depois: num homelab não há nada a configurar. Para uma frota maior, **Configurações → Agentes → Atualizações dos agentes → Implantação → Ondas de implantação** ordena a frota em ondas sucessivas. As mesmas configurações existem em `PUT /api/agent/updates/rollout`, `POST /api/agent/updates/rollout/pause` e `POST /api/agent/updates/rollout/resume`.
+
+Cada onda escolhe agentes entre os que as ondas anteriores não escolheram:
+
+| Onda | Escolhe |
+|---|---|
+| Um número de agentes | Esse número de agentes a mais: um canário de uma ou duas máquinas. |
+| Parte da frota (%) | Os agentes necessários para que as ondas até aqui cubram essa parte (cumulativo: 5, depois 25, depois 100). Os mesmos agentes sempre vêm primeiro. |
+| Site | Os agentes que declaram este site (`site` na configuração do agente). |
+| Pasta | Os agentes cujo equipamento está nesta pasta da página de equipamentos. |
+| Tag | Os agentes cujo equipamento tem esta tag, com este valor se informado. |
+
+Os agentes que nenhuma onda escolhe formam uma última onda. Os agentes marcados como **canário** estão sempre na primeira. Os nomes são comparados sem diferenciar maiúsculas de minúsculas.
+
+- Uma onda abre quando a anterior não tem mais agentes a atualizar e o último agente dela executa a nova versão há pelo menos a **espera entre ondas** (60 minutos por padrão). Uma onda vazia é ignorada.
+- **Parada automática**: se, numa onda, a parte de agentes que falharam (falha, reversão ou recusa) entre os que tentaram atingir o limite (20% por padrão, 0 nunca para), nenhum agente recebe mais ofertas automáticas e o estado deles indica *Interrompido*. A página diz em qual onda. **Retomar a implantação** perdoa as falhas já informadas, para que a parada não dispare de novo na hora; os agentes que falharam mantêm a versão até **Atualizar agora**.
+- **Pausa**: *Pausar a implantação* retém todas as ofertas automáticas até *Retomar a implantação*.
+- **Fixar uma versão**: um agente com as atualizações em *Desativadas* (configuração por agente) não está em nenhuma onda e mantém a versão.
+- **Atualizar agora** e **Atualizar todos agora** ignoram as ondas, a pausa e a parada.
+- Os agentes não vistos há uma semana ficam fora das ondas: uma máquina desativada nunca bloqueia a implantação.
+- Nada muda no agente: os agentes já informam o resultado de cada tentativa (versão, sucesso, falha, reversão) em cada envio. Sem ondas configuradas, a implantação é a de sempre.
+- As ondas, a espera, o limite e a pausa fazem parte do backup.
+
 ## Vínculo: uma máquina, um agente {#binding-one-machine-one-agent}
 
 Um token de cadastro diz *esta máquina tem permissão para falar*. Não diz

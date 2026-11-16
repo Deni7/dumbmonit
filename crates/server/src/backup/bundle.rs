@@ -222,6 +222,10 @@ pub struct Bundle {
     /// Absente tant qu'aucun lieu n'a été choisi.
     #[serde(default)]
     pub wall_weather: Option<Value>,
+    /// Déploiement par vagues des mises à jour automatiques des agents : vagues,
+    /// délai, seuil d'arrêt et pause (clé `agent.update_rollout` de `settings`).
+    #[serde(default)]
+    pub agent_update_rollout: Option<Value>,
 }
 
 impl Bundle {
