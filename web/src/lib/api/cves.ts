@@ -11,6 +11,7 @@ import type {
 	CveSettings,
 	CveSettingsInput,
 	CveSummary,
+	CveTargetsResult,
 	TargetId
 } from './types';
 
@@ -38,6 +39,17 @@ export function getCveInventory(target?: TargetId, signal?: AbortSignal): Promis
 /** Start a refresh now (409 when the feature is off). */
 export function refreshCves(): Promise<{ refreshing: boolean }> {
 	return request<{ refreshing: boolean }>('/security/cves/refresh', { method: 'POST' });
+}
+
+/** Turn the CVE check on or off for several devices at once (administrators). */
+export function setCveScanTargets(
+	targetIds: TargetId[],
+	enabled: boolean
+): Promise<CveTargetsResult> {
+	return request<CveTargetsResult>('/security/cves/targets', {
+		method: 'POST',
+		body: { target_ids: targetIds, enabled }
+	});
 }
 
 /** Accept the risk of one CVE on one device. */

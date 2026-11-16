@@ -5,6 +5,16 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- **CVE check per monitor, in bulk.** On Monitors › List, select several monitors and use
+  "CVE check" to turn the known-vulnerability check on or off for all of them at once (turning it
+  off asks for a second click; a toast reports the result with an Undo). The same switch is on each
+  monitor's form. A monitor with the check off is no longer inventoried and its results leave the
+  CVE list, summary and alerts; they come back when it is turned on again. It is on by default,
+  included in backups, and exposed as `cve_scan` on the monitor API and through
+  `POST /api/security/cves/targets`.
+
 ### Changed
 
 - **One typeface family everywhere: Inter and JetBrains Mono.** The console, the status pages, the

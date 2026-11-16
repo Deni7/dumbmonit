@@ -131,6 +131,8 @@ export interface Target {
 	multisite: MultisiteConfig | null;
 	interval_secs: number;
 	enabled: boolean;
+	/** Known-vulnerability (CVE) check on for this device; absent from older servers (treat as on). */
+	cve_scan?: boolean;
 	tags: Record<string, string>;
 	credential_kind: string;
 	/** A secret is saved: leaving its field blank on edit keeps it. */
@@ -226,6 +228,8 @@ export interface TargetPayload {
 	multisite?: MultisiteConfig | null;
 	interval_secs?: number;
 	enabled?: boolean;
+	/** CVE check of this device; absent on edit keeps it (on at creation). */
+	cve_scan?: boolean;
 	tags?: Record<string, string>;
 	/** Flat folder shown on `/targets`. Absent or empty: no folder. */
 	group_name?: string;
@@ -5748,6 +5752,17 @@ export interface CveSettings {
 export interface CveSettingsInput {
 	enabled: boolean;
 	nvd_api_key?: string;
+}
+
+/** Body of `POST /api/security/cves/targets`: the CVE check of several devices (1 to 500 ids). */
+export interface CveTargetsInput {
+	target_ids: TargetId[];
+	enabled: boolean;
+}
+
+/** `updated`: devices whose setting really changed (unknown ids and those already so do not count). */
+export interface CveTargetsResult {
+	updated: number;
 }
 
 export interface CveSource {

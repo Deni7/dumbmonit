@@ -35,7 +35,7 @@
 	import { alertsStore } from '#lib/stores/alerts.svelte.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import ReviewNotice from '#lib/components/device-form/ReviewNotice.svelte';
-	import { Button, ClickSpark, Confirm, EmptyState, ErrorNotice, Menu, SelectionBar, Skeleton } from '#lib/ui/index.js';
+	import { Button, ClickSpark, Confirm, EmptyState, ErrorNotice, Menu, SelectionBar, Skeleton, Toast } from '#lib/ui/index.js';
 	import RackList from '#lib/components/devices/RackList.svelte';
 	import type { ReorderControls, RowSelection } from '#lib/components/devices/RackList.svelte';
 	import FolderHeader from '#lib/components/devices/FolderHeader.svelte';
@@ -45,6 +45,7 @@
 	import { buildRack, nearestRow, needsAttention, type RackRow } from '#lib/components/devices/rack.js';
 	import {
 		SORT_KEYS,
+		cveScanChanges,
 		hasAllTags,
 		matchesSite,
 		parseListQuery,
@@ -81,8 +82,10 @@
 		SlidersHorizontal,
 		Trash2,
 		MapPin,
-		RadioTower
+		RadioTower,
+		ShieldCheck
 	} from 'lucide-svelte';
+	import { setCveScanTargets } from '#lib/api/cves.js';
 	import { assignLocation, listLocations } from '#lib/api/locations.js';
 	import { listRelays } from '#lib/api/relay.js';
 	import { locationForSite } from '#lib/components/devices/relay/relay-site.js';
@@ -589,6 +592,50 @@
 			(t) => updateTarget(t.id, targetToPayload(t, { group_name: group }))
 		);
 	const bulkDelete = () => bulk(selectedTargets, (t) => deleteTarget(t.id));
+
+	// CVE check in bulk: one request for the whole selection. Turning it off is
+	// armed first (second click in the menu); the result comes back as a toast
+	// with Undo, and the selection mode is left so the toast is not hidden
+	// behind the action bar.
+	let cveArmed = $state(false);
+	let cveToast = $state<{ key: number; message: string; undo: { ids: TargetId[]; enabled: boolean } | null } | null>(null);
+	let cveToastKey = 0;
+	const cveUndo = $derived(cveToast?.undo ?? null);
+
+	async function bulkCve(enabled: boolean) {
+		const picked = selectedTargets;
+		if (bulkBusy || picked.length === 0) return;
+		const ids = cveScanChanges(picked, enabled);
+		if (ids.length === 0) {
+			cveToast = { key: ++cveToastKey, message: m.devices_list_bulk_cve_none(), undo: null };
+			return;
+		}
+		bulkBusy = true;
+		bulkReport = null;
+		try {
+			const { updated } = await setCveScanTargets(ids, enabled);
+			await alertsStore.refresh();
+			cveToast = {
+				key: ++cveToastKey,
+				message: (enabled ? m.devices_list_bulk_cve_done_on : m.devices_list_bulk_cve_done_off)({ count: updated }),
+				undo: updated > 0 ? { ids, enabled: !enabled } : null
+			};
+			stopSelecting();
+		} catch (error) {
+			bulkReport = { failed: picked.map((t) => ({ name: t.name, error })), total: picked.length };
+		} finally {
+			bulkBusy = false;
+		}
+	}
+
+	async function undoCve(undo: { ids: TargetId[]; enabled: boolean }) {
+		try {
+			await setCveScanTargets(undo.ids, undo.enabled);
+			await alertsStore.refresh();
+		} catch (error) {
+			actionError = error;
+		}
+	}
 
 	// Locations of the world map, offered in bulk once selecting starts.
 	let bulkLocations = $state<MapLocation[]>([]);
@@ -1379,6 +1426,41 @@
 					{/snippet}
 				</Menu>
 			{/if}
+			<Menu label={m.devices_list_bulk_cve()} align="left" placement="up">
+				{#snippet trigger({ toggle, open })}
+					<Button size="sm" variant="secondary" disabled={bulkBusy || selectedTargets.length === 0} aria-haspopup="menu" aria-expanded={open} onclick={() => { cveArmed = false; toggle(); }}>
+						<ShieldCheck class="size-4" aria-hidden="true" />
+						{m.devices_list_bulk_cve()}
+					</Button>
+				{/snippet}
+				{#snippet children({ close })}
+					<ul class="flex min-w-48 flex-col gap-0.5">
+						<li>
+							<button type="button" role="menuitem" class="flex min-h-10 w-full items-center rounded-lg px-3 text-left text-[0.8125rem] text-ink hover:bg-surface-2" onclick={() => { close(); void bulkCve(true); }}>
+								{m.devices_list_bulk_cve_on()}
+							</button>
+						</li>
+						<li>
+							<button
+								type="button"
+								role="menuitem"
+								class={`flex min-h-10 w-full items-center rounded-lg px-3 text-left text-[0.8125rem] hover:bg-surface-2 ${cveArmed ? 'font-semibold text-warning-ink' : 'text-ink'}`}
+								onclick={() => {
+									if (!cveArmed) {
+										cveArmed = true;
+										return;
+									}
+									cveArmed = false;
+									close();
+									void bulkCve(false);
+								}}
+							>
+								{cveArmed ? m.devices_list_bulk_cve_off_confirm({ count: selectedTargets.length }) : m.devices_list_bulk_cve_off()}
+							</button>
+						</li>
+					</ul>
+				{/snippet}
+			</Menu>
 			<Confirm confirmLabel={m.devices_list_bulk_delete_confirm({ count: selectedTargets.length })} loading={bulkBusy} disabled={bulkBusy || selectedTargets.length === 0} onconfirm={bulkDelete}>
 				<Trash2 class="size-4" aria-hidden="true" />
 				{m.devices_list_bulk_delete()}
@@ -1396,6 +1478,17 @@
 			{/if}
 			<Button size="sm" variant="ghost" onclick={() => { relaySkipped = 0; relayPlace = null; }}>{m.devices_list_bulk_dismiss()}</Button>
 		</div>
+	{/if}
+	{#if cveToast}
+		{#key cveToast.key}
+			<Toast
+				message={cveToast.message}
+				actionLabel={cveUndo ? m.devices_list_bulk_cve_undo() : undefined}
+				onaction={cveUndo ? () => void undoCve(cveUndo) : undefined}
+				onclose={() => (cveToast = null)}
+				durationMs={8000}
+			/>
+		{/key}
 	{/if}
 	{#if bulkReport}
 		<div class="mb-3">

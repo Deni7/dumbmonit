@@ -3,6 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+	cveScanChanges,
 	freeTags,
 	hasAllTags,
 	matchesSite,
@@ -120,6 +121,13 @@ test('bulk runner keeps going after a failure and reports it', async () => {
 	assert.deepEqual(out.ok, [1, 3]);
 	assert.equal(out.failed.length, 1);
 	assert.equal(out.failed[0].name, 'b');
+});
+
+test('bulk CVE check only touches monitors not already in the wanted state', () => {
+	const list = [t(1, 'a'), t(2, 'b', { cve_scan: false }), t(3, 'c', { cve_scan: true })];
+	assert.deepEqual(cveScanChanges(list, false), [1, 3]);
+	assert.deepEqual(cveScanChanges(list, true), [2]);
+	assert.deepEqual(cveScanChanges([], false), []);
 });
 
 test('site filter: all, none, or one location', () => {
