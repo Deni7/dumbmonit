@@ -5205,6 +5205,11 @@ paths:
           required: false
           schema: { type: string }
           description: Address the site reaches the relay at; the one set on the relay, else its host name.
+        - name: agent_port_only
+          in: query
+          required: false
+          schema: { type: boolean, default: false }
+          description: "Commands that use the agent port only (a remote site): the install scripts and binaries are read on the agent port, pinned by the key of its certificate, next to the encrypted channel."
       responses:
         "200":
           description: Install parameters.
@@ -11580,7 +11585,8 @@ components:
       type: object
       required: [base_url, checksums, linux_template, windows_template]
       properties:
-        base_url: { type: string, description: "`https://` URL of the web port, or of a relay's gateway (install scripts and binaries)." }
+        base_url: { type: string, description: "`https://` URL of the web port, of the agent port (`agent_port_only`), or of a relay's gateway (install scripts and binaries)." }
+        agent_port_only: { type: boolean, description: "True when scripts, binaries and the encrypted channel all use the agent port: the only port a remote site needs." }
         agent_url: { type: [string, "null"], description: "URL of the encrypted agent channel, `https://host:8443`." }
         ca_pin: { type: [string, "null"], description: SHA-256 fingerprint of the agent certificate authority. }
         checksums:
@@ -11735,6 +11741,7 @@ components:
         client_id: { type: [integer, "null"], format: int64, description: "MSP mode: the client the token enrols into. Absent: the default client." }
         relay_id: { type: [integer, "null"], format: int64, description: "Install through this relay agent (a site behind a firewall): the commands point at its gateway, which the server asks the relay to open. The relay must belong to the same client." }
         relay_host: { type: [string, "null"], maxLength: 253, description: Address the site reaches the relay at (host name or IP, no scheme or port). }
+        agent_port_only: { type: boolean, default: false, description: "Commands that use the agent port only (a remote site). Always on for a relay token." }
     CreatedAgentToken:
       allOf:
         - $ref: "#/components/schemas/AgentToken"

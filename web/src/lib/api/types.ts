@@ -1743,6 +1743,8 @@ export interface AgentTokenPayload {
 	relay_id?: TargetId | null;
 	/** Address the site reaches the relay at. Left out: the one set, else its host name. */
 	relay_host?: string | null;
+	/** Commands that use the agent port only (a remote site). Always on for a relay token. */
+	agent_port_only?: boolean;
 }
 
 /** A machine enrolled with a token. `GET /api/agent/tokens/{id}/machines`. */

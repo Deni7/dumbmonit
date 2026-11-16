@@ -17,6 +17,16 @@ istanza da guardare.
 
 ## 1. Pubblica il server su HTTPS
 
+!!! tip "Una sola porta per un sito remoto"
+    Il comando di installazione mostrato per un relay usa **solo la porta degli
+    agent**: lo script di installazione, il binario dell'agent e il canale
+    cifrato arrivano tutti da `https://<server>:8443`. Il comando fissa la chiave
+    del certificato di quella porta e lo SHA-256 di ogni binario: il download è
+    verificato da un capo all'altro senza aprire al sito la porta web (8080). Gli
+    strumenti di distribuzione ottengono lo stesso comando con
+    `GET /api/agent/install?agent_port_only=true`. I paragrafi seguenti sulla
+    porta web riguardano solo gli agent che usano ancora il vecchio canale.
+
 L'agente relè recupera i suoi lavori dal server: il server deve essere raggiungibile dal
 sito remoto, tipicamente `https://monitor.example.org` dietro un reverse proxy. Due cose viaggiano su
 quel collegamento:
@@ -50,7 +60,9 @@ Qualsiasi macchina al sito remoto con Docker, usando `docker-compose.agent.yml`
 dal repository:
 
 ```sh
-DUMBMONIT_AGENT_URL=https://monitor.example.org \
+DUMBMONIT_AGENT_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_TLS_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_CA_PIN=… \
 DUMBMONIT_AGENT_TOKEN=dmon_… \
 DUMBMONIT_AGENT_HOSTNAME=relay-lyon \
 DUMBMONIT_AGENT_RELAY=true \
@@ -122,7 +134,7 @@ connessione fino al server.
 macchina questo server?*, scegli **Tramite &lt;relay&gt; (sito)**. Indica l'indirizzo con cui il
 sito raggiunge il relay (un IP o un nome locale). I comandi mostrati — Linux/macOS, Windows,
 Docker — puntano allora al gateway del relay
-(`--url=http://192.168.10.5:8443 --tls-url=https://192.168.10.5:8443`) e portano ancora
+(`--url=https://192.168.10.5:8443 --tls-url=https://192.168.10.5:8443`) e portano ancora
 l'impronta dell'autorità di certificazione del **server**. Il percorso attende poi la prima
 connessione e ti lascia dare un nome alla macchina, metterla in una cartella e collocarla in una
 sede senza lasciare la pagina. Da un sito in *Aggiungi per sito*, **Server con l'agente**

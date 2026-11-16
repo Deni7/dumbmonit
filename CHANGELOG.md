@@ -5,6 +5,15 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- **One port for a remote site.** The agent port (8443) now also serves `install.sh`, `install.ps1`
+  and the agent binaries, without a client certificate (like enrolment). The install command shown
+  for a relay uses that port only: script, binary and encrypted channel come from
+  `https://<server>:8443`, pinned by the key of its certificate and the SHA-256 of each binary, so
+  the web port can stay private. Deployment tools get the same command with
+  `GET /api/agent/install?agent_port_only=true` (or `agent_port_only` when creating a token).
+
 ### Changed
 
 - **One typeface family everywhere: Inter and JetBrains Mono.** The console, the status pages, the

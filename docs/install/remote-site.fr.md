@@ -27,6 +27,17 @@ surveiller.
 
 ## 1. Publier le serveur sur HTTPS
 
+!!! tip "Un seul port pour un site distant"
+    La commande d'installation affichée pour un relais n'utilise **que le port des
+    agents** : le script d'installation, le binaire de l'agent et le canal chiffré
+    viennent tous de `https://<serveur>:8443`. La commande épingle la clé du
+    certificat de ce port et l'empreinte SHA-256 de chaque binaire : le
+    téléchargement est vérifié de bout en bout sans ouvrir le port de
+    l'interface (8080) au site. Les outils de déploiement obtiennent la même
+    commande par `GET /api/agent/install?agent_port_only=true`. Les paragraphes
+    ci-dessous sur le port de l'interface ne concernent que les agents qui
+    passent encore par l'ancien canal.
+
 Le relais récupère ses tâches depuis le serveur : le serveur doit être
 accessible depuis le site distant, typiquement
 `https://monitor.example.org` derrière un reverse proxy. Deux choses
@@ -78,9 +89,13 @@ Sous Linux, macOS ou FreeBSD, l'installateur en une ligne avec `--relay` et le
 site (inutile avec un jeton de relais créé depuis la page d'ajout) :
 
 ```sh
-curl -sSL https://monitor.example.org/install.sh | sudo sh -s -- \
-  --token=dmon_… --url=https://monitor.example.org --relay --site='Lyon office'
+curl -sSL -k --pinnedpubkey sha256//… https://monitor.example.org:8443/install.sh | sudo sh -s -- \
+  --token=dmon_… --url=https://monitor.example.org:8443 --pinned-key=sha256//… \
+  --tls-url=https://monitor.example.org:8443 --ca-pin=… --relay --site='Lyon office'
 ```
+
+Copiez la vraie commande depuis DumbMonit : elle porte les épingles et les
+empreintes.
 
 Sous Windows, ajoutez `-Relay -Site 'Lyon office'` à la commande d'installation
 PowerShell.
@@ -89,7 +104,9 @@ Ou n'importe quelle machine sur le site distant avec Docker, en utilisant
 `docker-compose.agent.yml` du dépôt :
 
 ```sh
-DUMBMONIT_AGENT_URL=https://monitor.example.org \
+DUMBMONIT_AGENT_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_TLS_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_CA_PIN=… \
 DUMBMONIT_AGENT_TOKEN=dmon_… \
 DUMBMONIT_AGENT_HOSTNAME=relay-lyon \
 DUMBMONIT_AGENT_RELAY=true \
@@ -164,7 +181,7 @@ l'agent**, et sous *Comment la machine joint-elle ce serveur ?* choisissez
 **Via &lt;relais&gt; (site)**. Indiquez l'adresse par laquelle le site joint
 le relais (une IP ou un nom local). Les commandes affichées — Linux/macOS,
 Windows, Docker — visent alors la passerelle du relais
-(`--url=http://192.168.10.5:8443 --tls-url=https://192.168.10.5:8443`) et
+(`--url=https://192.168.10.5:8443 --tls-url=https://192.168.10.5:8443`) et
 portent toujours l'empreinte de l'autorité **du serveur**. Le flux attend
 ensuite la première connexion et permet de nommer la machine, de la ranger
 dans un dossier et de la placer sur un site, sans quitter la page. Depuis un

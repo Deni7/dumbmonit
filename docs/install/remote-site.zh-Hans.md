@@ -13,6 +13,13 @@
 
 ## 1. 通过HTTPS发布服务器 {#1-publish-the-server-over-https}
 
+!!! tip "远程站点只需一个端口"
+    为中继显示的安装命令**只使用代理端口**：安装脚本、代理二进制文件和加密通道都来自
+    `https://<服务器>:8443`。命令固定该端口证书的密钥以及每个二进制文件的 SHA-256：
+    下载过程端到端受验证，无需向站点开放 Web 端口（8080）。部署工具可通过
+    `GET /api/agent/install?agent_port_only=true` 获取同样的命令。下文关于 Web
+    端口的段落只适用于仍通过旧通道连接的代理。
+
 中继从服务器获取其作业：服务器必须从远程网站可到达，通常 `https://monitor.example.org` 在反向代理后。两件事在该链接上传导：
 
 - **注册令牌** (`dmon_…`)，在每个请求的 `Authorization` 标头中——对任何代理如此；
@@ -31,7 +38,9 @@ Web 端口只接受 HTTPS，因此两者在途中都是加密的。在互联网�
 任何在远程网站有Docker的机器，使用来自仓库的 `docker-compose.agent.yml`：
 
 ```sh
-DUMBMONIT_AGENT_URL=https://monitor.example.org \
+DUMBMONIT_AGENT_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_TLS_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_CA_PIN=… \
 DUMBMONIT_AGENT_TOKEN=dmon_… \
 DUMBMONIT_AGENT_HOSTNAME=relay-lyon \
 DUMBMONIT_AGENT_RELAY=true \

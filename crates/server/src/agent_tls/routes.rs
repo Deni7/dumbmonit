@@ -1,15 +1,22 @@
 //! Routes du port des agents.
 //!
 //! Le protocole des agents (lots, commandes, relais) y est servi tel que sur
-//! le port de l'interface, mais derrière un certificat client valable. Seul
-//! l'enrôlement s'en passe : c'est lui qui le délivre, contre le jeton
-//! d'enrôlement. Rien d'autre n'est servi ici — ni interface, ni version, ni
-//! documentation de l'API : un inconnu qui se connecte n'apprend rien.
+//! le port de l'interface, mais derrière un certificat client valable. Deux
+//! choses s'en passent :
+//!
+//! - l'enrôlement, qui délivre ce certificat contre le jeton d'enrôlement ;
+//! - les fichiers d'installation (`/install.sh`, `/install.ps1`,
+//!   `/download/…`), publics de toute façon sur le port de l'interface : une
+//!   machine d'un site distant s'installe ainsi par ce seul port. La commande
+//!   épingle la clé du certificat de ce port (`curl --pinnedpubkey`, rappel de
+//!   validation en PowerShell) et l'empreinte SHA-256 de chaque binaire.
+//!
+//! Rien d'autre n'est servi ici — ni interface, ni version, ni documentation
+//! de l'API.
 //!
 //! Un agent relais y ouvre aussi les tunnels des agents de son site
-//! ([`super::tunnel`]). À travers un tunnel, et seulement ainsi, une machine du
-//! site lit les fichiers d'installation (`/install.sh`, `/install.ps1`,
-//! `/download/…`) : sa commande vise `https://relais:8443`, la passerelle du
+//! ([`super::tunnel`]). Les machines du site y lisent les mêmes fichiers à
+//! travers lui : leur commande vise `https://relais:8443`, la passerelle du
 //! relais la porte jusqu'ici, et la session TLS (épinglée par la commande) va
 //! de la machine au serveur — le relais ne voit que du chiffré.
 
@@ -60,7 +67,8 @@ pub fn router(state: AppState) -> Router {
         .route(&under_api(RELAY_TUNNEL_PATH), get(open_tunnel))
         .route_layer(middleware::from_fn_with_state(state.clone(), require_certificate));
     let open = Router::new().route("/agent/tls/enroll", post(enrol));
-    // Fichiers d'installation, pour les machines du site d'un relais.
+    // Fichiers d'installation, sans certificat client : machines d'un site
+    // distant (un seul port) et machines derrière un relais.
     let site = Router::new()
         .route("/install.sh", get(site_install_sh))
         .route("/install.ps1", get(site_install_ps1))
@@ -217,13 +225,12 @@ async fn open_tunnel(
     response
 }
 
-/// Garde des fichiers d'installation : seulement à travers le tunnel d'un
-/// relais qui l'est encore. En direct, ce port ne sert rien de tel (les
-/// commandes directes visent le port de l'interface). `None` : servi.
+/// Garde des fichiers d'installation. En direct, ils sont servis à qui les
+/// demande, comme sur le port de l'interface : rien n'y est secret (le jeton
+/// voyage dans les arguments de la commande, jamais dans l'URL). À travers le
+/// tunnel d'un relais, seulement si celui-ci l'est encore. `None` : servi.
 async fn site_files_refused(state: &AppState, peer: Option<&AgentPeer>) -> Option<Response> {
-    let Some(relay) = peer.and_then(|peer| peer.via_relay) else {
-        return Some(not_found().await);
-    };
+    let relay = peer.and_then(|peer| peer.via_relay)?;
     match is_relay(state, relay).await {
         Ok(true) => None,
         Ok(false) => Some(error(StatusCode::FORBIDDEN, NOT_A_RELAY)),

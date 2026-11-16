@@ -17,6 +17,16 @@ Instanz, die man im Auge behalten müsste.
 
 ## 1. Den Server über HTTPS veröffentlichen {#1-publish-the-server-over-https}
 
+!!! tip "Ein einziger Port für einen entfernten Standort"
+    Der für ein Relay angezeigte Installationsbefehl nutzt **nur den
+    Agenten-Port**: Installationsskript, Agenten-Binärdatei und verschlüsselter
+    Kanal kommen alle von `https://<server>:8443`. Der Befehl pinnt den Schlüssel
+    des Zertifikats dieses Ports und den SHA-256 jeder Binärdatei: Der Download
+    wird durchgehend geprüft, ohne den Web-Port (8080) für den Standort zu
+    öffnen. Deployment-Werkzeuge erhalten denselben Befehl über
+    `GET /api/agent/install?agent_port_only=true`. Die folgenden Absätze zum
+    Web-Port betreffen nur Agenten, die noch den alten Kanal darüber nutzen.
+
 Das Relay holt seine Aufträge vom Server ab: Der Server muss vom entfernten Standort aus
 erreichbar sein, typischerweise `https://monitor.example.org` hinter einem Reverse-Proxy. Zwei
 Dinge laufen über diese Verbindung:
@@ -53,7 +63,9 @@ Jeder Rechner am entfernten Standort mit Docker, mit der Datei `docker-compose.a
 dem Repository:
 
 ```sh
-DUMBMONIT_AGENT_URL=https://monitor.example.org \
+DUMBMONIT_AGENT_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_TLS_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_CA_PIN=… \
 DUMBMONIT_AGENT_TOKEN=dmon_… \
 DUMBMONIT_AGENT_HOSTNAME=relay-lyon \
 DUMBMONIT_AGENT_RELAY=true \
@@ -123,7 +135,7 @@ das Relay trägt ihre Verbindung zum Server.
 erreicht der Rechner diesen Server?* **Über &lt;Relay&gt; (Standort)**. Geben Sie die Adresse an,
 unter der der Standort das Relay erreicht (eine IP oder ein lokaler Name). Die angezeigten Befehle
 — Linux/macOS, Windows, Docker — zeigen dann auf das Gateway des Relays
-(`--url=http://192.168.10.5:8443 --tls-url=https://192.168.10.5:8443`) und tragen weiterhin den
+(`--url=https://192.168.10.5:8443 --tls-url=https://192.168.10.5:8443`) und tragen weiterhin den
 Fingerabdruck der Zertifizierungsstelle des **Servers**. Der Ablauf wartet dann auf die erste
 Verbindung und lässt Sie den Rechner benennen, in einen Ordner legen und einem Standort zuordnen,
 ohne die Seite zu verlassen. Von einem Standort in *Nach Standort hinzufügen* aus wählt **Server

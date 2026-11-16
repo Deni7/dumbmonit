@@ -10,7 +10,7 @@ you monitor remote sites.** DumbMonit only serves HTTPS.
 | Port | Protocol | Role | Who must reach it | Exposure |
 |------|----------|------|-------------------|----------|
 | **8080** | TCP (HTTPS) | Web interface, API, install scripts, public status pages | Your browsers; agents on the same network | LAN only. WAN only for public status pages, behind a reverse proxy. |
-| **8443** | TCP (TLS 1.3, client certificates) | Agent channel | Agents, including those on other sites | LAN, or WAN if restricted to the agents' IPs. |
+| **8443** | TCP (TLS 1.3, client certificates) | Agent channel, and the install scripts and agent downloads for remote sites | Agents, including those on other sites | LAN, or WAN if restricted to the agents' IPs. |
 | **5514** | UDP and TCP | Syslog input (off by default) | Devices that send logs | LAN only. Never WAN. |
 | **1162** | UDP | SNMP trap input (off by default) | Devices that send traps | LAN only. Never WAN. |
 | 8428, 8429, 9428 | TCP | Bundled storage (metrics, long-term metrics, logs) | Nobody but DumbMonit itself | Never published. They listen on `127.0.0.1`. |
@@ -40,6 +40,11 @@ the Internet, but it still deserves a source filter. Change it with
 `DUMBMONIT_AGENT_LISTEN` (`off` closes it) and
 `DUMBMONIT_AGENT_PUBLIC_PORT` if a port forward publishes another number.
 
+- **Installs:** without a client certificate, this port also serves the
+  install scripts and the agent binaries (the same files as the web port). The
+  install command shown for a relay uses this port only, so a remote site
+  never needs 8080. The command pins the key of the port's certificate and the
+  SHA-256 of each binary.
 - **Closed:** agents on other networks cannot report. Agents on the same
   network as the server can still use the web port.
 - **Open on the Internet:** anyone can try a TLS handshake, but without an
@@ -98,7 +103,8 @@ Make sure your router has no port forward to the server. That is all.
 
 ### 2. Agents on remote sites
 
-Only 8443 must be reachable. Keep 8080 private.
+Only 8443 must be reachable. Keep 8080 private: the install command of a
+relay downloads the script and the agent from 8443 too.
 
 On the router or the cloud firewall, forward TCP 8443 to the server. Then
 allow it **only from the IPs of your sites**. Replace `203.0.113.10` and

@@ -19,14 +19,24 @@ instance to look at.
     The relay, like every agent, talks to the server over TLS 1.3 with its own
     agent certificate (mutual TLS). Open **TCP 8443** (the agent port) from the
     remote site to the server: the relay always connects out, nothing has to
-    reach it. This is the only port needed to monitor from another site. See
+    reach the server from there on any other port. This is the only port needed
+    to monitor from another site, installation included. See
     [Agent channel security](agent-security.md).
 
 ## 1. Publish the server over HTTPS
 
-The relay fetches its jobs from the server: the server must be reachable from
-the remote site, typically `https://monitor.example.org` behind a reverse
-proxy. Two things travel on that link:
+!!! tip "One port for a remote site"
+    The install command shown for a relay uses the **agent port only**: the
+    install script, the agent binary and the encrypted channel all come from
+    `https://<server>:8443`. The command pins the key of the certificate of that
+    port and the SHA-256 of each binary, so the download is verified end to end
+    without opening the web port (8080) to the site. Deployment tools get the
+    same command from `GET /api/agent/install?agent_port_only=true`.
+
+The relay fetches its jobs from the server: the server's agent port must be
+reachable from the remote site (TCP 8443). The paragraphs below about the web
+port only apply to agents that still use the former channel through it. Two
+things travel on that link:
 
 - the **enrollment token** (`dmon_…`), in the `Authorization` header of every
   request — as for any agent;
@@ -74,9 +84,12 @@ On Linux, macOS or FreeBSD, the one-line installer with `--relay` and the site
 (not needed with a relay token from the add page):
 
 ```sh
-curl -sSL https://monitor.example.org/install.sh | sudo sh -s -- \
-  --token=dmon_… --url=https://monitor.example.org --relay --site='Lyon office'
+curl -sSL -k --pinnedpubkey sha256//… https://monitor.example.org:8443/install.sh | sudo sh -s -- \
+  --token=dmon_… --url=https://monitor.example.org:8443 --pinned-key=sha256//… \
+  --tls-url=https://monitor.example.org:8443 --ca-pin=… --relay --site='Lyon office'
 ```
+
+Copy the real command from DumbMonit: it carries the pins and the checksums.
 
 On Windows, add `-Relay -Site 'Lyon office'` to the PowerShell install command.
 
@@ -84,7 +97,9 @@ Or any machine at the remote site with Docker, using `docker-compose.agent.yml`
 from the repository:
 
 ```sh
-DUMBMONIT_AGENT_URL=https://monitor.example.org \
+DUMBMONIT_AGENT_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_TLS_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_CA_PIN=… \
 DUMBMONIT_AGENT_TOKEN=dmon_… \
 DUMBMONIT_AGENT_HOSTNAME=relay-lyon \
 DUMBMONIT_AGENT_RELAY=true \
@@ -216,7 +231,7 @@ A monitor does not have to choose between the server and one relay: it can be pr
 
 | What you see | Cause and fix |
 |---|---|
-| The relay machine never appears | The command did not reach the server. From the remote site, open the server address in a browser and check TCP 8443. See [Network ports](ports.md). |
+| The relay machine never appears | The command did not reach the server. From the remote site, check that TCP 8443 of the server answers (`curl -k https://<server>:8443/install.sh`). See [Network ports](ports.md). |
 | The add page shows a red channel message | Port 8443 is not published or is blocked. Publish it (`"8443:8443"` under `ports:`) and open it in the firewall. |
 | The agent page does not say *Relay* | The relay switch is off. Open the monitor, use the **gear**, switch on *Relay for a remote site*, give the site, save. It applies at the next report. |
 | A monitor shows *Timed out: relay agent … did not pick up the probe* | The relay is stopped or not in relay mode. Check the service on the relay machine and that `relay: true` is set. |

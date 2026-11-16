@@ -19,7 +19,7 @@ only needs to reach the server on the agent port, also from another site.
 
 | Where | Port | Why |
 |-------|------|-----|
-| Server, inbound | **TCP 8443** | Encrypted agent channel. The only port agents on other networks need. |
+| Server, inbound | **TCP 8443** | Encrypted agent channel, plus the install scripts and agent downloads for remote sites. The only port agents on other networks need. |
 | Server, inbound | TCP 8080 | Web interface, install scripts and agent downloads. Can stay private (LAN, VPN). |
 | Agents | none | Agents only make outbound connections. |
 | Relay with a gateway | TCP 8443 (configurable), **from the site's network only** | Agents of a site that cannot reach the server connect to the relay (see below). |
@@ -74,8 +74,12 @@ rather than a bare "server unreachable".
   cannot speak for another machine.
 - **Throttled enrolment.** Wrong tokens are counted per address and blocked
   after a few attempts. Tokens are single use unless made reusable.
-- **Nothing leaks before authentication.** The agent port serves the agent
-  protocol only: no web interface, no version, no API description.
+- **Nothing leaks before authentication.** Without a client certificate, the
+  agent port answers enrolment and the public install files only
+  (`/install.sh`, `/install.ps1`, `/download/<agent file>`, the same as on the
+  web port): no web interface, no version, no API description. A remote site
+  installs through this single port: the command pins the key of its
+  certificate and the SHA-256 of each binary.
 - **Keys at rest.** The authority's private key is stored encrypted with the
   instance key (`/data/secret.key`). On the agent, `agent-tls.json` (key and
   certificate) sits next to `agent.yaml`, readable by its owner only (mode 0600
@@ -145,7 +149,7 @@ Not protected against:
   key, as they can read anything else there);
 - someone with access to both the server's `/data` and its instance key;
 - the very first download: the install script and the binary come from the web
-  port, over HTTPS. The command shown in the interface carries the fingerprint
+  port (or, for a remote site, from the agent port), over HTTPS. The command shown in the interface carries the fingerprint
   of the server's certificate and pins it, so the download is verified even
   with the self-signed certificate (a reverse proxy with a public certificate is
   verified the usual way). The agent channel itself is pinned from the first
@@ -285,5 +289,7 @@ On the agent (`agent.yaml` or environment): `tls_url` /
 `GET /api/agent/install?base_url=…` returns the web URL, the agent channel URL,
 the CA fingerprint, the binary checksums, and the Unix and PowerShell install
 commands with `{TOKEN}` to replace. With `relay_id=<relay>` (and optionally
-`relay_host=`), the commands go through that relay's gateway. GPO or Ansible generators should use it
+`relay_host=`), the commands go through that relay's gateway. With
+`agent_port_only=true`, scripts and binaries come from the agent port as well:
+one port for a remote site. GPO or Ansible generators should use it
 rather than rebuilding the command.

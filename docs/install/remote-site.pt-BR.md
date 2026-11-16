@@ -17,6 +17,16 @@ instância para consultar.
 
 ## 1. Publicar o servidor sobre HTTPS {#1-publish-the-server-over-https}
 
+!!! tip "Uma única porta para um site remoto"
+    O comando de instalação mostrado para um relay usa **apenas a porta dos
+    agentes**: o script de instalação, o binário do agente e o canal criptografado
+    vêm todos de `https://<servidor>:8443`. O comando fixa a chave do certificado
+    dessa porta e o SHA-256 de cada binário: o download é verificado de ponta a
+    ponta sem abrir a porta web (8080) para o site. Ferramentas de implantação
+    obtêm o mesmo comando com `GET /api/agent/install?agent_port_only=true`. Os
+    parágrafos abaixo sobre a porta web só valem para agentes que ainda usam o
+    canal antigo.
+
 O agente de retransmissão busca seus trabalhos do servidor: o servidor deve ser acessível a partir do
 site remoto, normalmente `https://monitor.example.org` atrás de um proxy reverso. Duas coisas viajam nesse link:
 
@@ -49,7 +59,9 @@ Qualquer máquina no site remoto com Docker, usando `docker-compose.agent.yml`
 do repositório:
 
 ```sh
-DUMBMONIT_AGENT_URL=https://monitor.example.org \
+DUMBMONIT_AGENT_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_TLS_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_CA_PIN=… \
 DUMBMONIT_AGENT_TOKEN=dmon_… \
 DUMBMONIT_AGENT_HOSTNAME=relay-lyon \
 DUMBMONIT_AGENT_RELAY=true \
@@ -122,7 +134,7 @@ servidor.
 máquina chega a este servidor?*, escolha **Por meio de &lt;relay&gt; (site)**. Informe o endereço
 pelo qual o site chega ao relay (um IP ou um nome local). Os comandos mostrados — Linux/macOS,
 Windows, Docker — passam a apontar para o gateway do relay
-(`--url=http://192.168.10.5:8443 --tls-url=https://192.168.10.5:8443`) e continuam levando a
+(`--url=https://192.168.10.5:8443 --tls-url=https://192.168.10.5:8443`) e continuam levando a
 impressão digital da autoridade certificadora do **servidor**. O fluxo então espera a primeira
 conexão e deixa você nomear a máquina, colocá-la em uma pasta e em um local sem sair da página.
 A partir de um site em *Adicionar por site*, **Servidor com o agente** pré-seleciona o relay

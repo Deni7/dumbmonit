@@ -684,13 +684,33 @@ async fn only_a_relay_with_its_certificate_can_open_a_tunnel() {
 }
 
 #[tokio::test]
-async fn the_install_files_are_read_over_tls_through_a_relay_only() {
+async fn the_install_files_are_read_over_tls_directly_or_through_a_relay() {
     let (lab, admin) = lab().await;
     let ca = authority(&lab).await;
-    // En direct, le port des agents ne sert aucun fichier d'installation.
+    // En direct, sans certificat client : un site distant s'installe par ce
+    // seul port.
     let direct =
         client(&lab, &ca, None).get(url(&lab, "/install.sh")).send().await.expect("direct");
-    assert_eq!(direct.status(), StatusCode::NOT_FOUND);
+    assert_eq!(direct.status(), StatusCode::OK);
+    assert!(direct.text().await.unwrap().starts_with("#!/bin/sh"));
+    let windows =
+        client(&lab, &ca, None).get(url(&lab, "/install.ps1")).send().await.expect("direct");
+    assert_eq!(windows.status(), StatusCode::OK);
+    // Les binaires suivent la même liste fermée que sur le port de l'interface.
+    let unknown = client(&lab, &ca, None)
+        .get(url(&lab, "/download/..%2Fsecret.key"))
+        .send()
+        .await
+        .expect("direct");
+    assert_eq!(unknown.status(), StatusCode::NOT_FOUND);
+    // Le reste du protocole exige toujours un certificat client.
+    let ingest = client(&lab, &ca, None)
+        .post(url(&lab, "/api/ingest"))
+        .json(&batch("id-anonyme"))
+        .send()
+        .await
+        .expect("lot");
+    assert_eq!(ingest.status(), StatusCode::UNAUTHORIZED);
 
     // À travers la passerelle d'un relais : les scripts, sous TLS jusqu'au
     // serveur ; le relais ne voit que du chiffré.
@@ -804,4 +824,48 @@ async fn install_commands_through_a_relay_point_at_its_gateway_and_open_it() {
         )
         .await;
     assert_eq!(reply.status, StatusCode::BAD_REQUEST, "{}", reply.body);
+}
+
+#[tokio::test]
+async fn a_relay_install_command_uses_the_agent_port_only() {
+    let (lab, admin) = lab().await;
+    let reply = lab
+        .app
+        .post(
+            "/api/agent/tokens",
+            json!({ "relay": true, "site": "Lyon", "base_url": "https://monit.example.com:8080" }),
+            Some(&admin),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::CREATED, "{}", reply.body);
+    let server_pin = lab.state.agent_tls().server_pin().expect("épingle du port des agents");
+    let pin = lab.state.agent_tls().pins()[0].clone();
+    let linux = reply.body["install_linux"].as_str().unwrap();
+    let fetch = format!(
+        "curl -sSL -k --pinnedpubkey {server_pin} https://monit.example.com:8443/install.sh"
+    );
+    assert!(linux.starts_with(&fetch), "{linux}");
+    assert!(linux.contains(" --url=https://monit.example.com:8443"), "{linux}");
+    assert!(linux.contains(" --tls-url=https://monit.example.com:8443"), "{linux}");
+    assert!(linux.contains(&format!("--ca-pin={pin}")), "{linux}");
+    assert!(!linux.contains(":8080"), "un seul port : {linux}");
+    let windows = reply.body["install_windows"].as_str().unwrap();
+    assert!(
+        windows.contains("DownloadString('https://monit.example.com:8443/install.ps1')"),
+        "{windows}"
+    );
+    assert!(windows.contains(&format!("-PinnedKey {server_pin}")), "{windows}");
+    assert!(!windows.contains(":8080"), "{windows}");
+
+    // Les mêmes paramètres, sans jeton, pour les générateurs de déploiement.
+    let query = "/api/agent/install?base_url=https://monit.example.com:8080";
+    let params = lab.app.get(&format!("{query}&agent_port_only=true"), Some(&admin)).await;
+    assert_eq!(params.status, StatusCode::OK, "{}", params.body);
+    assert_eq!(params.body["agent_port_only"], true);
+    assert_eq!(params.body["base_url"], "https://monit.example.com:8443");
+    assert_eq!(params.body["https_pin"], server_pin.as_str());
+    // Sans l'option, l'interface reste le point d'entrée des scripts.
+    let web = lab.app.get(query, Some(&admin)).await;
+    assert_eq!(web.body["agent_port_only"], false);
+    assert_eq!(web.body["base_url"], "https://monit.example.com:8080");
 }

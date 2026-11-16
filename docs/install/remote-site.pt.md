@@ -17,6 +17,16 @@ segunda instância para vigiar.
 
 ## 1. Publicar o servidor por HTTPS {#1-publish-the-server-over-https}
 
+!!! tip "Uma só porta para um site remoto"
+    O comando de instalação mostrado para um retransmissor usa **apenas a porta
+    dos agentes**: o script de instalação, o binário do agente e o canal cifrado
+    vêm todos de `https://<servidor>:8443`. O comando fixa a chave do certificado
+    dessa porta e o SHA-256 de cada binário: a transferência é verificada de
+    ponta a ponta sem abrir a porta web (8080) ao site. As ferramentas de
+    implementação obtêm o mesmo comando com
+    `GET /api/agent/install?agent_port_only=true`. Os parágrafos abaixo sobre a
+    porta web só se aplicam a agentes que ainda usam o canal antigo.
+
 O retransmissor obtém os seus trabalhos do servidor: o servidor tem de ser
 alcançável a partir do site remoto, tipicamente `https://monitor.example.org`
 atrás de um proxy inverso. Duas coisas viajam nessa ligação:
@@ -52,7 +62,9 @@ Qualquer máquina no site remoto com Docker, usando `docker-compose.agent.yml`
 do repositório:
 
 ```sh
-DUMBMONIT_AGENT_URL=https://monitor.example.org \
+DUMBMONIT_AGENT_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_TLS_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_CA_PIN=… \
 DUMBMONIT_AGENT_TOKEN=dmon_… \
 DUMBMONIT_AGENT_HOSTNAME=relay-lyon \
 DUMBMONIT_AGENT_RELAY=true \
@@ -124,7 +136,7 @@ este leva a ligação até ao servidor.
 máquina a este servidor?*, escolha **Através de &lt;retransmissor&gt; (site)**. Indique o endereço
 pelo qual o site chega ao retransmissor (um IP ou um nome local). Os comandos mostrados —
 Linux/macOS, Windows, Docker — apontam então para o gateway do retransmissor
-(`--url=http://192.168.10.5:8443 --tls-url=https://192.168.10.5:8443`) e continuam a levar a
+(`--url=https://192.168.10.5:8443 --tls-url=https://192.168.10.5:8443`) e continuam a levar a
 impressão digital da autoridade de certificação do **servidor**. O fluxo espera pela primeira
 ligação e deixa-o dar nome à máquina, arrumá-la numa pasta e colocá-la num site sem sair da
 página. A partir de um site em *Adicionar por site*, **Servidor com o agente** pré-seleciona o

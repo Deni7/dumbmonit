@@ -21,7 +21,7 @@ site.
 
 | Où | Port | Pourquoi |
 |----|------|----------|
-| Serveur, entrant | **TCP 8443** | Canal chiffré des agents. Le seul port nécessaire aux agents d'autres réseaux. |
+| Serveur, entrant | **TCP 8443** | Canal chiffré des agents, et scripts d'installation et téléchargement de l'agent pour les sites distants. Le seul port nécessaire aux agents d'autres réseaux. |
 | Serveur, entrant | TCP 8080 | Interface web, scripts d'installation et téléchargement de l'agent. Peut rester privé (LAN, VPN). |
 | Agents | aucun | Les agents n'établissent que des connexions sortantes. |
 | Relais avec passerelle | TCP 8443 (réglable), **depuis le réseau du site seulement** | Les agents d'un site qui ne joignent pas le serveur se connectent au relais (voir plus bas). |
@@ -79,8 +79,12 @@ qu'un simple « serveur injoignable ».
 - **Enrôlement freiné.** Les jetons erronés sont comptés par adresse et bloqués
   après quelques essais. Un jeton est à usage unique, sauf s'il est créé
   réutilisable.
-- **Rien ne fuit avant l'authentification.** Le port agents ne sert que le
-  protocole des agents : ni interface, ni version, ni description de l'API.
+- **Rien ne fuit avant l'authentification.** Sans certificat client, le port
+  agents ne répond qu'à l'enrôlement et aux fichiers d'installation publics
+  (`/install.sh`, `/install.ps1`, `/download/<fichier de l'agent>`, les mêmes
+  que sur le port web) : ni interface, ni version, ni description de l'API. Un
+  site distant s'installe par ce seul port : la commande épingle la clé de son
+  certificat et l'empreinte SHA-256 de chaque binaire.
 - **Clés au repos.** La clé privée de l'autorité est chiffrée par la clé de
   l'instance (`/data/secret.key`). Sur l'agent, `agent-tls.json` (clé et
   certificat) est rangé à côté d'`agent.yaml`, lisible par son seul
@@ -154,7 +158,7 @@ Non protégé contre :
   reste) ;
 - quiconque accède à la fois à `/data` et à la clé de l'instance du serveur ;
 - le tout premier téléchargement : le script et le binaire viennent du port
-  web, en HTTPS. La commande affichée dans l'interface porte l'empreinte du
+  web (ou, pour un site distant, du port agents), en HTTPS. La commande affichée dans l'interface porte l'empreinte du
   certificat du serveur et l'épingle, donc le téléchargement est vérifié même
   avec le certificat autosigné (un reverse proxy avec un certificat public est
   vérifié de la façon habituelle). Le canal des agents, lui, est épinglé dès la
@@ -230,6 +234,8 @@ Sur l'agent (`agent.yaml` ou environnement) : `tls_url` /
 agents, l'empreinte de l'autorité, les empreintes des binaires, et les
 commandes d'installation Unix et PowerShell avec `{TOKEN}` à remplacer. Avec
 `relay_id=<relais>` (et éventuellement `relay_host=`), les commandes passent
-par la passerelle de ce relais. Un
+par la passerelle de ce relais. Avec `agent_port_only=true`, scripts et
+binaires viennent eux aussi du port agents : un seul port pour un site
+distant. Un
 générateur GPO ou Ansible doit s'en servir plutôt que de reconstruire la
 commande.

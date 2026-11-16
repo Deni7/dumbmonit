@@ -15,8 +15,9 @@
 //!   certificat en cours). Supprimer la machine révoque le certificat ;
 //! - **épinglage** : l'agent ne reconnaît le serveur qu'à l'empreinte SHA-256
 //!   de l'autorité, que porte la commande d'installation ;
-//! - **installation à travers un relais** : les machines d'un site lisent les
-//!   fichiers d'installation sur ce port, par le tunnel du relais. `curl` et
+//! - **installation par ce seul port** : une machine d'un site distant (en
+//!   direct, ou par le tunnel d'un relais) y lit les fichiers d'installation,
+//!   sans certificat client. `curl` et
 //!   PowerShell y reconnaissent le serveur à la clé publique de son
 //!   certificat, gardée d'un renouvellement à l'autre ([`AgentTls::server_pin`]),
 //!   et peuvent n'y parler que TLS 1.2 (Windows 10, Windows Server 2019) :
