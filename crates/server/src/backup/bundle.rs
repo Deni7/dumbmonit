@@ -218,6 +218,10 @@ pub struct Bundle {
     /// `agent.enrolment` de `settings`, migration 0233).
     #[serde(default)]
     pub agent_enrolment: Option<Value>,
+    /// Déploiement par vagues des mises à jour automatiques des agents : vagues,
+    /// délai, seuil d'arrêt et pause (clé `agent.update_rollout` de `settings`).
+    #[serde(default)]
+    pub agent_update_rollout: Option<Value>,
 }
 
 impl Bundle {

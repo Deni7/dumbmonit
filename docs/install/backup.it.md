@@ -73,6 +73,7 @@ passphrase è persa è perso.
 | `incidents` | Incidenti e annunci di manutenzione, con i loro aggiornamenti. |
 | `users` | Account: nome utente, nome visualizzato, ruolo, collegamento SSO, abilitato o no. |
 | `agent_tokens` | Token di iscrizione agent, come hash. Gli agent installati continuano a inviare dopo un ripristino. |
+| `agent_update_rollout` | Le ondate di rilascio degli aggiornamenti automatici degli agent: ondate, attesa, soglia di errori e pausa. |
 | `api_tokens` | Token API, come hash. I token esistenti continuano a funzionare. |
 | `push_monitors` | Token heartbeat, così gli URL che i tuoi job cron già chiamano restano gli stessi. |
 

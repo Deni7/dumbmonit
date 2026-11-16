@@ -11,6 +11,10 @@
 //! progressif (machines pilotes d'abord), pas de retour en arrière sans
 //! demande, pas de nouvelle tentative automatique d'une version qui a échoué.
 //! L'agent, de son côté, vérifie la signature et peut encore refuser.
+//!
+//! Le déploiement progressif a deux formes : les machines pilotes d'abord
+//! (défaut), ou des vagues ordonnées, avec pause et arrêt sur échec
+//! (`rollout.rs`).
 
 use std::collections::BTreeMap;
 
@@ -22,6 +26,7 @@ use sqlx::{Row, SqlitePool};
 
 use crate::alerting::silence;
 use crate::api::agent_files::{self, ShippedBinary};
+use crate::collectors::agent::rollout::{self, Hold, Member, MemberState, Plan, Rollout};
 use crate::db;
 use crate::state::AppState;
 
@@ -167,6 +172,23 @@ pub enum Gate {
     Open,
     /// Les machines ordinaires attendent les pilotes : pourquoi.
     Waiting(String),
+    /// Déploiement par vagues : la vague de la machine n'est pas ouverte.
+    Wave,
+    /// Pause manuelle.
+    Paused,
+    /// Propagation arrêtée : trop d'échecs dans une vague.
+    Halted,
+}
+
+impl From<Option<Hold>> for Gate {
+    fn from(hold: Option<Hold>) -> Self {
+        match hold {
+            None => Self::Open,
+            Some(Hold::Wave) => Self::Wave,
+            Some(Hold::Paused) => Self::Paused,
+            Some(Hold::Halted) => Self::Halted,
+        }
+    }
 }
 
 /// Ce que la décision rend pour une machine.
@@ -236,10 +258,15 @@ pub fn evaluate(
             }
             _ => {}
         }
-        if !host.canary
-            && let Gate::Waiting(why) = gate
-        {
-            return Verdict::hold("waiting_canary", Some(why.clone()));
+        match gate {
+            Gate::Open => {}
+            Gate::Waiting(why) if !host.canary => {
+                return Verdict::hold("waiting_canary", Some(why.clone()));
+            }
+            Gate::Waiting(_) => {}
+            Gate::Wave => return Verdict::hold("waiting_wave", None),
+            Gate::Paused => return Verdict::hold("paused", None),
+            Gate::Halted => return Verdict::hold("halted", None),
         }
     }
     let recently_offered = host.offered_sha.as_deref() == Some(binary.sha256.as_str())
@@ -424,7 +451,7 @@ const HOST_COLUMNS: &str = "h.target_id, t.name, h.hostname, h.agent_version, h.
      h.agent_platform, h.update_ability, h.update_mode, h.update_canary, h.update_requested_ms,
      h.update_allow_downgrade, h.update_offered_ms, h.update_offered_sha, h.agent_sha_since_ms,
      h.update_outcome, h.update_outcome_sha, h.update_outcome_reason, h.update_outcome_ms,
-     h.update_outcome_to, h.last_seen_at";
+     h.update_outcome_to, h.last_seen_at, h.site, t.group_name, t.tags";
 
 /// Une machine telle que la base la connaît.
 #[derive(Debug, Clone)]
@@ -433,6 +460,11 @@ pub struct HostRow {
     pub name: String,
     pub hostname: String,
     pub last_seen_at: Option<String>,
+    /// Site déclaré par l'agent.
+    pub site: Option<String>,
+    /// Dossier de l'équipement (vide : aucun).
+    pub group: String,
+    pub tags: BTreeMap<String, String>,
     pub state: HostState,
 }
 
@@ -465,6 +497,10 @@ fn row_to_host(row: &sqlx::sqlite::SqliteRow) -> Result<HostRow> {
         name: row.try_get("name")?,
         hostname: row.try_get("hostname")?,
         last_seen_at: row.try_get("last_seen_at")?,
+        site: row.try_get("site")?,
+        group: row.try_get("group_name")?,
+        // Illisibles : sans étiquette plutôt qu'une erreur pour tout le parc.
+        tags: serde_json::from_str(&row.try_get::<String, _>("tags")?).unwrap_or_default(),
         state: HostState {
             agent_version: row.try_get("agent_version")?,
             sha256: row.try_get("agent_sha256")?,
@@ -542,6 +578,81 @@ fn canaries(hosts: &[HostRow], binaries: &Binaries, settings: &Settings) -> Vec<
         .collect()
 }
 
+/// Une machine qu'on n'a pas vue depuis une semaine n'est plus attendue par les
+/// vagues : elle ne doit pas les bloquer.
+const ABANDONED_AFTER_MS: i64 = 7 * 24 * 60 * 60 * 1000;
+
+/// Instant (ms) d'une date du serveur (UTC, sans suffixe ou avec `Z`).
+fn seen_ms(text: &str) -> Option<i64> {
+    let text = text.trim_end_matches('Z');
+    let naive = chrono::NaiveDateTime::parse_from_str(text, "%Y-%m-%dT%H:%M:%S").ok()?;
+    Some(naive.and_utc().timestamp_millis())
+}
+
+/// Les machines que les vagues ordonnent : celles qui peuvent se mettre à
+/// jour, le veulent (une machine exclue, c'est-à-dire épinglée, n'en fait pas
+/// partie) et ont donné signe de vie cette semaine. Le binaire de leur
+/// plateforme doit être livré.
+fn rollout_members(
+    hosts: &[HostRow],
+    binaries: &Binaries,
+    settings: &Settings,
+    rollout: &Rollout,
+    now_ms: i64,
+) -> Vec<Member> {
+    hosts
+        .iter()
+        .filter_map(|host| {
+            let state = &host.state;
+            if !state.enabled(settings) || state.ability.as_deref() != Some("ready") {
+                return None;
+            }
+            let binary = binaries.get(state.platform.as_deref()?)?;
+            let seen = host.last_seen_at.as_deref().and_then(seen_ms);
+            if seen.is_some_and(|seen| now_ms - seen > ABANDONED_AFTER_MS) {
+                return None;
+            }
+            let member_state = if state.up_to_date(binary) {
+                MemberState::Done { since_ms: state.sha_since_ms.unwrap_or(0) }
+            } else if dumbmonit_proto::is_older(server_version(), &state.agent_version) {
+                MemberState::Idle
+            } else {
+                match state.failure_for(binary, settings) {
+                    Some(outcome) if outcome.at_ms > rollout.forgiven_before_ms => {
+                        MemberState::Failed
+                    }
+                    Some(_) => MemberState::Idle,
+                    None => MemberState::Pending,
+                }
+            };
+            Some(Member {
+                id: host.target_id,
+                canary: state.canary,
+                site: host.site.clone(),
+                group: host.group.clone(),
+                tags: host.tags.clone(),
+                state: member_state,
+            })
+        })
+        .collect()
+}
+
+/// Le plan des vagues ; `None` quand aucune n'est configurée (déploiement
+/// « pilotes d'abord »).
+fn wave_plan(
+    hosts: &[HostRow],
+    binaries: &Binaries,
+    settings: &Settings,
+    rollout: &Rollout,
+    now_ms: i64,
+) -> Option<Plan> {
+    if rollout.waves.is_empty() {
+        return None;
+    }
+    let members = rollout_members(hosts, binaries, settings, rollout, now_ms);
+    Some(rollout::plan(rollout, &members, now_ms))
+}
+
 /// Machine sous une fenêtre de maintenance (silence) en ce moment.
 fn in_maintenance(silences: &[silence::Silence], target_id: TargetId) -> bool {
     silence::first_match(silences, Utc::now(), Some(target_id), &BTreeMap::new()).is_some()
@@ -581,12 +692,24 @@ pub async fn offer_for(state: &AppState, target_id: TargetId) -> Result<Option<A
         let silences = db::alerts::list_silences(pool).await?;
         host.state.in_maintenance = in_maintenance(&silences, target_id);
     }
-    let gate = if host.state.canary || host.state.requested_ms.is_some() {
+    let rollout = rollout::load(pool).await?;
+    let gate = if host.state.requested_ms.is_some() {
         Gate::Open
+    } else if rollout.paused {
+        Gate::Paused
+    } else if rollout.waves.is_empty() {
+        if host.state.canary {
+            Gate::Open
+        } else {
+            let hosts = hosts(pool).await?;
+            let binaries = binaries(&state.config.agent_dir).await;
+            gate(&canaries(&hosts, &binaries, &settings), settings.canary_minutes, now_ms())
+        }
     } else {
         let hosts = hosts(pool).await?;
         let binaries = binaries(&state.config.agent_dir).await;
-        gate(&canaries(&hosts, &binaries, &settings), settings.canary_minutes, now_ms())
+        let plan = wave_plan(&hosts, &binaries, &settings, &rollout, now_ms());
+        Gate::from(plan.and_then(|plan| plan.hold_for(target_id)))
     };
     let verdict =
         evaluate(&settings, &host.state, Some(&binary), server_version(), &gate, now_ms());
@@ -675,6 +798,68 @@ pub async fn set_host(
     Ok(found)
 }
 
+/// Modification partielle de la politique de vagues.
+#[derive(Debug, Clone, Default)]
+pub struct RolloutChange {
+    pub waves: Option<Vec<rollout::Wave>>,
+    pub delay_minutes: Option<u32>,
+    pub max_failure_percent: Option<u32>,
+}
+
+/// Change la politique de vagues (champs absents inchangés). Rend le message
+/// d'erreur de l'API quand elle ne tient pas.
+pub async fn change_rollout(
+    pool: &SqlitePool,
+    change: RolloutChange,
+) -> Result<std::result::Result<(), String>> {
+    let mut rollout = rollout::load(pool).await?;
+    if let Some(waves) = change.waves {
+        rollout.waves = waves;
+    }
+    if let Some(minutes) = change.delay_minutes {
+        rollout.delay_minutes = minutes;
+    }
+    if let Some(percent) = change.max_failure_percent {
+        rollout.max_failure_percent = percent;
+    }
+    if let Err(message) = rollout.validate() {
+        return Ok(Err(message));
+    }
+    rollout::save(pool, &rollout).await?;
+    Ok(Ok(()))
+}
+
+/// Pause manuelle : plus aucune offre automatique, « Update now » mis à part.
+pub async fn pause_rollout(pool: &SqlitePool) -> Result<()> {
+    let mut rollout = rollout::load(pool).await?;
+    if !rollout.paused {
+        rollout.paused = true;
+        rollout::save(pool, &rollout).await?;
+    }
+    Ok(())
+}
+
+/// Reprise, après une pause ou un arrêt sur échec. Reprendre un arrêt pardonne
+/// les échecs déjà rapportés : sans cela il se redéclencherait aussitôt.
+pub async fn resume_rollout(state: &AppState) -> Result<()> {
+    let pool = &state.pool;
+    let mut rollout = rollout::load(pool).await?;
+    let settings = settings(pool).await?;
+    let binaries = binaries(&state.config.agent_dir).await;
+    let hosts = hosts(pool).await?;
+    let now = now_ms();
+    let halted = wave_plan(&hosts, &binaries, &settings, &rollout, now)
+        .is_some_and(|plan| plan.halt.is_some());
+    if halted {
+        rollout.forgiven_before_ms = now;
+    }
+    if halted || rollout.paused {
+        rollout.paused = false;
+        rollout::save(pool, &rollout).await?;
+    }
+    Ok(())
+}
+
 /// « Update now » : la machine reçoit l'offre à son prochain lot, hors
 /// fenêtre et hors déploiement progressif, et retente une version en échec.
 pub async fn request(
@@ -732,6 +917,8 @@ pub struct AgentView {
     pub enabled: Option<bool>,
     pub canary: bool,
     pub requested: bool,
+    /// Rang (à partir de 1) de sa vague, si des vagues sont configurées.
+    pub wave: Option<usize>,
     pub status: &'static str,
     pub reason: Option<String>,
     pub last: Option<Outcome>,
@@ -746,13 +933,54 @@ pub struct BinaryView {
     pub signed: bool,
 }
 
+/// Une vague, dans la vue de l'interface.
+#[derive(Debug, Clone, Serialize)]
+pub struct WaveView {
+    /// Sa sélection ; `null` : la dernière vague, « tout le reste ».
+    pub select: Option<rollout::Wave>,
+    pub members: usize,
+    pub updated: usize,
+    pub failed: usize,
+    /// `done` (plus rien à mettre à jour), `active` (ouverte), `waiting`
+    /// (la suivante, quand elle n'attend plus que le délai ou la précédente)
+    /// ou `upcoming`.
+    pub state: &'static str,
+}
+
+/// L'arrêt automatique, dans la vue de l'interface.
+#[derive(Debug, Clone, Serialize)]
+pub struct HaltView {
+    /// Rang (à partir de 1) de la vague en cause.
+    pub wave: usize,
+    pub failed: usize,
+    pub attempted: usize,
+}
+
+/// La politique de vagues, dans la vue de l'interface.
+#[derive(Debug, Clone, Serialize)]
+pub struct PolicyView {
+    pub waves: Vec<rollout::Wave>,
+    pub delay_minutes: u32,
+    pub max_failure_percent: u32,
+}
+
 /// Feu du déploiement, dans la vue de l'interface.
 #[derive(Debug, Clone, Serialize)]
 pub struct RolloutView {
     pub canaries: usize,
     pub canaries_updated: usize,
+    /// Les machines qui ne sont pas pilotes peuvent se mettre à jour.
     pub open: bool,
     pub reason: Option<String>,
+    /// Politique de vagues (aucune : pilotes d'abord).
+    pub policy: PolicyView,
+    pub paused: bool,
+    pub halted: Option<HaltView>,
+    pub waves: Vec<WaveView>,
+    /// Rang (à partir de 1) de la vague en cours.
+    pub current_wave: Option<usize>,
+    /// Ouverture de la prochaine vague, quand seul le délai l'en sépare.
+    pub next_wave_at: Option<String>,
 }
 
 /// `GET /api/agent/updates`
@@ -769,6 +997,63 @@ pub struct Overview {
     pub agents: Vec<AgentView>,
 }
 
+fn rollout_view(
+    rollout: &Rollout,
+    plan: Option<&Plan>,
+    canaries: &[Canary],
+    legacy_gate: &Gate,
+) -> RolloutView {
+    let (open, reason) = match (plan, legacy_gate) {
+        _ if rollout.paused => (false, None),
+        (Some(plan), _) => (plan.fully_open(), None),
+        (None, Gate::Open) => (true, None),
+        (None, Gate::Waiting(why)) => (false, Some(why.clone())),
+        (None, _) => (false, None),
+    };
+    let waves = plan.map_or_else(Vec::new, |plan| {
+        let current = plan.current();
+        plan.waves
+            .iter()
+            .enumerate()
+            .map(|(k, wave)| WaveView {
+                select: wave.wave.clone(),
+                members: wave.members.len(),
+                updated: wave.done,
+                failed: wave.failed,
+                state: if wave.pending == 0 && k < plan.open_count {
+                    "done"
+                } else if current == Some(k) {
+                    "active"
+                } else if k == plan.open_count && plan.next_at_ms.is_some() {
+                    "waiting"
+                } else {
+                    "upcoming"
+                },
+            })
+            .collect()
+    });
+    RolloutView {
+        canaries: canaries.len(),
+        canaries_updated: canaries.iter().filter(|canary| canary.up_to_date).count(),
+        open,
+        reason,
+        policy: PolicyView {
+            waves: rollout.waves.clone(),
+            delay_minutes: rollout.delay_minutes,
+            max_failure_percent: rollout.max_failure_percent,
+        },
+        paused: rollout.paused,
+        halted: plan.and_then(|plan| plan.halt).map(|halt| HaltView {
+            wave: halt.wave + 1,
+            failed: halt.failed,
+            attempted: halt.attempted,
+        }),
+        waves,
+        current_wave: plan.and_then(Plan::current).map(|k| k + 1),
+        next_wave_at: plan.and_then(|plan| plan.next_at_ms).and_then(at),
+    }
+}
+
 pub async fn overview(state: &AppState) -> Result<Overview> {
     let pool = &state.pool;
     let settings = settings(pool).await?;
@@ -781,12 +1066,19 @@ pub async fn overview(state: &AppState) -> Result<Overview> {
     };
     let canaries = canaries(&hosts, &binaries, &settings);
     let now = now_ms();
-    let gate = gate(&canaries, settings.canary_minutes, now);
+    let rollout = rollout::load(pool).await?;
+    let plan = wave_plan(&hosts, &binaries, &settings, &rollout, now);
+    let legacy_gate = gate(&canaries, settings.canary_minutes, now);
     let mut agents = Vec::with_capacity(hosts.len());
     for host in &mut hosts {
         host.state.in_maintenance = in_maintenance(&silences, host.target_id);
         let binary = host.state.platform.as_deref().and_then(|p| binaries.get(p));
-        let verdict = evaluate(&settings, &host.state, binary, server_version(), &gate, now);
+        let host_gate = match &plan {
+            _ if rollout.paused => Gate::Paused,
+            Some(plan) => Gate::from(plan.hold_for(host.target_id)),
+            None => legacy_gate.clone(),
+        };
+        let verdict = evaluate(&settings, &host.state, binary, server_version(), &host_gate, now);
         agents.push(AgentView {
             id: host.target_id,
             name: host.name.clone(),
@@ -797,6 +1089,7 @@ pub async fn overview(state: &AppState) -> Result<Overview> {
             enabled: host.state.mode,
             canary: host.state.canary,
             requested: host.state.requested_ms.is_some(),
+            wave: plan.as_ref().and_then(|plan| plan.wave_of(host.target_id)).map(|k| k + 1),
             status: verdict.status,
             reason: verdict.reason,
             last: host.state.outcome.clone(),
@@ -806,15 +1099,7 @@ pub async fn overview(state: &AppState) -> Result<Overview> {
     Ok(Overview {
         blocked_unsigned: !settings.allow_unsigned
             && binaries.values().any(|binary| binary.signature.is_none()),
-        rollout: RolloutView {
-            canaries: canaries.len(),
-            canaries_updated: canaries.iter().filter(|canary| canary.up_to_date).count(),
-            open: gate == Gate::Open,
-            reason: match gate {
-                Gate::Open => None,
-                Gate::Waiting(why) => Some(why),
-            },
-        },
+        rollout: rollout_view(&rollout, plan.as_ref(), &canaries, &legacy_gate),
         binaries: binaries
             .iter()
             .map(|(platform, binary)| BinaryView {
@@ -1030,5 +1315,123 @@ mod tests {
         assert_eq!(decide(&Settings::default(), &offered, &Gate::Open).status, "updating");
         let stale = HostState { offered_ms: Some(NOW - UPDATING_FOR_MS - 1), ..offered };
         assert_eq!(decide(&Settings::default(), &stale, &Gate::Open).status, "pending");
+    }
+
+    #[test]
+    fn waves_pause_and_halt_hold_the_offer_unless_asked() {
+        let cases = [
+            (Gate::Wave, "waiting_wave"),
+            (Gate::Paused, "paused"),
+            (Gate::Halted, "halted"),
+        ];
+        for (gate, status) in cases {
+            let verdict = decide(&Settings::default(), &host(), &gate);
+            assert_eq!((verdict.status, verdict.offer), (status, false));
+            let asked = HostState { requested_ms: Some(NOW - 1), ..host() };
+            assert!(decide(&Settings::default(), &asked, &gate).offer, "Update now passe outre");
+        }
+    }
+
+    fn row(id: TargetId, state: HostState) -> HostRow {
+        HostRow {
+            target_id: id,
+            name: format!("agent-{id}"),
+            hostname: format!("agent-{id}"),
+            last_seen_at: at(NOW),
+            site: None,
+            group: String::new(),
+            tags: BTreeMap::new(),
+            state,
+        }
+    }
+
+    fn shipped() -> Binaries {
+        BTreeMap::from([("linux-x86_64".to_string(), binary())])
+    }
+
+    #[test]
+    fn only_agents_that_can_and_want_to_update_are_ordered_in_waves() {
+        let policy = Rollout::default();
+        let mut paris = row(1, host());
+        paris.site = Some("Paris".into());
+        paris.group = "prod".into();
+        paris.tags.insert("env".into(), "prod".into());
+        let pinned = row(2, HostState { mode: Some(false), ..host() });
+        let container = row(3, HostState { ability: Some("container".into()), ..host() });
+        let mut gone = row(4, host());
+        gone.last_seen_at = at(NOW - ABANDONED_AFTER_MS - 1);
+        let running = HostState { sha256: Some("b".repeat(64)), sha_since_ms: Some(7), ..host() };
+        let current = row(5, running);
+        let newer = row(6, HostState { agent_version: "99.0.0".into(), ..host() });
+        let failed = row(7, HostState { outcome: failure("rolled_back", NOW - 5), ..host() });
+        let forgiven = row(8, HostState { outcome: failure("failed", NOW - 5), ..host() });
+        let pilot = row(9, HostState { canary: true, ..host() });
+        let hosts = vec![paris, pinned, container, gone, current, newer, failed, forgiven, pilot];
+
+        let members = rollout_members(&hosts, &shipped(), &Settings::default(), &policy, NOW);
+        let by_id = |id: TargetId| members.iter().find(|member| member.id == id);
+        for excluded in [2, 3, 4] {
+            assert!(by_id(excluded).is_none(), "agent {excluded} ne fait partie d'aucune vague");
+        }
+        let paris = by_id(1).expect("membre");
+        assert_eq!(paris.state, MemberState::Pending);
+        assert_eq!(paris.site.as_deref(), Some("Paris"));
+        assert_eq!(paris.group, "prod");
+        assert_eq!(paris.tags.get("env").map(String::as_str), Some("prod"));
+        assert_eq!(by_id(5).unwrap().state, MemberState::Done { since_ms: 7 });
+        assert_eq!(by_id(6).unwrap().state, MemberState::Idle, "plus récent que le serveur");
+        assert_eq!(by_id(7).unwrap().state, MemberState::Failed);
+        assert_eq!(by_id(8).unwrap().state, MemberState::Failed);
+        assert!(by_id(9).unwrap().canary);
+
+        let forgiving = Rollout { forgiven_before_ms: NOW, ..Rollout::default() };
+        let members = rollout_members(&hosts, &shipped(), &Settings::default(), &forgiving, NOW);
+        let state = |id: TargetId| members.iter().find(|member| member.id == id).unwrap().state;
+        assert_eq!(state(8), MemberState::Idle, "un échec pardonné ne compte plus");
+        assert_eq!(state(7), MemberState::Idle);
+    }
+
+    #[test]
+    fn a_failing_wave_stops_the_rollout_and_resuming_forgives_it() {
+        let policy = Rollout {
+            waves: vec![rollout::Wave::Count { value: 2 }],
+            delay_minutes: 0,
+            max_failure_percent: 50,
+            ..Rollout::default()
+        };
+        let settings = Settings::default();
+        let mut hosts: Vec<HostRow> = (1..=6).map(|id| row(id, host())).collect();
+        let first = wave_plan(&hosts, &shipped(), &settings, &policy, NOW).expect("des vagues");
+        assert_eq!(first.open_count, 1);
+        let (failing, other) = (first.waves[0].members[0], first.waves[0].members[1]);
+        let outsider = first.waves[1].members[0];
+        assert_eq!(first.hold_for(outsider), Some(Hold::Wave));
+        assert_eq!(first.hold_for(other), None);
+
+        // Un des deux canaris échoue : 1 sur 1 tentative, au-dessus de 50 %.
+        for host in &mut hosts {
+            if host.target_id == failing {
+                host.state.outcome = failure("rolled_back", NOW - 5);
+            }
+        }
+        let stopped = wave_plan(&hosts, &shipped(), &settings, &policy, NOW).unwrap();
+        assert!(stopped.halt.is_some());
+        let verdict = |plan: &Plan, id: TargetId| {
+            let state = &hosts.iter().find(|host| host.target_id == id).unwrap().state;
+            let gate = Gate::from(plan.hold_for(id));
+            evaluate(&settings, state, Some(&binary()), "0.14.0", &gate, NOW)
+        };
+        for id in [other, outsider] {
+            assert_eq!(verdict(&stopped, id).status, "halted");
+        }
+        assert_eq!(verdict(&stopped, failing).status, "failed", "son propre échec reste dit");
+
+        // Reprise : l'échec est pardonné, le canari restant est de nouveau
+        // offert, la deuxième vague attend toujours le canari.
+        let resumed = Rollout { forgiven_before_ms: NOW, ..policy };
+        let plan = wave_plan(&hosts, &shipped(), &settings, &resumed, NOW).unwrap();
+        assert!(plan.halt.is_none());
+        assert!(verdict(&plan, other).offer);
+        assert_eq!(verdict(&plan, outsider).status, "waiting_wave");
     }
 }

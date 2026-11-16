@@ -5368,7 +5368,8 @@ paths:
       summary: Automatic agent updates (admin only)
       description: >-
         Settings, the agent binaries this server ships (with their signature
-        state), the canary rollout gate and, for each agent, its version and
+        state), the rollout (canary agents first, or ordered waves, with the
+        pause and the automatic stop) and, for each agent, its version and
         update status. This is the agent binary itself, not Docker containers.
       security: [{ cookieAuth: [] }]
       x-token-scope: none
@@ -5413,6 +5414,81 @@ paths:
         Every agent able to replace itself and older than this server's build
         gets the update at its next report, outside the window and the canary
         rollout, and retries a version that failed.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "200":
+          description: Update state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgentUpdates" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/agent/updates/rollout:
+    put:
+      operationId: setAgentUpdateRollout
+      tags: [Agents]
+      summary: Set the rollout waves of the agent updates
+      description: >-
+        Without waves (the default) the rollout is the historical one: canary
+        agents first, then everyone. With waves, agents are ordered: each wave
+        takes, among the agents the previous waves did not take, a number of
+        agents (`count`), enough agents to reach a share of the fleet
+        (`percent`, cumulative), or those of a `site`, a `group` (the folder of
+        the device) or a `tag`. The agents no wave takes form a last implicit
+        wave; agents marked canary are always in the first one. A wave opens
+        once the previous one has no agent left to update and its last agent
+        has run the new build for `delay_minutes`. If, in a wave, the share of
+        agents that failed (failed, rolled back or refused) among those that
+        tried reaches `max_failure_percent`, the propagation stops until
+        `resume`. Agents whose updates are turned off are in no wave (their
+        version is pinned). Omitted fields are unchanged; `waves: []` goes back
+        to the historical rollout.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgentUpdateRolloutChange" }
+      responses:
+        "200":
+          description: Update state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgentUpdates" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/agent/updates/rollout/pause:
+    post:
+      operationId: pauseAgentUpdateRollout
+      tags: [Agents]
+      summary: Pause the rollout
+      description: >-
+        No agent gets an automatic offer until `resume`. "Update now" still works.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "200":
+          description: Update state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgentUpdates" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/agent/updates/rollout/resume:
+    post:
+      operationId: resumeAgentUpdateRollout
+      tags: [Agents]
+      summary: Resume the rollout after a pause or an automatic stop
+      description: >-
+        Resuming a stop forgives the failures already reported, so the stop does
+        not trigger again at once; the agents that failed stay on their version
+        until "Update now".
       security: [{ cookieAuth: [] }]
       x-token-scope: none
       responses:
@@ -11670,6 +11746,49 @@ components:
         window: { type: string, enum: [any, maintenance, manual] }
         canary_minutes: { type: integer, minimum: 0, maximum: 10080 }
         allow_unsigned: { type: boolean }
+    AgentUpdateWave:
+      description: >-
+        One wave. `count`: that many more agents; `percent`: enough agents so that
+        the waves so far cover that share of the fleet (1 to 100); `site`: the
+        agents that declare this site; `group`: the agents whose device is in this
+        folder; `tag`: the agents whose device carries this tag (with this value
+        when given). Names compare without regard to case.
+      oneOf:
+        - type: object
+          required: [by, value]
+          properties:
+            by: { const: count }
+            value: { type: integer, minimum: 1, maximum: 100000 }
+        - type: object
+          required: [by, value]
+          properties:
+            by: { const: percent }
+            value: { type: integer, minimum: 1, maximum: 100 }
+        - type: object
+          required: [by, value]
+          properties:
+            by: { const: site }
+            value: { type: string, minLength: 1, maxLength: 80 }
+        - type: object
+          required: [by, value]
+          properties:
+            by: { const: group }
+            value: { type: string, minLength: 1, maxLength: 80 }
+        - type: object
+          required: [by, key]
+          properties:
+            by: { const: tag }
+            key: { type: string, minLength: 1, maxLength: 80 }
+            value: { type: [string, "null"], maxLength: 80 }
+    AgentUpdateRolloutChange:
+      type: object
+      properties:
+        waves:
+          type: array
+          maxItems: 20
+          items: { $ref: "#/components/schemas/AgentUpdateWave" }
+        delay_minutes: { type: integer, minimum: 0, maximum: 10080, description: Minutes between the end of a wave and the opening of the next (default 60). }
+        max_failure_percent: { type: integer, minimum: 0, maximum: 100, description: Share of failed agents in a wave that stops the propagation; 0 never stops (default 20). }
     AgentUpdates:
       type: object
       required: [settings, version, binaries, rollout, agents]
@@ -11689,12 +11808,46 @@ components:
               signed: { type: boolean }
         rollout:
           type: object
-          required: [canaries, canaries_updated, open]
+          required: [canaries, canaries_updated, open, policy, paused, waves]
           properties:
             canaries: { type: integer }
             canaries_updated: { type: integer }
-            open: { type: boolean, description: Agents that are not canaries may update. }
-            reason: { type: [string, "null"] }
+            open: { type: boolean, description: Agents that are not canaries may update (every wave is open, nothing is paused or stopped). }
+            reason: { type: [string, "null"], description: Why the other agents wait, without waves. }
+            policy:
+              type: object
+              required: [waves, delay_minutes, max_failure_percent]
+              properties:
+                waves:
+                  type: array
+                  items: { $ref: "#/components/schemas/AgentUpdateWave" }
+                delay_minutes: { type: integer }
+                max_failure_percent: { type: integer }
+            paused: { type: boolean }
+            halted:
+              type: [object, "null"]
+              description: The propagation stopped because too many agents failed in a wave.
+              properties:
+                wave: { type: integer, description: Rank of that wave, from 1. }
+                failed: { type: integer }
+                attempted: { type: integer }
+            waves:
+              type: array
+              description: The waves in order, the implicit last one included (`select` is null). Empty without waves.
+              items:
+                type: object
+                required: [members, updated, failed, state]
+                properties:
+                  select:
+                    oneOf:
+                      - { $ref: "#/components/schemas/AgentUpdateWave" }
+                      - { type: "null" }
+                  members: { type: integer }
+                  updated: { type: integer }
+                  failed: { type: integer }
+                  state: { type: string, enum: [done, active, waiting, upcoming] }
+            current_wave: { type: [integer, "null"], description: Rank, from 1, of the wave being updated. }
+            next_wave_at: { type: [string, "null"], description: When the next wave opens, if only its delay holds it back (UTC, no suffix). }
         agents:
           type: array
           items:
@@ -11710,9 +11863,10 @@ components:
               enabled: { type: [boolean, "null"], description: Per-agent override; null follows the global setting. }
               canary: { type: boolean }
               requested: { type: boolean, description: Update now was asked and has not been answered yet. }
+              wave: { type: [integer, "null"], description: "Rank, from 1, of the agent's wave; null without waves or when it is in none." }
               status:
                 type: string
-                enum: [up_to_date, pending, updating, failed, refused, disabled, manual, waiting_window, waiting_canary, newer, legacy, container, read_only, disabled_locally, unsupported, no_binary, unsigned]
+                enum: [up_to_date, pending, updating, failed, refused, disabled, manual, waiting_window, waiting_canary, waiting_wave, paused, halted, newer, legacy, container, read_only, disabled_locally, unsupported, no_binary, unsigned]
               reason: { type: [string, "null"] }
               last:
                 type: [object, "null"]

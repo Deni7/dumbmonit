@@ -136,6 +136,7 @@ pub async fn restore(
     report.push(restore_overrides(&mut tx, bundle, &refs).await?);
     report.push(restore_notify_policy(&mut tx, bundle).await?);
     report.push(restore_agent_enrolment(&mut tx, bundle).await?);
+    report.push(restore_agent_update_rollout(&mut tx, bundle).await?);
     report.push(restore_instance(&mut tx, bundle).await?);
     report.push(restore_silences(&mut tx, bundle, &refs).await?);
     report.push(restore_status_pages(&mut tx, bundle, &refs).await?);
@@ -965,6 +966,61 @@ async fn restore_agent_enrolment(
     .execute(&mut **tx)
     .await
     .context("écriture de la garde de l'enrôlement")?;
+    report.count(if existing.is_some() {
+        RestoreOutcome::Updated
+    } else {
+        RestoreOutcome::Created
+    });
+    Ok(report)
+}
+
+/// Déploiement par vagues des mises à jour des agents : remplacé par celui du
+/// lot, après contrôle. Un réglage illisible ou invalide est signalé et laissé
+/// de côté, l'instance garde le sien ; un lot d'avant cette section n'y touche pas.
+async fn restore_agent_update_rollout(
+    tx: &mut Transaction<'_, Sqlite>,
+    bundle: &Bundle,
+) -> Result<SectionReport> {
+    use crate::collectors::agent::rollout::{Rollout, SETTINGS_KEY};
+    let mut report = SectionReport::new("agent_update_rollout");
+    let Some(raw) = &bundle.agent_update_rollout else { return Ok(report) };
+    let rollout = match serde_json::from_value::<Rollout>(raw.clone()) {
+        Ok(rollout) if rollout.validate().is_ok() => rollout,
+        _ => {
+            report.skipped += 1;
+            let note = "The agent update rollout settings of the backup are unreadable";
+            report.notes.push(note.into());
+            return Ok(report);
+        }
+    };
+    let existing = sqlx::query("SELECT value FROM settings WHERE key = ?")
+        .bind(SETTINGS_KEY)
+        .fetch_optional(&mut **tx)
+        .await
+        .context("lecture du déploiement par vagues des agents")?;
+    let value = serde_json::to_vec(&rollout)?;
+    match &existing {
+        Some(row) if row.try_get::<Vec<u8>, _>("value")? == value => {
+            report.skipped += 1;
+            return Ok(report);
+        }
+        // Rien de rangé et la politique par défaut : rien à restaurer.
+        None if rollout == Rollout::default() => {
+            report.skipped += 1;
+            return Ok(report);
+        }
+        _ => {}
+    }
+    sqlx::query(
+        "INSERT INTO settings (key, value) VALUES (?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value,
+             updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')",
+    )
+    .bind(SETTINGS_KEY)
+    .bind(&value)
+    .execute(&mut **tx)
+    .await
+    .context("écriture du déploiement par vagues des agents")?;
     report.count(if existing.is_some() {
         RestoreOutcome::Updated
     } else {

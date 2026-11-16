@@ -71,6 +71,7 @@ frase-passe se perdeu está perdido.
 | `incidents` | Incidentes e anúncios de manutenção, com as suas atualizações. |
 | `users` | Contas: nome de utilizador, nome de exibição, função, ligação SSO, ativada ou não. |
 | `agent_tokens` | Tokens de registo de agente, como hashes. Os agentes instalados continuam a enviar depois de um restauro. |
+| `agent_update_rollout` | As vagas de implementação das atualizações automáticas dos agentes: vagas, espera, limite de falhas e pausa. |
 | `api_tokens` | Tokens de API, como hashes. Os tokens existentes continuam a funcionar. |
 | `push_monitors` | Tokens de heartbeat, para que os URLs que as suas tarefas cron já chamam permaneçam os mesmos. |
 

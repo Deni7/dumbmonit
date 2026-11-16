@@ -76,6 +76,7 @@ Bündel, dessen Passphrase verloren ist, ist verloren.
 | `incidents` | Vorfälle und Wartungsankündigungen, mit ihren Updates. |
 | `users` | Konten: Benutzername, Anzeigename, Rolle, SSO-Verknüpfung, aktiviert oder nicht. |
 | `agent_tokens` | Agent-Enrollment-Tokens, als Hashes. Installierte Agents pushen nach einer Wiederherstellung weiter. |
+| `agent_update_rollout` | Die Rollout-Wellen der automatischen Agent-Updates: Wellen, Wartezeit, Fehlerschwelle und Pause. |
 | `api_tokens` | API-Tokens, als Hashes. Bestehende Tokens funktionieren weiter. |
 | `push_monitors` | Heartbeat-Tokens, sodass die URLs, die Ihre Cron-Jobs schon aufrufen, gleich bleiben. |
 

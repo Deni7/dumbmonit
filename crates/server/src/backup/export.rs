@@ -102,6 +102,9 @@ pub async fn collect(pool: &SqlitePool, cipher: &Cipher, options: ExportOptions)
         agent_enrolment: Some(serde_json::to_value(
             crate::collectors::agent::enrolment::load_settings(pool).await?,
         )?),
+        agent_update_rollout: Some(serde_json::to_value(
+            crate::collectors::agent::rollout::load(pool).await?,
+        )?),
     })
 }
 

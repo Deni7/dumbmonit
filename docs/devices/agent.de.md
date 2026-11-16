@@ -709,6 +709,31 @@ wäre.
 Wie man es Schritt für Schritt einrichtet, steht unter
 [Einen entfernten Standort überwachen](../install/remote-site.md).
 
+## Rollout in Wellen für Agent-Updates {#automatic-updates-waves}
+
+Agenten aktualisieren sich selbst: Der Server bietet sein eigenes signiertes Binary an. Standardmäßig aktualisieren sich Agenten mit der Markierung **Canary** zuerst und alle anderen folgen: Für ein Homelab ist nichts einzustellen. Für eine größere Flotte ordnet **Einstellungen → Agenten → Agent-Updates → Rollout → Rollout-Wellen** die Flotte in aufeinanderfolgenden Wellen. Dieselben Einstellungen gibt es über `PUT /api/agent/updates/rollout`, `POST /api/agent/updates/rollout/pause` und `POST /api/agent/updates/rollout/resume`.
+
+Jede Welle nimmt Agenten aus denen, die die vorherigen Wellen nicht genommen haben:
+
+| Welle | Nimmt |
+|---|---|
+| Eine Anzahl Agenten | So viele Agenten mehr: ein Canary aus ein oder zwei Rechnern. |
+| Anteil der Flotte (%) | So viele Agenten, dass die bisherigen Wellen diesen Anteil abdecken (kumulativ: 5, dann 25, dann 100). Es kommen immer dieselben Agenten zuerst. |
+| Standort | Die Agenten, die diesen Standort melden (`site` in der Agent-Konfiguration). |
+| Ordner | Die Agenten, deren Gerät in diesem Ordner der Geräteseite liegt. |
+| Tag | Die Agenten, deren Gerät diesen Tag trägt, mit diesem Wert, falls angegeben. |
+
+Die Agenten, die keine Welle nimmt, bilden eine letzte Welle. Als **Canary** markierte Agenten sind immer in der ersten Welle. Namen werden ohne Beachtung der Groß- und Kleinschreibung verglichen.
+
+- Eine Welle öffnet sich, wenn die vorherige keinen zu aktualisierenden Agenten mehr hat und ihr letzter Agent den neuen Build seit der **Wartezeit zwischen Wellen** (Standard 60 Minuten) ausführt. Eine leere Welle wird übersprungen.
+- **Automatischer Stopp**: Erreicht in einer Welle der Anteil fehlgeschlagener Agenten (Fehler, Rollback oder Ablehnung) unter denen, die es versucht haben, den Schwellenwert (Standard 20 %, 0 stoppt nie), erhält kein Agent mehr ein automatisches Angebot, und ihr Status lautet *Gestoppt*. Die Seite nennt die Welle. **Rollout fortsetzen** verzeiht die bisher gemeldeten Fehler, damit der Stopp nicht sofort wieder auslöst; fehlgeschlagene Agenten behalten ihre Version bis **Jetzt aktualisieren**.
+- **Pause**: *Rollout pausieren* hält alle automatischen Angebote bis *Rollout fortsetzen* zurück.
+- **Version anheften**: Ein Agent, dessen Updates auf *Aus* stehen (Einstellung pro Agent), liegt in keiner Welle und behält seine Version.
+- **Jetzt aktualisieren** und **Alle jetzt aktualisieren** ignorieren Wellen, Pause und Stopp.
+- Agenten, die eine Woche lang nicht gesehen wurden, bleiben außerhalb der Wellen: Ein ausgemusterter Rechner blockiert nie den Rollout.
+- Auf Agentenseite ändert sich nichts: Agenten melden in jedem Paket bereits das Ergebnis jedes Versuchs (Version, Erfolg, Fehler, Rollback). Ohne konfigurierte Wellen verläuft der Rollout wie bisher.
+- Wellen, Wartezeit, Schwellenwert und Pause sind Teil der Sicherung.
+
 ## Bindung: ein Rechner, ein Agent {#binding-one-machine-one-agent}
 
 Ein Enrollment-Token sagt *dieser Rechner darf sprechen*. Es sagt nicht, *welcher* Rechner

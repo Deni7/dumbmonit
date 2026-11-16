@@ -740,6 +740,31 @@ senza VPN e senza nulla da aprire sul lato remoto.
 
 Come configurarlo, passo per passo, è descritto in [Monitorare un sito remoto](../install/remote-site.md).
 
+## Rilascio degli aggiornamenti degli agent a ondate {#automatic-updates-waves}
+
+Gli agent si aggiornano da soli: il server offre il proprio binario firmato. Per impostazione predefinita gli agent contrassegnati come **canary** si aggiornano per primi e gli altri seguono: in un homelab non c'è nulla da configurare. Per un parco più grande, **Impostazioni → Agent → Aggiornamenti degli agent → Rilascio → Ondate di rilascio** ordina il parco in ondate successive. Le stesse impostazioni sono disponibili con `PUT /api/agent/updates/rollout`, `POST /api/agent/updates/rollout/pause` e `POST /api/agent/updates/rollout/resume`.
+
+Ogni ondata prende agent tra quelli che le ondate precedenti non hanno preso:
+
+| Ondata | Prende |
+|---|---|
+| Un numero di agent | Altrettanti agent in più: un canary di una o due macchine. |
+| Quota del parco (%) | Gli agent necessari perché le ondate finora coprano quella quota (cumulativo: 5, poi 25, poi 100). Passano sempre per primi gli stessi agent. |
+| Sito | Gli agent che dichiarano questo sito (`site` nella configurazione dell'agent). |
+| Cartella | Gli agent il cui dispositivo si trova in questa cartella della pagina dei dispositivi. |
+| Tag | Gli agent il cui dispositivo ha questo tag, con questo valore se indicato. |
+
+Gli agent che nessuna ondata prende formano un'ultima ondata. Gli agent contrassegnati come **canary** sono sempre nella prima. I nomi si confrontano senza distinguere maiuscole e minuscole.
+
+- Un'ondata si apre quando la precedente non ha più agent da aggiornare e il suo ultimo agent esegue la nuova build da almeno l'**attesa tra le ondate** (60 minuti per impostazione predefinita). Un'ondata vuota viene saltata.
+- **Arresto automatico**: se, in un'ondata, la quota di agent falliti (errore, ripristino o rifiuto) tra quelli che ci hanno provato raggiunge la soglia (20% per impostazione predefinita, 0 non si ferma mai), nessun agent riceve più offerte automatiche e il loro stato indica *Interrotto*. La pagina dice in quale ondata. **Riprendi il rilascio** perdona gli errori già segnalati, così l'arresto non scatta di nuovo subito; gli agent falliti mantengono la loro versione fino a **Aggiorna ora**.
+- **Pausa**: *Metti in pausa il rilascio* trattiene tutte le offerte automatiche fino a *Riprendi il rilascio*.
+- **Bloccare una versione**: un agent con gli aggiornamenti su *Off* (impostazione per agent) non è in nessuna ondata e mantiene la sua versione.
+- **Aggiorna ora** e **Aggiorna tutti ora** ignorano ondate, pausa e arresto.
+- Gli agent non visti da una settimana restano fuori dalle ondate: una macchina dismessa non blocca mai il rilascio.
+- Nulla cambia lato agent: gli agent riferiscono già l'esito di ogni tentativo (versione, successo, errore, ripristino) in ogni invio. Senza ondate configurate il rilascio è quello di sempre.
+- Le ondate, l'attesa, la soglia e la pausa fanno parte del backup.
+
 ## Associazione: una macchina, un agent {#binding-one-machine-one-agent}
 
 Un token di registrazione dice *questa macchina è autorizzata a parlare*. Non dice

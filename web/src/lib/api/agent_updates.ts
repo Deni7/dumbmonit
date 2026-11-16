@@ -3,7 +3,7 @@
  * Docker container `auto_update` policies. Administrator session only.
  */
 import { request } from './client';
-import type { AgentUpdateSettings, AgentUpdates } from './types';
+import type { AgentUpdateRolloutPolicy, AgentUpdateSettings, AgentUpdates } from './types';
 
 export function getAgentUpdates(signal?: AbortSignal): Promise<AgentUpdates> {
 	return request<AgentUpdates>('/agent/updates', { signal });
@@ -24,4 +24,18 @@ export function updateAgentNow(id: number, allowDowngrade = false): Promise<Agen
 
 export function updateAllAgentsNow(): Promise<AgentUpdates> {
 	return request<AgentUpdates>('/agent/updates/all', { method: 'POST' });
+}
+
+/** Rollout waves, delay and failure threshold (absent fields unchanged; `waves: []` = canary agents first). */
+export function setAgentUpdateRollout(policy: Partial<AgentUpdateRolloutPolicy>): Promise<AgentUpdates> {
+	return request<AgentUpdates>('/agent/updates/rollout', { method: 'PUT', body: policy });
+}
+
+export function pauseAgentUpdateRollout(): Promise<AgentUpdates> {
+	return request<AgentUpdates>('/agent/updates/rollout/pause', { method: 'POST' });
+}
+
+/** After a pause or an automatic stop. */
+export function resumeAgentUpdateRollout(): Promise<AgentUpdates> {
+	return request<AgentUpdates>('/agent/updates/rollout/resume', { method: 'POST' });
 }

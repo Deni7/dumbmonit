@@ -5,6 +5,15 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- **Agent updates by waves.** Beyond "canary agents first", an administrator can order the fleet in
+  successive waves (a number of agents, a share of the fleet, a site, a folder or a tag), set the
+  delay between waves, and let the rollout stop by itself when too many agents of a wave fail or
+  roll back. A rollout can be paused and resumed, and an agent whose updates are off keeps its
+  version. Nothing changes until waves are configured. The settings are part of the backup
+  (`PUT /api/agent/updates/rollout`, `POST .../pause`, `POST .../resume`).
+
 ### Changed
 
 - **One typeface family everywhere: Inter and JetBrains Mono.** The console, the status pages, the

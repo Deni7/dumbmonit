@@ -69,6 +69,7 @@ recovery**: a bundle whose passphrase is lost is lost.
 | `incidents` | Incidents and maintenance announcements, with their updates. |
 | `users` | Accounts: username, display name, role, SSO link, enabled or not. |
 | `agent_tokens` | Agent enrolment tokens, as hashes. Installed agents keep pushing after a restore. Tokens from an older backup are renamed to opaque `tok_…` identifiers. |
+| `agent_update_rollout` | The rollout waves of the automatic agent updates: waves, delay, failure threshold and pause. |
 | `api_tokens` | API tokens, as hashes. Existing tokens keep working. |
 | `push_monitors` | Heartbeat tokens, so the URLs your cron jobs already call stay the same. |
 | `locations` | World map locations (name, address, spot, site); each monitor keeps its location. |

@@ -540,6 +540,31 @@ date, pending, updating, failed (with the reason), refused, disabled, manual,
 waiting for window, waiting for canaries, newer than server, legacy, container,
 read-only, disabled locally, unsupported, no binary.
 
+### Rollout waves {#automatic-updates-waves}
+
+By default, agents marked **canary** update first and everyone else follows (see the table above): nothing to configure for a homelab. For a larger fleet, **Settings → Agents → Automatic agent updates → Rollout → Rollout waves** orders the fleet in successive waves. The same settings are available through `PUT /api/agent/updates/rollout`, `POST /api/agent/updates/rollout/pause` and `POST /api/agent/updates/rollout/resume`.
+
+Each wave takes agents among those the previous waves did not take:
+
+| Wave | Takes |
+|---|---|
+| A number of agents | That many more agents: a canary of one or two machines. |
+| Share of the fleet (%) | Enough agents for the waves so far to cover that share (cumulative: 5, then 25, then 100). The same agents always come first. |
+| Site | The agents that declare this site (`site` in the agent configuration). |
+| Folder | The agents whose device is in this folder of the Devices page. |
+| Tag | The agents whose device carries this tag, with this value if one is given. |
+
+The agents no wave takes form a last wave. Agents marked **canary** are always in the first wave. Names are compared without regard to case.
+
+- A wave opens when the previous one has no agent left to update and its last agent has run the new build for the **delay between waves** (default 60 minutes). An empty wave is skipped.
+- **Automatic stop**: if, in a wave, the share of agents that failed (failed, rolled back or refused) among those that tried reaches the threshold (default 20 %, 0 never stops), no agent receives an automatic offer any more and their status reads *Stopped*. The page says in which wave. **Resume rollout** forgives the failures reported so far, so the stop does not trigger again at once; the agents that failed keep their version until **Update now**.
+- **Pause**: *Pause rollout* holds every automatic offer until *Resume rollout*.
+- **Pinning a version**: an agent whose updates are set to *Off* (per-agent setting) is in no wave and keeps its version.
+- **Update now** and **Update all now** ignore waves, pause and stop.
+- Agents not seen for a week are left out of the waves, so a decommissioned machine never blocks the rollout.
+- Nothing changes on the agent side: agents already report the outcome of each attempt (version, success, failure, rollback) in every batch. With no wave configured, the rollout is exactly the one above.
+- The waves, the delay, the threshold and the pause are part of the [backup](../install/backup.md).
+
 ### Security {#automatic-updates-security}
 
 - **Integrity**: the SHA-256 comes from the server.
