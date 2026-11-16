@@ -1,0 +1,163 @@
+# Cisco Meraki, through the Dashboard API v1 (https://api.meraki.com/api/v1), read
+# with the API key of a read-only organization administrator sent as a Bearer
+# token. Formerly a built-in type.
+schema: 1
+id: meraki
+version: 1.0.0
+requires: ">=0.17"
+label: Cisco Meraki
+summary: A Meraki organization through the Dashboard API — devices offline, Internet uplinks that failed, license out of compliance or expiring.
+examples: [Meraki MX / MS / MR, Cisco Meraki cloud dashboard]
+address_hint: api.meraki.com
+scheme: https
+default_port: 443
+setup:
+  title: Give DumbMonit a read-only API key
+  steps:
+    - In the Meraki dashboard, open Organization → Settings and tick Enable access to the Cisco Meraki Dashboard API.
+    - Create a read-only organization administrator for DumbMonit (Organization → Administrators), sign in with it, and generate an API key under My profile → API access.
+    - "Find the organization ID: it is listed by this call.\ncurl -H \"Authorization: Bearer <key>\" https://api.meraki.com/api/v1/organizations"
+    - In DumbMonit, enter api.meraki.com as the address (api.meraki.ca, api.meraki.cn, api.meraki.in or api.gov-meraki.com for a country dashboard), paste the key and the organization ID.
+  permissions:
+    - Organization access Read-only
+  warning: >-
+    A pack only talks to the address of the device. If the dashboard redirects
+    your organization to another server (the error names it, e.g. n123.meraki.com),
+    enter that server as the address.
+  doc_url: https://developer.cisco.com/meraki/api-v1/authorization/
+credentials:
+  - kind: api_token
+    label: API key
+    help: The API key of a read-only organization administrator.
+options:
+  - key: organization
+    label: Organization ID
+    help: The numeric ID of the organization, as GET /api/v1/organizations lists it (not its name).
+    placeholder: "549236"
+    required: true
+
+sources:
+  - id: statuses
+    type: http
+    path: /api/v1/organizations/{{option.organization}}/devices/statuses?perPage=1000
+    auth: bearer
+  # Read only by organizations with a security appliance; a refusal is not a failure.
+  - id: uplinks
+    type: http
+    path: /api/v1/organizations/{{option.organization}}/uplinks/statuses?perPage=1000
+    auth: bearer
+    optional: true
+  - id: licenses
+    type: http
+    path: /api/v1/organizations/{{option.organization}}/licenses/overview
+    auth: bearer
+    optional: true
+
+metrics:
+  # Co-termination licensing: one status and one date for the organization.
+  - name: license_ok
+    help: 1 when the co-termination license status is OK.
+    source: licenses
+    json: $.status
+    map: { OK: 1, "*": 0 }
+  - name: license_expiration_timestamp_seconds
+    help: When the co-termination license expires (Unix seconds).
+    source: licenses
+    json: $.expirationDate
+    date: "%b %d, %Y UTC"
+  # Per-device licensing: how many licenses already expired.
+  - name: licenses_expired
+    help: Per-device licenses that expired.
+    source: licenses
+    json: $.states.expired.count
+
+discover:
+  - name: devices
+    source: statuses
+    rows: $[*]
+    max_rows: 1000
+    labels:
+      device: $.name
+      serial: $.serial
+      model: $.model
+      product_type: $.productType
+      network_id: $.networkId
+    metrics:
+      # Dormant devices (unseen for a long time) have no online/offline sample.
+      - name: device_online
+        help: 1 when the device reaches the cloud dashboard (online or alerting).
+        json: $.status
+        map: { online: 1, alerting: 1, offline: 0 }
+      - name: device_offline
+        help: 1 when the device is offline.
+        json: $.status
+        map: { online: 0, alerting: 0, offline: 1 }
+      - name: device_alerting
+        help: 1 when the device is online but reports a problem.
+        json: $.status
+        map: { online: 0, alerting: 1, offline: 0 }
+      - name: device_last_report_timestamp_seconds
+        help: When the device last reported to the dashboard (Unix seconds).
+        json: $.lastReportedAt
+        date: rfc3339
+  - name: uplinks
+    source: uplinks
+    rows: $[*]
+    max_rows: 1000
+    labels:
+      serial: $.serial
+      network_id: $.networkId
+    each: $.uplinks[*]
+    each_labels:
+      interface: $.interface
+    metrics:
+      # "not connected" is an empty socket (second WAN, cellular without SIM): not a failure.
+      - name: uplink_up
+        help: 1 when the uplink is active or ready.
+        json: $.status
+        map: { active: 1, ready: 1, connecting: 0, "not connected": 0, failed: 0 }
+      - name: uplink_failed
+        help: 1 when a configured uplink lost Internet access.
+        json: $.status
+        map: { active: 0, ready: 0, connecting: 0, "not connected": 0, failed: 1 }
+
+rules:
+  - name: device_offline
+    title: Meraki device offline
+    description: >-
+      A Cisco Meraki device has been offline (out of reach of the cloud dashboard)
+      for ten minutes. Dormant devices, unseen for a long time, are left out.
+    expr: dumbmonit_meraki_device_offline
+    op: ">"
+    threshold: 0
+    for: 10m
+    severity: warning
+  - name: uplink_failed
+    title: Meraki uplink failed
+    description: >-
+      A Meraki router lost the Internet access of a configured uplink (the wired
+      and cellular sockets without a cable are not counted).
+    expr: dumbmonit_meraki_uplink_failed
+    op: ">"
+    threshold: 0
+    for: 5m
+    severity: warning
+  - name: license_problem
+    title: Meraki license problem
+    description: >-
+      The Meraki license is not in compliance, or per-device licenses expired:
+      the dashboard may stop managing the devices.
+    expr: dumbmonit_meraki_license_ok < bool 1 or dumbmonit_meraki_licenses_expired
+    op: ">"
+    threshold: 0
+    for: 1h
+    severity: warning
+  - name: license_expiring
+    title: Meraki license expiring
+    description: The Meraki co-termination license expires in less than 30 days.
+    expr: (dumbmonit_meraki_license_expiration_timestamp_seconds - time()) / 86400
+    op: "<"
+    threshold: 30
+    for: 1h
+    severity: warning
+    unit: d

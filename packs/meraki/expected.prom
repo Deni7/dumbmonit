@@ -1,0 +1,39 @@
+# TYPE dumbmonit_meraki_device_alerting gauge
+dumbmonit_meraki_device_alerting{device="AP-lobby",model="MR46",network_id="N_24329156",product_type="wireless",serial="Q2MD-CCCC-0003"} 0
+dumbmonit_meraki_device_alerting{device="MS-core",model="MS225-24P",network_id="N_24329156",product_type="switch",serial="Q2XX-BBBB-0002"} 1
+dumbmonit_meraki_device_alerting{device="MX-main",model="MX68",network_id="N_24329156",product_type="appliance",serial="Q2QN-AAAA-0001"} 0
+dumbmonit_meraki_device_alerting{device="MX-warehouse",model="MX67",network_id="N_24329157",product_type="appliance",serial="Q2QN-EEEE-0005"} 0
+# TYPE dumbmonit_meraki_device_last_report_timestamp_seconds gauge
+dumbmonit_meraki_device_last_report_timestamp_seconds{device="",model="MR36",network_id="N_24329157",product_type="wireless",serial="Q2MD-DDDD-0004"} 1780300800
+dumbmonit_meraki_device_last_report_timestamp_seconds{device="AP-lobby",model="MR46",network_id="N_24329156",product_type="wireless",serial="Q2MD-CCCC-0003"} 1789998600
+dumbmonit_meraki_device_last_report_timestamp_seconds{device="MS-core",model="MS225-24P",network_id="N_24329156",product_type="switch",serial="Q2XX-BBBB-0002"} 1789999890
+dumbmonit_meraki_device_last_report_timestamp_seconds{device="MX-main",model="MX68",network_id="N_24329156",product_type="appliance",serial="Q2QN-AAAA-0001"} 1789999920
+dumbmonit_meraki_device_last_report_timestamp_seconds{device="MX-warehouse",model="MX67",network_id="N_24329157",product_type="appliance",serial="Q2QN-EEEE-0005"} 1789999930
+# TYPE dumbmonit_meraki_device_offline gauge
+dumbmonit_meraki_device_offline{device="AP-lobby",model="MR46",network_id="N_24329156",product_type="wireless",serial="Q2MD-CCCC-0003"} 1
+dumbmonit_meraki_device_offline{device="MS-core",model="MS225-24P",network_id="N_24329156",product_type="switch",serial="Q2XX-BBBB-0002"} 0
+dumbmonit_meraki_device_offline{device="MX-main",model="MX68",network_id="N_24329156",product_type="appliance",serial="Q2QN-AAAA-0001"} 0
+dumbmonit_meraki_device_offline{device="MX-warehouse",model="MX67",network_id="N_24329157",product_type="appliance",serial="Q2QN-EEEE-0005"} 0
+# TYPE dumbmonit_meraki_device_online gauge
+dumbmonit_meraki_device_online{device="AP-lobby",model="MR46",network_id="N_24329156",product_type="wireless",serial="Q2MD-CCCC-0003"} 0
+dumbmonit_meraki_device_online{device="MS-core",model="MS225-24P",network_id="N_24329156",product_type="switch",serial="Q2XX-BBBB-0002"} 1
+dumbmonit_meraki_device_online{device="MX-main",model="MX68",network_id="N_24329156",product_type="appliance",serial="Q2QN-AAAA-0001"} 1
+dumbmonit_meraki_device_online{device="MX-warehouse",model="MX67",network_id="N_24329157",product_type="appliance",serial="Q2QN-EEEE-0005"} 1
+# TYPE dumbmonit_meraki_license_expiration_timestamp_seconds gauge
+dumbmonit_meraki_license_expiration_timestamp_seconds 1792627200
+# TYPE dumbmonit_meraki_license_ok gauge
+dumbmonit_meraki_license_ok 1
+# TYPE dumbmonit_meraki_licenses_expired gauge
+dumbmonit_meraki_licenses_expired 1
+# TYPE dumbmonit_meraki_uplink_failed gauge
+dumbmonit_meraki_uplink_failed{interface="cellular",network_id="N_24329156",serial="Q2QN-AAAA-0001"} 0
+dumbmonit_meraki_uplink_failed{interface="wan1",network_id="N_24329156",serial="Q2QN-AAAA-0001"} 1
+dumbmonit_meraki_uplink_failed{interface="wan1",network_id="N_24329157",serial="Q2QN-EEEE-0005"} 0
+dumbmonit_meraki_uplink_failed{interface="wan2",network_id="N_24329156",serial="Q2QN-AAAA-0001"} 0
+dumbmonit_meraki_uplink_failed{interface="wan2",network_id="N_24329157",serial="Q2QN-EEEE-0005"} 0
+# TYPE dumbmonit_meraki_uplink_up gauge
+dumbmonit_meraki_uplink_up{interface="cellular",network_id="N_24329156",serial="Q2QN-AAAA-0001"} 0
+dumbmonit_meraki_uplink_up{interface="wan1",network_id="N_24329156",serial="Q2QN-AAAA-0001"} 0
+dumbmonit_meraki_uplink_up{interface="wan1",network_id="N_24329157",serial="Q2QN-EEEE-0005"} 1
+dumbmonit_meraki_uplink_up{interface="wan2",network_id="N_24329156",serial="Q2QN-AAAA-0001"} 1
+dumbmonit_meraki_uplink_up{interface="wan2",network_id="N_24329157",serial="Q2QN-EEEE-0005"} 0

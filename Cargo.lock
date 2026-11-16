@@ -1396,6 +1396,7 @@ dependencies = [
  "dumbmonit-proto",
  "regex",
  "reqwest",
+ "roxmltree",
  "semver",
  "serde",
  "serde_json",
