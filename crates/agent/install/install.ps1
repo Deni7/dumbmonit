@@ -47,6 +47,12 @@ param(
     [int]$GatewayPort = 8443,
     # Do not touch the Windows firewall.
     [switch]$NoFirewall,
+    # Outbound HTTP proxy to reach the server: http://[user:password@]host:port, 'system' (the
+    # WinHTTP proxy of the machine, see 'netsh winhttp show proxy') or 'none'. Used for the
+    # downloads here and written to agent.yaml; the agent's TLS goes through it end to end.
+    [string]$Proxy,
+    # Hosts reached without the proxy, comma-separated.
+    [string]$NoProxy,
     # Optional modules to run (docker, plakar, system_health, sensors, smart, zfs,
     # libvirt, wireguard, ipsec, perf_counters, or none). Omitted: every module detects itself.
     [string[]]$Modules,
@@ -140,6 +146,32 @@ function Use-ServerTls {
 
 function Restore-ValidationTls {
     if ($PinnedKey) { [Net.ServicePointManager]::ServerCertificateValidationCallback = $null }
+}
+
+# Mandataire des téléchargements de ce script : celui donné par -Proxy (avec ses
+# identifiants), aucun pour 'none', celui du système sinon (le défaut de
+# WebClient). Seul http:// est accepté, comme l'agent.
+function Use-Mandataire {
+    if (-not $Proxy -or $Proxy -eq 'system') { return }
+    if ($Proxy -eq 'none') {
+        [Net.WebRequest]::DefaultWebProxy = $null
+        return
+    }
+    if ($Proxy -notmatch '^http://') {
+        Stop-Sur "-Proxy expects http://host:port, system or none (the agent's own TLS goes through it)."
+    }
+    $adresse = [Uri]$Proxy
+    $mandataire = New-Object Net.WebProxy("http://$($adresse.Authority)", $true)
+    if ($NoProxy) {
+        $mandataire.BypassList = @($NoProxy -split ',' | ForEach-Object { [Regex]::Escape($_.Trim()) } | Where-Object { $_ })
+    }
+    if ($adresse.UserInfo) {
+        $nom, $secret = $adresse.UserInfo -split ':', 2
+        $mandataire.Credentials = New-Object Net.NetworkCredential(
+            [Uri]::UnescapeDataString($nom), [Uri]::UnescapeDataString([string]$secret))
+    }
+    [Net.WebRequest]::DefaultWebProxy = $mandataire
+    Write-Etape "Using the proxy $($adresse.Authority) to reach the server"
 }
 
 # Le canal chiffré des agents répond-il ? Une simple connexion TCP, bornée à
@@ -288,6 +320,7 @@ if ($PinnedKey -and $PinnedKey -cnotmatch '^sha256//[A-Za-z0-9+/]{43}=$') {
 if ($GatewayPort -lt 1 -or $GatewayPort -gt 65535) {
     Stop-Sur "Invalid -GatewayPort value: $GatewayPort"
 }
+Use-Mandataire
 Use-ServerTls
 
 # ------------------------------------------------------------------ binaire
@@ -383,6 +416,9 @@ $lignes.Add("token: $Token")
 if ($PinnedKey) { $lignes.Add("server_pin: $PinnedKey") }
 if ($TlsUrl) { $lignes.Add("tls_url: $TlsUrl") }
 if ($CaPin)  { $lignes.Add("ca_pin: $CaPin") }
+# Entre apostrophes : des identifiants peuvent contenir « : » ou « # ».
+if ($Proxy)   { $lignes.Add("proxy: '$($Proxy -replace "'", "''")'") }
+if ($NoProxy) { $lignes.Add("no_proxy: '$($NoProxy -replace "'", "''")'") }
 if ($Interval -gt 0)  { $lignes.Add("interval_secs: $Interval") }
 if ($HostName)        { $lignes.Add("hostname: $HostName") }
 if ($Relay)           { $lignes.Add("relay: true") }

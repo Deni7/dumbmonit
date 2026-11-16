@@ -13,6 +13,7 @@ use dumbmonit_proto::{
 };
 use tokio::sync::Notify;
 
+use crate::proxy::ProxyConfig;
 use crate::tls::{self, Pins};
 
 /// Ce qui peut arriver à un envoi, et surtout ce qu'il faut en faire.
@@ -106,6 +107,10 @@ pub struct PushClient {
     /// côté serveur, passerelle ouverte ou essayée. Un seul jeton en attente
     /// (`notify_one`) : plusieurs demandes rapprochées donnent un seul lot.
     report_now: Arc<Notify>,
+    /// Mandataire sortant vers le serveur, résolu (voir `proxy.rs`) : chaque
+    /// client HTTP du canal le reprend, celui du canal chiffré compris — la
+    /// session TLS de l'agent passe alors par `CONNECT`, de bout en bout.
+    proxy: Arc<ProxyConfig>,
 }
 
 impl PushClient {
@@ -115,8 +120,9 @@ impl PushClient {
         secret: Option<String>,
         timeout: Duration,
     ) -> Result<Self> {
+        let proxy = Arc::new(ProxyConfig::default());
         let channel = Channel {
-            http: http_client(timeout, None)?,
+            http: http_client(timeout, None, &proxy)?,
             base_url: server_url.trim_end_matches('/').to_string(),
             encrypted: false,
         };
@@ -130,7 +136,24 @@ impl PushClient {
             legacy_key: Arc::new(AtomicBool::new(false)),
             reachable: Arc::new(Notify::new()),
             report_now: Arc::new(Notify::new()),
+            proxy,
         })
+    }
+
+    /// Passe par ce mandataire (déjà résolu) pour joindre le serveur. À appeler
+    /// avant [`PushClient::pin_server`] et [`PushClient::use_tls`], qui le
+    /// reprennent.
+    pub fn with_proxy(mut self, proxy: ProxyConfig) -> Result<Self> {
+        self.proxy = Arc::new(proxy);
+        let channel = Channel {
+            http: http_client(self.timeout, None, &self.proxy)?,
+            base_url: self.channel().base_url.clone(),
+            encrypted: false,
+        };
+        if let Ok(mut held) = self.channel.write() {
+            *held = Arc::new(channel);
+        }
+        Ok(self)
     }
 
     /// Canal courant.
@@ -183,7 +206,7 @@ impl PushClient {
     pub fn use_tls(&self, url: &str, identity: Option<(Vec<u8>, Vec<u8>)>) -> Result<()> {
         let config = tls::client_config(self.pins.clone(), identity)?;
         let channel = Channel {
-            http: http_client(self.timeout, Some(config))?,
+            http: http_client(self.timeout, Some(config), &self.proxy)?,
             base_url: url.trim_end_matches('/').to_string(),
             encrypted: true,
         };
@@ -199,7 +222,7 @@ impl PushClient {
     pub fn pin_server(&self, pin: &str) -> Result<()> {
         let config = tls::pinned_key_config(pin)?;
         let channel = Channel {
-            http: http_client(self.timeout, Some(config))?,
+            http: http_client(self.timeout, Some(config), &self.proxy)?,
             base_url: self.channel().base_url.clone(),
             encrypted: false,
         };
@@ -240,7 +263,7 @@ impl PushClient {
     ) -> Result<TlsCertificate, PushError> {
         let config = tls::client_config(self.pins.clone(), None)
             .map_err(|error| PushError::Transport(format!("{error:#}")))?;
-        let http = http_client(self.timeout, Some(config))
+        let http = http_client(self.timeout, Some(config), &self.proxy)
             .map_err(|error| PushError::Transport(format!("{error:#}")))?;
         let target = format!("{}{TLS_ENROL_PATH}", url.trim_end_matches('/'));
         let response = self
@@ -620,8 +643,12 @@ fn rejection_of(status: reqwest::StatusCode, body: &str) -> PushError {
 
 /// Client HTTP d'un canal : en clair ou derrière l'ancien mandataire tel que
 /// configuré, ou, avec `tls`, canal chiffré strict — HTTPS seulement, sans
-/// redirection.
-fn http_client(timeout: Duration, tls: Option<rustls::ClientConfig>) -> Result<reqwest::Client> {
+/// redirection. `proxy` : le mandataire sortant, traversé par `CONNECT`.
+fn http_client(
+    timeout: Duration,
+    tls: Option<rustls::ClientConfig>,
+    proxy: &ProxyConfig,
+) -> Result<reqwest::Client> {
     let mut builder = reqwest::Client::builder()
         .timeout(timeout)
         // Le socket est réutilisé d'un envoi au suivant : sur un lien distant,
@@ -635,7 +662,7 @@ fn http_client(timeout: Duration, tls: Option<rustls::ClientConfig>) -> Result<r
             .https_only(true)
             .redirect(reqwest::redirect::Policy::none());
     }
-    builder.build().context("building the HTTP client")
+    proxy.apply(builder)?.build().context("building the HTTP client")
 }
 
 /// Construit l'URL d'ingestion à partir de la racine du serveur.

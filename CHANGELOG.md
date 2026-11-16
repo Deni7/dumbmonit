@@ -29,6 +29,15 @@ All notable changes to this project are documented here. The format follows
   commands, and the channel announcement carries it, so agents installed without `--tls-url` use it
   too. Checked at startup (`https://host[:port]` only). The configuration reference has HAProxy and
   Traefik examples (TLS passed through, never terminated).
+- **Agent behind an outbound proxy.** `proxy:` in `agent.yaml` (or `DUMBMONIT_AGENT_PROXY`):
+  `http://[user:password@]host:port`, `none`, or `system` on Windows (the machine's WinHTTP proxy,
+  then the Internet Explorer one of the service account); `no_proxy:` lists the hosts reached
+  directly, `proxy_user` / `proxy_password` keep credentials out of the URL. Without the key,
+  `HTTPS_PROXY` / `NO_PROXY` apply as before. The agent's TLS session crosses the proxy by
+  `CONNECT`, end to end (client certificate and pinning unchanged); only `http://` proxies are
+  accepted. The installers take `--proxy` / `--no-proxy` (`-Proxy`, `-NoProxy`) for their own
+  downloads and write them to `agent.yaml`; `docker-compose.agent.yml` passes
+  `DUMBMONIT_AGENT_PROXY`.
 
 ### Changed
 

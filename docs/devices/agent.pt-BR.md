@@ -363,6 +363,8 @@ incluído, em todo sistema.
 | `--open-gateway` | `-OpenGateway` | Relay: abre a porta do gateway no firewall local (firewalld, ufw, firewall do Windows), apenas para a sub-rede local. Implícito com `--relay`; o comando de um token de relay já o inclui. `--uninstall` remove a regra. |
 | `--gateway-port=N` | `-GatewayPort N` | Porta do gateway do relay aberta no firewall (padrão 8443). |
 | `--no-firewall` | `-NoFirewall` | Não mexe no firewall local. |
+| `--proxy=URL` | `-Proxy` | Proxy HTTP de saída até o servidor, `http://[usuário:senha@]host:porta` ou `none` (`-Proxy` também aceita `system`). Usado nos downloads e gravado no `agent.yaml`. Veja [Proxy de saída](#outbound-proxy). |
+| `--no-proxy=LIST` | `-NoProxy` | Hosts alcançados sem o proxy, separados por vírgulas. |
 | `--uninstall` | `-Uninstall` | Desinstala o agente e exclui sua configuração. |
 | `--help` | | Mostra a ajuda. |
 
@@ -710,6 +712,52 @@ Três [regras integradas](../alerting/rules.md#hyper-v) se aplicam:
   ocupados por quinze minutos (Aviso).
 - **Hyper-V virtual disk errors**: um disco virtual reportou erros de
   E/S na última hora (Aviso).
+
+## Proxy de saída {#outbound-proxy}
+
+Onde as máquinas só saem por um proxy HTTP, o agente chega ao servidor por ele
+com `CONNECT`: o proxy abre um túnel TCP até a porta dos agentes, e a sessão TLS
+1.3 do agente (certificado de cliente, autoridade fixada) vai de ponta a ponta
+até o servidor. O proxy só vê o nome e a porta, depois dados criptografados; um
+proxy que inspeciona TLS é recusado pela fixação, como qualquer intermediário.
+
+```yaml
+proxy: http://proxy.corp.example:3128   # or none, or system (Windows)
+no_proxy: [.corp.example, 10.0.0.0/8]    # reached directly
+proxy_user: CORP\monitoring             # optional, instead of user:password@ in the URL
+proxy_password: …
+```
+
+- `proxy` (ou `DUMBMONIT_AGENT_PROXY`): `http://[usuário:senha@]host:porta`,
+  codificado em porcentagem na URL, ou as chaves separadas `proxy_user` /
+  `proxy_password` (`DUMBMONIT_AGENT_PROXY_USER`,
+  `DUMBMONIT_AGENT_PROXY_PASSWORD`). Só proxies `http://`: a conexão com o
+  proxy não é criptografada, o que ela transporta é. `none` vai sempre direto.
+- `no_proxy` (ou `DUMBMONIT_AGENT_NO_PROXY`, separados por vírgulas): hosts,
+  domínios (com subdomínios), endereços ou redes alcançados diretamente.
+- Sem `proxy`, valem as variáveis de sempre: `HTTPS_PROXY`, `HTTP_PROXY`,
+  `ALL_PROXY` e `NO_PROXY` (também em minúsculas). Um serviço não herda o seu
+  shell: coloque-as na unit (`systemctl edit dumbmonit-agent`,
+  `Environment=HTTPS_PROXY=…`) ou use a chave.
+- Os instaladores aceitam `--proxy=URL --no-proxy=LISTA` (`-Proxy`,
+  `-NoProxy`): usam o proxy nos próprios downloads e o gravam no `agent.yaml`.
+- `proxy: system` no Windows usa o proxy WinHTTP da máquina (o dos serviços) e
+  depois o do Internet Explorer da conta do serviço. Para configurá-lo:
+
+```powershell
+netsh winhttp set proxy proxy-server="proxy.corp.example:3128" bypass-list="*.corp.example"
+netsh winhttp import proxy source=ie   # or copy the Internet Explorer settings
+```
+
+  A configuração automática (PAC, WPAD) não é seguida: informe o proxy
+  explicitamente.
+- O proxy só vale para as conexões com o servidor DumbMonit (medições,
+  comandos, relay, atualizações, sentinela). Um relay consulta os equipamentos
+  do seu local, e testa o próprio gateway, diretamente.
+- Já variáveis como `HTTPS_PROXY` valem para todas as conexões do agente, inclusive as sondagens do relay: exclua as redes do local com `NO_PROXY`.
+
+Na inicialização o agente registra o proxy que usa
+(`outbound proxy to the server`), nunca as credenciais.
 
 ## Executar o agente no Docker / em outra rede {#run-the-agent-in-docker--on-another-network}
 

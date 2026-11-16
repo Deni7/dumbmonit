@@ -443,6 +443,8 @@ Windows) in place of its other flags does the same.
 | `--open-gateway` | `-OpenGateway` | Relay: open the gateway port on the local firewall (firewalld, ufw, Windows firewall), to the local subnet only. Implied by `--relay`; the command shown for a relay token carries it. `--uninstall` removes the rule. |
 | `--gateway-port=N` | `-GatewayPort N` | Port of the relay gateway opened on the firewall (default 8443). |
 | `--no-firewall` | `-NoFirewall` | Leave the local firewall alone. |
+| `--proxy=URL` | `-Proxy` | Outbound HTTP proxy to reach the server, `http://[user:password@]host:port` or `none` (`-Proxy` also takes `system`). Used for the downloads and written to `agent.yaml`. See [Outbound proxy](#outbound-proxy). |
+| `--no-proxy=LIST` | `-NoProxy` | Hosts reached without the proxy, comma-separated. |
 | `--uninstall` | `-Uninstall` | Uninstall the agent and delete its configuration. |
 | `--help` | | Show the help. |
 
@@ -978,6 +980,53 @@ The Windows agent can also raise alerts on Windows events (failed logons,
 unexpected reboots, crashed services, disk errors): rules are set per machine
 on its device page, none exists by default. See
 [Windows event log alerts](agent-windows-events.md).
+
+## Outbound proxy {#outbound-proxy}
+
+Where machines only go out through an HTTP proxy, the agent reaches the
+server through it with `CONNECT`: the proxy opens a TCP pipe to the agent port,
+and the agent's TLS 1.3 session (client certificate, pinned authority) goes end
+to end to the server. The proxy only sees the host name and port, then
+ciphertext; a proxy that inspects TLS is refused by the pinning, like any other
+man in the middle.
+
+```yaml
+proxy: http://proxy.corp.example:3128   # or none, or system (Windows)
+no_proxy: [.corp.example, 10.0.0.0/8]    # reached directly
+proxy_user: CORP\monitoring             # optional, instead of user:password@ in the URL
+proxy_password: …
+```
+
+- `proxy` (or `DUMBMONIT_AGENT_PROXY`): `http://[user:password@]host:port`,
+  percent-encoded in the URL, or the separate `proxy_user` / `proxy_password`
+  keys (`DUMBMONIT_AGENT_PROXY_USER`, `DUMBMONIT_AGENT_PROXY_PASSWORD`). Only
+  `http://` proxies: the connection to the proxy itself is not encrypted, what
+  it carries is. `none` always goes direct.
+- `no_proxy` (or `DUMBMONIT_AGENT_NO_PROXY`, comma-separated): hosts, domains
+  (with their subdomains), addresses or networks reached directly.
+- Without `proxy`, the usual variables apply: `HTTPS_PROXY`, `HTTP_PROXY`,
+  `ALL_PROXY` and `NO_PROXY` (lowercase too). A service does not inherit your
+  shell: put them in the unit (`systemctl edit dumbmonit-agent`,
+  `Environment=HTTPS_PROXY=…`) or use the key.
+- The installers take `--proxy=URL --no-proxy=LIST` (`-Proxy`, `-NoProxy`): they
+  use it for their own downloads and write it to `agent.yaml`.
+- `proxy: system` on Windows uses the machine's WinHTTP proxy (the one services
+  use), then the Internet Explorer proxy of the service account. Set it with:
+
+```powershell
+netsh winhttp set proxy proxy-server="proxy.corp.example:3128" bypass-list="*.corp.example"
+netsh winhttp import proxy source=ie   # or copy the Internet Explorer settings
+```
+
+  Automatic configuration (PAC, WPAD) is not followed: give the proxy
+  explicitly.
+- The proxy only applies to the connections to the DumbMonit server
+  (measurements, commands, relay, updates, sentinel). A relay probes the devices
+  of its site, and tests its own gateway, directly.
+- Variables such as `HTTPS_PROXY`, on the other hand, apply to every connection of the agent, relay probes included: exclude the site's networks with `NO_PROXY`.
+
+The agent logs the proxy it uses at startup (`outbound proxy to the server`),
+never its credentials.
 
 ## Run the agent in Docker / on another network
 

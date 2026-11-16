@@ -236,6 +236,10 @@ impl Agent {
             HTTP_TIMEOUT,
         )
         .context("preparing the push client")?;
+        // Mandataire vers le serveur, avant tout canal : chacun le reprend.
+        let proxy = config.proxy.resolve();
+        info!(proxy = proxy.describe(), "outbound proxy to the server");
+        let client = client.with_proxy(proxy).context("configuring the outbound proxy")?;
         if let Some(pin) = &config.server_pin {
             client.pin_server(pin).context("pinning the server key")?;
         }
@@ -1412,6 +1416,7 @@ mod tests {
             server_pin: None,
             plain_server_url: false,
             log_level: tracing::Level::INFO,
+            proxy: crate::proxy::ProxyConfig::default(),
             deprecated_env: Vec::new(),
         }
     }

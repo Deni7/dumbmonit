@@ -176,6 +176,7 @@ mod tests {
             server_pin: None,
             plain_server_url: false,
             log_level: tracing::Level::INFO,
+            proxy: crate::proxy::ProxyConfig::default(),
             deprecated_env: Vec::new(),
         }
     }

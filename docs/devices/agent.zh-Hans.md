@@ -227,6 +227,8 @@ docker buildx build --target agent-dist --output type=local,dest=dist/agent .
 | `--open-gateway` | `-OpenGateway` | 中继：在本地防火墙（firewalld、ufw、Windows 防火墙）上开放网关端口，仅对本地子网开放。使用 `--relay` 时自动启用；中继令牌的命令已包含此选项。`--uninstall` 会删除该规则。 |
 | `--gateway-port=N` | `-GatewayPort N` | 在防火墙上开放的中继网关端口（默认 8443）。 |
 | `--no-firewall` | `-NoFirewall` | 不改动本地防火墙。 |
+| `--proxy=URL` | `-Proxy` | 连接服务器所用的出站 HTTP 代理，`http://[用户:密码@]主机:端口` 或 `none`（`-Proxy` 还接受 `system`）。用于下载，并写入 `agent.yaml`。参见[出站代理](#outbound-proxy)。 |
+| `--no-proxy=LIST` | `-NoProxy` | 不经代理直连的主机，逗号分隔。 |
 | `--uninstall` | `-Uninstall` | 卸载代理并删除其配置。 |
 | `--help` | | 显示帮助。 |
 
@@ -460,6 +462,34 @@ perf_counters:
 - **Hyper-V VM 健康关键**：Hyper-V 报告 VM 在关键健康五分钟（警告） — 最常见磁盘用尽空间。
 - **Hyper-V 主机 CPU 高**：逻辑处理器超过 90% 忙十五分钟（通知）。
 - **Hyper-V 虚拟磁盘错误**：虚拟磁盘在最后一小时报告 I/O 错误（通知）。
+
+## 出站代理 {#outbound-proxy}
+
+当机器只能通过 HTTP 代理访问外部时，代理程序会通过 `CONNECT` 经由它连接服务器：HTTP 代理打开一条通往代理端口的 TCP 隧道，而代理程序的 TLS 1.3 会话（客户端证书、固定的证书颁发机构）端到端直达服务器。HTTP 代理只能看到主机名和端口，之后只有密文；会解密检查 TLS 的代理会像任何中间人一样被证书固定拒绝。
+
+```yaml
+proxy: http://proxy.corp.example:3128   # or none, or system (Windows)
+no_proxy: [.corp.example, 10.0.0.0/8]    # reached directly
+proxy_user: CORP\monitoring             # optional, instead of user:password@ in the URL
+proxy_password: …
+```
+
+- `proxy`（或 `DUMBMONIT_AGENT_PROXY`）：`http://[用户:密码@]主机:端口`，URL 中需百分号编码；也可使用单独的 `proxy_user` / `proxy_password` 键（`DUMBMONIT_AGENT_PROXY_USER`、`DUMBMONIT_AGENT_PROXY_PASSWORD`）。只支持 `http://` 代理：到代理本身的连接不加密，但其中传输的内容是加密的。`none` 表示始终直连。
+- `no_proxy`（或 `DUMBMONIT_AGENT_NO_PROXY`，逗号分隔）：直连的主机、域名（含子域名）、地址或网络。
+- 未设置 `proxy` 时，使用常见的环境变量：`HTTPS_PROXY`、`HTTP_PROXY`、`ALL_PROXY` 和 `NO_PROXY`（小写形式也可）。服务不会继承你的 shell：请把它们写进单元文件（`systemctl edit dumbmonit-agent`，`Environment=HTTPS_PROXY=…`），或使用该配置键。
+- 安装程序接受 `--proxy=URL --no-proxy=列表`（`-Proxy`、`-NoProxy`）：用于自身的下载，并写入 `agent.yaml`。
+- 在 Windows 上，`proxy: system` 使用本机的 WinHTTP 代理（服务所用的代理），其次是服务账户的 Internet Explorer 代理。设置方法：
+
+```powershell
+netsh winhttp set proxy proxy-server="proxy.corp.example:3128" bypass-list="*.corp.example"
+netsh winhttp import proxy source=ie   # or copy the Internet Explorer settings
+```
+
+  不支持自动配置（PAC、WPAD）：请显式指定代理。
+- 代理只用于连接 DumbMonit 服务器（测量数据、命令、中继、更新、哨兵）。中继对其站点设备的探测以及对自身网关的测试都是直连。
+- 而 `HTTPS_PROXY` 等环境变量会作用于代理程序的所有连接，包括中继的探测：请用 `NO_PROXY` 排除站点网络。
+
+代理程序启动时会在日志中记录所用的代理（`outbound proxy to the server`），但从不记录凭据。
 
 ## 在 Docker / 另一网络中运行代理 {#run-the-agent-in-docker--on-another-network}
 

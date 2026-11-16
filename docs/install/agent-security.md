@@ -270,6 +270,11 @@ works. To share port 443 with websites, route on the server name (SNI) with
 The web port can stay behind your usual reverse proxy, which connects to it over
 HTTPS.
 
+On the agent's side, an outbound HTTP proxy is fine: the agent opens a `CONNECT`
+tunnel through it and its TLS session stays end to end, client certificate and
+pinning included; a proxy that intercepts TLS is refused. See
+[Outbound proxy](../devices/agent.md#outbound-proxy).
+
 ## Rotating the certificate authority
 
 In **Settings → Agents → Agent channel → Certificate authority rotation**:

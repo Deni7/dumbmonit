@@ -152,6 +152,10 @@ struct FileConfig {
     hyperv: Option<FlagOrAuto>,
     max_buffered_samples: Option<usize>,
     log_level: Option<String>,
+    proxy: Option<String>,
+    no_proxy: Option<Patterns>,
+    proxy_user: Option<String>,
+    proxy_password: Option<String>,
     system_health: Option<SystemHealthFile>,
     databases: Option<DatabasesFile>,
 }
@@ -344,6 +348,8 @@ pub struct Config {
     /// de l'une emmène l'autre.
     pub secret_path: PathBuf,
     pub log_level: tracing::Level,
+    /// Mandataire sortant vers le serveur (voir `proxy.rs`).
+    pub proxy: crate::proxy::ProxyConfig,
     /// Variables `EZYMONIT_*` encore utilisées, sous la forme (ancien nom, nouveau
     /// nom) : le journal n'existe pas encore quand la configuration est lue, les
     /// avertissements sont rejoués par [`Config::warn_deprecated_env`].
@@ -380,6 +386,7 @@ impl fmt::Debug for Config {
             .field("probe", &self.probe)
             .field("max_buffered_samples", &self.max_buffered_samples)
             .field("log_level", &self.log_level)
+            .field("proxy", &self.proxy)
             .field("system_health", &self.system_health)
             .field("plakar", &self.plakar)
             .field("sensors", &self.sensors)
@@ -862,6 +869,21 @@ impl Config {
             wanted("system_health"),
         )?;
 
+        // Mandataire vers le serveur : la clé `proxy` (ou sa variable), à défaut
+        // HTTPS_PROXY et consorts, que le client HTTP lit de lui-même.
+        // Une variable vide (celles de docker-compose.agent.yml) laisse le fichier
+        // décider.
+        let set = |name: &str| env.get(name).filter(|value| !value.is_empty());
+        let proxy = crate::proxy::ProxyConfig::parse(
+            set("DUMBMONIT_AGENT_PROXY").or(file.proxy).as_deref(),
+            match set("DUMBMONIT_AGENT_NO_PROXY") {
+                Some(raw) => split_list(&raw),
+                None => file.no_proxy.map(Patterns::into_items).unwrap_or_default(),
+            },
+            set("DUMBMONIT_AGENT_PROXY_USER").or(file.proxy_user).as_deref(),
+            set("DUMBMONIT_AGENT_PROXY_PASSWORD").or(file.proxy_password).as_deref(),
+        )?;
+
         Ok(Self {
             server_url,
             token,
@@ -909,6 +931,7 @@ impl Config {
             max_buffered_samples,
             secret_path: Self::resolve_secret_path(&env, config_path),
             log_level,
+            proxy,
             deprecated_env: env.deprecated(),
         })
     }
@@ -1937,6 +1960,43 @@ system_health:
         };
         let config = Config::merge(file, env(&[])).expect("configuration");
         assert_eq!(config.system_health.updates_interval, Duration::from_secs(1800));
+    }
+
+    #[test]
+    fn the_outbound_proxy_comes_from_the_file_or_the_environment() {
+        use crate::proxy::ProxyMode;
+        // Rien : l'environnement habituel (HTTPS_PROXY…), lu par le client.
+        let config = Config::merge(file_with_url_and_token(), env(&[])).unwrap();
+        assert_eq!(config.proxy.mode, ProxyMode::Environment);
+
+        let file = from_yaml(
+            "proxy: http://jo:s3cret@proxy.corp:3128\nno_proxy: [.corp.lan, 10.0.0.0/8]\n",
+        );
+        let config = Config::merge(file, env(&[])).unwrap();
+        let ProxyMode::Explicit(url) = &config.proxy.mode else { panic!("explicite") };
+        assert_eq!(url.url, "http://proxy.corp:3128/");
+        assert_eq!(url.username.as_deref(), Some("jo"));
+        assert_eq!(config.proxy.no_proxy, [".corp.lan", "10.0.0.0/8"]);
+        assert!(!format!("{config:?}").contains("s3cret"), "le mot de passe a fuité");
+
+        // La variable prime, la liste se lit séparée par des virgules.
+        let file = from_yaml("proxy: http://proxy.corp:3128\n");
+        let vars = env(&[
+            ("DUMBMONIT_AGENT_PROXY", "none"),
+            ("DUMBMONIT_AGENT_NO_PROXY", "a.lan, b.lan"),
+        ]);
+        let config = Config::merge(file, vars).unwrap();
+        assert_eq!(config.proxy.mode, ProxyMode::Direct);
+        assert_eq!(config.proxy.no_proxy, ["a.lan", "b.lan"]);
+
+        // Identifiants à part, et refus clairs au démarrage.
+        let file = from_yaml("proxy: http://proxy.corp:3128\nproxy_user: jo\n");
+        let vars = env(&[("DUMBMONIT_AGENT_PROXY_PASSWORD", "p@ss")]);
+        let config = Config::merge(file, vars).unwrap();
+        let ProxyMode::Explicit(url) = &config.proxy.mode else { panic!("explicite") };
+        assert_eq!(url.password.as_deref(), Some("p@ss"));
+        assert!(Config::merge(from_yaml("proxy: https://proxy.corp:3128\n"), env(&[])).is_err());
+        assert!(Config::merge(from_yaml("proxy: proxy.corp:3128\n"), env(&[])).is_err());
     }
 
     #[test]

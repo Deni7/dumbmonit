@@ -64,6 +64,10 @@ SITE=""
 OPEN_GATEWAY=0
 GATEWAY_PORT="8443"
 NO_FIREWALL=0
+# Mandataire sortant vers le serveur (`proxy:` de agent.yaml), et les hôtes
+# joints en direct.
+PROXY=""
+NO_PROXY_LIST=""
 
 SERVICE_NAME="dumbmonit-agent"
 # Étiquette launchd et nom rc.d : ni l'un ni l'autre n'accepte le nom Linux tel
@@ -115,6 +119,12 @@ OPTIONS:
                         Undone by --uninstall.
     --gateway-port=N    Port of the relay gateway (default: 8443)
     --no-firewall       Do not touch the local firewall
+    --proxy=URL         Outbound HTTP proxy to reach the server,
+                        http://[user:password@]host:port (or none). Used for
+                        the downloads here and written to agent.yaml; the
+                        agent's TLS session goes through it end to end
+                        (CONNECT). Without it, HTTPS_PROXY is used if set.
+    --no-proxy=LIST     Hosts reached without the proxy, comma-separated
     --bin=PATH          Local binary to install instead of downloading it
     --pinned-key=PIN    Public key of the server's HTTPS certificate
                         (sha256//base64, as curl --pinnedpubkey takes it), for
@@ -173,6 +183,8 @@ for argument in "$@"; do
         --open-gateway) OPEN_GATEWAY=1 ;;
         --gateway-port=*) GATEWAY_PORT="${argument#*=}" ;;
         --no-firewall) NO_FIREWALL=1 ;;
+        --proxy=*)    PROXY="${argument#*=}" ;;
+        --no-proxy=*) NO_PROXY_LIST="${argument#*=}" ;;
         --bin=*)      LOCAL_BIN="${argument#*=}" ;;
         --sha256=*)   EXPECTED_SHA256="${argument#*=}" ;;
         --insecure-skip-checksum) SKIP_CHECKSUM=1 ;;
@@ -469,6 +481,23 @@ case "$URL" in
     *) echec "the server URL must start with https:// (got $URL): DumbMonit only serves HTTPS" ;;
 esac
 
+# Mandataire : les téléchargements de ce script le prennent aussi (curl, wget
+# et fetch lisent ces variables). Seul http:// est accepté, comme l'agent.
+case "$PROXY" in
+    "") ;;
+    none|off) unset https_proxy HTTPS_PROXY http_proxy HTTP_PROXY all_proxy ALL_PROXY ;;
+    http://*)
+        https_proxy="$PROXY"; HTTPS_PROXY="$PROXY"; http_proxy="$PROXY"; HTTP_PROXY="$PROXY"
+        export https_proxy HTTPS_PROXY http_proxy HTTP_PROXY
+        info "using the proxy ${PROXY##*@} to reach the server"
+        ;;
+    *) echec "--proxy expects http://host:port or none (the agent's own TLS goes through it)" ;;
+esac
+if [ -n "$NO_PROXY_LIST" ]; then
+    no_proxy="$NO_PROXY_LIST"; NO_PROXY="$NO_PROXY_LIST"
+    export no_proxy NO_PROXY
+fi
+
 # ---------------------------------------------------------------- binaire
 
 # Une clé épinglée impose curl : ni fetch ni wget ne savent vérifier un
@@ -671,6 +700,13 @@ umask 077
     if [ -n "$PINNED_KEY" ]; then echo "server_pin: $PINNED_KEY"; fi
     if [ -n "$TLS_URL" ]; then echo "tls_url: $TLS_URL"; fi
     if [ -n "$CA_PIN" ]; then echo "ca_pin: $CA_PIN"; fi
+    if [ -n "$PROXY" ]; then
+        # Entre apostrophes : des identifiants peuvent contenir « : » ou « # ».
+        echo "proxy: '$(echo "$PROXY" | sed "s/'/''/g")'"
+    fi
+    if [ -n "$NO_PROXY_LIST" ]; then
+        echo "no_proxy: '$(echo "$NO_PROXY_LIST" | sed "s/'/''/g")'"
+    fi
     if [ -n "$INTERVAL" ]; then echo "interval_secs: $INTERVAL"; fi
     if [ -n "$HOSTNAME_OVERRIDE" ]; then echo "hostname: $HOSTNAME_OVERRIDE"; fi
     if [ "$RELAY" -eq 1 ]; then echo "relay: true"; fi

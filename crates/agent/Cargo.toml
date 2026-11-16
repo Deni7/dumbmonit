@@ -91,7 +91,8 @@ windows-service = "0.8"
 # listés dans `perf_counters` ; journal d'événements (`wevtapi`) pour les
 # règles d'événements (`collect/eventlog`). Même version que celle qu'apporte
 # déjà `windows-service`, pour ne pas faire entrer une seconde copie des
-# liaisons.
+# liaisons. WinHTTP : le mandataire système de la machine (`proxy: system`).
 windows-sys = { version = "0.61", features = [
-    "Win32_Foundation", "Win32_System_EventLog", "Win32_System_Performance",
+    "Win32_Foundation", "Win32_Networking_WinHttp", "Win32_System_EventLog",
+    "Win32_System_Performance",
 ] }

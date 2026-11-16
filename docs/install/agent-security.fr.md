@@ -215,6 +215,11 @@ ce nom : exemples HAProxy et Traefik dans
 Le port web peut rester derrière votre mandataire habituel, qui s'y connecte en
 HTTPS.
 
+Côté agent, un mandataire HTTP sortant convient : l'agent y ouvre un tunnel
+`CONNECT` et sa session TLS reste de bout en bout, certificat client et
+épinglage compris ; un mandataire qui intercepte TLS est refusé. Voir
+[Mandataire sortant](../devices/agent.md#outbound-proxy).
+
 ## Rotation de l'autorité de certification
 
 Dans **Réglages → Agents → Canal des agents → Rotation de l'autorité de

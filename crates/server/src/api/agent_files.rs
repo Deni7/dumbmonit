@@ -352,6 +352,19 @@ mod tests {
         assert!(uninstall.contains("Remove-RegleParefeu"));
     }
 
+    /// Le mandataire sortant donné à l'installateur sert aux téléchargements et
+    /// finit dans agent.yaml, entre apostrophes (des identifiants peuvent y être).
+    #[test]
+    fn the_scripts_take_an_outbound_proxy_and_write_it_quoted() {
+        assert!(INSTALL_SH.contains("--proxy=*)    PROXY="));
+        assert!(INSTALL_SH.contains("--no-proxy=*) NO_PROXY_LIST="));
+        assert!(INSTALL_SH.contains("export https_proxy HTTPS_PROXY"));
+        assert!(INSTALL_SH.contains("echo \"proxy: '$(echo \"$PROXY\" | sed \"s/'/''/g\")'\""));
+        assert!(INSTALL_PS1.contains("[string]$Proxy"));
+        assert!(INSTALL_PS1.contains("[Net.WebRequest]::DefaultWebProxy = $mandataire"));
+        assert!(INSTALL_PS1.contains("$lignes.Add(\"proxy: '$($Proxy -replace \"'\", \"''\")'\")"));
+    }
+
     /// La vérification est obligatoire : sans empreinte, ou sans outil pour la
     /// calculer, rien n'est installé, sauf échappatoire explicite et bruyante.
     #[test]

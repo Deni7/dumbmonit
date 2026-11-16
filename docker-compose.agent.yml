@@ -30,6 +30,10 @@ services:
       # wins); this forces another address, for example 0.0.0.0:9443. Publish
       # the same port below.
       DUMBMONIT_AGENT_GATEWAY_LISTEN: ${DUMBMONIT_AGENT_GATEWAY_LISTEN:-}
+      # Outbound HTTP proxy to reach the server (http://[user:password@]host:port,
+      # or none) and the hosts reached directly. HTTPS_PROXY / NO_PROXY work too.
+      DUMBMONIT_AGENT_PROXY: ${DUMBMONIT_AGENT_PROXY:-}
+      DUMBMONIT_AGENT_NO_PROXY: ${DUMBMONIT_AGENT_NO_PROXY:-}
     ports:
       # Relay gateway: the agents of the site connect here, and the relay
       # carries their encrypted channel to the server. A relay opens it as soon
