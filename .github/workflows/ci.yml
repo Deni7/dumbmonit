@@ -9,7 +9,9 @@ name: CI
 # Pushes to dev and main run everything.
 #
 # The Docker image build left this workflow: upgrade.yml builds both images on
-# every push to dev and main (and release.yml pushes them), never on PRs.
+# every push to dev and main (and release.yml pushes them). A PR only gets the
+# server image, built by upgrade.yml for the upgrade test, when it touches
+# something that ends up in the image.
 
 on:
   push:

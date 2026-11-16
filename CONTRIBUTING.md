@@ -316,13 +316,16 @@ Releases are tagged from `main`, after `dev` has been merged into it.
 Before tagging `vX.Y.Z`:
 
 0. Check that the **Upgrade test** workflow is green on `main`. It starts the
-   last published release, creates a user, monitors of several kinds, a rule, a
-   silence, a channel and a status page, waits for metrics, then starts the
+   last published release, creates real data (users and teams, monitors of
+   several kinds, encrypted secrets, a simulated agent, rules, silences, a
+   channel, a status page, settings), waits for metrics, then starts the
    candidate image on the same `/data` volume and checks that health, login,
-   every object and the VictoriaMetrics history survived. Run it by hand
-   against any image with `scripts/upgrade-test.sh [IMAGE]` (needs docker,
-   curl and python3; default image `ghcr.io/selfhostr/dumbmonit:edge`;
-   `OLD_IMAGE=…` picks another starting point). A failure means an existing
+   every object, the secrets, the VictoriaMetrics history and a backup
+   restore survived. It also runs on pull requests into `dev` and `main` that
+   touch the image. Run it by hand against any image with
+   `scripts/upgrade-test.sh [IMAGE]` (needs docker, curl, git and python3;
+   default image `ghcr.io/selfhostr/dumbmonit:edge`; `OLD_IMAGE=…` picks another
+   starting point, see `docs/development.md`). A failure means an existing
    install would lose data when updating: fix it before tagging.
 
 1. Move the `Unreleased` section of `CHANGELOG.md` under the new version and date.

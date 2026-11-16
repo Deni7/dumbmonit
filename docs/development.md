@@ -109,6 +109,59 @@ Integration tests live in `crates/server/tests/`; pure modules (metric
 conversion, option parsing, alert state machine, silences) are tested in place
 without network.
 
+### Upgrade test
+
+`.github/workflows/upgrade.yml` checks that an existing install survives an
+update. It builds the image of the commit, then runs `scripts/upgrade-test.sh`
+twice, side by side: from the last published release, which fails the job, and
+from the last release of the previous minor version, which only warns (the
+project defines no oldest supported version). It runs on every push to `dev` and
+`main`, and on pull requests into them that touch the crates, the Dockerfile,
+`profiles/`, `integrations/` or the test itself. It is also the release gate:
+a tag on `main` is only published after a green run of it.
+
+Each run starts the old image on a fresh `/data` volume and creates real data
+through the API: an administrator, an operator and a viewer, two teams,
+monitors of several kinds (HTTP, TCP with a parent, ping, SNMP and Proxmox with
+encrypted credentials, Home Assistant with an encrypted token, a heartbeat, a
+simulated agent that pushes 30 minutes of history), rules (one built-in rule
+switched off), silences, an ntfy channel with an encrypted token, a status page
+with an incident, instance and notification settings, an API token. A small mock
+service (`scripts/upgrade-test/mock.py`) plays Home Assistant and ntfy and
+records the tokens it is shown. After the metrics have accumulated, the old
+image exports a backup and stops cleanly.
+
+The candidate image then starts on the same volume and the test checks that it is
+healthy and logs no error, that every object reads back with the same values and
+ids, that each user can still sign in, that the encrypted secrets are readable
+(the Home Assistant probe and the channel test must present the right tokens to
+the mock, and a backup export, which decrypts every secret, must succeed), that
+the heartbeat URL, the agent token and binding, the API token and the public
+status page still work, that the VictoriaMetrics history is complete and that
+monitoring resumed. Finally the backup made by the old version is restored on a
+fresh instance of the candidate, which must come out with the same configuration
+and working secrets.
+
+To run it locally you need Docker on Linux (the mock service is reached through
+the gateway of a temporary Docker network), `curl`, `git` and `python3`:
+
+```bash
+scripts/upgrade-test.sh                                   # last release -> ghcr.io/selfhostr/dumbmonit:edge
+scripts/upgrade-test.sh dumbmonit-dev                      # last release -> an image you built
+OLD_IMAGE=previous-minor scripts/upgrade-test.sh dumbmonit-dev
+OLD_IMAGE=ghcr.io/selfhostr/dumbmonit:0.16.1 scripts/upgrade-test.sh dumbmonit-dev
+KEEP=1 UPGRADE_LOG_DIR=./upgrade-logs scripts/upgrade-test.sh dumbmonit-dev   # keep everything to debug
+```
+
+It takes about four minutes, most of it waiting for the old version to collect
+metrics. On failure it prints the last lines of the logs of the old, new and
+restored containers and of the mock service; the complete logs are in
+`UPGRADE_LOG_DIR` (in CI, the `upgrade-test-logs` artifact). The `[ok]`, `[KO]`
+and `[..]` lines tell what was verified, what broke and what an old version could
+not create (not covered, not blocking). The seed data, the checks and the fields
+compared live in `scripts/upgrade-test/data.py`: when you add a setting that must
+survive updates, create it in `phase_seed` and read it back in `snapshot`.
+
 ## Adding a collector
 
 1. Implement `Collector` from `crates/proto/src/collector.rs`: `kind()`,

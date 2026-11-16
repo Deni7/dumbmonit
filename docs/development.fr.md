@@ -109,6 +109,63 @@ Les tests d'intégration vivent dans `crates/server/tests/` ; les modules purs
 (conversion métrique, analyse des options, machine d'états d'alerte, silences)
 sont testés en place sans réseau.
 
+### Test de mise à jour
+
+`.github/workflows/upgrade.yml` vérifie qu'une installation existante survit à une
+mise à jour. Il construit l'image du commit, puis lance deux fois
+`scripts/upgrade-test.sh`, côte à côte : depuis la dernière release publiée, qui
+fait échouer le job, et depuis la dernière release de la version mineure
+précédente, qui avertit seulement (le projet ne définit pas de plus ancienne
+version supportée). Il tourne à chaque tirage vers `dev` et `main`, et sur les
+demandes de tirage vers ces branches qui touchent les crates, le Dockerfile,
+`profiles/`, `integrations/` ou le test lui-même. C'est aussi la porte de la
+publication : une étiquette sur `main` n'est publiée qu'après une exécution verte.
+
+Chaque exécution démarre l'ancienne image sur un volume `/data` neuf et crée de
+vraies données par l'API : un administrateur, un opérateur et un lecteur, deux
+équipes, des moniteurs de plusieurs types (HTTP, TCP avec un parent, ping, SNMP et
+Proxmox à identifiants chiffrés, Home Assistant à jeton chiffré, un battement de
+cœur, un agent simulé qui pousse 30 minutes d'historique), des règles (dont une
+règle livrée désactivée), des silences, un canal ntfy à jeton chiffré, une page de
+statut avec un incident, des réglages d'instance et de notification, un jeton
+d'API. Un petit faux service (`scripts/upgrade-test/mock.py`) joue Home Assistant
+et ntfy et note les jetons qu'on lui présente. Une fois les métriques accumulées,
+l'ancienne image exporte une sauvegarde puis s'arrête proprement.
+
+L'image candidate démarre ensuite sur le même volume et le test vérifie qu'elle
+est saine et sans erreur au journal, que chaque objet se relit avec les mêmes
+valeurs et les mêmes identifiants, que chaque compte peut encore se connecter, que
+les secrets chiffrés sont lisibles (la sonde Home Assistant et l'envoi de test du
+canal doivent présenter les bons jetons au faux service, et l'export d'une
+sauvegarde, qui déchiffre tous les secrets, doit réussir), que l'URL du battement
+de cœur, le jeton et la liaison de l'agent, le jeton d'API et la page de statut
+publique fonctionnent toujours, que l'historique VictoriaMetrics est complet et
+que la supervision a repris. Enfin la sauvegarde faite par l'ancienne version est
+restaurée sur une instance neuve de la candidate, qui doit retrouver la même
+configuration et des secrets fonctionnels.
+
+Pour le lancer en local il faut Docker sous Linux (le faux service est joint par
+la passerelle d'un réseau Docker temporaire), `curl`, `git` et `python3` :
+
+```bash
+scripts/upgrade-test.sh                                   # dernière release -> ghcr.io/selfhostr/dumbmonit:edge
+scripts/upgrade-test.sh dumbmonit-dev                      # dernière release -> une image que vous avez construite
+OLD_IMAGE=previous-minor scripts/upgrade-test.sh dumbmonit-dev
+OLD_IMAGE=ghcr.io/selfhostr/dumbmonit:0.16.1 scripts/upgrade-test.sh dumbmonit-dev
+KEEP=1 UPGRADE_LOG_DIR=./upgrade-logs scripts/upgrade-test.sh dumbmonit-dev   # tout garder pour déboguer
+```
+
+Il dure environ quatre minutes, dont l'essentiel à attendre que l'ancienne version
+collecte des métriques. En cas d'échec il affiche les dernières lignes des
+journaux des conteneurs ancien, nouveau et restauré et du faux service ; les
+journaux complets sont dans `UPGRADE_LOG_DIR` (en CI, l'artefact
+`upgrade-test-logs`). Les lignes `[ok]`, `[KO]` et `[..]` disent ce qui a été
+vérifié, ce qui est cassé et ce qu'une ancienne version n'a pas pu créer (non
+couvert, non bloquant). Les données de départ, les contrôles et les champs
+comparés vivent dans `scripts/upgrade-test/data.py` : quand vous ajoutez un
+réglage qui doit survivre aux mises à jour, créez-le dans `phase_seed` et
+relisez-le dans `snapshot`.
+
 ## Ajout d'un collecteur
 
 1. Implémentez `Collector` de `crates/proto/src/collector.rs` : `kind()`,
