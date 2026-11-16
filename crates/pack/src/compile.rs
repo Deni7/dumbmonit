@@ -375,10 +375,8 @@ fn sources(
     options: &BTreeMap<String, String>,
     problems: &mut Problems,
 ) -> Vec<Source> {
-    let session_requests = manifest
-        .session
-        .as_ref()
-        .map_or(0, |session| 1 + usize::from(session.logout.is_some()));
+    let session_requests =
+        manifest.session.as_ref().map_or(0, |session| 1 + usize::from(session.logout.is_some()));
     if manifest.sources.len() + session_requests > MAX_REQUESTS {
         problems.error(
             "sources",

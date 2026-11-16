@@ -94,9 +94,9 @@ const ATTENTION: Record<NodeState, number> = {
 	disabled: 4
 };
 
-const NETWORK_KINDS = new Set(['snmp', 'opnsense', 'pfsense', 'unifi', 'mikrotik', 'omada', 'meraki', 'openwrt', 'fortigate', 'sophos', 'paloalto', 'sonicwall']);
+const NETWORK_KINDS = new Set(['snmp', 'opnsense', 'pfsense', 'unifi', 'mikrotik', 'omada', 'pack.meraki', 'openwrt', 'fortigate', 'sophos', 'pack.paloalto', 'pack.sonicwall']);
 /** Firewalls and gateways: the top of a site. */
-const GATEWAY_KINDS = new Set(['opnsense', 'pfsense', 'fortigate', 'sophos', 'paloalto', 'sonicwall', 'mikrotik']);
+const GATEWAY_KINDS = new Set(['opnsense', 'pfsense', 'fortigate', 'sophos', 'pack.paloalto', 'pack.sonicwall', 'mikrotik']);
 
 export function isGateway(kind: string): boolean {
 	return GATEWAY_KINDS.has(kind);

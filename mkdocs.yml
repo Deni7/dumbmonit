@@ -104,11 +104,11 @@ nav:
       - pfSense: devices/pfsense.md
       - FortiGate: devices/fortigate.md
       - Sophos Firewall: devices/sophos.md
-      - Cisco Meraki: devices/meraki.md
+      - Cisco Meraki (community pack): devices/meraki.md
       - TP-Link Omada: devices/omada.md
       - Aruba Central: devices/arubacentral.md
-      - Palo Alto PAN-OS: devices/paloalto.md
-      - SonicWall SonicOS: devices/sonicwall.md
+      - Palo Alto PAN-OS (community pack): devices/paloalto.md
+      - SonicWall SonicOS (community pack): devices/sonicwall.md
       - OpenVPN server: devices/openvpn.md
       - UniFi Network: devices/unifi.md
       - Home Assistant: devices/homeassistant.md
@@ -174,7 +174,7 @@ nav:
       - Lidarr (beta): devices/lidarr.md
       - Prowlarr (beta): devices/prowlarr.md
       - qBittorrent (beta): devices/qbittorrent.md
-      - UniFi Protect (beta): devices/unifiprotect.md
+      - UniFi Protect (community pack): devices/unifiprotect.md
       - Frigate NVR (beta): devices/frigate.md
       - Keycloak (beta): devices/keycloak.md
       - authentik (beta): devices/authentik.md

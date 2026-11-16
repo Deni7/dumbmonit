@@ -208,6 +208,11 @@ pub async fn restore(
     let report = import::restore(&state.pool, &state.cipher, &opened, payload.apply).await?;
 
     if payload.apply {
+        // Une sauvegarde d'avant les paquets communautaires porte encore les
+        // anciens types (`meraki`…) : ses cibles prennent le type du paquet.
+        if let Err(error) = crate::packs::convert_moved_kinds(&state.pool).await {
+            tracing::warn!(%error, "devices of moved types not converted after the restore");
+        }
         // Les paquets restaurés définissent des types : le registre les prend
         // tout de suite, sans attendre un redémarrage.
         if let Err(error) = crate::packs::sync_registry(&state.pool, &state.collectors).await {

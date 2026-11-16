@@ -132,7 +132,6 @@ const KIND_ICON: Record<string, typeof LucideIcon> = {
 	lidarr: Disc3,
 	prowlarr: Waypoints,
 	qbittorrent: Cloud,
-	unifiprotect: ShieldCheck,
 	frigate: Radio,
 	keycloak: ShieldCheck,
 	authentik: ShieldCheck,
@@ -186,12 +185,9 @@ const KIND_ICON: Record<string, typeof LucideIcon> = {
 	ovh: Server,
 	infomaniak: Cloud,
 	fortigate: BrickWallShield,
-	meraki: Cloud,
 	omada: Antenna,
 	sophos: ShieldCheck,
 	arubacentral: Wifi,
-	paloalto: BrickWallShield,
-	sonicwall: ShieldCheck,
 	qnap: HardDrive,
 	ceph: Database,
 	minio: Archive,
@@ -208,7 +204,7 @@ export function kindIcon(kind: string): typeof LucideIcon {
 }
 
 /** Kinds that describe a machine the collector polls, in display order. */
-const DEVICE_KINDS = ['snmp', 'netconfig', 'proxmox', 'vsphere', 'xcpng', 'nutanix', 'pbs', 'pdm', 'pmg', 'synology', 'truenas', 'unraid', 'opnsense', 'pfsense', 'fortigate', 'sophos', 'openvpn', 'unifi', 'omada', 'meraki', 'homeassistant', 'mikrotik', 'nut', 'redfish', 'pihole', 'adguard', 'mdaemon', 'securitygateway', 'victoriametrics', 'victorialogs', 'loki', 'graylog', 'nextcloud', 'immich', 'paperless', 'jellyfin', 'plex', 'gitlab', 'forgejo', 'sonarr', 'radarr', 'lidarr', 'prowlarr', 'qbittorrent', 'unifiprotect', 'frigate', 'keycloak', 'authentik', 'vaultwarden', 'mailcow', 'redis', 'mongodb', 'rabbitmq', 'mssql', 'oracle', 'elasticsearch', 'influxdb', 'kafka', 'crowdsec', 'traefik', 'caddy', 'prometheus', 'otlp', 'nginx', 'apache', 'npm', 'kubernetes', 'activedirectory', 'winrm', 'veeam', 'tailscale', 'arubacentral', 'paloalto', 'sonicwall', 'qnap', 'ceph', 'minio', 'kopia', 'duplicati', 'm365', 'entra', 'azure', 'aws', 'cloudflare', 'hetzner', 'ovh', 'infomaniak'];
+const DEVICE_KINDS = ['snmp', 'netconfig', 'proxmox', 'vsphere', 'xcpng', 'nutanix', 'pbs', 'pdm', 'pmg', 'synology', 'truenas', 'unraid', 'opnsense', 'pfsense', 'fortigate', 'sophos', 'openvpn', 'unifi', 'omada', 'homeassistant', 'mikrotik', 'nut', 'redfish', 'pihole', 'adguard', 'mdaemon', 'securitygateway', 'victoriametrics', 'victorialogs', 'loki', 'graylog', 'nextcloud', 'immich', 'paperless', 'jellyfin', 'plex', 'gitlab', 'forgejo', 'sonarr', 'radarr', 'lidarr', 'prowlarr', 'qbittorrent', 'frigate', 'keycloak', 'authentik', 'vaultwarden', 'mailcow', 'redis', 'mongodb', 'rabbitmq', 'mssql', 'oracle', 'elasticsearch', 'influxdb', 'kafka', 'crowdsec', 'traefik', 'caddy', 'prometheus', 'otlp', 'nginx', 'apache', 'npm', 'kubernetes', 'activedirectory', 'winrm', 'veeam', 'tailscale', 'arubacentral', 'qnap', 'ceph', 'minio', 'kopia', 'duplicati', 'm365', 'entra', 'azure', 'aws', 'cloudflare', 'hetzner', 'ovh', 'infomaniak'];
 
 /** Services in display order: the everyday checks first, the specialised ones after. */
 const SERVICE_KINDS = ['http', 'ping', 'tcp', 'dns', 'tls', 'ntp', 'domain', 'provider', 'mail_blacklist', 'ip_blacklist', 'push', 'smtp', 'postgres', 'mysql', 'mqtt', 'websocket', 'udp', 'ssh', 'imap', 'pop3', 'snmp_oid', 'radius', 'grpc'];
@@ -253,7 +249,6 @@ const KIND_KEYWORDS: Record<string, string> = {
 	lidarr: 'music albums artists pvr arr usenet torrent download self-hosted app',
 	prowlarr: 'indexers trackers usenet torrent arr proxy search self-hosted app',
 	qbittorrent: 'torrent bittorrent download client seeding webui self-hosted app',
-	unifiprotect: 'ubiquiti unifi protect cameras nvr video surveillance cctv recording doorbell',
 	frigate: 'cameras nvr video surveillance cctv object detection coral tpu rtsp self-hosted app',
 	keycloak: 'identity sso oidc saml login realm iam authentication self-hosted app',
 	authentik: 'identity sso oidc saml ldap login outpost iam authentication self-hosted app',
@@ -308,11 +303,8 @@ const KIND_KEYWORDS: Record<string, string> = {
 	infomaniak: 'infomaniak swiss hosting web mail kdrive product domain expiry cloud',
 	fortigate: 'fortinet fortios firewall utm ngfw ipsec vpn sd-wan ha cluster fortiguard',
 	sophos: 'sophos xg xgs sfos firewall utm ipsec vpn',
-	meraki: 'cisco meraki cloud dashboard mx ms mr switch access point wifi security appliance sd-wan uplink license',
 	omada: 'tp-link tplink omada eap access point wifi switch gateway er605 oc200 oc300 sdn controller',
 	arubacentral: 'aruba hpe central greenlake wifi wi-fi wireless access point ap switch gateway cloud instant on',
-	paloalto: 'palo alto networks pan-os panos pa-series vm-series firewall ngfw ha globalprotect panorama beta',
-	sonicwall: 'sonicwall sonicos tz nsa nssp nsv firewall utm vpn beta',
 	qnap: 'nas qts quts hero storage raid volume disk smart snapshot backup',
 	ceph: 'storage cluster osd pg pool mon mgr rados rbd cephfs object block distributed proxmox rook',
 	minio: 'object storage s3 bucket erasure prometheus metrics distributed',

@@ -390,7 +390,7 @@ CI/CD runners, a scheduled task that stopped running.
 
 ### Media, identity and mail applications
 
-Sonarr, Radarr, Lidarr, Prowlarr, qBittorrent, UniFi Protect, Frigate, Keycloak, authentik, Vaultwarden and mailcow ([monitors](../devices/index.md)). These keep answering while the service they provide is broken: a download client down, a camera dropped, a database gone behind a login page. An application that does not answer at all is Monitor unreachable.
+Sonarr, Radarr, Lidarr, Prowlarr, qBittorrent, Frigate, Keycloak, authentik, Vaultwarden and mailcow ([monitors](../devices/index.md)). These keep answering while the service they provide is broken: a download client down, a camera dropped, a database gone behind a login page. An application that does not answer at all is Monitor unreachable. UniFi Protect became a community pack: its rules come with the pack ([UniFi Protect](../devices/unifiprotect.md)).
 
 | Rule | What | Default threshold | Hold | Severity | Reminder |
 |---|---|---|---|---|---|
@@ -413,10 +413,6 @@ Sonarr, Radarr, Lidarr, Prowlarr, qBittorrent, UniFi Protect, Frigate, Keycloak,
 | qBittorrent torrents in error | Torrents are in error or have lost their files (`dumbmonit_qbittorrent_torrents_errored`). | > 0 | 15 min | Advisory (`warning`) | 24 h |
 | qBittorrent disconnected | qBittorrent is firewalled or disconnected (`dumbmonit_qbittorrent_connected == bool 0`): nothing is downloaded or seeded. | > 0 | 15 min | Advisory (`warning`) | 6 h |
 | qBittorrent free space low | Less than 5 GiB free in the download folder (`dumbmonit_qbittorrent_free_space_bytes / 1073741824`); clears above 6 GiB. | < 5 GiB | 30 min | Advisory (`warning`) | 24 h |
-| Protect camera offline | A UniFi Protect camera is disconnected from its NVR (`dumbmonit_unifiprotect_camera_online == bool 0`). The notification names the camera. | > 0 | 5 min | Advisory (`warning`) | 6 h |
-| Protect camera not recording | A camera is connected and set to record but does not (`dumbmonit_unifiprotect_cameras_not_recording`). | > 0 | 15 min | Advisory (`warning`) | 6 h |
-| Protect NVR disk unhealthy | The NVR reports a failing disk (`dumbmonit_unifiprotect_disks_unhealthy`). | > 0 | 5 min | Warning (`critical`) | 1 h |
-| Protect recording disabled | Recording is switched off on the NVR (`dumbmonit_unifiprotect_recording_disabled`). | > 0 | 10 min | Advisory (`warning`) | 6 h |
 | Frigate camera offline | A camera delivers no frames to Frigate (`dumbmonit_frigate_camera_online == bool 0`). The notification names the camera. | > 0 | 5 min | Advisory (`warning`) | 6 h |
 | Frigate detector stuck | A detector has been on the same inference for more than 30 seconds (`dumbmonit_frigate_detector_busy_seconds`). | > 30 s | 2 min | Advisory (`warning`) | 1 h |
 | Frigate storage almost full | The disk holding the recordings is more than 90 % full (`dumbmonit_frigate_storage_used_percent`); clears below 88 %. | > 90 % | 30 min | Advisory (`warning`) | 24 h |
@@ -883,14 +879,7 @@ See [Sophos Firewall](../devices/sophos.md).
 
 ### Cisco Meraki
 
-See [Cisco Meraki](../devices/meraki.md) (beta). Devices are labelled `device`, `serial`, `model` and `network`, uplinks `interface`.
-
-| Rule | What | Default threshold | Hold | Severity | Reminder |
-|---|---|---|---|---|---|
-| Meraki device offline | A Cisco Meraki device has been offline (out of reach of the cloud dashboard) for ten minutes. Dormant devices, unseen for a long time, are left out (`dumbmonit_meraki_device_offline`). | > 0 | 10 min | Advisory (`warning`) | 6 h |
-| Meraki uplink failed | A Meraki router lost the Internet access of a configured uplink (the wired and cellular sockets without a cable are not counted) (`dumbmonit_meraki_uplink_failed`). | > 0 | 5 min | Advisory (`warning`) | 6 h |
-| Meraki license problem | The Meraki license is not in compliance (expired, missing or out of compliance): the dashboard may stop managing the devices (`dumbmonit_meraki_license_ok`). | < 1 | 1 h | Advisory (`warning`) | 1 d |
-| Meraki license expiring | A Meraki license expires in less than 30 days (`dumbmonit_meraki_license_expiry_seconds`). | < 30 d | 1 h | Advisory (`warning`) | 1 d |
+Now a community pack: its rules come with the pack, under the uid `pack:meraki:<name>`. See [Cisco Meraki](../devices/meraki.md).
 
 ### TP-Link Omada
 
@@ -918,23 +907,12 @@ Read over SNMP by the Stormshield profile; see [Stormshield SNS](../devices/snmp
 | Stormshield HA link faulty | A link between the nodes of a Stormshield HA cluster is faulty (`dumbmonit_stormshield_ha_faulty_links`). | > 0 | 5 min | Advisory (`warning`) | 6 h |
 ### Palo Alto PAN-OS
 
-See [Palo Alto PAN-OS](../devices/paloalto.md) (beta). Interfaces are labelled `interface` and `zone`, licences `license`.
-
-| Palo Alto interface without link | A Palo Alto firewall interface bound to a zone has no link: cable, transceiver or the device in front (`dumbmonit_paloalto_interface_down`). | > 0 | 5 min | Advisory (`warning`) | 6 h |
-| Palo Alto HA peer lost | The peer of a Palo Alto HA pair is no longer active or passive, or the HA link to it is down: there is no standby any more (`dumbmonit_paloalto_ha_peer_up`). | < 1 | 2 min | Warning (`critical`) | 6 h |
-| Palo Alto HA out of sync | The running configuration of a Palo Alto HA pair is not synchronized: a failover would run another configuration (`dumbmonit_paloalto_ha_in_sync`). | < 1 | 15 min | Advisory (`warning`) | 6 h |
-| Palo Alto HA member not functional | This Palo Alto firewall reports its HA state as suspended or non-functional (`dumbmonit_paloalto_ha_local_functional`). | < 1 | 5 min | Warning (`critical`) | 6 h |
-| Palo Alto session table filling up | The session table of a Palo Alto firewall has stayed above 90 % of its capacity for ten minutes: new sessions will be refused when it is full (`dumbmonit_paloalto_session_usage_percent`). | > 90 % | 10 min | Advisory (`warning`) | 6 h |
-| Palo Alto management CPU high | The management plane CPU of a Palo Alto firewall has stayed above 90 % for fifteen minutes (`dumbmonit_paloalto_cpu_usage_percent`). | > 90 % | 15 min | Advisory (`warning`) | 6 h |
-| Palo Alto management memory high | The management plane memory of a Palo Alto firewall has stayed above 90 % for fifteen minutes (`dumbmonit_paloalto_memory_used_percent`). | > 90 % | 15 min | Advisory (`warning`) | 6 h |
-| Palo Alto licence expiring | A licence or subscription of a Palo Alto firewall expires in less than 30 days, or has expired (`dumbmonit_paloalto_license_expiry_seconds`). | < 30 d | 1 h | Advisory (`warning`) | 1 d |
-| Palo Alto commit failed | The last configuration commit of a Palo Alto firewall failed: the running configuration is not the one that was saved (`dumbmonit_paloalto_last_commit_ok`). | < 1 | 5 min | Info (`info`) | 1 d |
+Now a community pack: its rules come with the pack, under the uid `pack:paloalto:<name>`. See [Palo Alto PAN-OS](../devices/paloalto.md).
 
 ### SonicWall SonicOS
 
-See [SonicWall SonicOS](../devices/sonicwall.md) (beta).
+Now a community pack: its rules come with the pack, under the uid `pack:sonicwall:<name>`. See [SonicWall SonicOS](../devices/sonicwall.md).
 
-| SonicWall interface without link | A SonicWall interface bound to a zone has no link (`dumbmonit_sonicwall_interface_down`). | > 0 | 5 min | Advisory (`warning`) | 6 h |
 ### QNAP QTS
 
 See [QNAP QTS / QuTS hero](../devices/qnap.md). Volumes are labelled `volume`, disks `disk` and `model`.

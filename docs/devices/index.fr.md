@@ -44,11 +44,11 @@ surveillance**. Voir [Ajouter votre première surveillance](../install/first-dev
 | [pfSense](pfsense.md) | `pfsense` | clé d'API REST (utilisateur en lecture seule) | Pare-feu : passerelles en panne ou avec pertes, interfaces sans lien, services arrêtés |
 | [FortiGate](fortigate.md) | `fortigate` | jeton d'API REST (profil en lecture seule, hôte de confiance) | Pare-feu : tunnels IPsec, liens, synchro HA, mode conserve, licences FortiGuard |
 | [Sophos Firewall](sophos.md) | `sophos` | nom d'utilisateur/mot de passe (profil en lecture seule) | Pare-feu : liens d'interface seulement (l'API XML n'expose ni tunnel, ni HA, ni licence) |
-| [Cisco Meraki](meraki.md) | `meraki` | clé d'API (administrateur en lecture seule) | Bêta. Cloud Meraki : appareils hors ligne, liaisons Internet en échec, état et expiration de la licence, clients par réseau |
+| [Cisco Meraki](meraki.md) | `pack.meraki` | clé d'API (administrateur en lecture seule) | Pack communautaire. Cloud Meraki : appareils hors ligne, liaisons Internet en échec, état et expiration de la licence |
 | [TP-Link Omada](omada.md) | `omada` | identifiant et secret de client OpenAPI (rôle Viewer) | Bêta. Contrôleur Omada : appareils déconnectés ou en attente, CPU et mémoire, mises à jour du firmware, clients par site |
 | [Aruba Central](arubacentral.md) | `arubacentral` | client d'API (ID et secret) ou jeton d'accès | Bêta. Points d'accès, commutateurs et passerelles Aruba par l'API cloud : appareils hors ligne, alertes critiques, santé des appareils, clients |
-| [Palo Alto PAN-OS](paloalto.md) | `paloalto` | nom d'utilisateur/mot de passe ou clé d'API (rôle limité aux requêtes opérationnelles de l'API XML) | Bêta. Pare-feu : liens d'interface, pair et synchro HA, table des sessions, licences, validations en échec |
-| [SonicWall SonicOS](sonicwall.md) | `sonicwall` | nom d'utilisateur/mot de passe (utilisateur en lecture seule) | Bêta. Pare-feu : liens d'interface seulement |
+| [Palo Alto PAN-OS](paloalto.md) | `pack.paloalto` | clé d'API (rôle limité aux requêtes opérationnelles de l'API XML) | Pack communautaire. Pare-feu : liens d'interface, pair et synchro HA, table des sessions, CPU et mémoire de gestion, licences |
+| [SonicWall SonicOS](sonicwall.md) | `pack.sonicwall` | nom d'utilisateur/mot de passe (utilisateur en lecture seule) | Pack communautaire. Pare-feu : liens d'interface seulement |
 | [Serveur OpenVPN](openvpn.md) | `openvpn` | aucun, ou mot de passe de gestion | Serveur OpenVPN via son interface de gestion : version, état, clients connectés |
 | [UniFi Network](unifi.md) | `unifi` | clé d'API ou nom d'utilisateur/mot de passe | Console UniFi ou serveur auto-hébergé : appareils, WAN, clients |
 | [Home Assistant](homeassistant.md) | `homeassistant` | jeton d'accès longue durée | Maison connectée : entités indisponibles, batteries faibles, mises à jour, réparations |
@@ -115,7 +115,7 @@ surveillance**. Voir [Ajouter votre première surveillance](../install/first-dev
 | [Lidarr (bêta)](lidarr.md) | `lidarr` | clé d'API | Musique : santé, clients et indexeurs en échec, erreurs de file, disque, mises à jour |
 | [Prowlarr (bêta)](prowlarr.md) | `prowlarr` | clé d'API | Indexeurs : santé, indexeurs désactivés après des échecs, disque, mises à jour |
 | [qBittorrent (bêta)](qbittorrent.md) | `qbittorrent` | nom d'utilisateur et mot de passe, ou aucun | Client torrent : torrents en erreur, connectivité perdue, vitesses, espace libre |
-| [UniFi Protect (bêta)](unifiprotect.md) | `unifiprotect` | nom d'utilisateur et mot de passe locaux | Caméras : hors ligne ou sans enregistrement, disques et stockage du NVR |
+| [UniFi Protect](unifiprotect.md) | `pack.unifiprotect` | clé d'API (API d'intégration) | Pack communautaire. Caméras déconnectées |
 | [Frigate NVR (bêta)](frigate.md) | `frigate` | aucun ou jeton porteur | NVR : caméras sans images, détecteurs bloqués, débits, stockage des enregistrements |
 | [Keycloak (bêta)](keycloak.md) | `keycloak` | aucun, ou identifiant et secret de client | Identité : disponibilité et base de données, realms, sessions, utilisateurs |
 | [authentik (bêta)](authentik.md) | `authentik` | jeton d'API | Identité : disponibilité, workers, tâches en échec, avant-postes, mises à jour |

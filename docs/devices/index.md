@@ -42,11 +42,11 @@ the type, fill in the form, **Add monitor**. See
 | [pfSense](pfsense.md) | `pfsense` | REST API key (read-only user) | Firewall: gateways down or lossy, interfaces without link, stopped services |
 | [FortiGate](fortigate.md) | `fortigate` | REST API token (read-only profile, trusted host) | Firewall: IPsec tunnels, links, HA sync, conserve mode, FortiGuard licences |
 | [Sophos Firewall](sophos.md) | `sophos` | username/password (read-only profile) | Firewall: interface links only (the XML API exposes no tunnel, HA or licence state) |
-| [Cisco Meraki](meraki.md) | `meraki` | API key (read-only administrator) | Beta. Meraki cloud: devices offline, failed Internet uplinks, license state and expiry, clients per network |
+| [Cisco Meraki](meraki.md) | `pack.meraki` | API key (read-only administrator) | Community pack. Meraki cloud: devices offline, failed Internet uplinks, license state and expiry |
 | [TP-Link Omada](omada.md) | `omada` | OpenAPI client ID and secret (Viewer role) | Beta. Omada controller: devices disconnected or pending, CPU and memory, firmware updates, clients per site |
 | [Aruba Central](arubacentral.md) | `arubacentral` | API client (ID and secret) or access token | Beta. Aruba access points, switches and gateways through the cloud API: devices offline, critical alerts, device health, clients |
-| [Palo Alto PAN-OS](paloalto.md) | `paloalto` | username/password or API key (role-based, XML API operational requests only) | Beta. Firewall: interface links, HA peer and sync, session table, licences, failed commits |
-| [SonicWall SonicOS](sonicwall.md) | `sonicwall` | username/password (read-only user) | Beta. Firewall: interface links only |
+| [Palo Alto PAN-OS](paloalto.md) | `pack.paloalto` | API key (role-based, XML API operational requests only) | Community pack. Firewall: interface links, HA peer and sync, session table, management CPU and memory, licences |
+| [SonicWall SonicOS](sonicwall.md) | `pack.sonicwall` | username/password (read-only user) | Community pack. Firewall: interface links only |
 | [OpenVPN server](openvpn.md) | `openvpn` | none, or management password | OpenVPN server through its management interface: version, state, connected clients |
 | [UniFi Network](unifi.md) | `unifi` | API key or username/password | UniFi console or self-hosted server: devices, WAN, clients |
 | [Home Assistant](homeassistant.md) | `homeassistant` | long-lived access token | Smart home: unavailable entities, low batteries, updates, repairs |
@@ -113,7 +113,7 @@ the type, fill in the form, **Add monitor**. See
 | [Lidarr (beta)](lidarr.md) | `lidarr` | API key | Music: health, failing clients and indexers, queue errors, disk, updates |
 | [Prowlarr (beta)](prowlarr.md) | `prowlarr` | API key | Indexers: health, indexers disabled after failures, disk, updates |
 | [qBittorrent (beta)](qbittorrent.md) | `qbittorrent` | user name and password, or none | Torrent client: torrents in error, lost connectivity, speeds, free space |
-| [UniFi Protect (beta)](unifiprotect.md) | `unifiprotect` | local user name and password | Cameras: offline or not recording, NVR disks and storage |
+| [UniFi Protect](unifiprotect.md) | `pack.unifiprotect` | API key (integration API) | Community pack. Cameras disconnected |
 | [Frigate NVR (beta)](frigate.md) | `frigate` | none or bearer token | NVR: cameras without frames, detector hangs, frame rates, recording storage |
 | [Keycloak (beta)](keycloak.md) | `keycloak` | none, or client ID and secret | Identity: readiness and database, realms, sessions, users |
 | [authentik (beta)](authentik.md) | `authentik` | API token | Identity: readiness, workers, failed tasks, outposts, updates |

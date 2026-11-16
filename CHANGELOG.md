@@ -12,6 +12,26 @@ All notable changes to this project are documented here. The format follows
   for code and figures, replacing Geist and Bricolage Grotesque. Both are open source (SIL OFL 1.1)
   and served from DumbMonit itself; the documentation no longer loads anything from Google Fonts.
 
+- **Cisco Meraki, Palo Alto PAN-OS, SonicWall and UniFi Protect become community packs.** Written
+  without a device to try them on, they leave the binary for `packs/meraki`, `packs/paloalto`,
+  `packs/sonicwall` and `packs/unifiprotect`, which anyone can fix without waiting for a release.
+  Existing monitors move to the pack's type (`pack.meraki`…) with their credential, settings and
+  history; until the pack is installed (Settings → Integration packs) they say which one to install.
+  The built-in rules of these types are removed: each pack installs its own. Meraki's
+  *Organization* now takes the organization ID and its network filter is gone; PAN-OS needs an API
+  key (no more user name and password) and no longer watches the last commit; UniFi Protect reads
+  the official integration API with an API key, which reports cameras connected or not, but neither
+  recording nor recorder disks. Aruba Central and QNAP stay built in (token from another host,
+  session cookie in the URL).
+
+### Added
+
+- **Integration packs read more APIs.** `format: xml` (converted to JSON, with `lists` for elements
+  that are always lists), `date:` for metrics that are dates (written in Unix seconds, compared with
+  `time()` by rules), `optional: true` for sources a role or a licence may refuse, `each` to read a
+  list nested in each discovered row, `"*"` in a `map` for every other text value, and a `session`
+  opened before the sources and always closed after them.
+
 ## 0.17.1 — 2026-11-04
 
 ### Changed

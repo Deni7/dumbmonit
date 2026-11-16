@@ -2713,8 +2713,6 @@ const PROWLARR_APP_OPTIONS: &[OptionView] =
     &[app_scheme("http"), app_port("9696"), APP_TLS, APP_TIMEOUT];
 const QBITTORRENT_APP_OPTIONS: &[OptionView] =
     &[app_scheme("http"), app_port("8080"), APP_TLS, APP_TIMEOUT];
-const UNIFIPROTECT_APP_OPTIONS: &[OptionView] =
-    &[app_scheme("https"), app_port("443"), APP_TLS, APP_TIMEOUT];
 const FRIGATE_APP_OPTIONS: &[OptionView] =
     &[app_scheme("http"), app_port("5000"), APP_TLS, APP_TIMEOUT];
 const KEYCLOAK_APP_OPTIONS: &[OptionView] = &[
@@ -2780,16 +2778,6 @@ const QBITTORRENT_NO_AUTH: CredentialView = CredentialView {
     label: "No authentication (allowed address)",
     help: "For an address qBittorrent lets in without a login (whitelisted IP subnets).",
     fields: &[],
-};
-
-const PROTECT_LOGIN: CredentialView = CredentialView {
-    kind: "username_password",
-    label: "Local user name / password",
-    help: "A local UniFi OS user with the View Only role on Protect. Ubiquiti cloud accounts are refused.",
-    fields: &[
-        cred_text("username", "User name", "", "dumbmonit"),
-        cred_secret("password", "Password", "", "", true),
-    ],
 };
 
 const KEYCLOAK_NO_AUTH: CredentialView = CredentialView {
@@ -4216,7 +4204,7 @@ const IP_BLACKLIST_OPTIONS: &[OptionView] = &[
 ];
 
 /// Délai par requête des équipements commerciaux lus par leur API
-/// (`collectors/{pfsense,unraid,veeam,tailscale,fortigate,sophos,meraki,omada}`, défaut de
+/// (`collectors/{pfsense,unraid,veeam,tailscale,fortigate,sophos,omada}`, défaut de
 /// `selfhosted/options.rs`).
 const VENDOR_TIMEOUT: OptionView = number(
     "request_timeout_seconds",
@@ -4544,38 +4532,6 @@ const FORTIGATE_OPTIONS: &[OptionView] = &[
     VENDOR_TIMEOUT,
 ];
 
-/// Clé d'API Meraki d'un administrateur de l'organisation en lecture seule.
-const MERAKI_KEY: CredentialView = CredentialView {
-    kind: "api_token",
-    label: "API key",
-    help: "The key of the read-only administrator created for DumbMonit, sent as a bearer token.",
-    fields: &[cred_secret(
-        "token",
-        "API key",
-        "Generated under My profile → API access, shown once. Stored encrypted, never shown again.",
-        "",
-        true,
-    )],
-};
-
-const MERAKI_OPTIONS: &[OptionView] = &[
-    text(
-        "organization",
-        "Organization",
-        "The ID or name of the organization to read. Empty: the first one the API key sees.",
-        "Acme Corp",
-        "",
-    ),
-    text(
-        "networks",
-        "Networks",
-        "Comma-separated network names or IDs to watch. Empty: every network of the organization.",
-        "Main office, Warehouse",
-        "",
-    ),
-    VENDOR_TIMEOUT,
-];
-
 /// Client OpenAPI d'Omada (mode « Client », rôle Observateur).
 const OMADA_CLIENT: CredentialView = CredentialView {
     kind: "username_password",
@@ -4642,76 +4598,6 @@ const SOPHOS_OPTIONS: &[OptionView] = &[
         "Used if the address does not give a port: the administration port, 4444 by default.",
         "4444",
         "4444",
-    ),
-    SELF_SIGNED_TLS,
-    VENDOR_TIMEOUT,
-];
-
-/// Palo Alto PAN-OS (`collectors/paloalto`) : mot de passe du compte d'API, ou
-/// clé déjà générée.
-const PALOALTO_LOGIN: CredentialView = CredentialView {
-    kind: "username_password",
-    label: "User name and password",
-    help: "The dumbmonit account: DumbMonit asks the firewall for an API key with it and keeps the key, the password only travels in a request body.",
-    fields: &[
-        cred_text(
-            "username",
-            "User name",
-            "The read-only account created for DumbMonit.",
-            "dumbmonit",
-        ),
-        cred_secret("password", "Password", "", "", true),
-    ],
-};
-
-const PALOALTO_KEY: CredentialView = CredentialView {
-    kind: "api_token",
-    label: "API key",
-    help: "A key already generated for the dumbmonit account, sent in the X-PAN-KEY header.",
-    fields: &[cred_secret(
-        "token",
-        "API key",
-        "As returned by the keygen request. Stored encrypted, never shown again.",
-        "",
-        true,
-    )],
-};
-
-const PALOALTO_OPTIONS: &[OptionView] = &[
-    number(
-        "port",
-        "Port",
-        "Used if the address does not give a port: the HTTPS port of the management interface.",
-        "443",
-        "443",
-    ),
-    SELF_SIGNED_TLS,
-    VENDOR_TIMEOUT,
-];
-
-/// SonicWall SonicOS (`collectors/sonicwall`) : compte en HTTP Basic.
-const SONICWALL_LOGIN: CredentialView = CredentialView {
-    kind: "username_password",
-    label: "User name and password",
-    help: "The dumbmonit user, in a read-only group, sent as HTTP Basic.",
-    fields: &[
-        cred_text(
-            "username",
-            "User name",
-            "The read-only user created for DumbMonit.",
-            "dumbmonit",
-        ),
-        cred_secret("password", "Password", "", "", true),
-    ],
-};
-
-const SONICWALL_OPTIONS: &[OptionView] = &[
-    number(
-        "port",
-        "Port",
-        "Used if the address does not give a port: the HTTPS port of the management interface.",
-        "443",
-        "443",
     ),
     SELF_SIGNED_TLS,
     VENDOR_TIMEOUT,
@@ -6357,28 +6243,6 @@ fn compiled(kind: &str) -> Option<CollectorView> {
             },
             options: QBITTORRENT_APP_OPTIONS,
         },
-        "unifiprotect" => CollectorView {
-            kind: "unifiprotect",
-            label: "UniFi Protect (beta)",
-            summary: "Cameras offline or not recording, NVR disks and storage, recording switched off.",
-            examples: &["UNVR", "Dream Machine Pro", "Cloud Key Gen2+"],
-            credential_types: &["username_password"],
-            credentials: &[PROTECT_LOGIN],
-            address_hint: "unvr.lan",
-            default_port: 443,
-            setup: Setup {
-                title: "Create a local view-only user for Protect",
-                steps: &[
-                    "In UniFi OS, open Admins & Users → Create New and create a local user named as follows, with no cloud account.\ndumbmonit",
-                    "Give it access to the Protect application only, with the View Only role, and none to Network or other applications.",
-                    "In DumbMonit, enter the console's address and that user name and password.",
-                ],
-                ports: &[to_device!(443, "tcp", "UniFi OS (HTTPS, default)",)],
-                permissions: &[],
-                warning: "Use a local account: UniFi OS refuses Ubiquiti cloud accounts here. The console's certificate is usually self-signed: turn on the certificate option.",
-            },
-            options: UNIFIPROTECT_APP_OPTIONS,
-        },
         "frigate" => CollectorView {
             kind: "frigate",
             label: "Frigate NVR (beta)",
@@ -7840,31 +7704,6 @@ fn compiled(kind: &str) -> Option<CollectorView> {
             },
             options: SOPHOS_OPTIONS,
         },
-        "meraki" => CollectorView {
-            kind: "meraki",
-            label: "Cisco Meraki (beta)",
-            summary: "Beta. A Cisco Meraki organization through the Dashboard API: devices offline, Internet uplinks that failed, license out of compliance or expiring, clients per network.",
-            examples: &["Meraki MX / MS / MR", "Cisco Meraki cloud dashboard"],
-            credential_types: &["api_token"],
-            credentials: &[MERAKI_KEY],
-            address_hint: "api.meraki.com",
-            default_port: 443,
-            setup: Setup {
-                title: "Create a read-only API key for DumbMonit",
-                steps: &[
-                    "In the Meraki dashboard, open Organization → Settings and tick Enable access to the Cisco Meraki Dashboard API.",
-                    "Open Organization → Administrators → Add admin and create an administrator dedicated to DumbMonit, with Organization access set to Read-only.\ndumbmonit@example.com",
-                    "Sign in as that administrator, open My profile → API access and click Generate new API key. Copy it: the dashboard shows it only once.",
-                    "In DumbMonit, enter api.meraki.com as the address and paste the key as API key. Leave Organization empty to read the first organization the key sees.",
-                ],
-                ports: &[to_device!(443, "tcp", "Meraki Dashboard API (HTTPS, api.meraki.com)")],
-                permissions: &[
-                    "Organization access: Read-only\nLists devices, uplinks, licensing and clients, changes nothing",
-                ],
-                warning: "A dormant device (not seen for a long time) is counted but never reported as down, and a WAN socket without a cable is not a failed uplink: only an uplink that lost its Internet access is.",
-            },
-            options: MERAKI_OPTIONS,
-        },
         "omada" => CollectorView {
             kind: "omada",
             label: "TP-Link Omada (beta)",
@@ -7904,58 +7743,6 @@ fn compiled(kind: &str) -> Option<CollectorView> {
                 warning: "The Omada controller ships a self-signed certificate: tick \"Accept an unverifiable certificate\" unless you installed your own. The OpenAPI exists from controller version 5.9.",
             },
             options: OMADA_OPTIONS,
-        },
-        "paloalto" => CollectorView {
-            kind: "paloalto",
-            label: "Palo Alto PAN-OS",
-            summary: "Beta. A Palo Alto Networks firewall through the PAN-OS XML API: interfaces without link, HA peer lost or out of sync, session table filling up, management CPU and memory, licences expiring, failed commits.",
-            examples: &["PA-400 / PA-1400 series", "VM-Series", "PAN-OS 10.x and 11.x"],
-            credential_types: &["username_password", "api_token"],
-            credentials: &[PALOALTO_LOGIN, PALOALTO_KEY],
-            address_hint: "pa.lan",
-            default_port: 443,
-            setup: Setup {
-                title: "Create a read-only XML API account for DumbMonit",
-                steps: &[
-                    "Device → Admin Roles → Add: name the role as follows. On the XML API tab enable Operational Requests only; leave every other privilege, and the Web UI and Command Line tabs, disabled.\ndumbmonit-ro",
-                    "Device → Administrators → Add: name the account as follows, set Authentication to a password, the type to Role Based and the role to the one above.\ndumbmonit",
-                    "Click Commit: the role and the account exist only once committed.",
-                    "In DumbMonit, enter the firewall address (pa.lan) with that user name and password, or with an API key you generated for that account.",
-                ],
-                ports: &[to_device!(443, "tcp", "Management interface (HTTPS, default)")],
-                permissions: &[
-                    "XML API → Operational Requests: enabled\nshow system info, resources, sessions, interfaces, HA state, jobs and licence info",
-                    "Every other XML API privilege: disabled\nConfiguration, Commit, Export, Import, Report, Log and User-ID Agent are not needed",
-                    "Web UI and Command Line: disabled\nThe account never signs in interactively",
-                ],
-                warning: "The management interface ships a self-signed certificate: tick \"Accept an unverifiable certificate\" unless you installed your own.",
-            },
-            options: PALOALTO_OPTIONS,
-        },
-        "sonicwall" => CollectorView {
-            kind: "sonicwall",
-            label: "SonicWall SonicOS",
-            summary: "Beta. A SonicWall firewall through the SonicOS 7 API: the link of every interface bound to a zone. Kept minimal on purpose: only the API paths SonicWall publishes are read.",
-            examples: &["SonicWall TZ / NSa / NSsp", "SonicWall NSv", "SonicOS 7.x"],
-            credential_types: &["username_password"],
-            credentials: &[SONICWALL_LOGIN],
-            address_hint: "sonicwall.lan",
-            default_port: 443,
-            setup: Setup {
-                title: "Create a read-only user for the SonicOS API",
-                steps: &[
-                    "Device → Settings → Administration → Audit/SonicOS API: make sure HTTP Basic Access (RFC-2617) is on, then click Accept.",
-                    "Device → Users → Local Users & Groups → Add User: name it as follows, give it a long random password and add it to the group SonicWall Read-Only Admins.\ndumbmonit",
-                    "Allow HTTPS management on the interface DumbMonit reaches the firewall through (Device → Network → Interfaces → Configure → Management).",
-                    "In DumbMonit, enter the firewall address (sonicwall.lan) with that user name and password.",
-                ],
-                ports: &[to_device!(443, "tcp", "Management interface (HTTPS, default)")],
-                permissions: &[
-                    "Group SonicWall Read-Only Admins\nThe account reads and changes nothing",
-                ],
-                warning: "The management interface ships a self-signed certificate: tick \"Accept an unverifiable certificate\" unless you installed your own.",
-            },
-            options: SONICWALL_OPTIONS,
         },
         "qnap" => CollectorView {
             kind: "qnap",
@@ -8187,18 +7974,17 @@ fn guide_url(kind: &str) -> String {
         "postgres" => "services",
         "snmp" | "proxmox" | "pbs" | "pdm" | "pmg" | "synology" | "opnsense" | "truenas"
         | "redfish" | "loki" | "graylog" | "mdaemon" | "securitygateway" | "nextcloud"
-        | "immich" | "sonarr" | "radarr" | "lidarr" | "prowlarr" | "qbittorrent"
-        | "unifiprotect" | "frigate" | "keycloak" | "authentik" | "vaultwarden" | "mailcow"
-        | "paperless" | "jellyfin" | "plex" | "gitlab" | "forgejo" | "pihole" | "adguard"
-        | "nut" | "mikrotik" | "unifi" | "homeassistant" | "vsphere" | "redis" | "mongodb"
-        | "rabbitmq" | "crowdsec" | "traefik" | "caddy" | "nginx" | "apache" | "npm" | "domain"
-        | "provider" | "mail_blacklist" | "ip_blacklist" | "kubernetes" | "activedirectory"
-        | "pfsense" | "unraid" | "veeam" | "winrm" | "tailscale" | "fortigate" | "sophos"
-        | "meraki" | "omada" | "arubacentral" | "paloalto" | "sonicwall" | "qnap" | "ceph"
-        | "minio" | "kopia" | "duplicati" | "openvpn" | "xcpng" | "nutanix" | "mssql"
-        | "oracle" | "elasticsearch" | "influxdb" | "kafka" | "push" | "webchange" | "website"
-        | "netconfig" | "m365" | "entra" | "azure" | "aws" | "cloudflare" | "hetzner" | "ovh"
-        | "infomaniak" | "prometheus" | "otlp" => kind,
+        | "immich" | "sonarr" | "radarr" | "lidarr" | "prowlarr" | "qbittorrent" | "frigate"
+        | "keycloak" | "authentik" | "vaultwarden" | "mailcow" | "paperless" | "jellyfin"
+        | "plex" | "gitlab" | "forgejo" | "pihole" | "adguard" | "nut" | "mikrotik" | "unifi"
+        | "homeassistant" | "vsphere" | "redis" | "mongodb" | "rabbitmq" | "crowdsec"
+        | "traefik" | "caddy" | "nginx" | "apache" | "npm" | "domain" | "provider"
+        | "mail_blacklist" | "ip_blacklist" | "kubernetes" | "activedirectory" | "pfsense"
+        | "unraid" | "veeam" | "winrm" | "tailscale" | "fortigate" | "sophos" | "omada"
+        | "arubacentral" | "qnap" | "ceph" | "minio" | "kopia" | "duplicati" | "openvpn"
+        | "xcpng" | "nutanix" | "mssql" | "oracle" | "elasticsearch" | "influxdb" | "kafka"
+        | "push" | "webchange" | "website" | "netconfig" | "m365" | "entra" | "azure" | "aws"
+        | "cloudflare" | "hetzner" | "ovh" | "infomaniak" | "prometheus" | "otlp" => kind,
         _ => return String::new(),
     };
     let anchor = match kind {
@@ -8326,7 +8112,6 @@ mod tests {
         "lidarr",
         "prowlarr",
         "qbittorrent",
-        "unifiprotect",
         "frigate",
         "keycloak",
         "authentik",
@@ -8376,10 +8161,7 @@ mod tests {
         "fortigate",
         "arubacentral",
         "sophos",
-        "meraki",
         "omada",
-        "paloalto",
-        "sonicwall",
         "qnap",
         "ceph",
         "minio",
@@ -8931,7 +8713,6 @@ mod tests {
             ("lidarr", &["scheme", "port", "insecure_tls", "request_timeout_seconds"]),
             ("prowlarr", &["scheme", "port", "insecure_tls", "request_timeout_seconds"]),
             ("qbittorrent", &["scheme", "port", "insecure_tls", "request_timeout_seconds"]),
-            ("unifiprotect", &["scheme", "port", "insecure_tls", "request_timeout_seconds"]),
             ("frigate", &["scheme", "port", "insecure_tls", "request_timeout_seconds"]),
             (
                 "keycloak",
@@ -9106,10 +8887,7 @@ mod tests {
             ("fortigate", &["port", "vdom", "insecure_tls", "request_timeout_seconds"]),
             ("arubacentral", &["token_address", "request_timeout_seconds"]),
             ("sophos", &["port", "insecure_tls", "request_timeout_seconds"]),
-            ("meraki", &["organization", "networks", "request_timeout_seconds"]),
             ("omada", &["port", "omadac_id", "site", "insecure_tls", "request_timeout_seconds"]),
-            ("paloalto", &["port", "insecure_tls", "request_timeout_seconds"]),
-            ("sonicwall", &["port", "insecure_tls", "request_timeout_seconds"]),
             ("qnap", &["scheme", "port", "insecure_tls", "request_timeout_seconds"]),
             ("ceph", &["scheme", "port", "insecure_tls", "request_timeout_seconds"]),
             ("minio", &["scheme", "port", "insecure_tls", "request_timeout_seconds"]),
@@ -9256,7 +9034,6 @@ mod tests {
             ("lidarr", "http", selfhosted::arr::LIDARR.port),
             ("prowlarr", "http", selfhosted::arr::PROWLARR.port),
             ("qbittorrent", "http", selfhosted::qbittorrent::DEFAULT_PORT),
-            ("unifiprotect", "https", selfhosted::protect::DEFAULT_PORT),
             ("frigate", "http", selfhosted::frigate::DEFAULT_PORT),
             ("keycloak", "http", selfhosted::keycloak::DEFAULT_PORT),
             ("authentik", "http", selfhosted::authentik::DEFAULT_PORT),
@@ -9343,8 +9120,6 @@ mod tests {
             ("fortigate", dumbmonit_collectors::fortigate::DEFAULT_PORT),
             ("sophos", dumbmonit_collectors::sophos::DEFAULT_PORT),
             ("omada", dumbmonit_collectors::omada::DEFAULT_PORT),
-            ("paloalto", dumbmonit_collectors::paloalto::DEFAULT_PORT),
-            ("sonicwall", dumbmonit_collectors::sonicwall::DEFAULT_PORT),
             ("qnap", dumbmonit_collectors::qnap::DEFAULT_PORT),
             ("ceph", dumbmonit_collectors::ceph::DEFAULT_PORT),
             ("minio", dumbmonit_collectors::minio::DEFAULT_PORT),
@@ -9361,11 +9136,8 @@ mod tests {
             "tailscale",
             "fortigate",
             "sophos",
-            "meraki",
             "omada",
             "arubacentral",
-            "paloalto",
-            "sonicwall",
             "qnap",
             "ceph",
             "minio",
@@ -9400,8 +9172,6 @@ mod tests {
             defaut("arubacentral", "token_address"),
             dumbmonit_collectors::arubacentral::DEFAULT_TOKEN_ADDRESS
         );
-        assert_eq!(describe("meraki").address_hint, dumbmonit_collectors::meraki::DEFAULT_ADDRESS);
-        assert_eq!(describe("meraki").default_port, dumbmonit_collectors::meraki::DEFAULT_PORT);
         for kind in ["redis", "mongodb"] {
             assert_eq!(
                 defaut(kind, "request_timeout_seconds"),
@@ -9699,8 +9469,6 @@ mod tests {
             ("fortigate", "dumbmonit"),
             ("arubacentral", "dumbmonit"),
             ("sophos", "dumbmonit"),
-            ("paloalto", "dumbmonit"),
-            ("sonicwall", "dumbmonit"),
             ("qnap", "dumbmonit"),
             ("ceph", "dumbmonit"),
             ("xcpng", "dumbmonit"),
@@ -9883,7 +9651,6 @@ mod tests {
             ("lidarr", include_str!("../../../../docs/devices/lidarr.md")),
             ("prowlarr", include_str!("../../../../docs/devices/prowlarr.md")),
             ("qbittorrent", include_str!("../../../../docs/devices/qbittorrent.md")),
-            ("unifiprotect", include_str!("../../../../docs/devices/unifiprotect.md")),
             ("frigate", include_str!("../../../../docs/devices/frigate.md")),
             ("keycloak", include_str!("../../../../docs/devices/keycloak.md")),
             ("authentik", include_str!("../../../../docs/devices/authentik.md")),
@@ -9924,12 +9691,9 @@ mod tests {
             ("duplicati", include_str!("../../../../docs/devices/duplicati.md")),
             ("tailscale", include_str!("../../../../docs/devices/tailscale.md")),
             ("fortigate", include_str!("../../../../docs/devices/fortigate.md")),
-            ("meraki", include_str!("../../../../docs/devices/meraki.md")),
             ("omada", include_str!("../../../../docs/devices/omada.md")),
             ("arubacentral", include_str!("../../../../docs/devices/arubacentral.md")),
             ("sophos", include_str!("../../../../docs/devices/sophos.md")),
-            ("paloalto", include_str!("../../../../docs/devices/paloalto.md")),
-            ("sonicwall", include_str!("../../../../docs/devices/sonicwall.md")),
             ("qnap", include_str!("../../../../docs/devices/qnap.md")),
             ("ceph", include_str!("../../../../docs/devices/ceph.md")),
             ("minio", include_str!("../../../../docs/devices/minio.md")),

@@ -40,7 +40,6 @@ pub mod kubernetes;
 pub mod log_gate;
 pub mod m365;
 pub mod mdaemon;
-pub mod meraki;
 pub mod mikrotik;
 pub mod minio;
 pub mod mongodb;
@@ -57,7 +56,6 @@ pub mod openvpn;
 pub mod opnsense;
 pub mod oracle;
 pub mod ovh;
-pub mod paloalto;
 pub mod pbs;
 pub mod pdm;
 pub mod pfsense;
@@ -73,7 +71,6 @@ pub mod rest;
 pub mod selfhosted;
 pub mod snmp;
 pub(crate) mod socket;
-pub mod sonicwall;
 pub mod sophos;
 pub mod switch_ports;
 pub mod synology;
@@ -99,6 +96,33 @@ use dumbmonit_proto::{
 
 /// Marge laissée à une sonde pour écrire son verdict après son propre délai.
 const PROBE_TIMEOUT_MARGIN: Duration = Duration::from_secs(2);
+
+/// Types autrefois compilés, devenus des paquets communautaires du même nom
+/// (`packs/<id>` du dépôt) : leurs cibles prennent le type `pack.<id>`.
+pub const MOVED_TO_PACKS: &[&str] = &["meraki", "paloalto", "sonicwall", "unifiprotect"];
+
+/// Ce qu'il faut dire d'une cible dont le type n'a pas de collecteur parce qu'il
+/// vient d'un paquet communautaire absent : lequel installer. `None` pour tout
+/// autre type inconnu.
+///
+/// `pack.` est le préfixe des types de paquets (`dumbmonit_pack::KIND_PREFIX`,
+/// crate qui dépend de celle-ci).
+pub fn pack_to_install(kind: &str) -> Option<String> {
+    if let Some(id) = kind.strip_prefix("pack.") {
+        return Some(format!(
+            "Install the community pack \"{id}\" (Settings → Integration packs; the file is \
+             packs/{id}/pack.yaml in the DumbMonit repository): this device is probed again \
+             as soon as it is installed."
+        ));
+    }
+    MOVED_TO_PACKS.contains(&kind).then(|| {
+        format!(
+            "The \"{kind}\" type now ships as the community pack \"{kind}\": install it \
+             (Settings → Integration packs; the file is packs/{kind}/pack.yaml in the DumbMonit \
+             repository), then add this device again with that type."
+        )
+    })
+}
 
 pub use activedirectory::ActiveDirectoryCollector;
 pub use adguard::AdguardCollector;
@@ -126,7 +150,6 @@ pub use kopia::KopiaCollector;
 pub use kubernetes::KubernetesCollector;
 pub use m365::M365Collector;
 pub use mdaemon::{MdaemonCollector, SecurityGatewayCollector};
-pub use meraki::MerakiCollector;
 pub use mikrotik::MikrotikCollector;
 pub use minio::MinioCollector;
 pub use mongodb::MongodbCollector;
@@ -141,7 +164,6 @@ pub use openvpn::OpenvpnCollector;
 pub use opnsense::OpnsenseCollector;
 pub use oracle::OracleCollector;
 pub use ovh::OvhCollector;
-pub use paloalto::PaloaltoCollector;
 pub use pbs::PbsCollector;
 pub use pdm::PdmCollector;
 pub use pfsense::PfsenseCollector;
@@ -156,12 +178,10 @@ pub use redis::RedisCollector;
 pub use selfhosted::{
     ArrCollector, AuthentikCollector, ForgejoCollector, FrigateCollector, GitlabCollector,
     ImmichCollector, JellyfinCollector, KeycloakCollector, MailcowCollector, NextcloudCollector,
-    PaperlessCollector, PlexCollector, ProtectCollector, QbittorrentCollector,
-    VaultwardenCollector,
+    PaperlessCollector, PlexCollector, QbittorrentCollector, VaultwardenCollector,
 };
 pub use snmp::SnmpCollector;
 pub use socket::DEFAULT_TIMEOUT as SOCKET_DEFAULT_TIMEOUT;
-pub use sonicwall::SonicwallCollector;
 pub use sophos::SophosCollector;
 pub use synology::SynologyCollector;
 pub use tailscale::TailscaleCollector;
@@ -239,7 +259,6 @@ impl Registry {
         registry.register(Arc::new(ArrCollector::lidarr()));
         registry.register(Arc::new(ArrCollector::prowlarr()));
         registry.register(Arc::new(QbittorrentCollector::new()));
-        registry.register(Arc::new(ProtectCollector::new()));
         registry.register(Arc::new(FrigateCollector::new()));
         registry.register(Arc::new(KeycloakCollector::new()));
         registry.register(Arc::new(AuthentikCollector::new()));
@@ -290,10 +309,7 @@ impl Registry {
         registry.register(Arc::new(ArubaCentralCollector::new()));
         registry.register(Arc::new(FortigateCollector::new()));
         registry.register(Arc::new(SophosCollector::new()));
-        registry.register(Arc::new(MerakiCollector::new()));
         registry.register(Arc::new(OmadaCollector::new()));
-        registry.register(Arc::new(PaloaltoCollector::new()));
-        registry.register(Arc::new(SonicwallCollector::new()));
         registry.register(Arc::new(QnapCollector::new()));
         registry.register(Arc::new(CephCollector::new()));
         registry.register(Arc::new(MinioCollector::new()));
@@ -464,11 +480,13 @@ impl Registry {
         timeout: Duration,
     ) -> Result<Vec<Sample>, ProbeError> {
         let collector = self.get(&target.kind).ok_or_else(|| {
-            ProbeError::Config(format!(
-                "no collector for type \"{}\" (available: {})",
-                target.kind,
-                self.kinds().join(", ")
-            ))
+            ProbeError::Config(pack_to_install(&target.kind).unwrap_or_else(|| {
+                format!(
+                    "no collector for type \"{}\" (available: {})",
+                    target.kind,
+                    self.kinds().join(", ")
+                )
+            }))
         })?;
 
         let timeout = Self::deadline_for(target, timeout);
@@ -559,6 +577,24 @@ mod tests {
         // Avec `timeout_seconds` : la sonde va au bout.
         cible.tags.insert("timeout_seconds".into(), "1".into());
         registry.probe(&cible, Duration::from_millis(100)).await.expect("sonde terminée");
+    }
+
+    #[tokio::test]
+    async fn un_paquet_absent_dit_lequel_installer() {
+        let registry = Registry::new();
+        let mut cible = cible_lente();
+        cible.kind = "pack.meraki".into();
+        let error = registry.probe(&cible, Duration::from_secs(1)).await.unwrap_err();
+        assert!(matches!(error, ProbeError::Config(_)), "{error:?}");
+        assert!(error.to_string().contains("Install the community pack \"meraki\""), "{error}");
+        // Un ancien type compilé devenu paquet le dit aussi.
+        cible.kind = "paloalto".into();
+        let error = registry.probe(&cible, Duration::from_secs(1)).await.unwrap_err();
+        assert!(error.to_string().contains("community pack \"paloalto\""), "{error}");
+        // Un type simplement inconnu garde le message d'origine.
+        cible.kind = "nope".into();
+        let error = registry.probe(&cible, Duration::from_secs(1)).await.unwrap_err();
+        assert!(error.to_string().contains("no collector for type \"nope\""), "{error}");
     }
 
     #[test]
