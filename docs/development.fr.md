@@ -109,6 +109,42 @@ Les tests d'intégration vivent dans `crates/server/tests/` ; les modules purs
 (conversion métrique, analyse des options, machine d'états d'alerte, silences)
 sont testés en place sans réseau.
 
+## Tests de bout en bout
+
+`web/e2e/` contient des parcours Playwright qui pilotent l'image réelle dans
+Chromium, en affichage bureau et sur un téléphone de 390 px : première
+configuration, ajout d'un moniteur HTTP, canal webhook, panne puis retour à la
+normale (alerte, webhook, page de statut publique), mur, déconnexion et
+reconnexion. Toute erreur de console ou exception non attendue fait échouer une
+étape. La CI les exécute dans `.github/workflows/e2e.yml` et conserve captures
+d'écran, traces et journal du serveur d'une exécution échouée.
+
+La suite démarre son propre conteneur sur un volume vide (un par projet), ainsi
+que deux petits serveurs sur votre machine : le service surveillé et un
+récepteur de webhook. Docker est le seul prérequis en plus de Node.
+
+```bash
+docker build -t dumbmonit-candidate:ci .      # ou n'importe quelle image : E2E_IMAGE=...
+cd web
+npm ci
+npm run test:e2e:install                      # Chromium et ses bibliothèques système, une fois
+npm run test:e2e                              # les deux projets, l'un après l'autre
+npm run test:e2e -- --project=mobile          # un seul projet
+npm run test:e2e -- --headed --debug          # pour regarder
+npx playwright show-report ../playwright-report
+```
+
+Variables : `E2E_IMAGE` (défaut `dumbmonit-candidate:ci`), `E2E_HOST` (nom par
+lequel le conteneur joint votre machine, défaut `host.docker.internal`, relié à
+la passerelle de l'hôte), `E2E_SETUP_CODE`. `E2E_BASE_URL` vise à la place une
+instance déjà lancée (neuve, démarrée avec ce code de configuration et
+`DUMBMONIT_ALERT_INTERVAL_SECS=10`). Un pare-feu qui bloque le pont Docker vers
+l'hôte empêche le moniteur et le webhook de fonctionner.
+
+Les parcours sont séquentiels et partagent une instance : une étape échouée
+saute les suivantes. Préférez les rôles et les libellés pour les sélecteurs ;
+n'ajoutez un `data-testid` que si rien d'autre ne convient.
+
 ## Ajout d'un collecteur
 
 1. Implémentez `Collector` de `crates/proto/src/collector.rs` : `kind()`,
