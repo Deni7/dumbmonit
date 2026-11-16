@@ -435,6 +435,7 @@ async fn add_one(
         location_id: None,
         multisite: None,
         credential: None,
+        cve_scan: None,
         client_id: None,
     };
     let created =

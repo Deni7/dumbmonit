@@ -13,6 +13,14 @@ All notable changes to this project are documented here. The format follows
   and caches the answer for ten minutes; browsers never contact it. Off until a city is chosen, and
   silent when the service does not answer. The setting is part of backups.
 
+- **CVE check per monitor, in bulk.** On Monitors › List, select several monitors and use
+  "CVE check" to turn the known-vulnerability check on or off for all of them at once (turning it
+  off asks for a second click; a toast reports the result with an Undo). The same switch is on each
+  monitor's form. A monitor with the check off is no longer inventoried and its results leave the
+  CVE list, summary and alerts; they come back when it is turned on again. It is on by default,
+  included in backups, and exposed as `cve_scan` on the monitor API and through
+  `POST /api/security/cves/targets`.
+
 ### Changed
 
 - **Public status pages: leaner, in the console's own look.** The page uses the console's tokens,

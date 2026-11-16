@@ -493,8 +493,8 @@ async fn upsert_target(
     let tags = serde_json::to_string(&target.tags)?;
 
     let existing = sqlx::query(
-        "SELECT id, name, profile_id, interval_secs, enabled, tags, credential_enc, group_name,
-                position
+        "SELECT id, name, profile_id, interval_secs, enabled, cve_scan, tags, credential_enc,
+                group_name, position
          FROM targets WHERE kind = ? AND address = ?",
     )
     .bind(&target.kind)
@@ -505,9 +505,9 @@ async fn upsert_target(
 
     let Some(row) = existing else {
         sqlx::query(
-            "INSERT INTO targets (name, address, kind, profile_id, interval_secs, enabled, tags,
-                                  credential_enc, group_name, position)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO targets (name, address, kind, profile_id, interval_secs, enabled, cve_scan,
+                                  tags, credential_enc, group_name, position)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&target.name)
         .bind(&target.address)
@@ -515,6 +515,7 @@ async fn upsert_target(
         .bind(&target.profile_id)
         .bind(target.interval_secs.max(10))
         .bind(i64::from(target.enabled))
+        .bind(i64::from(target.cve_scan))
         .bind(&tags)
         .bind(credential.map(|plain| cipher.encrypt(&plain)).transpose()?)
         .bind(&target.group_name)
@@ -532,6 +533,7 @@ async fn upsert_target(
         && row.try_get::<Option<String>, _>("profile_id")? == target.profile_id
         && row.try_get::<i64, _>("interval_secs")? == target.interval_secs
         && (row.try_get::<i64, _>("enabled")? != 0) == target.enabled
+        && (row.try_get::<i64, _>("cve_scan")? != 0) == target.cve_scan
         && serde_json::from_str::<Value>(&stored_tags).ok()
             == serde_json::from_str::<Value>(&tags).ok()
         && same_secret(cipher, stored_credential.as_deref(), target.credential.as_ref())
@@ -543,8 +545,8 @@ async fn upsert_target(
     }
 
     sqlx::query(
-        "UPDATE targets SET name = ?, profile_id = ?, interval_secs = ?, enabled = ?, tags = ?,
-             credential_enc = ?, group_name = ?, position = ?,
+        "UPDATE targets SET name = ?, profile_id = ?, interval_secs = ?, enabled = ?,
+             cve_scan = ?, tags = ?, credential_enc = ?, group_name = ?, position = ?,
              updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
          WHERE id = ?",
     )
@@ -552,6 +554,7 @@ async fn upsert_target(
     .bind(&target.profile_id)
     .bind(target.interval_secs.max(10))
     .bind(i64::from(target.enabled))
+    .bind(i64::from(target.cve_scan))
     .bind(&tags)
     .bind(credential.map(|plain| cipher.encrypt(&plain)).transpose()?)
     .bind(&target.group_name)

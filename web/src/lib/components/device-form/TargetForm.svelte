@@ -119,6 +119,7 @@
 	let msAgents = $state<number[]>(untrack(() => [...(target?.multisite?.agents ?? [])]));
 	let msQuorum = $state<number | null>(untrack(() => target?.multisite?.quorum ?? null));
 	let enabled = $state(untrack(() => target?.enabled ?? true));
+	let cveScan = $state(untrack(() => target?.cve_scan ?? true));
 	let groupName = $state(untrack(() => target?.group_name ?? folderDefault));
 	// MSP mode: the client of the target. Offered when there is a choice; only
 	// the MSP administrator moves an existing target (its dependents follow).
@@ -364,6 +365,7 @@
 				: {}),
 			interval_secs: intervalSecs,
 			enabled,
+			cve_scan: cveScan,
 			group_name: groupName.trim(),
 			location_id: locationId,
 			...(showClient && clientId !== null && !clientLocked ? { client_id: clientId } : {}),
@@ -732,6 +734,10 @@
 
 			<Field label={m.deviceform_form_enabled_label()} for="target-enabled" inline help={m.deviceform_form_enabled_help()}>
 				<Toggle id="target-enabled" bind:checked={enabled} label={m.deviceform_form_enabled_label()} />
+			</Field>
+
+			<Field label={m.deviceform_form_cve_label()} for="target-cve-scan" inline help={m.deviceform_form_cve_help()}>
+				<Toggle id="target-cve-scan" bind:checked={cveScan} label={m.deviceform_form_cve_label()} />
 			</Field>
 		</div>
 	{/if}

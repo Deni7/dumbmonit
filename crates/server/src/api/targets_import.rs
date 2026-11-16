@@ -217,6 +217,7 @@ pub async fn import(
             location_id: None,
             multisite: None,
             credential: None,
+            cve_scan: None,
             client_id: None,
         };
         let input = match payload.validate(&state, None) {

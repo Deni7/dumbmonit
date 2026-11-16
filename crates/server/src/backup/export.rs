@@ -510,7 +510,7 @@ async fn targets(
 ) -> Result<Vec<BundleTarget>> {
     let rows = sqlx::query(
         "SELECT id, name, address, kind, profile_id, parent_id, via_agent, interval_secs,
-                enabled, tags, credential_enc, group_name, position,
+                enabled, cve_scan, tags, credential_enc, group_name, position,
                 (SELECT l.name FROM locations l WHERE l.id = targets.location_id) AS location
          FROM targets ORDER BY id",
     )
@@ -566,6 +566,7 @@ async fn targets(
                 .and_then(|p| refs.get(&p).cloned()),
             interval_secs: row.try_get("interval_secs")?,
             enabled: row.try_get::<i64, _>("enabled")? != 0,
+            cve_scan: row.try_get::<i64, _>("cve_scan")? != 0,
             tags: serde_json::from_str(&tags).unwrap_or_default(),
             credential,
             group_name: row.try_get("group_name")?,

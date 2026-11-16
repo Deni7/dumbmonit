@@ -8819,6 +8819,45 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
 
+  /api/security/cves/targets:
+    post:
+      operationId: setCveScanTargets
+      tags: [Security]
+      summary: Turn the CVE check on or off for several devices
+      description: >-
+        A device whose check is off is no longer inventoried, and its results
+        disappear from the list, the summary and the alerts; they come back when
+        the check is turned on again. Unknown ids are ignored, repeated ids count
+        once. At most 500 ids per request. Administrators only.
+      x-token-scope: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_ids, enabled]
+              properties:
+                target_ids:
+                  type: array
+                  minItems: 1
+                  maxItems: 500
+                  items: { type: integer, format: int64 }
+                enabled: { type: boolean }
+      responses:
+        "200":
+          description: How many devices actually changed (those already in the requested state do not count).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [updated]
+                properties:
+                  updated: { type: integer }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /api/security/cves/ignores:
     post:
       operationId: ignoreCve
@@ -12267,6 +12306,7 @@ components:
         client_id: { type: integer, format: int64, description: "MSP mode: the client of the target (`1`, the default client, otherwise)." }
         interval_secs: { type: integer }
         enabled: { type: boolean }
+        cve_scan: { type: boolean, description: "Known-vulnerability (CVE) check is on for this device. `true` by default; `false` keeps it out of the scan and of `GET /api/security/cves*`." }
         tags:
           type: object
           additionalProperties: { type: string }
@@ -12420,6 +12460,7 @@ components:
         client_id: { type: integer, format: int64, description: "MSP mode: the client of the target. Absent on `POST`: the client chosen in the header, the only client of the account, or the default client. Only an MSP administrator changes it on `PUT`; the targets depending on it move along." }
         interval_secs: { type: integer, minimum: 10, default: 60 }
         enabled: { type: boolean, default: true }
+        cve_scan: { type: boolean, default: true, description: "Known-vulnerability (CVE) check of this device. Absent on `PUT` keeps the setting. For several devices at once, see `POST /api/security/cves/targets`." }
         tags:
           type: object
           description: Type options go here under their key.
