@@ -2796,7 +2796,7 @@ const KEYCLOAK_NO_AUTH: CredentialView = CredentialView {
 const KEYCLOAK_CLIENT: CredentialView = CredentialView {
     kind: "username_password",
     label: "Client ID / secret",
-    help: "A service-account client with read-only roles. DumbMonit asks for a token at each probe.",
+    help: "A service-account client with read-only roles and the kc-admin-api client scope. DumbMonit asks for a token at each probe.",
     fields: &[
         cred_text("username", "Client ID", "", "dumbmonit"),
         cred_secret("password", "Client secret", "Stored encrypted, never shown again.", "", true),
@@ -6418,7 +6418,8 @@ fn compiled(kind: &str) -> Option<CollectorView> {
                 steps: &[
                     "Run Keycloak with health checks on, with the option below. From Keycloak 25 they answer on the management port 9000.\nKC_HEALTH_ENABLED=true",
                     "Optional, for realms, sessions and users: in the master realm, create a client named as follows, with Client authentication and Service accounts roles on, and Standard flow off.\ndumbmonit",
-                    "On that client's Service accounts roles tab, assign the client roles listed below, then copy the secret from its Credentials tab.",
+                    "On that client's Client scopes tab, choose Add client scope and add the scope named as follows as Default. From Keycloak 26.8.2 the admin API refuses tokens without it.\nkc-admin-api",
+                    "On that client's Service accounts roles tab, assign the roles below from the client of each realm to read (master-realm, or homelab-realm for a realm named homelab), then copy the secret from its Credentials tab.",
                     "In DumbMonit, enter Keycloak's address and the client ID and secret, or choose None (health checks only).",
                 ],
                 ports: &[
@@ -6435,8 +6436,10 @@ fn compiled(kind: &str) -> Option<CollectorView> {
                     ),
                 ],
                 permissions: &[
-                    "view-realm\nMaster-realm client role: realms and their state",
-                    "view-users\nMaster-realm client role: user counts",
+                    "view-realm\nPer realm: realms and their state",
+                    "view-users\nPer realm: user counts",
+                    "view-clients\nPer realm: session counts. Without it Keycloak hides them, and DumbMonit reports an error instead of zero",
+                    "manage-realm (optional)\nOn master-realm only: version, uptime and memory. A powerful role: leave it out unless you need these",
                 ],
                 warning: "Keycloak 24 and earlier serve the health checks on the main port: set the health port option to same. Health checks must be enabled on the server, or DumbMonit reports a missing /health/ready.",
             },
@@ -6446,7 +6449,7 @@ fn compiled(kind: &str) -> Option<CollectorView> {
             kind: "authentik",
             label: "authentik",
             summary: "Readiness, workers, failed system tasks, outpost connections, version updates, users.",
-            examples: &["authentik 2025.x"],
+            examples: &["authentik 2025.10 and later", "authentik 2025.8 and earlier"],
             credential_types: &["api_token"],
             credentials: &[AUTHENTIK_TOKEN],
             address_hint: "auth.lan",
@@ -6473,7 +6476,7 @@ fn compiled(kind: &str) -> Option<CollectorView> {
                     ),
                 ],
                 permissions: &[],
-                warning: "authentik has no read-only role for its system pages: the token's user must be allowed into the interface, so keep the key only in DumbMonit. Pages the token cannot read are skipped, not failed.",
+                warning: "authentik has no read-only role for its system pages: the token's user must be allowed into the interface, so keep the key only in DumbMonit. Pages the token cannot read are skipped; a page this authentik version does not have counts as a scrape error.",
             },
             options: AUTHENTIK_APP_OPTIONS,
         },

@@ -25,11 +25,11 @@ Toutes les métriques sont préfixées `dumbmonit_keycloak_`.
 |---|---|---|
 | `ready`, `live` | 1 tant que le contrôle de disponibilité / de vie indique UP |  |
 | `health_check_up` | chaque contrôle de disponibilité (base de données…), 32 au plus | `check` |
-| `admin_readable` | 1 quand le compte de service a pu lire l'API d'administration (absent sans identifiants) |  |
-| `version_info` | valeur 1 | `version` |
-| `uptime_seconds`, `memory_used_percent` | temps depuis le démarrage ; mémoire JVM utilisée |  |
+| `admin_readable` | 1 quand l'API d'administration a accepté le jeton du compte de service, 0 quand elle l'a refusé (absent sans identifiants) |  |
+| `version_info` | valeur 1 (seulement avec `manage-realm`, voir plus bas) | `version` |
+| `uptime_seconds`, `memory_used_percent` | temps depuis le démarrage ; mémoire JVM utilisée (seulement avec `manage-realm`) |  |
 | `realms_total`, `realms_disabled` | realms, et ceux désactivés |  |
-| `realm_sessions`, `realm_offline_sessions`, `realm_users` | sessions actives, sessions hors ligne et utilisateurs de chaque realm lu | `realm` |
+| `realm_sessions`, `realm_offline_sessions`, `realm_users` | sessions actives, sessions hors ligne et utilisateurs de chaque realm lu ; pas de nombre de sessions pour un realm dont le compte ne voit pas les clients | `realm` |
 | `sessions_active` | sessions actives, tous les realms lus |  |
 | `scrape_errors` | appels qui ont échoué à la dernière sonde |  |
 
@@ -49,14 +49,30 @@ Les [règles intégrées](../alerting/rules.md#self-hosted-applications) qui s'a
     dumbmonit
     ```
 
-3. Sur l'onglet Service accounts roles de ce client, attribuez les rôles de client listés ci-dessous, puis copiez le secret de l'onglet Credentials.
+3. Sur l'onglet Client scopes de ce client, choisissez Add client scope et ajoutez en Default le scope nommé comme suit. Depuis Keycloak 26.8.2, l'API d'administration refuse les jetons qui ne l'ont pas.
 
-4. Dans DumbMonit, saisissez l'adresse de Keycloak et l'identifiant et le secret du client, ou choisissez Aucun (contrôles de santé seulement).
+    ```
+    kc-admin-api
+    ```
+
+4. Sur l'onglet Service accounts roles de ce client, attribuez les rôles ci-dessous du client de chaque realm à lire (master-realm, ou homelab-realm pour un realm nommé homelab), puis copiez le secret de l'onglet Credentials.
+
+5. Dans DumbMonit, saisissez l'adresse de Keycloak et l'identifiant et le secret du client, ou choisissez Aucun (contrôles de santé seulement).
 
 ### Droits requis
 
-- **view-realm** : Master-realm client role: realms and their state
-- **view-users** : Master-realm client role: user counts
+- **view-realm** : par realm : les realms et leur état
+- **view-users** : par realm : le nombre d'utilisateurs
+- **view-clients** : par realm : le nombre de sessions. Sans lui, Keycloak les cache, et DumbMonit signale une erreur au lieu d'un zéro
+- **manage-realm (facultatif)** : sur master-realm seulement : version, durée de fonctionnement et mémoire. Un rôle puissant : ne le donnez que si vous en avez besoin
+
+Dans le realm master, chaque realm a son propre client qui porte ses rôles d'administration : `master-realm` pour master lui-même, `homelab-realm` pour un realm nommé `homelab`, etc. Les rôles de `master-realm` seuls ne montrent que le realm master. Filtrez la fenêtre Assign role par clients pour les trouver.
+
+Ce qui se passe quand il manque quelque chose :
+
+- **Pas de scope `kc-admin-api`** (Keycloak 26.8.2 et suivants) : Keycloak délivre le jeton, puis son API d'administration répond 401 et journalise « Expected audience not available in the token ». `admin_readable` vaut 0, `scrape_errors` compte l'appel refusé et le journal du serveur nomme le scope à ajouter. Keycloak crée `kc-admin-api` dans chaque realm lors de la mise à jour et ne le donne qu'à ses propres clients (`admin-cli`, `security-admin-console`).
+- **Pas de `view-clients`** : Keycloak répond aux statistiques de sessions par une liste vide, comme pour un realm où personne n'est connecté. DumbMonit vérifie si le compte voit les clients du realm : sinon, il ne publie aucun nombre de sessions pour ce realm et compte une erreur, plutôt qu'un faux zéro.
+- **Pas de `manage-realm`** : depuis Keycloak 26.4, `/admin/serverinfo` ne donne la version, la durée de fonctionnement et la mémoire qu'à un compte du realm master qui a `manage-realm`. Sans lui, ces trois métriques sont simplement absentes ; tout le reste fonctionne.
 
 !!! warning
     Keycloak 24 et antérieurs servent les contrôles de santé sur le port principal : réglez l'option de port de santé sur same. Les contrôles de santé doivent être activés sur le serveur, sinon DumbMonit signale un /health/ready absent.

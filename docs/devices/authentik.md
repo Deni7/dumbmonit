@@ -27,14 +27,25 @@ All metrics are prefixed `dumbmonit_authentik_`.
 | `version_info` | value 1 | `version` |
 | `update_available` | 1 when a newer release exists (absent when authentik cannot read the latest version) | `latest_version` |
 | `workers`, `workers_version_mismatch` | workers reporting, and those on another version than the server |  |
-| `tasks_failed`, `tasks_warning` | system tasks whose last run failed / ended with a warning |  |
-| `task_failed` | value 1 for each failed task, at most 32 | `task` |
+| `tasks_failed`, `tasks_warning` | scheduled tasks whose last run failed / ended with a warning (paused schedules are left out) |  |
+| `task_failed` | value 1 for each failed task, at most 32 | `task` (`authentik.sources.ldap.tasks.ldap_sync:ldap-corp`) |
 | `outposts_total`, `outposts_disconnected` | outposts that serve at least one provider, and those with no instance seen in five minutes |  |
 | `outpost_instances` | instances seen in the last five minutes (at most 10 outposts) | `outpost` |
 | `users` | user accounts |  |
 | `scrape_errors` | calls that failed on the last probe |  |
 
 The [built-in rules](../alerting/rules.md#self-hosted-applications) that apply: authentik not ready, authentik has no worker, authentik task failed, authentik outpost disconnected, authentik update available, plus Monitor unreachable.
+
+### Workers and tasks across versions
+
+authentik 2025.10 moved its background work to new API routes. DumbMonit reads the new ones first and falls back to the old ones when authentik answers 404:
+
+| | authentik 2025.10 and later | Earlier versions |
+|---|---|---|
+| Workers | `/api/v3/tasks/workers/` (`version_matching`) | `/api/v3/admin/workers/` (`version_matches`) |
+| Tasks | `/api/v3/tasks/schedules/`: the status of the last run of each schedule | `/api/v3/admin/system_tasks/` |
+
+When neither route exists, or when a web page comes back instead of JSON (a reverse proxy answering for authentik, for instance), the workers or tasks metrics are missing and `scrape_errors` counts the call, with the reason in the server log: the "no worker" and "task failed" rules never go quiet without a sign.
 
 ## Create an API token in authentik
 
@@ -51,7 +62,7 @@ The [built-in rules](../alerting/rules.md#self-hosted-applications) that apply: 
 4. In DumbMonit, enter authentik's address and paste the key.
 
 !!! warning
-    authentik has no read-only role for its system pages: the token's user must be allowed into the interface, so keep the key only in DumbMonit. Pages the token cannot read are skipped, not failed.
+    authentik has no read-only role for its system pages: the token's user must be allowed into the interface, so keep the key only in DumbMonit. Pages the token cannot read are skipped; a page this authentik version does not have counts as a scrape error.
 
 ## Credentials
 
