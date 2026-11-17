@@ -2,8 +2,8 @@ apiVersion: v2
 name: dumbmonit
 description: Self-hosted monitoring for homelabs and small teams (single instance, SQLite + VictoriaMetrics).
 type: application
-version: 0.1.0
-appVersion: "0.17.1"
+version: 0.2.0
+appVersion: "0.18.0"
 kubeVersion: ">=1.25.0-0"
 home: https://dumbmonit.selfhostr.io
 sources:

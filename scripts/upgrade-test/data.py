@@ -770,7 +770,7 @@ def phase_after(a, report):
                      f"jeton d'API refusé (HTTP {status})")
 
     page = api.request("GET", f"/api/public/status/{PAGE_SLUG}")
-    if page[0] == 200 and isinstance(page[1], dict) and page[1].get("title") == PAGE_TITLE:
+    if page[0] == 200 and isinstance(page[1], dict) and (page[1].get("page") or {}).get("title") == PAGE_TITLE:
         report.ok("page de statut publique servie, même titre")
     else:
         report.ko(f"page de statut publique /api/public/status/{PAGE_SLUG} : HTTP {page[0]} "

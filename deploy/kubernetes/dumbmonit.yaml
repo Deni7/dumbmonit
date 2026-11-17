@@ -86,7 +86,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: dumbmonit
-          image: ghcr.io/selfhostr/dumbmonit:0.17.1
+          image: ghcr.io/selfhostr/dumbmonit:0.18.0
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
