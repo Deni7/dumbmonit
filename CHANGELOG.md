@@ -155,6 +155,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **Documentation is now English only.** The translated pages are gone; the interface stays translated in nine languages.
 - **Public status pages: leaner, in the console's own look.** The page uses the console's tokens,
   surfaces and type, tighter header, banner and service rows, in the light or dark of the visitor's
   system (the page's Theme setting still forces one). The history bar's colour legend is gone: hover,
