@@ -28,6 +28,17 @@ fn main() -> Result<()> {
         std::process::exit(dumbmonit_server::healthcheck::run());
     }
 
+    // `dumbmonit ha status|promote` : état et promotion du serveur de secours,
+    // par des fichiers de `/data/ha` — ni base ni réseau.
+    if args.first().map(String::as_str) == Some("ha") {
+        #[cfg(unix)]
+        if let Err(error) = dumbmonit_server::privileges::drop_if_root() {
+            eprintln!("ha: cannot drop root: {error}");
+            std::process::exit(1);
+        }
+        std::process::exit(dumbmonit_server::ha::cli::run(&args[1..]));
+    }
+
     init_tracing();
 
     let config = Config::from_env().context("invalid configuration")?;
@@ -74,6 +85,18 @@ async fn run(mut config: Config, startup: Startup) -> Result<()> {
     ensure_data_dir_writable(&config.data_dir, startup).await?;
 
     let secret = resolve_secret(&config).await?;
+    // Serveur de secours (`DUMBMONIT_HA_DIR`) : en attente, on reste ici — ni
+    // base ouverte, ni VictoriaMetrics, ni port, ni sonde — jusqu'à la
+    // promotion ; actif, le bail est tenu et la base locale est la bonne.
+    // `docker stop` l'arrête aussi en attente : le processus est souvent le
+    // PID 1 du conteneur, qui ignore SIGTERM sans gestionnaire.
+    let ha = tokio::select! {
+        started = dumbmonit_server::ha::start(&config, &secret) => started?,
+        () = shutdown_signal() => {
+            info!("stopped while waiting as the standby server");
+            return Ok(());
+        }
+    };
     if config.demo {
         // Démonstration publique : la base repart de zéro à chaque démarrage, et
         // rien ne doit jamais partir vers l'extérieur (voir `demo`).
@@ -87,6 +110,10 @@ async fn run(mut config: Config, startup: Startup) -> Result<()> {
     }
     let pool = db::open_with(&config.database_path(), config.db_pool_size).await?;
     let cipher = db::init_cipher(&pool, &secret).await?;
+    // Réplique de la base vers le répertoire partagé, pour le serveur en attente.
+    if let Some(ha) = &ha {
+        ha.spawn_replication(pool.clone());
+    }
     if config.reset_password {
         auth::reset_password(&pool).await?;
         warn!(
@@ -342,6 +369,10 @@ async fn run(mut config: Config, startup: Startup) -> Result<()> {
     // VictoriaLogs et l'historique long terme d'abord, les mesures brutes en
     // dernier.
     state_for_shutdown.storage().stop_all().await;
+    // Dernière réplique, puis bail rendu : l'autre serveur peut prendre la main.
+    if let Some(ha) = &ha {
+        ha.shutdown(&state_for_shutdown.pool).await;
+    }
 
     info!("clean shutdown");
     Ok(())
