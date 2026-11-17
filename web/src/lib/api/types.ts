@@ -1922,6 +1922,12 @@ export interface AgentHost {
 	gateway_tunnels?: number;
 	/** The relay's last test of its own gateway. Mirrors `GatewayCheck` in `crates/proto/src/push.rs`. */
 	gateway_check?: GatewayCheck | null;
+	/**
+	 * Server the agent reports to when its configuration lists several
+	 * (`server_urls`): the primary or a backup. `null` with a single address;
+	 * absent on an older server.
+	 */
+	server_link?: ServerLink | null;
 }
 
 /**
@@ -1934,6 +1940,24 @@ export interface GatewayCheck {
 	ok: boolean;
 	error?: string | null;
 	checked_at_ms: number;
+}
+
+/**
+ * Address of the server an agent uses among those of its configuration
+ * (`server_url`, then `server_urls`). Mirrors `ServerLink` in
+ * `crates/proto/src/push.rs`.
+ */
+export interface ServerLink {
+	/** Rank of the address in use: 0 for the primary. */
+	active: number;
+	/** Addresses configured, the primary included. */
+	servers: number;
+	/** Address in use, `https://host:port`. */
+	url: string;
+	/** When the agent moved to a backup server (Unix ms); absent on the primary. */
+	since_ms?: number | null;
+	/** Last error seen on the primary, in English; absent on the primary. */
+	primary_error?: string | null;
 }
 
 /** Response of `POST /api/targets/{id}/agent/rebind`. */

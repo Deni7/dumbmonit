@@ -837,6 +837,7 @@ a container without mounting a file:
 |---|---|
 | `DUMBMONIT_AGENT_CONFIG` | Path of the configuration file |
 | `DUMBMONIT_AGENT_URL` | Server URL |
+| `DUMBMONIT_AGENT_URLS` | Backup servers, comma-separated (see [Backup servers](#backup-servers)) |
 | `DUMBMONIT_AGENT_TOKEN` | Enrollment token |
 | `DUMBMONIT_AGENT_SECRET_FILE` | Where to keep the binding secret (default: `agent-secret`, next to the configuration file) |
 | `DUMBMONIT_AGENT_INTERVAL_SECS` | Sampling period |
@@ -1006,6 +1007,38 @@ The Windows agent can also raise alerts on Windows events (failed logons,
 unexpected reboots, crashed services, disk errors): rules are set per machine
 on its device page, none exists by default. See
 [Windows event log alerts](agent-windows-events.md).
+
+## Backup servers {#backup-servers}
+
+With a [standby server](../install/high-availability.md), list it after the
+primary: the agent moves to it when the primary stops answering, and comes
+back to the primary on its own.
+
+```yaml
+server_url: https://monitor-a.lan:8080
+server_urls:
+  - https://monitor-b.lan:8080
+  # When the standby's agent channel is on another host or port:
+  # - url: https://monitor-b.lan:8080
+  #   tls_url: https://agents-b.example.com:443
+```
+
+- `server_urls` (or `DUMBMONIT_AGENT_URLS`, comma-separated): the backup
+  servers, in order. Without `server_url`, the first address of the list is
+  the primary. `server_url` and `tls_url` keep their meaning; nothing changes
+  without the key.
+- After three failed attempts in a row (no answer, timeout, `5xx`), the agent
+  moves to the next address, with the same certificate and pinning: both
+  servers share the agent authority, no re-enrolment. The channel of a backup
+  is its own host on the port of the primary's channel (8443 by default),
+  unless `tls_url` gives another one.
+- On a backup, the agent tries the primary every two minutes and goes back as
+  soon as it answers as an active server. A standby answers nothing: while no
+  server is active, the agent keeps its measurements and tries the addresses
+  in turn.
+- The machine page shows **Server: primary**, or **Backup** with the address
+  in use, since when, and the last error seen on the primary.
+- Only `https://` addresses (or the loopback) are accepted.
 
 ## Outbound proxy {#outbound-proxy}
 

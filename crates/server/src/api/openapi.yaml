@@ -11805,6 +11805,16 @@ components:
         ok: { type: boolean }
         error: { type: [string, "null"] }
         checked_at_ms: { type: integer, format: int64 }
+    ServerLink:
+      type: object
+      required: [active, servers, url]
+      description: "Address of the server an agent uses among those of its configuration (`server_url`, then `server_urls`), as its last batch reported it."
+      properties:
+        active: { type: integer, description: "Rank of the address in use: 0 for the primary, 1 or more for a backup server." }
+        servers: { type: integer, description: "Number of addresses configured, the primary included." }
+        url: { type: string, description: "Address in use (`https://host:port`)." }
+        since_ms: { type: [integer, "null"], format: int64, description: When the agent moved to a backup server (Unix milliseconds); absent on the primary. }
+        primary_error: { type: [string, "null"], description: Last error seen on the primary; absent on the primary. }
     AgentChannel:
       type: object
       required: [enabled, required, required_setting, protocol, key_exchange, agents]
@@ -14060,6 +14070,11 @@ components:
           oneOf:
             - type: "null"
             - $ref: "#/components/schemas/GatewayCheck"
+        server_link:
+          description: "Server the agent uses when its configuration lists several (`server_urls`); null with a single address."
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ServerLink"
     RebindWindow:
       type: object
       required: [rebind_until, minutes]

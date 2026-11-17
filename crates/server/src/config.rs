@@ -207,6 +207,9 @@ pub struct Config {
     /// séparés par des virgules), en plus de `localhost`, de la boucle locale,
     /// du nom d'hôte et de l'hôte de `DUMBMONIT_PUBLIC_URL`.
     pub tls_names: Vec<String>,
+    /// Serveur de secours (`DUMBMONIT_HA_*`, voir [`crate::ha`]). `None` : un
+    /// serveur seul, comme toujours.
+    pub ha: Option<crate::ha::HaConfig>,
 }
 
 /// Réglages d'instance du collecteur `website`.
@@ -351,6 +354,7 @@ impl Config {
             tls_cert: env_path("DUMBMONIT_TLS_CERT"),
             tls_key: env_path("DUMBMONIT_TLS_KEY"),
             tls_names: parse_tls_names(&env_or("DUMBMONIT_TLS_NAMES", "")),
+            ha: crate::ha::HaConfig::from_env()?,
         })
     }
 

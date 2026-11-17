@@ -287,6 +287,10 @@ pub struct AgentHostView {
     pub gateway_tunnels: usize,
     /// Dernier essai de sa passerelle par le relais lui-même.
     pub gateway_check: Option<dumbmonit_proto::GatewayCheck>,
+    /// Serveur que l'agent emploie quand il en connaît plusieurs
+    /// (`server_urls`) : primaire ou secours, depuis quand. `None` : une
+    /// seule adresse.
+    pub server_link: Option<dumbmonit_proto::ServerLink>,
 }
 
 impl AgentHostView {
@@ -316,6 +320,7 @@ impl AgentHostView {
             binding_supported: info.binding_supported,
             rebind_until: info.rebind_until,
             last_seen_at: info.last_seen_at,
+            server_link: info.server_link,
         }
     }
 }

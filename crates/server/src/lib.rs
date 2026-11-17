@@ -17,6 +17,7 @@ pub mod demo;
 pub mod first_run;
 pub mod geoip;
 pub mod gitops;
+pub mod ha;
 pub mod healthcheck;
 pub mod ical;
 pub mod instance;

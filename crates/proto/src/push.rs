@@ -176,7 +176,37 @@ pub struct AgentIdentity {
     /// passerelle, ou binaire antérieur).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub relay_gateway_check: Option<GatewayCheck>,
+    /// Adresse du serveur en service, quand l'agent en connaît plusieurs
+    /// (`server_urls`) : primaire ou secours, et depuis quand. Absent : une
+    /// seule adresse configurée, ou binaire antérieur.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server_link: Option<ServerLink>,
 }
+
+/// Adresse du serveur que l'agent emploie, parmi celles de sa configuration
+/// (`server_url`, puis `server_urls`, dans l'ordre). L'agent passe à la
+/// suivante quand la sienne ne répond plus, et revient à la première dès
+/// qu'elle répond de nouveau.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ServerLink {
+    /// Rang de l'adresse en service : 0 pour la primaire.
+    pub active: u32,
+    /// Nombre d'adresses configurées, primaire comprise.
+    pub servers: u32,
+    /// Adresse en service (`https://hôte:port`, sans chemin).
+    pub url: String,
+    /// Moment du passage sur une adresse de secours, en millisecondes depuis
+    /// l'époque Unix. Absent sur la primaire.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub since_ms: Option<i64>,
+    /// Dernière erreur de la primaire, en anglais, telle que l'interface
+    /// l'affiche. Absent sur la primaire.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub primary_error: Option<String>,
+}
+
+/// Longueur maximale d'une adresse ou d'un message d'erreur de [`ServerLink`].
+pub const MAX_SERVER_LINK_TEXT: usize = 300;
 
 /// Essai de sa propre passerelle par un relais : il s'y connecte comme une
 /// machine du site, à l'adresse réglée dans l'interface (à défaut, sur la
@@ -466,6 +496,7 @@ mod tests {
             relay_gateway: None,
             relay_gateway_check: None,
             remediation: None,
+            server_link: None,
         }
     }
 

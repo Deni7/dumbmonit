@@ -91,6 +91,7 @@ pub const MODULES: &[&str] = &[
 #[serde(default)]
 struct FileConfig {
     server_url: Option<String>,
+    server_urls: Option<ServerListFile>,
     token: Option<String>,
     tls_url: Option<String>,
     ca_pin: Option<String>,
@@ -201,6 +202,59 @@ enum PerfCounterFile {
     Named { path: String, name: Option<String> },
 }
 
+/// Adresses de serveur de `server_urls`, dans l'ordre : une liste, ou une
+/// seule chaîne aux éléments séparés par des virgules (la forme de
+/// `DUMBMONIT_AGENT_URLS`).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(untagged)]
+enum ServerListFile {
+    One(String),
+    Many(Vec<ServerEntryFile>),
+}
+
+/// Une adresse de serveur : son URL seule, ou son URL et celle de son canal
+/// chiffré quand il n'est pas sur le même hôte au même port que la primaire.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(untagged)]
+enum ServerEntryFile {
+    Url(String),
+    Full { url: String, tls_url: Option<String> },
+}
+
+impl ServerListFile {
+    fn into_endpoints(self) -> Vec<ServerEndpoint> {
+        match self {
+            Self::One(text) => split_list(&text)
+                .into_iter()
+                .map(|url| ServerEndpoint { url, tls_url: None })
+                .collect(),
+            Self::Many(entries) => entries
+                .into_iter()
+                .map(|entry| match entry {
+                    ServerEntryFile::Url(url) => ServerEndpoint { url, tls_url: None },
+                    ServerEntryFile::Full { url, tls_url } => ServerEndpoint { url, tls_url },
+                })
+                .collect(),
+        }
+    }
+}
+
+/// Un serveur DumbMonit que l'agent sait joindre : la racine de son
+/// interface, et l'adresse de son canal chiffré si elle est donnée.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServerEndpoint {
+    /// Racine du serveur (`https://hôte:8080`), sans barre oblique finale.
+    pub url: String,
+    /// Canal chiffré (`https://hôte:8443`). `None` : même hôte que `url`, au
+    /// port du canal de la primaire.
+    pub tls_url: Option<String>,
+}
+
+/// Racine d'une URL saisie : sans espaces ni barre oblique finale.
+fn clean_url(raw: &str) -> String {
+    raw.trim().trim_end_matches('/').to_string()
+}
+
 /// `true`, `false` ou `auto` : YAML lit les deux premiers comme des booléens,
 /// le troisième comme du texte.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -287,6 +341,11 @@ pub struct Config {
     /// le passage au tout-HTTPS) : seul le canal chiffré déjà enrôlé sert,
     /// jamais l'ancien canal en clair.
     pub plain_server_url: bool,
+    /// Serveurs de secours, dans l'ordre (`server_urls` sans la primaire) :
+    /// l'agent y passe quand la primaire ne répond plus, et revient à elle dès
+    /// qu'elle répond (voir `failover.rs`). Vide : un seul serveur, rien ne
+    /// change.
+    pub fallback_servers: Vec<ServerEndpoint>,
     pub interval: Duration,
     /// Nom d'hôte annoncé au serveur. `None` : celui que le système déclare.
     pub hostname: Option<String>,
@@ -381,6 +440,7 @@ impl fmt::Debug for Config {
             .field("ca_pin", &self.ca_pin)
             .field("server_pin", &self.server_pin)
             .field("plain_server_url", &self.plain_server_url)
+            .field("fallback_servers", &self.fallback_servers)
             .field("interval", &self.interval)
             .field("hostname", &self.hostname)
             .field("services", &self.services)
@@ -499,16 +559,63 @@ impl Config {
     }
 
     fn merge_at(file: FileConfig, env: EnvSource, config_path: Option<&Path>) -> Result<Self> {
-        let server_url = env
+        // `server_urls` : la liste ordonnée des serveurs. Sans `server_url`, la
+        // première adresse de la liste est la primaire.
+        let mut listed: Vec<ServerEndpoint> = match env.get("DUMBMONIT_AGENT_URLS") {
+            Some(raw) => split_list(&raw)
+                .into_iter()
+                .map(|url| ServerEndpoint { url, tls_url: None })
+                .collect(),
+            None => file.server_urls.map(ServerListFile::into_endpoints).unwrap_or_default(),
+        };
+        for endpoint in &mut listed {
+            endpoint.url = clean_url(&endpoint.url);
+            endpoint.tls_url =
+                endpoint.tls_url.as_deref().map(clean_url).filter(|url| !url.is_empty());
+        }
+        listed.retain(|endpoint| !endpoint.url.is_empty());
+        let explicit = env
             .get("DUMBMONIT_AGENT_URL")
             .or(file.server_url)
-            .map(|url| url.trim().trim_end_matches('/').to_string())
-            .unwrap_or_default();
+            .map(|url| clean_url(&url))
+            .filter(|url| !url.is_empty());
+        let (server_url, listed_tls_url) = match explicit {
+            Some(url) => (url, None),
+            None if !listed.is_empty() => {
+                let first = listed.remove(0);
+                (first.url, first.tls_url)
+            }
+            None => (String::new(), None),
+        };
         if server_url.is_empty() {
-            bail!("the server URL is required (key 'server_url' or variable DUMBMONIT_AGENT_URL)");
+            bail!(
+                "the server URL is required (key 'server_url' or 'server_urls', or variable \
+                 DUMBMONIT_AGENT_URL)"
+            );
         }
         if !server_url.starts_with("http://") && !server_url.starts_with("https://") {
             bail!("the server URL must start with https:// (got '{server_url}')");
+        }
+        let mut fallback_servers: Vec<ServerEndpoint> = Vec::new();
+        for endpoint in listed {
+            if endpoint.url == server_url
+                || fallback_servers.iter().any(|known| known.url == endpoint.url)
+            {
+                continue;
+            }
+            // Jamais de secours en clair hors boucle locale : la primaire en
+            // clair n'est tolérée que pour un agent déjà enrôlé, une adresse
+            // de secours ne sert que de route vers le même serveur.
+            let url = &endpoint.url;
+            if !url.starts_with("https://") && !is_loopback_http(url) {
+                bail!("server_urls: each address must start with https:// (got '{url}')");
+            }
+            if let Some(url) = &endpoint.tls_url
+                && !url.starts_with("https://")
+            {
+                bail!("server_urls: the agent channel URL must start with https:// (got '{url}')");
+            }
+            fallback_servers.push(endpoint);
         }
         // Une URL en clair hors boucle locale n'est tolérée que pour un agent
         // déjà enrôlé, qui ne parlera alors qu'à son canal chiffré rangé : c'est
@@ -527,8 +634,9 @@ impl Config {
         let tls_url = env
             .get("DUMBMONIT_AGENT_TLS_URL")
             .or(file.tls_url)
-            .map(|url| url.trim().trim_end_matches('/').to_string())
-            .filter(|url| !url.is_empty());
+            .map(|url| clean_url(&url))
+            .filter(|url| !url.is_empty())
+            .or(listed_tls_url);
         if let Some(url) = &tls_url
             && !url.starts_with("https://")
         {
@@ -910,6 +1018,7 @@ impl Config {
             ca_pin,
             server_pin,
             plain_server_url,
+            fallback_servers,
             interval: Duration::from_secs(interval_secs),
             hostname: env
                 .get("DUMBMONIT_AGENT_HOSTNAME")
@@ -1483,6 +1592,87 @@ mod tests {
 
         let bad = env(&[("DUMBMONIT_AGENT_BUFFER_MAX_MB", "beaucoup")]);
         assert!(Config::merge(file_with_url_and_token(), bad).is_err());
+    }
+
+    #[test]
+    fn server_urls_lists_the_backup_servers_in_order() {
+        // Sans `server_url`, la première adresse de la liste est la primaire.
+        let yaml = "token: dmon_x
+server_urls:
+  - https://a:8080/
+  - https://b:8080
+  - url: https://c:8080
+    tls_url: https://agents-c:9443/
+";
+        let file: FileConfig = dumbmonit_collectors::yaml::from_str(yaml).expect("yaml");
+        let config = Config::merge(file, env(&[])).expect("configuration");
+        assert_eq!(config.server_url, "https://a:8080");
+        assert_eq!(config.tls_url, None);
+        assert_eq!(
+            config.fallback_servers,
+            vec![
+                ServerEndpoint { url: "https://b:8080".into(), tls_url: None },
+                ServerEndpoint {
+                    url: "https://c:8080".into(),
+                    tls_url: Some("https://agents-c:9443".into()),
+                },
+            ]
+        );
+
+        // Avec `server_url`, la liste ne fait qu'ajouter des secours ; la
+        // primaire répétée et les doublons sont écartés.
+        let file = FileConfig {
+            server_urls: Some(ServerListFile::One(
+                "https://serveur:8080, https://b:8080,https://b:8080".into(),
+            )),
+            ..file_with_url_and_token()
+        };
+        let config = Config::merge(file, env(&[])).expect("configuration");
+        assert_eq!(config.server_url, "https://serveur:8080");
+        assert_eq!(
+            config.fallback_servers,
+            vec![ServerEndpoint { url: "https://b:8080".into(), tls_url: None }]
+        );
+
+        // L'environnement remplace la liste du fichier.
+        let file = FileConfig {
+            server_urls: Some(ServerListFile::One("https://b:8080".into())),
+            ..file_with_url_and_token()
+        };
+        let config = Config::merge(file, env(&[("DUMBMONIT_AGENT_URLS", "https://d:8080")]))
+            .expect("configuration");
+        assert_eq!(config.fallback_servers[0].url, "https://d:8080");
+        assert_eq!(config.fallback_servers.len(), 1);
+
+        // Rien ne change sans la clé.
+        let config = Config::merge(file_with_url_and_token(), env(&[])).expect("configuration");
+        assert!(config.fallback_servers.is_empty());
+    }
+
+    #[test]
+    fn a_backup_server_is_never_reached_in_clear() {
+        let file = FileConfig {
+            server_urls: Some(ServerListFile::One("http://b:8080".into())),
+            ..file_with_url_and_token()
+        };
+        assert!(Config::merge(file, env(&[])).is_err());
+        let file = FileConfig {
+            server_urls: Some(ServerListFile::Many(vec![ServerEntryFile::Full {
+                url: "https://b:8080".into(),
+                tls_url: Some("http://b:8443".into()),
+            }])),
+            ..file_with_url_and_token()
+        };
+        assert!(Config::merge(file, env(&[])).is_err());
+        // Seule une liste suffit à donner l'adresse du serveur.
+        let only_list = FileConfig {
+            token: Some("dmon_x".into()),
+            server_urls: Some(ServerListFile::One("https://a:8080,https://b:8080".into())),
+            ..FileConfig::default()
+        };
+        assert_eq!(Config::merge(only_list, env(&[])).unwrap().fallback_servers.len(), 1);
+        let nothing = FileConfig { token: Some("dmon_x".into()), ..FileConfig::default() };
+        assert!(Config::merge(nothing, env(&[])).is_err());
     }
 
     #[test]

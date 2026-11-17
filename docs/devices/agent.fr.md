@@ -838,6 +838,7 @@ utilisable dans un conteneur sans monter un fichier :
 |---|---|
 | `DUMBMONIT_AGENT_CONFIG` | Chemin du fichier de configuration |
 | `DUMBMONIT_AGENT_URL` | URL du serveur |
+| `DUMBMONIT_AGENT_URLS` | Serveurs de secours, séparés par des virgules (voir [Serveurs de secours](#backup-servers)) |
 | `DUMBMONIT_AGENT_TOKEN` | Jeton d'enrôlement |
 | `DUMBMONIT_AGENT_SECRET_FILE` | Où garder le secret de liaison (défaut : `agent-secret`, à côté du fichier de configuration) |
 | `DUMBMONIT_AGENT_INTERVAL_SECS` | Période d'échantillonnage |
@@ -1012,6 +1013,38 @@ L'agent Windows peut aussi déclencher des alertes sur des événements Windows
 disque) : les règles se règlent par machine sur sa page d'équipement, aucune
 n'existe par défaut. Voir
 [Alertes du journal d'événements Windows](agent-windows-events.md).
+
+## Serveurs de secours {#backup-servers}
+
+Avec un [serveur en attente](../install/high-availability.md), listez-le après
+la primaire : l'agent y passe quand la primaire ne répond plus, et revient à la
+primaire de lui-même.
+
+```yaml
+server_url: https://monitor-a.lan:8080
+server_urls:
+  - https://monitor-b.lan:8080
+  # Quand le canal des agents du secours est sur un autre hôte ou port :
+  # - url: https://monitor-b.lan:8080
+  #   tls_url: https://agents-b.example.com:443
+```
+
+- `server_urls` (ou `DUMBMONIT_AGENT_URLS`, séparées par des virgules) : les
+  serveurs de secours, dans l'ordre. Sans `server_url`, la première adresse de
+  la liste est la primaire. `server_url` et `tls_url` gardent leur sens ; rien
+  ne change sans la clé.
+- Après trois échecs consécutifs (pas de réponse, délai dépassé, `5xx`),
+  l'agent passe à l'adresse suivante, avec le même certificat et le même
+  épinglage : les deux serveurs partagent l'autorité des agents, pas de
+  réenrôlement. Le canal d'un secours est son propre hôte au port du canal de
+  la primaire (8443 par défaut), sauf si `tls_url` en donne un autre.
+- Sur un secours, l'agent réessaie la primaire toutes les deux minutes et y
+  revient dès qu'elle répond en serveur actif. Un serveur en attente ne répond
+  rien : tant qu'aucun serveur n'est actif, l'agent garde ses mesures et essaie
+  les adresses à tour de rôle.
+- La page de la machine affiche **Serveur : principal**, ou **Secours** avec
+  l'adresse en service, depuis quand, et la dernière erreur de la primaire.
+- Seules les adresses `https://` (ou la boucle locale) sont acceptées.
 
 ## Mandataire sortant {#outbound-proxy}
 

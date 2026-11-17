@@ -37,6 +37,7 @@ use crate::collect::zfs::ZfsProbe;
 use crate::collect::{SystemProbe, agent_samples, services};
 use crate::commands::CommandRunner;
 use crate::config::{Config, MIN_INTERVAL_SECS};
+use crate::failover::{self, Failover};
 use crate::logs::LogRunner;
 use crate::relay::{Offline, RelayRunner};
 use crate::relay_offline::{Backlog, PlanStore};
@@ -223,6 +224,9 @@ pub struct Agent {
     /// Vrai une fois un échec du canal chiffré signalé, pour ne le dire
     /// qu'une fois par épisode.
     tls_failed: bool,
+    /// Serveur en service parmi ceux de la configuration (`server_urls`) :
+    /// bascule vers un secours, retour à la primaire.
+    failover: Failover,
     /// Mise à jour automatique de l'agent lui-même.
     updater: SelfUpdater,
     /// Dernière offre de mise à jour du serveur, examinée après l'envoi.
@@ -339,6 +343,7 @@ impl Agent {
             tls_path,
             tls_retry_at: None,
             tls_failed: false,
+            failover: Failover::new(&config),
             updater,
             update_offer: None,
             after_stop: None,
@@ -581,6 +586,8 @@ impl Agent {
                 }
 
                 _ = tokio::time::sleep_until(next_send), if !self.buffer.is_empty() => {
+                    // Sur un serveur de secours : la primaire est-elle revenue ?
+                    self.check_primary().await;
                     next_send = match self.flush().await {
                         // Reste-t-il du retard ? On enchaîne, lot après lot.
                         FlushOutcome::Sent { .. } => {
@@ -602,7 +609,13 @@ impl Agent {
                         }
                         FlushOutcome::Idle => Instant::now(),
                         FlushOutcome::Failed(error) => {
-                            let delay = self.backoff.next_delay();
+                            // Juste basculé : la nouvelle adresse est essayée
+                            // sans attendre.
+                            let delay = if self.failover.take_switched() {
+                                Duration::ZERO
+                            } else {
+                                self.backoff.next_delay()
+                            };
                             self.note_failure(&error, delay);
                             // La panne commence peut-être : ce qui attend passe
                             // sur le disque, et la suite y ira au fil de l'eau.
@@ -921,6 +934,7 @@ impl Agent {
             self.identity.relay_gateway_check =
                 self.gateway_check.lock().ok().and_then(|held| held.clone());
         }
+        self.identity.server_link = self.failover.link(&self.client.base_url());
         let mut batch =
             PushBatch::new(self.identity.clone(), samples, chrono::Utc::now().timestamp_millis());
         if self.wants_inventory() {
@@ -941,6 +955,7 @@ impl Agent {
                 self.backoff.reset();
                 self.buffer.commit();
                 self.buffer.resume();
+                self.failover.succeeded();
                 self.binding_refused = false;
                 self.note_approved();
                 debug!(target = ack.target_id, accepted = ack.accepted, "batch accepted");
@@ -1022,6 +1037,9 @@ impl Agent {
             Err(error) if error.is_retryable() => {
                 // Journalisé par la boucle, qui connaît le délai avant la reprise.
                 self.buffer.restore(batch.samples);
+                if matches!(error, PushError::Transport(_)) {
+                    self.note_unreachable(&error);
+                }
                 FlushOutcome::Failed(error)
             }
             Err(error) => {
@@ -1108,7 +1126,9 @@ impl Agent {
         };
         let request =
             dumbmonit_proto::TlsEnrolRequest { identity: self.identity.clone(), public_key };
-        match self.client.enrol(&state.url, &request).await {
+        // Sur le serveur en service : un secours partage l'autorité et la base.
+        let url = self.failover.active_channel(&state.url);
+        match self.client.enrol(&url, &request).await {
             Ok(issued) => {
                 if let Some(secret) = issued.agent_secret.clone() {
                     self.adopt_binding(Some(secret), true);
@@ -1126,6 +1146,9 @@ impl Agent {
             Err(error) => {
                 if let PushError::Forbidden(message) = &error {
                     self.on_binding_refused(message);
+                }
+                if matches!(error, PushError::Transport(_)) {
+                    self.note_unreachable(&error);
                 }
                 self.note_tls_failure("enrolment on the encrypted agent channel failed", &error);
             }
@@ -1174,7 +1197,8 @@ impl Agent {
             // démarrage.
             warn!(error = %format!("{error:#}"), "cannot store the encrypted channel state");
         }
-        if let Err(error) = self.client.use_tls(&state.url, state.identity()) {
+        let url = self.failover.active_channel(&state.url);
+        if let Err(error) = self.client.use_tls(&url, state.identity()) {
             warn!(error = %format!("{error:#}"), "cannot switch to the encrypted agent channel");
         }
         self.tls = Some(state.clone());
@@ -1194,7 +1218,8 @@ impl Agent {
         if let Err(error) = state.save(&self.tls_path) {
             warn!(error = %format!("{error:#}"), "cannot store the encrypted channel state");
         }
-        if let Err(error) = self.client.use_tls(&state.url, None) {
+        let url = self.failover.active_channel(&state.url);
+        if let Err(error) = self.client.use_tls(&url, None) {
             warn!(error = %format!("{error:#}"), "cannot reset the encrypted agent channel");
         }
         self.tls_retry_at = None;
@@ -1207,6 +1232,65 @@ impl Agent {
         } else {
             self.tls_failed = true;
             warn!(%error, retry_in_s = TLS_RETRY.as_secs(), "{what}");
+        }
+    }
+
+    /// Échec de transport (serveur injoignable, délai, 5xx) : compté pour la
+    /// bascule, et passage à l'adresse suivante de `server_urls` s'il le faut.
+    fn note_unreachable(&mut self, error: &PushError) {
+        if let Some(next) = self.failover.failed(&error.to_string()) {
+            self.switch_server(next);
+        }
+    }
+
+    /// Compose désormais le serveur de rang `index` (0 : la primaire). Le
+    /// canal reste le même : certificat, épinglage et mandataire suivent.
+    fn switch_server(&mut self, index: usize) {
+        let Some(url) = self.server_root(index) else { return };
+        let from = self.client.base_url();
+        self.client.retarget(&url);
+        self.failover.switched_to(index, Instant::now());
+        if index == 0 {
+            info!(from, to = url, "the primary server answers again, switching back to it");
+        } else {
+            warn!(from, to = url, "server unreachable, switching to the next one in server_urls");
+        }
+    }
+
+    /// Racine à composer pour le serveur de rang `index` : son canal chiffré
+    /// quand l'agent y est, l'adresse de son interface sinon.
+    fn server_root(&self, index: usize) -> Option<String> {
+        if self.client.is_encrypted() {
+            let primary = self.tls.as_ref()?.url.as_str();
+            self.failover.channel_url(index, primary)
+        } else {
+            self.failover.web_url(index).map(str::to_string)
+        }
+    }
+
+    /// Sur un serveur de secours, réessaie la primaire de temps en temps
+    /// (requête légère, délai court) et y revient dès qu'elle répond en
+    /// serveur actif.
+    async fn check_primary(&mut self) {
+        if !self.failover.primary_due(Instant::now()) {
+            return;
+        }
+        let Some(url) = self.server_root(0) else { return };
+        let outcome = self
+            .client
+            .probe_http()
+            .get(format!("{url}{}", failover::PROBE_PATH))
+            .timeout(failover::PROBE_TIMEOUT)
+            .send()
+            .await
+            .map(|response| response.status().as_u16())
+            .map_err(|error| crate::client::describe(&error));
+        match failover::probe_verdict(outcome) {
+            Ok(()) => self.switch_server(0),
+            Err(reason) => {
+                debug!(primary = url, reason, "the primary server is still unavailable");
+                self.failover.primary_unreachable(&reason, Instant::now());
+            }
         }
     }
 
@@ -1551,6 +1635,7 @@ mod tests {
             ca_pin: None,
             server_pin: None,
             plain_server_url: false,
+            fallback_servers: Vec::new(),
             log_level: tracing::Level::INFO,
             proxy: crate::proxy::ProxyConfig::default(),
             deprecated_env: Vec::new(),
@@ -2441,5 +2526,98 @@ mod tests {
             _ = agent.run(shutdown) => panic!("la boucle s'est arrêtée seule"),
             () = check => {}
         }
+    }
+
+    // ------------------------------------------------ bascule entre serveurs
+
+    #[tokio::test]
+    async fn an_unreachable_primary_hands_over_to_the_backup_then_back() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicBool, Ordering};
+        // La primaire répond comme un serveur en attente (503) tant qu'elle
+        // n'est pas revenue ; revenue, son canal ne connaît pas la route de
+        // l'essai (404) et accepte les lots.
+        let up = Arc::new(AtomicBool::new(false));
+        let primary_up = up.clone();
+        let (primary, primary_calls) = crate::testsupport::fake_http(move |request| {
+            if !primary_up.load(Ordering::SeqCst) {
+                return (503, r#"{"error":"standby"}"#.to_string());
+            }
+            if request.path.starts_with(failover::PROBE_PATH) {
+                return (404, String::new());
+            }
+            (200, ACK.to_string())
+        })
+        .await;
+        let (backup, backup_calls) =
+            crate::testsupport::fake_http(|_| (200, ACK.to_string())).await;
+        let dir = tempfile::tempdir().unwrap();
+        let mut config = config();
+        config.server_url = primary.clone();
+        config.fallback_servers =
+            vec![crate::config::ServerEndpoint { url: backup.clone(), tls_url: None }];
+        config.secret_path = dir.path().join("agent-secret");
+        let mut agent = Agent::new(config).expect("agent");
+        let samples = agent.collect().await;
+        agent.buffer.push(samples);
+
+        // Les premiers échecs ne font pas basculer : un redémarrage du serveur
+        // dure quelques secondes.
+        for attempt in 1..failover::SWITCH_AFTER {
+            assert!(matches!(agent.flush().await, FlushOutcome::Failed(_)), "{attempt}");
+            assert_eq!(agent.failover.active(), 0);
+        }
+        assert!(matches!(agent.flush().await, FlushOutcome::Failed(_)));
+        assert_eq!(agent.failover.active(), 1, "bascule sur le secours");
+        assert_eq!(agent.client.base_url(), backup);
+        assert!(agent.failover.take_switched(), "la boucle réessaie sans attendre");
+
+        assert!(matches!(agent.flush().await, FlushOutcome::Sent { .. }));
+        let sent = backup_calls.bodies("POST", "/api/ingest");
+        assert_eq!(sent.len(), 1, "le retard part chez le secours");
+        let batch: serde_json::Value = serde_json::from_str(&sent[0]).unwrap();
+        let link = &batch["identity"]["server_link"];
+        assert_eq!(link["active"], 1);
+        assert_eq!(link["servers"], 2);
+        assert_eq!(link["url"], backup.as_str());
+        assert!(link["since_ms"].is_i64());
+        assert!(link["primary_error"].as_str().unwrap().contains("503"), "{link}");
+
+        // Réessayée, la primaire répond encore en serveur en attente : l'agent
+        // reste sur le secours.
+        agent.failover.recheck_now();
+        agent.check_primary().await;
+        assert_eq!(agent.failover.active(), 1);
+
+        // Revenue : l'agent y retourne, et le lot suivant part chez elle.
+        up.store(true, Ordering::SeqCst);
+        agent.failover.recheck_now();
+        agent.check_primary().await;
+        assert_eq!(agent.failover.active(), 0);
+        assert_eq!(agent.client.base_url(), primary);
+        let samples = agent.collect().await;
+        agent.buffer.push(samples);
+        assert!(matches!(agent.flush().await, FlushOutcome::Sent { .. }));
+        assert_eq!(primary_calls.count("GET", failover::PROBE_PATH), 2);
+        let last = primary_calls.bodies("POST", "/api/ingest").pop().unwrap();
+        let batch: serde_json::Value = serde_json::from_str(&last).unwrap();
+        assert_eq!(batch["identity"]["server_link"]["active"], 0);
+        assert!(batch["identity"]["server_link"].get("since_ms").is_none());
+        assert_eq!(backup_calls.count("POST", "/api/ingest"), 1);
+    }
+
+    #[tokio::test]
+    async fn without_server_urls_nothing_changes() {
+        let dir = tempfile::tempdir().unwrap();
+        let url = format!("http://127.0.0.1:{}", closed_port());
+        let mut agent = agent_for(&url, &dir);
+        let samples = agent.collect().await;
+        agent.buffer.push(samples);
+        for _ in 0..(failover::SWITCH_AFTER * 3) {
+            assert!(matches!(agent.flush().await, FlushOutcome::Failed(_)));
+        }
+        assert_eq!(agent.client.base_url(), url);
+        assert!(!agent.failover.take_switched());
+        assert_eq!(agent.identity.server_link, None, "rien n'est annoncé au serveur");
     }
 }

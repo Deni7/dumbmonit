@@ -84,6 +84,7 @@ nav:
       - Monitor a remote site: install/remote-site.md
       - Agent channel security: install/agent-security.md
       - Backup and restore: install/backup.md
+      - High availability: install/high-availability.md
       - Watching DumbMonit itself: install/self-monitoring.md
       - Sentinel mode: install/sentinel.md
       - Server logs: install/logs.md
@@ -248,5 +249,6 @@ nav:
       - Assurance case: development/assurance-case.md
       - Reproducible builds: development/reproducible-builds.md
       - Signing the agent binaries: development/agent-signing.md
+      - PostgreSQL plan: development/postgres-plan.md
       - Roadmap: development/roadmap.md
   - FAQ: faq.md
