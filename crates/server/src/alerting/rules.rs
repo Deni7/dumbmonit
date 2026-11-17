@@ -19,6 +19,7 @@ mod jellyfin;
 mod nextcloud;
 mod opnsense;
 mod pbs;
+mod pfsense;
 mod pihole;
 mod plex;
 mod postgres;
@@ -27,6 +28,9 @@ mod synology;
 mod tailscale;
 mod truenas;
 mod unifi;
+mod unraid;
+mod veeam;
+mod vsphere;
 
 /// Taux d'occupation processeur, toutes sources confondues.
 ///
@@ -140,11 +144,16 @@ pub fn builtin_rules() -> Vec<Rule> {
         // et elles sonnaient une semaine durant, la cible bien vivante. `bottomk`
         // ne garde que la plus fraîche de chaque cible, avec ses étiquettes : les
         // silences par tag et le nom affiché continuent de fonctionner.
+        //
+        // Le seuil de trois minutes est déjà l'anti-faux-positif (deux sondes
+        // manquées à la période par défaut) ; le `for` ne fait que confirmer au
+        // cycle suivant, trente secondes suffisent. Une minute de plus retardait
+        // chaque première alerte sans écarter de fausse panne.
         Rule {
             description: "No measurement received for more than three minutes.".to_string(),
             operator: Operator::Gt,
             threshold: 180.0,
-            for_duration: Duration::from_secs(60),
+            for_duration: Duration::from_secs(30),
             severity: Severity::Critical,
             unit: "s".to_string(),
             ..base(
@@ -592,7 +601,9 @@ pub fn builtin_rules() -> Vec<Rule> {
         },
         // Moniteurs de disponibilité. Contrairement au matériel, un service en
         // panne écrit bien un point (`probe_success = 0`) : la règle est un simple
-        // seuil, et le `for` absorbe un raté isolé. `== bool 0` rend 1 pour un
+        // seuil, et le `for` absorbe un raté isolé. Deux minutes, soit trois
+        // sondes en échec d'affilée à la période par défaut : un raté isolé, et
+        // même deux, ne sonnent jamais. `== bool 0` rend 1 pour un
         // service en panne ; sans `bool`, la comparaison renverrait 0 (la valeur
         // de gauche) et le seuil « > 0 » ne se déclencherait jamais.
         //
@@ -600,10 +611,10 @@ pub fn builtin_rules() -> Vec<Rule> {
         // propre règle, `push_missed`, en avertissement : un cron en retard n'est
         // pas une panne critique, et il ne doit pas alerter deux fois.
         Rule {
-            description: "The service has not responded correctly for three minutes.".to_string(),
+            description: "The service has not responded correctly for two minutes.".to_string(),
             operator: Operator::Gt,
             threshold: 0.0,
-            for_duration: Duration::from_secs(3 * 60),
+            for_duration: Duration::from_secs(2 * 60),
             severity: Severity::Critical,
             repeat_interval: Some(Duration::from_secs(1800)),
             ..base(
@@ -6559,63 +6570,6 @@ pub fn builtin_rules() -> Vec<Rule> {
                 "dumbmonit_sophos_interface_down",
             )
         },
-        Rule {
-            description: "A Cisco Meraki device has been offline (out of reach of the cloud dashboard) for ten minutes. Dormant devices, unseen for a long time, are left out.".to_string(),
-            operator: Operator::Gt,
-            threshold: 0.0,
-            for_duration: Duration::from_secs(10 * 60),
-            severity: Severity::Warning,
-            repeat_interval: Some(Duration::from_secs(6 * 3600)),
-            ..base(
-                "meraki_device_offline",
-                "Meraki device offline",
-                RuleKind::Threshold,
-                "dumbmonit_meraki_device_offline",
-            )
-        },
-        Rule {
-            description: "A Meraki router lost the Internet access of a configured uplink (the wired and cellular sockets without a cable are not counted).".to_string(),
-            operator: Operator::Gt,
-            threshold: 0.0,
-            for_duration: Duration::from_secs(5 * 60),
-            severity: Severity::Warning,
-            repeat_interval: Some(Duration::from_secs(6 * 3600)),
-            ..base(
-                "meraki_uplink_failed",
-                "Meraki uplink failed",
-                RuleKind::Threshold,
-                "dumbmonit_meraki_uplink_failed",
-            )
-        },
-        Rule {
-            description: "The Meraki license is not in compliance (expired, missing or out of compliance): the dashboard may stop managing the devices.".to_string(),
-            operator: Operator::Lt,
-            threshold: 1.0,
-            for_duration: Duration::from_secs(3600),
-            severity: Severity::Warning,
-            repeat_interval: Some(Duration::from_secs(24 * 3600)),
-            ..base(
-                "meraki_license_problem",
-                "Meraki license problem",
-                RuleKind::Threshold,
-                "dumbmonit_meraki_license_ok",
-            )
-        },
-        Rule {
-            description: "A Meraki license expires in less than 30 days.".to_string(),
-            operator: Operator::Lt,
-            threshold: 30.0 * 24.0 * 3600.0,
-            for_duration: Duration::from_secs(3600),
-            severity: Severity::Warning,
-            unit: "s".to_string(),
-            repeat_interval: Some(Duration::from_secs(24 * 3600)),
-            ..base(
-                "meraki_license_expiring",
-                "Meraki license expiring",
-                RuleKind::Threshold,
-                "dumbmonit_meraki_license_expiry_seconds",
-            )
-        },
         // --- TP-Link Omada (`collectors/omada`) ---
         Rule {
             description: "An Omada access point, switch or gateway has been disconnected from the controller for ten minutes.".to_string(),
@@ -6744,151 +6698,6 @@ pub fn builtin_rules() -> Vec<Rule> {
                 "Stormshield HA link faulty",
                 RuleKind::Threshold,
                 "dumbmonit_stormshield_ha_faulty_links",
-            )
-        },
-        Rule {
-            description: "A Palo Alto firewall interface bound to a zone has no link: cable, transceiver or the device in front.".to_string(),
-            operator: Operator::Gt,
-            threshold: 0.0,
-            for_duration: Duration::from_secs(5 * 60),
-            severity: Severity::Warning,
-            repeat_interval: Some(Duration::from_secs(6 * 3600)),
-            ..base(
-                "paloalto_interface_down",
-                "Palo Alto interface without link",
-                RuleKind::Threshold,
-                "dumbmonit_paloalto_interface_down",
-            )
-        },
-        Rule {
-            description: "The peer of a Palo Alto HA pair is no longer active or passive, or the HA link to it is down: there is no standby any more.".to_string(),
-            operator: Operator::Lt,
-            threshold: 1.0,
-            for_duration: Duration::from_secs(2 * 60),
-            severity: Severity::Critical,
-            repeat_interval: Some(Duration::from_secs(6 * 3600)),
-            ..base(
-                "paloalto_ha_peer_lost",
-                "Palo Alto HA peer lost",
-                RuleKind::Threshold,
-                "dumbmonit_paloalto_ha_peer_up",
-            )
-        },
-        Rule {
-            description: "The running configuration of a Palo Alto HA pair is not synchronized: a failover would run another configuration.".to_string(),
-            operator: Operator::Lt,
-            threshold: 1.0,
-            for_duration: Duration::from_secs(15 * 60),
-            severity: Severity::Warning,
-            repeat_interval: Some(Duration::from_secs(6 * 3600)),
-            ..base(
-                "paloalto_ha_out_of_sync",
-                "Palo Alto HA out of sync",
-                RuleKind::Threshold,
-                "dumbmonit_paloalto_ha_in_sync",
-            )
-        },
-        Rule {
-            description: "This Palo Alto firewall reports its HA state as suspended or non-functional.".to_string(),
-            operator: Operator::Lt,
-            threshold: 1.0,
-            for_duration: Duration::from_secs(5 * 60),
-            severity: Severity::Critical,
-            repeat_interval: Some(Duration::from_secs(6 * 3600)),
-            ..base(
-                "paloalto_ha_not_functional",
-                "Palo Alto HA member not functional",
-                RuleKind::Threshold,
-                "dumbmonit_paloalto_ha_local_functional",
-            )
-        },
-        Rule {
-            description: "The session table of a Palo Alto firewall has stayed above 90 % of its capacity for ten minutes: new sessions will be refused when it is full.".to_string(),
-            operator: Operator::Gt,
-            threshold: 90.0,
-            for_duration: Duration::from_secs(10 * 60),
-            severity: Severity::Warning,
-            unit: "%".to_string(),
-            repeat_interval: Some(Duration::from_secs(6 * 3600)),
-            ..base(
-                "paloalto_session_table_full",
-                "Palo Alto session table filling up",
-                RuleKind::Threshold,
-                "dumbmonit_paloalto_session_usage_percent",
-            )
-        },
-        Rule {
-            description: "The management plane CPU of a Palo Alto firewall has stayed above 90 % for fifteen minutes.".to_string(),
-            operator: Operator::Gt,
-            threshold: 90.0,
-            for_duration: Duration::from_secs(15 * 60),
-            severity: Severity::Warning,
-            unit: "%".to_string(),
-            repeat_interval: Some(Duration::from_secs(6 * 3600)),
-            ..base(
-                "paloalto_cpu_high",
-                "Palo Alto management CPU high",
-                RuleKind::Threshold,
-                "dumbmonit_paloalto_cpu_usage_percent",
-            )
-        },
-        Rule {
-            description: "The management plane memory of a Palo Alto firewall has stayed above 90 % for fifteen minutes.".to_string(),
-            operator: Operator::Gt,
-            threshold: 90.0,
-            for_duration: Duration::from_secs(15 * 60),
-            severity: Severity::Warning,
-            unit: "%".to_string(),
-            repeat_interval: Some(Duration::from_secs(6 * 3600)),
-            ..base(
-                "paloalto_memory_high",
-                "Palo Alto management memory high",
-                RuleKind::Threshold,
-                "dumbmonit_paloalto_memory_used_percent",
-            )
-        },
-        Rule {
-            description: "A licence or subscription of a Palo Alto firewall expires in less than 30 days, or has expired.".to_string(),
-            operator: Operator::Lt,
-            threshold: 30.0 * 24.0 * 3600.0,
-            for_duration: Duration::from_secs(3600),
-            severity: Severity::Warning,
-            unit: "s".to_string(),
-            repeat_interval: Some(Duration::from_secs(24 * 3600)),
-            ..base(
-                "paloalto_license_expiring",
-                "Palo Alto licence expiring",
-                RuleKind::Threshold,
-                "dumbmonit_paloalto_license_expiry_seconds",
-            )
-        },
-        Rule {
-            description: "The last configuration commit of a Palo Alto firewall failed: the running configuration is not the one that was saved.".to_string(),
-            operator: Operator::Lt,
-            threshold: 1.0,
-            for_duration: Duration::from_secs(5 * 60),
-            severity: Severity::Info,
-            repeat_interval: Some(Duration::from_secs(24 * 3600)),
-            ..base(
-                "paloalto_commit_failed",
-                "Palo Alto commit failed",
-                RuleKind::Threshold,
-                "dumbmonit_paloalto_last_commit_ok",
-            )
-        },
-        // --- SonicWall SonicOS (`collectors/sonicwall`, bêta) ---
-        Rule {
-            description: "A SonicWall interface bound to a zone has no link.".to_string(),
-            operator: Operator::Gt,
-            threshold: 0.0,
-            for_duration: Duration::from_secs(5 * 60),
-            severity: Severity::Warning,
-            repeat_interval: Some(Duration::from_secs(6 * 3600)),
-            ..base(
-                "sonicwall_interface_down",
-                "SonicWall interface without link",
-                RuleKind::Threshold,
-                "dumbmonit_sonicwall_interface_down",
             )
         },
         Rule {
@@ -7774,6 +7583,10 @@ pub fn builtin_rules() -> Vec<Rule> {
     rules.extend(pbs::rules());
     rules.extend(truenas::rules());
     rules.extend(unifi::rules());
+    rules.extend(pfsense::rules());
+    rules.extend(unraid::rules());
+    rules.extend(veeam::rules());
+    rules.extend(vsphere::rules());
     rules.extend(opnsense::rules());
     rules.extend(tailscale::rules());
     // Résolveurs DNS et domotique : un fichier par produit (`rules/<produit>.rs`).
@@ -7825,18 +7638,19 @@ fn app_rule(
 }
 
 /// Règles des applications de `collectors/selfhosted` : Sonarr, Radarr, Lidarr,
-/// Prowlarr, qBittorrent, UniFi Protect, Frigate, Keycloak, authentik,
-/// Vaultwarden et mailcow. Une application qui ne répond plus du tout relève de
+/// Prowlarr, qBittorrent, Frigate, Keycloak, authentik, Vaultwarden et
+/// mailcow. Une application qui ne répond plus du tout relève de
 /// la règle « injoignable » ; celles-ci surveillent ce qui continue de répondre
 /// pendant que le service est en panne.
 fn apps_rules() -> Vec<Rule> {
     let mut rules = Vec::new();
     // La famille *arr : mêmes métriques, préfixées par le produit.
-    for (kind, product, has_queue) in [
-        ("sonarr", "Sonarr", true),
-        ("radarr", "Radarr", true),
-        ("lidarr", "Lidarr", true),
-        ("prowlarr", "Prowlarr", false),
+    // Prowlarr n'a ni file de téléchargements ni `/diskspace` : pas de règle.
+    for (kind, product, has_queue, has_disk) in [
+        ("sonarr", "Sonarr", true, true),
+        ("radarr", "Radarr", true, true),
+        ("lidarr", "Lidarr", true, true),
+        ("prowlarr", "Prowlarr", false, false),
     ] {
         rules.push(app_rule(
             &format!("{kind}_health_error"),
@@ -7868,21 +7682,23 @@ fn apps_rules() -> Vec<Rule> {
                 app_hours(6),
             ));
         }
-        rules.push(Rule {
-            clear_threshold: Some(88.0),
-            unit: "%".to_string(),
-            ..app_rule(
-                &format!("{kind}_disk_almost_full"),
-                &format!("{product} disk almost full"),
-                &format!("A disk {product} reports is more than 90% full."),
-                &format!("dumbmonit_{kind}_disk_used_percent"),
-                Operator::Gt,
-                90.0,
-                app_minutes(30),
-                Severity::Warning,
-                app_hours(24),
-            )
-        });
+        if has_disk {
+            rules.push(Rule {
+                clear_threshold: Some(88.0),
+                unit: "%".to_string(),
+                ..app_rule(
+                    &format!("{kind}_disk_almost_full"),
+                    &format!("{product} disk almost full"),
+                    &format!("A disk {product} reports is more than 90% full."),
+                    &format!("dumbmonit_{kind}_disk_used_percent"),
+                    Operator::Gt,
+                    90.0,
+                    app_minutes(30),
+                    Severity::Warning,
+                    app_hours(24),
+                )
+            });
+        }
         rules.push(app_rule(
             &format!("{kind}_update_available"),
             &format!("{product} update available"),
@@ -7948,53 +7764,6 @@ fn apps_rules() -> Vec<Rule> {
             app_hours(24),
         )
     });
-
-    // UniFi Protect.
-    rules.push(app_rule(
-        "unifiprotect_camera_offline",
-        "Protect camera offline",
-        "A UniFi Protect camera has been disconnected from its NVR for five minutes.",
-        "dumbmonit_unifiprotect_camera_online == bool 0",
-        Operator::Gt,
-        0.0,
-        app_minutes(5),
-        Severity::Warning,
-        app_hours(6),
-    ));
-    rules.push(app_rule(
-        "unifiprotect_camera_not_recording",
-        "Protect camera not recording",
-        "A camera is connected but not recording although it is set to (disk trouble, \
-         recording stopped).",
-        "dumbmonit_unifiprotect_cameras_not_recording",
-        Operator::Gt,
-        0.0,
-        app_minutes(15),
-        Severity::Warning,
-        app_hours(6),
-    ));
-    rules.push(app_rule(
-        "unifiprotect_disk_unhealthy",
-        "Protect NVR disk unhealthy",
-        "The NVR reports a failing disk.",
-        "dumbmonit_unifiprotect_disks_unhealthy",
-        Operator::Gt,
-        0.0,
-        app_minutes(5),
-        Severity::Critical,
-        app_hours(1),
-    ));
-    rules.push(app_rule(
-        "unifiprotect_recording_disabled",
-        "Protect recording disabled",
-        "Recording is switched off on the NVR: no camera is recording.",
-        "dumbmonit_unifiprotect_recording_disabled",
-        Operator::Gt,
-        0.0,
-        app_minutes(10),
-        Severity::Warning,
-        app_hours(6),
-    ));
 
     // Frigate.
     rules.push(app_rule(
@@ -8665,8 +8434,8 @@ pub(crate) const PRODUITES: &[&str] = &[
     "dumbmonit_agent_eventlog_matches_critical",
     "dumbmonit_agent_eventlog_matches_warning",
     "dumbmonit_agent_eventlog_matches_info",
-    // pfSense, Unraid, Veeam, Tailscale, FortiGate, Sophos, Meraki, Omada
-    // (`collectors/{pfsense,unraid,veeam,tailscale,fortigate,sophos,meraki,omada}`),
+    // pfSense, Unraid, Veeam, Tailscale, FortiGate, Sophos, Omada
+    // (`collectors/{pfsense,unraid,veeam,tailscale,fortigate,sophos,omada}`),
     // Hyper-V par l'agent Windows (`agent/src/collect/perf_counters.rs`).
     "dumbmonit_pfsense_gateway_up",
     "dumbmonit_pfsense_gateway_loss_percent",
@@ -8704,10 +8473,6 @@ pub(crate) const PRODUITES: &[&str] = &[
     "dumbmonit_fortigate_license_expiry_seconds",
     "dumbmonit_fortigate_firmware_update_available",
     "dumbmonit_sophos_interface_down",
-    "dumbmonit_meraki_device_offline",
-    "dumbmonit_meraki_uplink_failed",
-    "dumbmonit_meraki_license_ok",
-    "dumbmonit_meraki_license_expiry_seconds",
     "dumbmonit_omada_device_offline",
     "dumbmonit_omada_device_cpu_usage_percent",
     "dumbmonit_omada_device_memory_used_percent",
@@ -8717,16 +8482,6 @@ pub(crate) const PRODUITES: &[&str] = &[
     "dumbmonit_arubacentral_devices_poor_health",
     "dumbmonit_stormshield_ha_dead_nodes",
     "dumbmonit_stormshield_ha_faulty_links",
-    "dumbmonit_paloalto_interface_down",
-    "dumbmonit_paloalto_ha_peer_up",
-    "dumbmonit_paloalto_ha_in_sync",
-    "dumbmonit_paloalto_ha_local_functional",
-    "dumbmonit_paloalto_session_usage_percent",
-    "dumbmonit_paloalto_cpu_usage_percent",
-    "dumbmonit_paloalto_memory_used_percent",
-    "dumbmonit_paloalto_license_expiry_seconds",
-    "dumbmonit_paloalto_last_commit_ok",
-    "dumbmonit_sonicwall_interface_down",
     "dumbmonit_agent_libvirt_domain_crashed",
     "dumbmonit_agent_libvirt_pool_used_percent",
     // Synology DSM par l'agent du paquet (`crates/agent/src/collect/dsm.rs`).
@@ -8792,16 +8547,11 @@ pub(crate) const PRODUITES: &[&str] = &[
     "dumbmonit_lidarr_update_available",
     "dumbmonit_lidarr_queue_has_errors",
     "dumbmonit_prowlarr_health_errors",
-    "dumbmonit_prowlarr_disk_used_percent",
     "dumbmonit_prowlarr_update_available",
     "dumbmonit_prowlarr_indexers_disabled",
     "dumbmonit_qbittorrent_torrents_errored",
     "dumbmonit_qbittorrent_connected",
     "dumbmonit_qbittorrent_free_space_bytes",
-    "dumbmonit_unifiprotect_camera_online",
-    "dumbmonit_unifiprotect_cameras_not_recording",
-    "dumbmonit_unifiprotect_disks_unhealthy",
-    "dumbmonit_unifiprotect_recording_disabled",
     "dumbmonit_frigate_camera_online",
     "dumbmonit_frigate_detector_busy_seconds",
     "dumbmonit_frigate_storage_used_percent",
@@ -9093,16 +8843,11 @@ mod tests {
             "lidarr_disk_almost_full",
             "lidarr_update_available",
             "prowlarr_health_error",
-            "prowlarr_disk_almost_full",
             "prowlarr_update_available",
             "prowlarr_indexers_disabled",
             "qbittorrent_torrents_errored",
             "qbittorrent_disconnected",
             "qbittorrent_free_space_low",
-            "unifiprotect_camera_offline",
-            "unifiprotect_camera_not_recording",
-            "unifiprotect_disk_unhealthy",
-            "unifiprotect_recording_disabled",
             "frigate_camera_offline",
             "frigate_detector_stuck",
             "frigate_storage_almost_full",
@@ -9218,6 +8963,8 @@ mod tests {
             "vsphere_datastore_inaccessible",
             "vsphere_vm_tools_not_running",
             "vsphere_alarm_red",
+            "vsphere_vm_snapshot_old",
+            "vsphere_vm_consolidation_needed",
             // Redis, MongoDB, RabbitMQ, CrowdSec.
             "redis_memory_near_limit",
             "redis_rejecting_connections",
@@ -9321,6 +9068,13 @@ mod tests {
             "pfsense_interface_down",
             "pfsense_service_stopped",
             "pfsense_disk_full",
+            "pfsense_states_table_full",
+            "pfsense_mbuf_high",
+            "pfsense_temperature_high",
+            "pfsense_cpu_high",
+            "pfsense_swap_high",
+            "pfsense_interface_errors",
+            "pfsense_carp_maintenance",
             "unraid_array_stopped",
             "unraid_disk_problem",
             "unraid_disk_errors",
@@ -9329,12 +9083,23 @@ mod tests {
             "unraid_parity_check_old",
             "unraid_cache_full",
             "unraid_container_stopped",
+            "unraid_vm_crashed",
+            "unraid_alert_unread",
+            "unraid_array_almost_full",
+            "unraid_memory_high",
+            "unraid_license_problem",
+            "unraid_trial_expiring",
+            "unraid_os_updates_ending",
             "veeam_job_failed",
             "veeam_job_warning",
             "veeam_job_old",
             "veeam_repository_full",
             "veeam_license_expiring",
             "veeam_support_expiring",
+            "veeam_repository_offline",
+            "veeam_license_invalid",
+            "veeam_config_backup_disabled",
+            "veeam_config_backup_old",
             "winrm_services_auto_stopped",
             "tailscale_device_offline",
             "tailscale_key_expiring",
@@ -9349,24 +9114,10 @@ mod tests {
             "fortigate_license_expiring",
             "fortigate_firmware_update",
             "sophos_interface_down",
-            "meraki_device_offline",
-            "meraki_uplink_failed",
-            "meraki_license_problem",
-            "meraki_license_expiring",
             "omada_device_offline",
             "omada_cpu_high",
             "omada_memory_high",
             "omada_firmware_update",
-            "paloalto_interface_down",
-            "paloalto_ha_peer_lost",
-            "paloalto_ha_out_of_sync",
-            "paloalto_ha_not_functional",
-            "paloalto_session_table_full",
-            "paloalto_cpu_high",
-            "paloalto_memory_high",
-            "paloalto_license_expiring",
-            "paloalto_commit_failed",
-            "sonicwall_interface_down",
             "qnap_volume_full",
             "qnap_disk_unhealthy",
             "qnap_disk_hot",
@@ -9465,6 +9216,10 @@ mod tests {
                             || pbs::PRODUCED.contains(&mot)
                             || truenas::PRODUCED.contains(&mot)
                             || unifi::PRODUCED.contains(&mot)
+                            || pfsense::PRODUCED.contains(&mot)
+                            || unraid::PRODUCED.contains(&mot)
+                            || veeam::PRODUCED.contains(&mot)
+                            || vsphere::PRODUCED.contains(&mot)
                             || opnsense::PRODUCED.contains(&mot)
                             || tailscale::PRODUCED.contains(&mot)
                             || pihole::PRODUCED.contains(&mot)

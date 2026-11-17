@@ -1,0 +1,85 @@
+name: Helm chart
+
+# Pull requests touching deploy/: lint, render and validate the chart and the
+# plain manifests. Tags v*: publish the chart as an OCI artifact.
+
+on:
+  pull_request:
+    paths:
+      - "deploy/**"
+      - ".github/workflows/helm.yml"
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  KUBECONFORM_VERSION: v0.8.0
+  K8S_VERSION: 1.35.0
+
+jobs:
+  validate:
+    name: Lint and validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+        with:
+          version: v4.3.2
+
+      - name: Install kubeconform
+        run: |
+          curl -fsSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" -o kc.tgz
+          tar -xzf kc.tgz kubeconform
+          sudo install kubeconform /usr/local/bin/kubeconform
+
+      - name: helm lint
+        run: helm lint deploy/helm/dumbmonit --strict
+
+      - name: helm template and kubeconform
+        run: |
+          set -euo pipefail
+          chart=deploy/helm/dumbmonit
+          render() { helm template dumbmonit "$chart" --namespace dumbmonit "$@"; }
+          check() { kubeconform -strict -summary -kubernetes-version "$K8S_VERSION" -; }
+          render | check
+          render --set ingress.enabled=true --set networkPolicy.enabled=true \
+            --set podDisruptionBudget.enabled=true --set secret.value=0123456789abcdef0123 \
+            --set agentService.type=NodePort --set agentService.nodePort=30443 \
+            --set victoriametrics.externalUrl=http://vm:8428 \
+            --set agentPublicUrl=https://agents.example.com:8443 \
+            --set tls.existingSecret=monit-tls | check
+
+      - name: Plain manifests
+        run: kubeconform -strict -summary -kubernetes-version "$K8S_VERSION" deploy/kubernetes/
+
+  publish:
+    name: Publish chart (OCI)
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+        with:
+          version: v4.3.2
+
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The chart version follows the release tag (v0.18.0 -> 0.18.0); the
+      # default image tag (appVersion) is the same version.
+      - name: Package and push
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          helm package deploy/helm/dumbmonit --version "$version" --app-version "$version"
+          helm push "dumbmonit-${version}.tgz" oci://ghcr.io/selfhostr/charts

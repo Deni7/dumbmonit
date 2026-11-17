@@ -35,6 +35,11 @@ allow-wildcard-paths = true
 [advisories]
 version = 2
 ignore = [
+    # chrono et chrono-tz signalés « non maintenus » (avis informatifs, aucune
+    # faille connue, aucune version de remplacement). Toute la gestion des dates
+    # et des fuseaux en dépend ; à revoir si un successeur s'impose.
+    { id = "RUSTSEC-2026-0543", reason = "chrono non maintenu : avis informatif, pas de faille ni de remplaçant" },
+    { id = "RUSTSEC-2026-0555", reason = "chrono-tz non maintenu : avis informatif, pas de faille ni de remplaçant" },
     # crypto-bigint 0.5 (via p256 0.13) : branches dépendantes du secret. Le
     # correctif n'existe qu'en 0.7, que p256 0.14 utilise, mais web-push-native
     # 0.5 (dernière version) exige p256 0.13. Exposition : la signature VAPID

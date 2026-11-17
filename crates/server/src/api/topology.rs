@@ -566,7 +566,7 @@ fn guests_query() -> String {
 /// pare-feux ; adresses des invités (Proxmox VE, vSphere).
 const FACT_SERIES: &str = "dumbmonit_(proxmox_node_up|proxmox_storage_pbs_info|pbs_datastore_available\
     |opnsense_interface_address_info|pfsense_interface_address_info\
-    |fortigate_interface_address_info|paloalto_interface_address_info\
+    |fortigate_interface_address_info\
     |proxmox_guest_ip_info|vsphere_vm_ip_info)";
 
 fn facts_query() -> String {
@@ -822,8 +822,9 @@ const MACHINE_KINDS: &[&str] = &[
     "pfsense",
     "fortigate",
     "sophos",
-    "paloalto",
-    "sonicwall",
+    // Paquets communautaires qui ont remplacé les types compilés du même nom.
+    "pack.paloalto",
+    "pack.sonicwall",
     "mikrotik",
     "pbs",
     "pmg",
@@ -834,7 +835,7 @@ const MACHINE_KINDS: &[&str] = &[
 
 /// Types dont la surveillance désigne un pare-feu ou une passerelle de site.
 pub(crate) const FIREWALL_KINDS: &[&str] =
-    &["opnsense", "pfsense", "fortigate", "sophos", "paloalto", "sonicwall", "mikrotik"];
+    &["opnsense", "pfsense", "fortigate", "sophos", "pack.paloalto", "pack.sonicwall", "mikrotik"];
 
 fn is_loopback(key: Option<&str>) -> bool {
     key.is_some_and(|k| k == "localhost" || k.parse::<IpAddr>().is_ok_and(|ip| ip.is_loopback()))

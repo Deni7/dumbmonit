@@ -134,6 +134,23 @@ impl RestClient {
         self.send(self.http.get(self.url(path)), path).await
     }
 
+    /// GET brut qui rend aussi les en-têtes de la réponse : une ouverture de
+    /// session y lit le cookie posé par `Set-Cookie`.
+    pub async fn get_with_headers(
+        &self,
+        path: &str,
+    ) -> Result<(StatusCode, reqwest::header::HeaderMap, String), ProbeError> {
+        let response = self
+            .prepare(self.http.get(self.url(path)))
+            .send()
+            .await
+            .map_err(|error| self.transport(&error, path))?;
+        let status = response.status();
+        let headers = response.headers().clone();
+        let body = response.text().await.map_err(|error| self.transport(&error, path))?;
+        Ok((status, headers, body))
+    }
+
     /// DELETE brut : statut et corps, sans interprétation (fermeture de session).
     pub async fn delete(&self, path: &str) -> Result<(StatusCode, String), ProbeError> {
         self.send(self.http.delete(self.url(path)), path).await
@@ -212,8 +229,8 @@ impl RestClient {
                  account."
             )),
             StatusCode::FORBIDDEN => ProbeError::Auth(format!(
-                "{product} accepted the credentials but refused {path} (403): the account or \
-                 key lacks the permission to read it, or this address is not allowed to use the \
+                "{product} refused {path} (403): the token or key is wrong or expired, the account \
+                 lacks the permission to read it, or this address is not allowed to use the \
                  API."
             )),
             StatusCode::NOT_FOUND => ProbeError::Protocol(format!(

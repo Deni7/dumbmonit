@@ -14,6 +14,10 @@ From the agent to the DumbMonit server:
 | 8443 | TCP | Readings and commands: the encrypted agent channel (TLS 1.3 and a client certificate) |
 | 8080 | TCP | Install script and agent download, at install and update time (HTTPS; 443 behind a reverse proxy) |
 
+A remote site can do without 8080: the agent port also serves the install
+script and the binaries, and the command shown for a relay uses 8443 only (see
+[Monitor a remote site](../install/remote-site.md)).
+
 The direction is deliberate: the agent calls the server, never the other way
 round. It crosses NAT and home firewalls, and requires opening **no port** on
 the monitored machine.
@@ -45,7 +49,7 @@ cannot write into another machine's series, even by forging its labels.
 | Windows performance counters | `agent_perf_counter`, one series per counter listed in `perf_counters` | `counter` |
 | MDaemon (Windows) | `mdaemon_queue_messages`, `mdaemon_queue_frozen`, `mdaemon_sessions_active`, `mdaemon_sessions_total`, `mdaemon_messages_total`, `mdaemon_filtered_messages_total`, `mdaemon_server_active`, `mdaemon_running`, `mdaemon_uptime_seconds` — see [MDaemon](mdaemon.md#mail-queues-through-the-agent) | `queue`, `protocol`, `filter`, `verdict`, `server` |
 | Hyper-V (Windows) | `hyperv_vms_health_ok`, `hyperv_vms_health_critical`, `hyperv_host_cpu_percent`, `hyperv_host_cpu_guest_percent`, `hyperv_partitions`; per VM `hyperv_vm_physical_memory_megabytes`, `hyperv_vm_guest_visible_memory_megabytes`, `hyperv_vm_memory_pressure_percent`; per virtual disk `hyperv_vhd_read_bytes_per_second`, `hyperv_vhd_write_bytes_per_second`, `hyperv_vhd_latency_seconds`, `hyperv_vhd_queue_length`, `hyperv_vhd_errors_total` — see [Hyper-V hosts](#hyper-v-hosts) | `vm`, `disk` |
-| Agent | `agent_collect_seconds`, `agent_buffered_samples`, `agent_dropped_samples` | |
+| Agent | `agent_collect_seconds`, `agent_buffered_samples`, `agent_dropped_samples`, `agent_buffer_disk_bytes`; relays: `agent_relay_buffered_results`, `agent_relay_dropped_results` | |
 
 A series that cannot be measured is **absent**, never zero: no `smartctl`, no
 `agent_disk_*`; no readable probe, no `agent_sensor_*`; no ZFS, no
@@ -436,6 +440,11 @@ Windows) in place of its other flags does the same.
 | `--sha256=LIST` | `-Sha256` | Expected SHA-256 of the download, as `platform-arch:hex` pairs separated by commas (a bare hex value also works). Included in the command DumbMonit shows; required unless the next flag is given. |
 | `--insecure-skip-checksum` | `-InsecureSkipChecksum` | Install a downloaded binary without verifying it, with a warning. Only for air-gapped or manual setups. |
 | `--no-start` | | Install everything, but do not contact the server or start the service (machine image, testing). |
+| `--open-gateway` | `-OpenGateway` | Relay: open the gateway port on the local firewall (firewalld, ufw, Windows firewall), to the local subnet only. Implied by `--relay`; the command shown for a relay token carries it. `--uninstall` removes the rule. |
+| `--gateway-port=N` | `-GatewayPort N` | Port of the relay gateway opened on the firewall (default 8443). |
+| `--no-firewall` | `-NoFirewall` | Leave the local firewall alone. |
+| `--proxy=URL` | `-Proxy` | Outbound HTTP proxy to reach the server, `http://[user:password@]host:port` or `none` (`-Proxy` also takes `system`). Used for the downloads and written to `agent.yaml`. See [Outbound proxy](#outbound-proxy). |
+| `--no-proxy=LIST` | `-NoProxy` | Hosts reached without the proxy, comma-separated. |
 | `--uninstall` | `-Uninstall` | Uninstall the agent and delete its configuration. |
 | `--help` | | Show the help. |
 
@@ -539,6 +548,31 @@ The agent list shows the version and an update status for each agent: up to
 date, pending, updating, failed (with the reason), refused, disabled, manual,
 waiting for window, waiting for canaries, newer than server, legacy, container,
 read-only, disabled locally, unsupported, no binary.
+
+### Rollout waves {#automatic-updates-waves}
+
+By default, agents marked **canary** update first and everyone else follows (see the table above): nothing to configure for a homelab. For a larger fleet, **Settings → Agents → Automatic agent updates → Rollout → Rollout waves** orders the fleet in successive waves. The same settings are available through `PUT /api/agent/updates/rollout`, `POST /api/agent/updates/rollout/pause` and `POST /api/agent/updates/rollout/resume`.
+
+Each wave takes agents among those the previous waves did not take:
+
+| Wave | Takes |
+|---|---|
+| A number of agents | That many more agents: a canary of one or two machines. |
+| Share of the fleet (%) | Enough agents for the waves so far to cover that share (cumulative: 5, then 25, then 100). The same agents always come first. |
+| Site | The agents that declare this site (`site` in the agent configuration). |
+| Folder | The agents whose device is in this folder of the Devices page. |
+| Tag | The agents whose device carries this tag, with this value if one is given. |
+
+The agents no wave takes form a last wave. Agents marked **canary** are always in the first wave. Names are compared without regard to case.
+
+- A wave opens when the previous one has no agent left to update and its last agent has run the new build for the **delay between waves** (default 60 minutes). An empty wave is skipped.
+- **Automatic stop**: if, in a wave, the share of agents that failed (failed, rolled back or refused) among those that tried reaches the threshold (default 20 %, 0 never stops), no agent receives an automatic offer any more and their status reads *Stopped*. The page says in which wave. **Resume rollout** forgives the failures reported so far, so the stop does not trigger again at once; the agents that failed keep their version until **Update now**.
+- **Pause**: *Pause rollout* holds every automatic offer until *Resume rollout*.
+- **Pinning a version**: an agent whose updates are set to *Off* (per-agent setting) is in no wave and keeps its version.
+- **Update now** and **Update all now** ignore waves, pause and stop.
+- Agents not seen for a week are left out of the waves, so a decommissioned machine never blocks the rollout.
+- Nothing changes on the agent side: agents already report the outcome of each attempt (version, success, failure, rollback) in every batch. With no wave configured, the rollout is exactly the one above.
+- The waves, the delay, the threshold and the pause are part of the [backup](../install/backup.md).
 
 ### Security {#automatic-updates-security}
 
@@ -760,6 +794,7 @@ perf_counters:             # Windows: performance counters to publish
   - path: '\Processor(_Total)\% Processor Time'
     name: cpu_total        # value of the "counter" label; the path when omitted
 max_buffered_samples: 20000
+buffer_max_mb: 256         # disk buffer for outages, in MB (0 = memory only)
 log_level: info
 ```
 
@@ -802,6 +837,7 @@ a container without mounting a file:
 |---|---|
 | `DUMBMONIT_AGENT_CONFIG` | Path of the configuration file |
 | `DUMBMONIT_AGENT_URL` | Server URL |
+| `DUMBMONIT_AGENT_URLS` | Backup servers, comma-separated (see [Backup servers](#backup-servers)) |
 | `DUMBMONIT_AGENT_TOKEN` | Enrollment token |
 | `DUMBMONIT_AGENT_SECRET_FILE` | Where to keep the binding secret (default: `agent-secret`, next to the configuration file) |
 | `DUMBMONIT_AGENT_INTERVAL_SECS` | Sampling period |
@@ -855,7 +891,7 @@ a container without mounting a file:
 | `DUMBMONIT_AGENT_RELAY` | `true` to run, for the server, the probes of the monitors assigned to this agent (see [Run the agent in Docker / on another network](#run-the-agent-in-docker--on-another-network)) |
 | `DUMBMONIT_AGENT_SITE` | Site label shown next to the agent when it is offered as a relay |
 | `DUMBMONIT_AGENT_GATEWAY_LISTEN` | A relay's gateway for the agents of its site, for example `0.0.0.0:8443` (`gateway_listen:`); wins over the port set in the UI (see [Install agents behind the relay](../install/remote-site.md#5-install-agents-behind-the-relay)) |
-| `DUMBMONIT_AGENT_GATEWAY_MAX_CONNECTIONS` | Connections the gateway holds at once, 64 by default (`gateway_max_connections:`) |
+| `DUMBMONIT_AGENT_GATEWAY_MAX_CONNECTIONS` | Connections the gateway holds at once, 256 by default, 2048 at most (`gateway_max_connections:`) |
 | `DUMBMONIT_AGENT_GATEWAY_RATE_KIB` | Rate of each tunnel through the gateway, per direction, in KiB/s, 4096 by default (`gateway_rate_kib:`) |
 
 ## Windows performance counters
@@ -971,6 +1007,85 @@ The Windows agent can also raise alerts on Windows events (failed logons,
 unexpected reboots, crashed services, disk errors): rules are set per machine
 on its device page, none exists by default. See
 [Windows event log alerts](agent-windows-events.md).
+
+## Backup servers {#backup-servers}
+
+With a [standby server](../install/high-availability.md), list it after the
+primary: the agent moves to it when the primary stops answering, and comes
+back to the primary on its own.
+
+```yaml
+server_url: https://monitor-a.lan:8080
+server_urls:
+  - https://monitor-b.lan:8080
+  # When the standby's agent channel is on another host or port:
+  # - url: https://monitor-b.lan:8080
+  #   tls_url: https://agents-b.example.com:443
+```
+
+- `server_urls` (or `DUMBMONIT_AGENT_URLS`, comma-separated): the backup
+  servers, in order. Without `server_url`, the first address of the list is
+  the primary. `server_url` and `tls_url` keep their meaning; nothing changes
+  without the key.
+- After three failed attempts in a row (no answer, timeout, `5xx`), the agent
+  moves to the next address, with the same certificate and pinning: both
+  servers share the agent authority, no re-enrolment. The channel of a backup
+  is its own host on the port of the primary's channel (8443 by default),
+  unless `tls_url` gives another one.
+- On a backup, the agent tries the primary every two minutes and goes back as
+  soon as it answers as an active server. A standby answers nothing: while no
+  server is active, the agent keeps its measurements and tries the addresses
+  in turn.
+- The machine page shows **Server: primary**, or **Backup** with the address
+  in use, since when, and the last error seen on the primary.
+- Only `https://` addresses (or the loopback) are accepted.
+
+## Outbound proxy {#outbound-proxy}
+
+Where machines only go out through an HTTP proxy, the agent reaches the
+server through it with `CONNECT`: the proxy opens a TCP pipe to the agent port,
+and the agent's TLS 1.3 session (client certificate, pinned authority) goes end
+to end to the server. The proxy only sees the host name and port, then
+ciphertext; a proxy that inspects TLS is refused by the pinning, like any other
+man in the middle.
+
+```yaml
+proxy: http://proxy.corp.example:3128   # or none, or system (Windows)
+no_proxy: [.corp.example, 10.0.0.0/8]    # reached directly
+proxy_user: CORP\monitoring             # optional, instead of user:password@ in the URL
+proxy_password: …
+```
+
+- `proxy` (or `DUMBMONIT_AGENT_PROXY`): `http://[user:password@]host:port`,
+  percent-encoded in the URL, or the separate `proxy_user` / `proxy_password`
+  keys (`DUMBMONIT_AGENT_PROXY_USER`, `DUMBMONIT_AGENT_PROXY_PASSWORD`). Only
+  `http://` proxies: the connection to the proxy itself is not encrypted, what
+  it carries is. `none` always goes direct.
+- `no_proxy` (or `DUMBMONIT_AGENT_NO_PROXY`, comma-separated): hosts, domains
+  (with their subdomains), addresses or networks reached directly.
+- Without `proxy`, the usual variables apply: `HTTPS_PROXY`, `HTTP_PROXY`,
+  `ALL_PROXY` and `NO_PROXY` (lowercase too). A service does not inherit your
+  shell: put them in the unit (`systemctl edit dumbmonit-agent`,
+  `Environment=HTTPS_PROXY=…`) or use the key.
+- The installers take `--proxy=URL --no-proxy=LIST` (`-Proxy`, `-NoProxy`): they
+  use it for their own downloads and write it to `agent.yaml`.
+- `proxy: system` on Windows uses the machine's WinHTTP proxy (the one services
+  use), then the Internet Explorer proxy of the service account. Set it with:
+
+```powershell
+netsh winhttp set proxy proxy-server="proxy.corp.example:3128" bypass-list="*.corp.example"
+netsh winhttp import proxy source=ie   # or copy the Internet Explorer settings
+```
+
+  Automatic configuration (PAC, WPAD) is not followed: give the proxy
+  explicitly.
+- The proxy only applies to the connections to the DumbMonit server
+  (measurements, commands, relay, updates, sentinel). A relay probes the devices
+  of its site, and tests its own gateway, directly.
+- Variables such as `HTTPS_PROXY`, on the other hand, apply to every connection of the agent, relay probes included: exclude the site's networks with `NO_PROXY`.
+
+The agent logs the proxy it uses at startup (`outbound proxy to the server`),
+never its credentials.
 
 ## Run the agent in Docker / on another network
 
@@ -1142,14 +1257,31 @@ cannot let a new one in.
 
 ## Outages and diagnostics
 
-When the server is unreachable, the agent keeps measuring and buffers its
-readings in memory with their original timestamps. They are sent as soon as
-the link is back: a server restart leaves no hole in the graphs. The buffer is
-bounded (`max_buffered_samples`, about an hour by default) and drops the oldest
-readings when full. Retries back off from 2 to 30 seconds with jitter, and resume at once when
-the relay channel reaches the server again. Measurements still waiting at
-shutdown are kept on disk (`pending-samples.json`, next to the binding secret)
-and sent at the next start.
+When the server is unreachable, the agent keeps measuring and keeps its
+readings with their original timestamps. They are sent as soon as the link is
+back: a server restart or a WAN outage leaves no hole in the graphs.
+
+- **In memory while all is well.** A batch leaves every cycle and nothing is
+  written to disk (an SD card does not take every reading).
+- **On disk as soon as a send fails.** What was waiting moves to a disk buffer
+  (`spool/` next to the binding secret), and every following cycle is written
+  there as it is collected, each record checksummed and flushed to disk. A
+  power cut during the outage loses nothing that was already collected; a
+  record torn by the cut is detected and dropped at the next start.
+- **Bounded.** The disk buffer is capped by `buffer_max_mb` (environment
+  `DUMBMONIT_AGENT_BUFFER_MAX_MB`, default 256 MB, compressed: several days for
+  an ordinary machine). When full, the oldest readings go first, and
+  `agent_dropped_samples` counts what was lost. `0` turns the disk buffer off
+  (memory only, `max_buffered_samples`, about an hour). An empty buffer takes
+  no space.
+- **Catch-up.** Once the server answers, the backlog is sent oldest first, in
+  batches with a short pause between them so the link stays usable; the
+  server takes timestamps up to 30 days old. A batch resent because its
+  acknowledgement was lost is de-duplicated by the time-series database.
+
+Retries back off from 2 to 30 seconds with jitter, and resume at once when the
+relay channel reaches the server again. A relay also keeps probing its site
+during an outage: see [Remote site](../install/remote-site.md#when-the-link-to-the-server-drops).
 
 ```sh
 dumbmonit-agent --dry-run          # print the readings, send nothing

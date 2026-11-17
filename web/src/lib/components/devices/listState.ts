@@ -174,6 +174,11 @@ export interface BulkOutcome {
 	failed: { id: TargetId; name: string; error: unknown }[];
 }
 
+/** Ids of the monitors whose CVE check is not yet in the wanted state (an absent flag means on). */
+export function cveScanChanges(targets: Target[], enabled: boolean): TargetId[] {
+	return targets.filter((t) => (t.cve_scan ?? true) !== enabled).map((t) => t.id);
+}
+
 /** Runs `action` over `targets` one after the other, collecting failures instead of stopping at the first. */
 export async function runBulk(
 	targets: Target[],

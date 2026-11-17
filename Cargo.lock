@@ -1307,10 +1307,13 @@ name = "dumbmonit-agent"
 version = "0.17.1"
 dependencies = [
  "anyhow",
+ "aws-lc-rs",
  "base64 0.23.1",
  "chrono",
+ "crc32fast",
  "dumbmonit-collectors",
  "dumbmonit-proto",
+ "flate2",
  "hex",
  "libc",
  "rcgen",
@@ -1323,10 +1326,12 @@ dependencies = [
  "sysinfo",
  "tempfile",
  "tokio",
+ "tokio-util",
  "tracing",
  "tracing-subscriber",
  "windows-service",
  "windows-sys 0.61.2",
+ "yamux",
 ]
 
 [[package]]
@@ -1396,6 +1401,7 @@ dependencies = [
  "dumbmonit-proto",
  "regex",
  "reqwest",
+ "roxmltree",
  "semver",
  "serde",
  "serde_json",
@@ -1468,13 +1474,13 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "tokio-rustls",
- "tokio-tungstenite",
  "tokio-util",
  "tower",
  "tower-http 0.7.1",
  "tracing",
  "tracing-subscriber",
  "web-push-native",
+ "yamux",
 ]
 
 [[package]]
@@ -2270,7 +2276,9 @@ checksum = "2c3e324da4c95177d6291d4c8730197c0d1822f8a9766814a4a44fa5ab797c9c"
 dependencies = [
  "atomic-waker",
  "bytes",
+ "futures-channel",
  "futures-core",
+ "h2",
  "http",
  "http-body",
  "httparse",
@@ -3273,6 +3281,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "pin-project"
+version = "1.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2466b2336ed02bcdca6b294417127b90ec92038d1d5c4fbeac971a922e0e0924"
+dependencies = [
+ "pin-project-internal",
+]
+
+[[package]]
+name = "pin-project-internal"
+version = "1.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c96395f0a926bc13b1c17622aaddda1ecb55d49c8f1bf9777e4d877800a43f8b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "pin-project-lite"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3742,6 +3770,7 @@ dependencies = [
  "base64 0.23.1",
  "bytes",
  "futures-core",
+ "h2",
  "http",
  "http-body",
  "http-body-util",
@@ -4837,6 +4866,12 @@ name = "stable_deref_trait"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
+
+[[package]]
+name = "static_assertions"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "stringprep"
@@ -6017,6 +6052,21 @@ dependencies = [
  "rusticata-macros",
  "thiserror 2.0.21",
  "time",
+]
+
+[[package]]
+name = "yamux"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f4e661d6ba6f09a768e31c6f3d88f9fac596ad5d376515d598a37b62d220b34"
+dependencies = [
+ "futures",
+ "log",
+ "nohash-hasher",
+ "parking_lot",
+ "pin-project",
+ "static_assertions",
+ "web-time",
 ]
 
 [[package]]

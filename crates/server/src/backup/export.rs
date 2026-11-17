@@ -102,6 +102,14 @@ pub async fn collect(pool: &SqlitePool, cipher: &Cipher, options: ExportOptions)
         agent_enrolment: Some(serde_json::to_value(
             crate::collectors::agent::enrolment::load_settings(pool).await?,
         )?),
+        // Seulement quand un lieu est choisi : sans lieu, rien à restaurer.
+        wall_weather: match crate::weather::load_settings(pool).await? {
+            settings if settings.place.is_some() => Some(serde_json::to_value(settings)?),
+            _ => None,
+        },
+        agent_update_rollout: Some(serde_json::to_value(
+            crate::collectors::agent::rollout::load(pool).await?,
+        )?),
     })
 }
 
@@ -505,7 +513,7 @@ async fn targets(
 ) -> Result<Vec<BundleTarget>> {
     let rows = sqlx::query(
         "SELECT id, name, address, kind, profile_id, parent_id, via_agent, interval_secs,
-                enabled, tags, credential_enc, group_name, position,
+                enabled, cve_scan, tags, credential_enc, group_name, position,
                 (SELECT l.name FROM locations l WHERE l.id = targets.location_id) AS location
          FROM targets ORDER BY id",
     )
@@ -561,6 +569,7 @@ async fn targets(
                 .and_then(|p| refs.get(&p).cloned()),
             interval_secs: row.try_get("interval_secs")?,
             enabled: row.try_get::<i64, _>("enabled")? != 0,
+            cve_scan: row.try_get::<i64, _>("cve_scan")? != 0,
             tags: serde_json::from_str(&tags).unwrap_or_default(),
             credential,
             group_name: row.try_get("group_name")?,

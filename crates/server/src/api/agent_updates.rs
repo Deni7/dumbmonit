@@ -23,13 +23,17 @@ use crate::api::{ApiError, ApiResult};
 use crate::auth::audit;
 use crate::auth::client_ip::ClientIp;
 use crate::auth::middleware::AdminIdentity;
-use crate::collectors::agent::selfupdate::{self, Overview, SettingsChange, Window};
+use crate::collectors::agent::rollout::Wave;
+use crate::collectors::agent::selfupdate::{self, Overview, RolloutChange, SettingsChange, Window};
 use crate::state::AppState;
 
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/agent/updates", get(overview).put(update_settings))
         .route("/agent/updates/all", post(update_all))
+        .route("/agent/updates/rollout", put(set_rollout))
+        .route("/agent/updates/rollout/pause", post(pause_rollout))
+        .route("/agent/updates/rollout/resume", post(resume_rollout))
         .route("/agent/updates/{id}", put(set_agent))
         .route("/agent/updates/{id}/now", post(update_now))
 }
@@ -189,5 +193,57 @@ async fn update_all(
     let subject = count.to_string();
     audit::record(&state.pool, Some(&me.label()), "agent_update.requested_all", Some(&subject), ip)
         .await;
+    Ok(Json(selfupdate::overview(&state).await?))
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct RolloutPayload {
+    /// Vagues ordonnées ; `[]` : le déploiement « pilotes d'abord ».
+    #[serde(default)]
+    pub waves: Option<Vec<Wave>>,
+    #[serde(default)]
+    pub delay_minutes: Option<u32>,
+    #[serde(default)]
+    pub max_failure_percent: Option<u32>,
+}
+
+/// `PUT /api/agent/updates/rollout` : la politique de vagues (champs absents
+/// inchangés).
+async fn set_rollout(
+    AdminIdentity(me): AdminIdentity,
+    ClientIp(ip): ClientIp,
+    State(state): State<AppState>,
+    Json(payload): Json<RolloutPayload>,
+) -> ApiResult<Json<Overview>> {
+    let change = RolloutChange {
+        waves: payload.waves,
+        delay_minutes: payload.delay_minutes,
+        max_failure_percent: payload.max_failure_percent,
+    };
+    selfupdate::change_rollout(&state.pool, change).await?.map_err(ApiError::BadRequest)?;
+    audit::record(&state.pool, Some(&me.label()), "agent_update.rollout", None, ip).await;
+    Ok(Json(selfupdate::overview(&state).await?))
+}
+
+/// `POST /api/agent/updates/rollout/pause` : plus aucune offre automatique.
+async fn pause_rollout(
+    AdminIdentity(me): AdminIdentity,
+    ClientIp(ip): ClientIp,
+    State(state): State<AppState>,
+) -> ApiResult<Json<Overview>> {
+    selfupdate::pause_rollout(&state.pool).await?;
+    audit::record(&state.pool, Some(&me.label()), "agent_update.paused", None, ip).await;
+    Ok(Json(selfupdate::overview(&state).await?))
+}
+
+/// `POST /api/agent/updates/rollout/resume` : reprise après une pause ou un
+/// arrêt sur échec.
+async fn resume_rollout(
+    AdminIdentity(me): AdminIdentity,
+    ClientIp(ip): ClientIp,
+    State(state): State<AppState>,
+) -> ApiResult<Json<Overview>> {
+    selfupdate::resume_rollout(&state).await?;
+    audit::record(&state.pool, Some(&me.label()), "agent_update.resumed", None, ip).await;
     Ok(Json(selfupdate::overview(&state).await?))
 }

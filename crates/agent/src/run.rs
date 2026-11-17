@@ -5,8 +5,8 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use dumbmonit_proto::{
-    AgentIdentity, AgentUpdateOffer, MAX_BATCH_SAMPLES, PushBatch, RelaySetting, Sample,
-    SoftwareInventory,
+    AgentIdentity, AgentUpdateOffer, MAX_BATCH_SAMPLES, MetricKind, PushBatch, RelaySetting,
+    Sample, SoftwareInventory,
 };
 use tokio::time::Instant;
 use tracing::{debug, info, warn};
@@ -37,16 +37,30 @@ use crate::collect::zfs::ZfsProbe;
 use crate::collect::{SystemProbe, agent_samples, services};
 use crate::commands::CommandRunner;
 use crate::config::{Config, MIN_INTERVAL_SECS};
+use crate::failover::{self, Failover};
 use crate::logs::LogRunner;
-use crate::relay::RelayRunner;
+use crate::relay::{Offline, RelayRunner};
+use crate::relay_offline::{Backlog, PlanStore};
 use crate::selfupdate::{AfterStop, SelfUpdater};
 use crate::sentinel::SentinelRunner;
 use crate::shutdown::Shutdown;
+use crate::spool::Spool;
 use crate::tls::TlsState;
 
 /// Délai avant une nouvelle tentative d'enrôlement ou de renouvellement sur le
 /// canal chiffré, après un échec.
 const TLS_RETRY: Duration = Duration::from_secs(60);
+
+/// Période de l'essai de la passerelle par le relais, une fois ouverte et
+/// essayée : un pare-feu, une publication de port ou une adresse peuvent
+/// changer sans que rien ne le dise à l'agent.
+const GATEWAY_RECHECK: Duration = Duration::from_secs(3600);
+
+/// Période de l'essai tant qu'il échoue.
+const GATEWAY_RETRY: Duration = Duration::from_secs(60);
+
+/// Essai de la passerelle partagé avec la tâche qui le mène.
+type GatewayCheckSlot = std::sync::Arc<std::sync::Mutex<Option<dumbmonit_proto::GatewayCheck>>>;
 
 /// Première temporisation après un échec d'envoi.
 const BACKOFF_BASE: Duration = Duration::from_secs(2);
@@ -65,6 +79,10 @@ pub(crate) const BACKOFF_MAX: Duration = Duration::from_secs(30);
 /// Quelques mégaoctets : de quoi couvrir un redémarrage pendant une coupure,
 /// pas de quoi remplir un disque.
 const MAX_PERSISTED_SAMPLES: usize = 20_000;
+
+/// Pause entre deux lots de rattrapage tirés du tampon disque : le retard part
+/// vite, sans prendre toute la liaison d'un petit site.
+const CATCHUP_PAUSE: Duration = Duration::from_millis(250);
 
 /// Délai maximal d'un envoi. Généreux, car un lot de rattrapage est volumineux et
 /// part parfois sur une liaison lente.
@@ -138,8 +156,11 @@ pub struct Agent {
     /// Commandes du serveur : redémarrage ou mise à jour d'un conteneur.
     commands: CommandRunner,
     /// Boucle du relais, lancée après le premier lot accepté — avant, le
-    /// serveur ne nous connaît pas encore et refuserait la demande.
+    /// serveur ne nous connaît pas encore et refuserait la demande —, ou dès
+    /// le démarrage pour un relais qui l'était à son dernier arrêt.
     relay: Option<tokio::task::JoinHandle<()>>,
+    /// Tampon disque des résultats du relais, ouvert avec lui.
+    relay_backlog: Option<Backlog>,
     /// Mode relais réglé depuis l'interface, tel que le dernier accusé de
     /// réception le porte. `None` tant que le serveur n'en a rien dit (serveur
     /// antérieur) : seule la configuration locale compte alors.
@@ -149,6 +170,13 @@ pub struct Agent {
     /// Dernière adresse que la passerelle n'a pas pu ouvrir : l'échec n'est
     /// journalisé qu'une fois, la tentative reprend à chaque lot.
     gateway_failed: Option<std::net::SocketAddr>,
+    /// Dernier essai de la passerelle à l'adresse du site, rempli par sa tâche
+    /// et joint aux lots ([`AgentIdentity::relay_gateway_check`]).
+    gateway_check: GatewayCheckSlot,
+    /// Essai en cours, s'il y en a un.
+    gateway_check_task: Option<tokio::task::JoinHandle<()>>,
+    /// Adresse du dernier essai lancé, et quand.
+    gateway_checked: Option<(String, Instant)>,
     /// Collecte de journaux de cette machine, et le réglage que le dernier accusé
     /// de réception portait (`None` : serveur antérieur, rien n'est collecté).
     logs: LogRunner,
@@ -196,6 +224,9 @@ pub struct Agent {
     /// Vrai une fois un échec du canal chiffré signalé, pour ne le dire
     /// qu'une fois par épisode.
     tls_failed: bool,
+    /// Serveur en service parmi ceux de la configuration (`server_urls`) :
+    /// bascule vers un secours, retour à la primaire.
+    failover: Failover,
     /// Mise à jour automatique de l'agent lui-même.
     updater: SelfUpdater,
     /// Dernière offre de mise à jour du serveur, examinée après l'envoi.
@@ -218,6 +249,10 @@ impl Agent {
             HTTP_TIMEOUT,
         )
         .context("preparing the push client")?;
+        // Mandataire vers le serveur, avant tout canal : chacun le reprend.
+        let proxy = config.proxy.resolve();
+        info!(proxy = proxy.describe(), "outbound proxy to the server");
+        let client = client.with_proxy(proxy).context("configuring the outbound proxy")?;
         if let Some(pin) = &config.server_pin {
             client.pin_server(pin).context("pinning the server key")?;
         }
@@ -257,7 +292,8 @@ impl Agent {
         );
         Ok(Self {
             interval: config.interval,
-            buffer: PendingBuffer::new(config.max_buffered_samples),
+            buffer: PendingBuffer::new(config.max_buffered_samples)
+                .with_spool(open_sample_spool(&config)),
             probe: SystemProbe::new(&config.probe),
             health: SystemHealthProbe::new(&config.system_health),
             docker: DockerProbe::new(&config.docker_socket, config.docker_max_containers),
@@ -285,9 +321,13 @@ impl Agent {
             backoff: Backoff::new(BACKOFF_BASE, BACKOFF_MAX),
             commands,
             relay: None,
+            relay_backlog: None,
             server_relay: None,
             gateway: None,
             gateway_failed: None,
+            gateway_check: GatewayCheckSlot::default(),
+            gateway_check_task: None,
+            gateway_checked: None,
             logs,
             server_logs: None,
             sentinel,
@@ -303,6 +343,7 @@ impl Agent {
             tls_path,
             tls_retry_at: None,
             tls_failed: false,
+            failover: Failover::new(&config),
             updater,
             update_offer: None,
             after_stop: None,
@@ -376,6 +417,26 @@ impl Agent {
             self.buffer.dropped(),
             now_ms,
         ));
+        samples.extend(self.buffer_samples(now_ms));
+        samples
+    }
+
+    /// Ce que le tampon disque occupe, et ce que le relais y garde.
+    fn buffer_samples(&self, now_ms: i64) -> Vec<Sample> {
+        let mut samples = Vec::new();
+        if self.buffer.has_spool() {
+            let bytes = self.buffer.disk_bytes() as f64;
+            samples.push(Sample::new("agent_buffer_disk_bytes", bytes, MetricKind::Gauge, now_ms));
+        }
+        if let Some(backlog) = &self.relay_backlog {
+            let stats = backlog.stats();
+            let pending = stats.pending() as f64;
+            let dropped = stats.dropped() as f64;
+            samples.extend([
+                Sample::new("agent_relay_buffered_results", pending, MetricKind::Gauge, now_ms),
+                Sample::new("agent_relay_dropped_results", dropped, MetricKind::Counter, now_ms),
+            ]);
+        }
         samples
     }
 
@@ -478,6 +539,13 @@ impl Agent {
             None => info!("modules: auto-detected (set 'modules' in agent.yaml to choose)"),
         }
         self.restore_pending();
+        // Relais au dernier arrêt : il reprend tout de suite, sans attendre
+        // un serveur peut-être injoignable — c'est tout l'intérêt du planning
+        // gardé. Le premier accusé de réception dira s'il doit le rester.
+        if self.config.buffer_max_mb > 0 && self.plan_store().exists() {
+            info!("this agent was a relay when it stopped: relaying resumes right away");
+            self.start_relay(&shutdown);
+        }
         // La sentinelle repart seule, sans attendre le serveur (peut-être en panne).
         self.sentinel.resume(&shutdown);
         self.probe.warm_up().await;
@@ -493,6 +561,9 @@ impl Agent {
         // Toute réponse favorable du serveur, y compris sur le canal du relais,
         // met fin à la temporisation : inutile d'attendre qu'elle expire.
         let reachable = self.client.reachable();
+        // Lot demandé sans attendre la période (réglage du relais changé côté
+        // serveur, passerelle ouverte ou essayée).
+        let report_now = self.client.report_requested();
 
         loop {
             tokio::select! {
@@ -515,6 +586,8 @@ impl Agent {
                 }
 
                 _ = tokio::time::sleep_until(next_send), if !self.buffer.is_empty() => {
+                    // Sur un serveur de secours : la primaire est-elle revenue ?
+                    self.check_primary().await;
                     next_send = match self.flush().await {
                         // Reste-t-il du retard ? On enchaîne, lot après lot.
                         FlushOutcome::Sent { .. } => {
@@ -528,12 +601,25 @@ impl Agent {
                             if self.apply_update().await {
                                 break;
                             }
-                            Instant::now()
+                            if self.buffer.catching_up() {
+                                Instant::now() + CATCHUP_PAUSE
+                            } else {
+                                Instant::now()
+                            }
                         }
                         FlushOutcome::Idle => Instant::now(),
                         FlushOutcome::Failed(error) => {
-                            let delay = self.backoff.next_delay();
+                            // Juste basculé : la nouvelle adresse est essayée
+                            // sans attendre.
+                            let delay = if self.failover.take_switched() {
+                                Duration::ZERO
+                            } else {
+                                self.backoff.next_delay()
+                            };
                             self.note_failure(&error, delay);
+                            // La panne commence peut-être : ce qui attend passe
+                            // sur le disque, et la suite y ira au fil de l'eau.
+                            self.buffer.spill();
                             Instant::now() + delay
                         }
                     };
@@ -541,6 +627,14 @@ impl Agent {
 
                 _ = reachable.notified(), if self.outage.is_some() && !self.buffer.is_empty() => {
                     debug!("server answered on another channel, sending now");
+                    next_send = Instant::now();
+                }
+
+                _ = report_now.notified() => {
+                    // Une mesure fraîche, puis un lot : son accusé de réception
+                    // porte le nouveau réglage, et le serveur voit la passerelle.
+                    debug!("report requested, collecting and sending now");
+                    next_collect = Instant::now();
                     next_send = Instant::now();
                 }
 
@@ -641,15 +735,10 @@ impl Agent {
         }
         match (self.relay_wanted(), self.relay.is_some()) {
             (true, false) => {
-                let runner = RelayRunner::new(
-                    self.client.clone(),
-                    self.identity.key(),
-                    RELAY_REQUEST_TIMEOUT,
-                );
                 if !self.config.relay {
                     info!(site = ?self.relay_site(), "relay mode switched on from the server");
                 }
-                self.relay = Some(tokio::spawn(runner.run(shutdown.clone())));
+                self.start_relay(shutdown);
             }
             (false, true) => {
                 // L'attente longue est simplement abandonnée ; une sonde déjà
@@ -657,10 +746,58 @@ impl Agent {
                 if let Some(handle) = self.relay.take() {
                     handle.abort();
                 }
+                // Plus relais : ni planning (il porte les identifiants des
+                // équipements), ni résultats en attente ne restent sur le disque.
+                self.plan_store().forget();
+                if let Some(backlog) = self.relay_backlog.take() {
+                    backlog.clear();
+                }
+                self.buffer.set_disk_limit(disk_limit(self.config.buffer_max_mb));
                 info!("relay mode switched off from the server");
             }
             _ => {}
         }
+    }
+
+    /// Lance la boucle du relais, avec de quoi tenir une coupure du lien
+    /// quand le tampon disque est actif.
+    fn start_relay(&mut self, shutdown: &Shutdown) {
+        let mut runner =
+            RelayRunner::new(self.client.clone(), self.identity.key(), RELAY_REQUEST_TIMEOUT);
+        if let Some(backlog) = self.open_relay_backlog() {
+            runner = runner.with_offline(Offline { store: self.plan_store(), backlog });
+        }
+        self.relay = Some(tokio::spawn(runner.run(shutdown.clone())));
+    }
+
+    /// Planning du relais, à côté du secret de liaison.
+    fn plan_store(&self) -> PlanStore {
+        PlanStore::beside(&self.config.secret_path)
+    }
+
+    /// Tampon des résultats du relais : les trois quarts de la borne du
+    /// disque, le reste pour les mesures de la machine elle-même.
+    fn open_relay_backlog(&mut self) -> Option<Backlog> {
+        if self.config.buffer_max_mb == 0 {
+            return None;
+        }
+        if self.relay_backlog.is_none() {
+            let total = disk_limit(self.config.buffer_max_mb);
+            let dir = spool_dir(&self.config.secret_path).join("relay");
+            match Backlog::open(&dir, total / 4 * 3) {
+                Ok(backlog) => self.relay_backlog = Some(backlog),
+                Err(error) => {
+                    warn!(
+                        path = %dir.display(),
+                        %error,
+                        "cannot open the relay buffer: results probed during an outage will be lost"
+                    );
+                    return None;
+                }
+            }
+            self.buffer.set_disk_limit(total / 4);
+        }
+        self.relay_backlog.clone()
     }
 
     /// Adresse où la passerelle doit écouter : `gateway_listen` en local, qui
@@ -713,7 +850,69 @@ impl Agent {
                 }
             }
         }
-        self.identity.relay_gateway = self.gateway.as_ref().map(|gateway| gateway.addr.port());
+        let port = self.gateway.as_ref().map(|gateway| gateway.addr.port());
+        if port != self.identity.relay_gateway {
+            // Passerelle ouverte, déplacée ou fermée : le serveur (et l'écran
+            // d'ajout qui attend qu'elle écoute) l'apprend par un lot immédiat,
+            // pas à la période suivante.
+            self.client.request_report();
+        }
+        self.identity.relay_gateway = port;
+        self.sync_gateway_check();
+    }
+
+    /// Essaie la passerelle à l'adresse que le site compose, comme le ferait
+    /// une de ses machines : quand elle s'ouvre, quand l'adresse change, puis
+    /// toutes les heures. Le résultat part avec un lot envoyé aussitôt.
+    fn sync_gateway_check(&mut self) {
+        if self.gateway_check_task.as_ref().is_some_and(|task| task.is_finished()) {
+            self.gateway_check_task = None;
+        }
+        let Some(port) = self.gateway.as_ref().map(|gateway| gateway.addr.port()) else {
+            if let Some(task) = self.gateway_check_task.take() {
+                task.abort();
+            }
+            self.gateway_checked = None;
+            if let Ok(mut held) = self.gateway_check.lock() {
+                *held = None;
+            }
+            self.identity.relay_gateway_check = None;
+            return;
+        };
+        let host = self.server_relay.as_ref().and_then(|relay| relay.gateway_host.as_deref());
+        let address = crate::gateway::check_address(host, port);
+        // Un essai raté se refait chaque minute : l'écran d'ajout attend de voir
+        // la correction (port publié, adresse) sans patienter une heure.
+        let failed = self
+            .gateway_check
+            .lock()
+            .ok()
+            .and_then(|held| held.as_ref().map(|check| !check.ok))
+            .unwrap_or(false);
+        let period = if failed { GATEWAY_RETRY } else { GATEWAY_RECHECK };
+        let due = match &self.gateway_checked {
+            Some((last, at)) => *last != address || at.elapsed() >= period,
+            None => true,
+        };
+        // Sans canal chiffré, pas de tunnel : rien à essayer encore.
+        let pins = self.client.pins();
+        if !due
+            || self.gateway_check_task.is_some()
+            || !self.client.is_encrypted()
+            || pins.is_empty()
+        {
+            return;
+        }
+        self.gateway_checked = Some((address.clone(), Instant::now()));
+        let slot = self.gateway_check.clone();
+        let client = self.client.clone();
+        self.gateway_check_task = Some(tokio::spawn(async move {
+            let check = crate::gateway::self_check(&address, pins).await;
+            if let Ok(mut held) = slot.lock() {
+                *held = Some(check);
+            }
+            client.request_report();
+        }));
     }
 
     /// Envoie un lot prélevé dans le tampon.
@@ -731,6 +930,11 @@ impl Agent {
             return FlushOutcome::Idle;
         }
         let count = samples.len();
+        if self.gateway.is_some() {
+            self.identity.relay_gateway_check =
+                self.gateway_check.lock().ok().and_then(|held| held.clone());
+        }
+        self.identity.server_link = self.failover.link(&self.client.base_url());
         let mut batch =
             PushBatch::new(self.identity.clone(), samples, chrono::Utc::now().timestamp_millis());
         if self.wants_inventory() {
@@ -749,6 +953,9 @@ impl Agent {
                     );
                 }
                 self.backoff.reset();
+                self.buffer.commit();
+                self.buffer.resume();
+                self.failover.succeeded();
                 self.binding_refused = false;
                 self.note_approved();
                 debug!(target = ack.target_id, accepted = ack.accepted, "batch accepted");
@@ -815,6 +1022,7 @@ impl Agent {
                     // Une mesure seule ne se coupe plus : la garder bloquerait
                     // tout le tampon derrière elle.
                     warn!(reason = message, "measurement too large for the server, dropped");
+                    self.buffer.commit();
                     return FlushOutcome::Sent { count };
                 }
                 self.buffer.restore(batch.samples);
@@ -829,12 +1037,16 @@ impl Agent {
             Err(error) if error.is_retryable() => {
                 // Journalisé par la boucle, qui connaît le délai avant la reprise.
                 self.buffer.restore(batch.samples);
+                if matches!(error, PushError::Transport(_)) {
+                    self.note_unreachable(&error);
+                }
                 FlushOutcome::Failed(error)
             }
             Err(error) => {
                 // Le serveur a compris et refusé : réémettre à l'identique ne ferait
                 // que reproduire le refus, en gardant le tampon plein pour rien.
                 warn!(%error, dropped = count, "batch rejected by the server, dropped");
+                self.buffer.commit();
                 self.forget_inventory(batch.inventory.as_ref());
                 self.eventlog.acknowledge(batch.event_log.as_ref());
                 FlushOutcome::Sent { count }
@@ -857,7 +1069,9 @@ impl Agent {
             // agent installé avant migre de lui-même, en épinglant l'autorité
             // annoncée (confiance au premier usage).
             let Some(offer) = self.client.offer() else { return };
-            let url = self.config.tls_url.clone().or_else(|| {
+            // L'adresse dédiée aux agents que le serveur annonce prime sur
+            // l'hôte de `server_url` ; celle de la configuration, sur les deux.
+            let url = self.config.tls_url.clone().or_else(|| offer.url.clone()).or_else(|| {
                 dumbmonit_proto::agent_channel_url(&self.config.server_url, offer.port)
             });
             let Some(url) = url else { return };
@@ -912,7 +1126,9 @@ impl Agent {
         };
         let request =
             dumbmonit_proto::TlsEnrolRequest { identity: self.identity.clone(), public_key };
-        match self.client.enrol(&state.url, &request).await {
+        // Sur le serveur en service : un secours partage l'autorité et la base.
+        let url = self.failover.active_channel(&state.url);
+        match self.client.enrol(&url, &request).await {
             Ok(issued) => {
                 if let Some(secret) = issued.agent_secret.clone() {
                     self.adopt_binding(Some(secret), true);
@@ -930,6 +1146,9 @@ impl Agent {
             Err(error) => {
                 if let PushError::Forbidden(message) = &error {
                     self.on_binding_refused(message);
+                }
+                if matches!(error, PushError::Transport(_)) {
+                    self.note_unreachable(&error);
                 }
                 self.note_tls_failure("enrolment on the encrypted agent channel failed", &error);
             }
@@ -978,7 +1197,8 @@ impl Agent {
             // démarrage.
             warn!(error = %format!("{error:#}"), "cannot store the encrypted channel state");
         }
-        if let Err(error) = self.client.use_tls(&state.url, state.identity()) {
+        let url = self.failover.active_channel(&state.url);
+        if let Err(error) = self.client.use_tls(&url, state.identity()) {
             warn!(error = %format!("{error:#}"), "cannot switch to the encrypted agent channel");
         }
         self.tls = Some(state.clone());
@@ -998,7 +1218,8 @@ impl Agent {
         if let Err(error) = state.save(&self.tls_path) {
             warn!(error = %format!("{error:#}"), "cannot store the encrypted channel state");
         }
-        if let Err(error) = self.client.use_tls(&state.url, None) {
+        let url = self.failover.active_channel(&state.url);
+        if let Err(error) = self.client.use_tls(&url, None) {
             warn!(error = %format!("{error:#}"), "cannot reset the encrypted agent channel");
         }
         self.tls_retry_at = None;
@@ -1011,6 +1232,65 @@ impl Agent {
         } else {
             self.tls_failed = true;
             warn!(%error, retry_in_s = TLS_RETRY.as_secs(), "{what}");
+        }
+    }
+
+    /// Échec de transport (serveur injoignable, délai, 5xx) : compté pour la
+    /// bascule, et passage à l'adresse suivante de `server_urls` s'il le faut.
+    fn note_unreachable(&mut self, error: &PushError) {
+        if let Some(next) = self.failover.failed(&error.to_string()) {
+            self.switch_server(next);
+        }
+    }
+
+    /// Compose désormais le serveur de rang `index` (0 : la primaire). Le
+    /// canal reste le même : certificat, épinglage et mandataire suivent.
+    fn switch_server(&mut self, index: usize) {
+        let Some(url) = self.server_root(index) else { return };
+        let from = self.client.base_url();
+        self.client.retarget(&url);
+        self.failover.switched_to(index, Instant::now());
+        if index == 0 {
+            info!(from, to = url, "the primary server answers again, switching back to it");
+        } else {
+            warn!(from, to = url, "server unreachable, switching to the next one in server_urls");
+        }
+    }
+
+    /// Racine à composer pour le serveur de rang `index` : son canal chiffré
+    /// quand l'agent y est, l'adresse de son interface sinon.
+    fn server_root(&self, index: usize) -> Option<String> {
+        if self.client.is_encrypted() {
+            let primary = self.tls.as_ref()?.url.as_str();
+            self.failover.channel_url(index, primary)
+        } else {
+            self.failover.web_url(index).map(str::to_string)
+        }
+    }
+
+    /// Sur un serveur de secours, réessaie la primaire de temps en temps
+    /// (requête légère, délai court) et y revient dès qu'elle répond en
+    /// serveur actif.
+    async fn check_primary(&mut self) {
+        if !self.failover.primary_due(Instant::now()) {
+            return;
+        }
+        let Some(url) = self.server_root(0) else { return };
+        let outcome = self
+            .client
+            .probe_http()
+            .get(format!("{url}{}", failover::PROBE_PATH))
+            .timeout(failover::PROBE_TIMEOUT)
+            .send()
+            .await
+            .map(|response| response.status().as_u16())
+            .map_err(|error| crate::client::describe(&error));
+        match failover::probe_verdict(outcome) {
+            Ok(()) => self.switch_server(0),
+            Err(reason) => {
+                debug!(primary = url, reason, "the primary server is still unavailable");
+                self.failover.primary_unreachable(&reason, Instant::now());
+            }
         }
     }
 
@@ -1085,6 +1365,9 @@ impl Agent {
         if self.buffer.is_empty() {
             return;
         }
+        // Sur le disque d'abord : un envoi coupé par le délai n'emporte alors
+        // rien avec lui.
+        self.buffer.spill();
         if let Ok(FlushOutcome::Sent { count }) =
             tokio::time::timeout(SHUTDOWN_FLUSH_TIMEOUT, self.flush()).await
         {
@@ -1093,9 +1376,17 @@ impl Agent {
         if self.buffer.is_empty() {
             return;
         }
-        // Le serveur n'a pas répondu (ou pas pour tout) : ce qui reste attend le
-        // prochain démarrage sur disque plutôt que d'être perdu.
         let pending = self.buffer.len();
+        if self.buffer.has_spool() {
+            info!(
+                pending,
+                bytes = self.buffer.disk_bytes(),
+                "the server did not answer before shutdown: measurements kept in the disk buffer"
+            );
+            return;
+        }
+        // Sans tampon disque : ce qui reste attend le prochain démarrage dans
+        // un fichier plutôt que d'être perdu.
         let path = self.pending_path();
         match self.buffer.save(&path, MAX_PERSISTED_SAMPLES) {
             Ok(kept) => info!(
@@ -1190,6 +1481,38 @@ impl Agent {
                 "sampling period adjusted by the server"
             );
             self.interval = wanted;
+        }
+    }
+}
+
+/// Répertoire des tampons disque, à côté du secret de liaison : le seul
+/// endroit où l'agent sait pouvoir écrire, et celui qu'on monte en volume pour
+/// un agent en conteneur.
+fn spool_dir(secret_path: &std::path::Path) -> std::path::PathBuf {
+    secret_path.with_file_name("spool")
+}
+
+/// Borne du tampon disque, en octets.
+fn disk_limit(megabytes: u64) -> u64 {
+    megabytes.saturating_mul(1024 * 1024)
+}
+
+/// Tampon disque des mesures de la machine. Impossible à ouvrir (droits,
+/// disque en lecture seule) : l'agent continue avec la mémoire seule.
+fn open_sample_spool(config: &Config) -> Option<Spool> {
+    if config.buffer_max_mb == 0 {
+        return None;
+    }
+    let dir = spool_dir(&config.secret_path).join("samples");
+    match Spool::open(&dir, disk_limit(config.buffer_max_mb)) {
+        Ok(spool) => Some(spool),
+        Err(error) => {
+            warn!(
+                path = %dir.display(),
+                %error,
+                "cannot open the disk catch-up buffer: measurements are kept in memory only"
+            );
+            None
         }
     }
 }
@@ -1306,12 +1629,15 @@ mod tests {
             databases: crate::collect::databases::DatabasesConfig::default(),
             perf_counters: crate::collect::perf_counters::PerfCountersConfig::default(),
             max_buffered_samples: 1_000,
+            buffer_max_mb: 0,
             secret_path: std::path::PathBuf::from("/inexistant/agent-secret"),
             tls_url: None,
             ca_pin: None,
             server_pin: None,
             plain_server_url: false,
+            fallback_servers: Vec::new(),
             log_level: tracing::Level::INFO,
+            proxy: crate::proxy::ProxyConfig::default(),
             deprecated_env: Vec::new(),
         }
     }
@@ -1336,7 +1662,12 @@ mod tests {
     }
 
     fn setting(enabled: bool, site: Option<&str>) -> Option<RelaySetting> {
-        Some(RelaySetting { enabled, site: site.map(str::to_string), gateway_port: None })
+        Some(RelaySetting {
+            enabled,
+            site: site.map(str::to_string),
+            gateway_port: None,
+            gateway_host: None,
+        })
     }
 
     #[tokio::test]
@@ -1385,21 +1716,36 @@ mod tests {
             enabled: false,
             site: None,
             gateway_port: Some(port),
+            gateway_host: None,
         }));
         agent.sync_gateway(&shutdown).await;
         assert!(agent.gateway.is_none());
         assert_eq!(agent.identity.relay_gateway, None);
 
+        let report = agent.client.report_requested();
         agent.adopt_relay(Some(RelaySetting {
             enabled: true,
             site: None,
             gateway_port: Some(port),
+            gateway_host: Some("192.168.10.5".into()),
         }));
         agent.sync_gateway(&shutdown).await;
         assert_eq!(agent.identity.relay_gateway, Some(port), "le port est annoncé au serveur");
+        // … tout de suite, par un lot demandé sans attendre la période.
+        tokio::time::timeout(Duration::from_millis(100), report.notified())
+            .await
+            .expect("lot immédiat demandé");
+        // Pas de canal chiffré dans ce test : pas d'essai, rien d'inventé.
+        assert!(agent.gateway_check_task.is_none());
+        assert_eq!(agent.identity.relay_gateway_check, None);
 
         // Relais sans passerelle : elle se ferme, le relais continue.
-        agent.adopt_relay(Some(RelaySetting { enabled: true, site: None, gateway_port: None }));
+        agent.adopt_relay(Some(RelaySetting {
+            enabled: true,
+            site: None,
+            gateway_port: None,
+            gateway_host: None,
+        }));
         agent.sync_gateway(&shutdown).await;
         assert!(agent.gateway.is_none());
         assert_eq!(agent.identity.relay_gateway, None);
@@ -1621,6 +1967,7 @@ mod tests {
         agent.client.set_offer(dumbmonit_proto::TlsOffer {
             port: closed_port(),
             pins: vec![PIN.to_string()],
+            url: None,
         });
         let samples = agent.collect().await;
         agent.buffer.push(samples);
@@ -1632,6 +1979,26 @@ mod tests {
         assert!(!state.locked);
         assert_eq!(calls.count("POST", "/api/ingest"), 1);
         assert!(agent.tls_retry_at.is_some(), "nouvel essai d'enrôlement plus tard");
+    }
+
+    #[tokio::test]
+    async fn the_dedicated_agent_address_announced_by_the_server_is_the_one_dialled() {
+        // Le serveur a une adresse dédiée aux agents : l'agent migre vers elle,
+        // pas vers l'hôte de son `server_url`.
+        let dir = tempfile::tempdir().unwrap();
+        let (url, _calls) = crate::testsupport::fake_http(|_| (200, ACK.to_string())).await;
+        let mut agent = agent_for(&url, &dir);
+        let dedicated = format!("https://localhost:{}", closed_port());
+        agent.client.set_offer(dumbmonit_proto::TlsOffer {
+            port: closed_port(),
+            pins: vec![PIN.to_string()],
+            url: Some(dedicated.clone()),
+        });
+        let samples = agent.collect().await;
+        agent.buffer.push(samples);
+
+        assert!(matches!(agent.flush().await, FlushOutcome::Sent { .. }));
+        assert_eq!(agent.tls.clone().expect("canal adopté").url, dedicated);
     }
 
     #[tokio::test]
@@ -2159,5 +2526,98 @@ mod tests {
             _ = agent.run(shutdown) => panic!("la boucle s'est arrêtée seule"),
             () = check => {}
         }
+    }
+
+    // ------------------------------------------------ bascule entre serveurs
+
+    #[tokio::test]
+    async fn an_unreachable_primary_hands_over_to_the_backup_then_back() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicBool, Ordering};
+        // La primaire répond comme un serveur en attente (503) tant qu'elle
+        // n'est pas revenue ; revenue, son canal ne connaît pas la route de
+        // l'essai (404) et accepte les lots.
+        let up = Arc::new(AtomicBool::new(false));
+        let primary_up = up.clone();
+        let (primary, primary_calls) = crate::testsupport::fake_http(move |request| {
+            if !primary_up.load(Ordering::SeqCst) {
+                return (503, r#"{"error":"standby"}"#.to_string());
+            }
+            if request.path.starts_with(failover::PROBE_PATH) {
+                return (404, String::new());
+            }
+            (200, ACK.to_string())
+        })
+        .await;
+        let (backup, backup_calls) =
+            crate::testsupport::fake_http(|_| (200, ACK.to_string())).await;
+        let dir = tempfile::tempdir().unwrap();
+        let mut config = config();
+        config.server_url = primary.clone();
+        config.fallback_servers =
+            vec![crate::config::ServerEndpoint { url: backup.clone(), tls_url: None }];
+        config.secret_path = dir.path().join("agent-secret");
+        let mut agent = Agent::new(config).expect("agent");
+        let samples = agent.collect().await;
+        agent.buffer.push(samples);
+
+        // Les premiers échecs ne font pas basculer : un redémarrage du serveur
+        // dure quelques secondes.
+        for attempt in 1..failover::SWITCH_AFTER {
+            assert!(matches!(agent.flush().await, FlushOutcome::Failed(_)), "{attempt}");
+            assert_eq!(agent.failover.active(), 0);
+        }
+        assert!(matches!(agent.flush().await, FlushOutcome::Failed(_)));
+        assert_eq!(agent.failover.active(), 1, "bascule sur le secours");
+        assert_eq!(agent.client.base_url(), backup);
+        assert!(agent.failover.take_switched(), "la boucle réessaie sans attendre");
+
+        assert!(matches!(agent.flush().await, FlushOutcome::Sent { .. }));
+        let sent = backup_calls.bodies("POST", "/api/ingest");
+        assert_eq!(sent.len(), 1, "le retard part chez le secours");
+        let batch: serde_json::Value = serde_json::from_str(&sent[0]).unwrap();
+        let link = &batch["identity"]["server_link"];
+        assert_eq!(link["active"], 1);
+        assert_eq!(link["servers"], 2);
+        assert_eq!(link["url"], backup.as_str());
+        assert!(link["since_ms"].is_i64());
+        assert!(link["primary_error"].as_str().unwrap().contains("503"), "{link}");
+
+        // Réessayée, la primaire répond encore en serveur en attente : l'agent
+        // reste sur le secours.
+        agent.failover.recheck_now();
+        agent.check_primary().await;
+        assert_eq!(agent.failover.active(), 1);
+
+        // Revenue : l'agent y retourne, et le lot suivant part chez elle.
+        up.store(true, Ordering::SeqCst);
+        agent.failover.recheck_now();
+        agent.check_primary().await;
+        assert_eq!(agent.failover.active(), 0);
+        assert_eq!(agent.client.base_url(), primary);
+        let samples = agent.collect().await;
+        agent.buffer.push(samples);
+        assert!(matches!(agent.flush().await, FlushOutcome::Sent { .. }));
+        assert_eq!(primary_calls.count("GET", failover::PROBE_PATH), 2);
+        let last = primary_calls.bodies("POST", "/api/ingest").pop().unwrap();
+        let batch: serde_json::Value = serde_json::from_str(&last).unwrap();
+        assert_eq!(batch["identity"]["server_link"]["active"], 0);
+        assert!(batch["identity"]["server_link"].get("since_ms").is_none());
+        assert_eq!(backup_calls.count("POST", "/api/ingest"), 1);
+    }
+
+    #[tokio::test]
+    async fn without_server_urls_nothing_changes() {
+        let dir = tempfile::tempdir().unwrap();
+        let url = format!("http://127.0.0.1:{}", closed_port());
+        let mut agent = agent_for(&url, &dir);
+        let samples = agent.collect().await;
+        agent.buffer.push(samples);
+        for _ in 0..(failover::SWITCH_AFTER * 3) {
+            assert!(matches!(agent.flush().await, FlushOutcome::Failed(_)));
+        }
+        assert_eq!(agent.client.base_url(), url);
+        assert!(!agent.failover.take_switched());
+        assert_eq!(agent.identity.server_link, None, "rien n'est annoncé au serveur");
     }
 }

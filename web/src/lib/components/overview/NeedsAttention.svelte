@@ -21,7 +21,7 @@
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import { Plate } from '#lib/ui/index.js';
 	import MuteControl from './MuteControl.svelte';
-	import { mutedBy } from './mute.js';
+	import { acknowledgedBy, mutedBy } from './mute.js';
 	import { readSky, type SkyRow } from './sky.js';
 	import { attentionRows, weekAhead } from './attention.js';
 
@@ -49,7 +49,13 @@
 	});
 
 	const sky = $derived(readSky({ targets: alertsStore.targets, probes: alertsStore.probes, alerts: alertsStore.alerts, rules }));
-	const rows = $derived(attentionRows(sky.needsYou));
+	// A monitor acknowledged until it answers again leaves the list (it comes back with
+	// its next outage, the server having lifted the silence).
+	const rows = $derived(
+		attentionRows(sky.needsYou).filter(
+			({ row }) => row.kind !== 'device' || !acknowledgedBy(silences, row.target.id, justCreated)
+		)
+	);
 	const shown = $derived(rows.slice(0, LIMIT));
 	const week = $derived(weekAhead(deadlines));
 	const monitors = $derived(alertsStore.targets.length);
@@ -76,6 +82,9 @@
 	let failure = $state<{ id: number; message: string } | null>(null);
 
 	$effect(() => {
+		// Read again with each poll of the monitors: the server lifts an acknowledgement
+		// by itself when a monitor answers again.
+		void alertsStore.targets;
 		const controller = new AbortController();
 		listSilences(controller.signal)
 			.then((list) => (silences = list))
@@ -84,6 +93,11 @@
 	});
 
 	function muted(silence: Silence) {
+		silences = [...silences.filter((s) => s.id !== silence.id), silence];
+		justCreated = [...justCreated, silence.id];
+		void alertsStore.refresh();
+	}
+	function acknowledged(silence: Silence) {
 		silences = [...silences.filter((s) => s.id !== silence.id), silence];
 		justCreated = [...justCreated, silence.id];
 		void alertsStore.refresh();
@@ -121,7 +135,7 @@
 						<div class="flex min-w-0 items-center gap-2">
 							<Plate tone={row.tone} size="sm" class="max-w-full min-w-0 truncate">{row.plate}</Plate>
 							{#if row.since}
-								<span class="ml-auto shrink-0 font-mono text-xs text-ink-3 tabular-nums md:hidden">{formatRelative(row.since)}</span>
+								<span class="ml-auto shrink-0 font-mono text-sm font-medium text-ink-2 tabular-nums md:hidden">{formatRelative(row.since)}</span>
 							{/if}
 						</div>
 						<a href={withBase(href(row))} class="mt-1 flex min-w-0 items-baseline gap-1.5 text-sm font-semibold text-ink hover:underline md:mt-0">
@@ -138,17 +152,18 @@
 						{/if}
 					</div>
 					{#if row.since}
-						<span class="w-16 shrink-0 whitespace-nowrap text-right font-mono text-xs text-ink-3 tabular-nums max-md:hidden">{formatRelative(row.since)}</span>
+						<span class="w-20 shrink-0 whitespace-nowrap text-right font-mono text-sm font-medium text-ink-2 tabular-nums max-md:hidden">{formatRelative(row.since)}</span>
 					{/if}
 					<div class="flex shrink-0 items-center">
 						{#if row.kind === 'alert'}
-							<AlertActions alert={row.alert} target={row.target} onchanged={() => void alertsStore.refresh()} />
+							<AlertActions alert={row.alert} target={row.target} labelled onchanged={() => void alertsStore.refresh()} />
 						{:else if auth.canOperate}
 							<MuteControl
 								target={row.target}
 								muted={mutedBy(silences, row.target.id, justCreated)}
 								onmuted={muted}
 								onunmuted={unmuted}
+								onacknowledged={acknowledged}
 								onfail={(message) => (failure = message ? { id: row.target.id, message } : null)}
 							/>
 						{/if}

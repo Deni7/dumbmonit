@@ -11,6 +11,7 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use dumbmonit_proto::TargetId;
@@ -31,6 +32,26 @@ const TICK: Duration = Duration::from_secs(1);
 /// Période de rechargement de la liste des cibles depuis la base.
 const RELOAD_EVERY: Duration = Duration::from_secs(15);
 
+/// Nombre de cibles neuves sondées dès leur apparition, par tour. Au-delà (un
+/// import de cinq cents moniteurs), les suivantes reprennent l'étalement
+/// ordinaire : la boucle n'attend jamais cinq cents jetons d'un coup.
+const IMMEDIATE_FIRST_PROBES: usize = 20;
+
+/// Génération des demandes de rechargement. Un compteur plutôt qu'un drapeau :
+/// chaque boucle garde la dernière valeur vue, et aucune ne « consomme » la
+/// demande d'une autre (les tests en font tourner plusieurs dans un processus).
+static WAKE: AtomicU64 = AtomicU64::new(0);
+
+/// Demande à la boucle de relire les cibles au prochain tour (une seconde au
+/// plus) plutôt qu'au prochain rechargement périodique.
+///
+/// Appelé à la création et à la modification d'une cible : le moniteur qu'on
+/// vient d'ajouter est sondé tout de suite, sans attendre jusqu'à quinze
+/// secondes de rechargement puis jusqu'à une période entière de décalage.
+pub fn wake() {
+    WAKE.fetch_add(1, Ordering::Relaxed);
+}
+
 pub fn spawn(state: AppState) {
     tokio::spawn(async move {
         if let Err(error) = run(state).await {
@@ -47,6 +68,10 @@ async fn run(state: AppState) -> anyhow::Result<()> {
     let mut ticker = interval(TICK);
     ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
     let mut last_reload = Instant::now() - RELOAD_EVERY;
+    let mut seen_wake = WAKE.load(Ordering::Relaxed);
+    // Faux jusqu'à la fin du premier tour : les cibles déjà là au démarrage sont
+    // étalées sur leur période ; celles qui apparaissent ensuite sont neuves.
+    let mut warmed = false;
     let mut targets = Vec::new();
     // Cibles interrogées par un agent relais plutôt que par le serveur.
     let mut relays: HashMap<TargetId, TargetId> = HashMap::new();
@@ -66,7 +91,9 @@ async fn run(state: AppState) -> anyhow::Result<()> {
         ticker.tick().await;
         let now = Instant::now();
 
-        if now.duration_since(last_reload) >= RELOAD_EVERY {
+        let wake = WAKE.load(Ordering::Relaxed);
+        if wake != seen_wake || now.duration_since(last_reload) >= RELOAD_EVERY {
+            seen_wake = wake;
             match db::targets::list_enabled(&state.pool, &state.cipher).await {
                 Ok(loaded) => {
                     // Oublier les cibles supprimées évite que la table ne grossisse
@@ -116,17 +143,26 @@ async fn run(state: AppState) -> anyhow::Result<()> {
         // et la décision tombe.
         crate::multisite::expire(&state, now).await;
 
+        let mut immediate = 0;
         for target in &targets {
+            let fresh = warmed && !next_run.contains_key(&target.id);
+            let first_now = fresh && immediate < IMMEDIATE_FIRST_PROBES;
+            if first_now {
+                immediate += 1;
+            }
             let due = next_run
                 .entry(target.id)
-                // Premier passage : on étale les cibles sur leur période plutôt que
-                // de toutes les interroger au démarrage.
-                .or_insert_with(|| now + initial_offset(target.id, target.interval));
+                .or_insert_with(|| first_due(now, target.id, target.interval, first_now));
 
             if *due > now {
                 continue;
             }
-            *due = now + target.interval;
+            // Une cible sondée d'emblée garde ensuite son décalage : cent moniteurs
+            // ajoutés ensemble ne se retrouvent pas sondés à la même seconde,
+            // indéfiniment.
+            let spread =
+                if first_now { initial_offset(target.id, target.interval) } else { Duration::ZERO };
+            *due = now + target.interval + spread;
 
             if let Some(config) = multisite.get(&target.id)
                 && crate::multisite::supports(&target.kind)
@@ -184,6 +220,7 @@ async fn run(state: AppState) -> anyhow::Result<()> {
         // Ce qui reste dû après le tour : des cibles que la boucle n'a pas pu
         // lancer faute de jeton d'exécution. C'est la seule mesure de retard qui
         // ait un sens — `/metrics` la publie sous `dumbmonit_scheduler_backlog`.
+        warmed = true;
         let ended = Instant::now();
         let backlog = next_run.values().filter(|due| **due <= ended).count();
         stats().scheduler_cycle(ended.duration_since(now), backlog);
@@ -244,6 +281,16 @@ fn delegate(state: &AppState, target: &dumbmonit_proto::Target, agent_id: Target
     }
 }
 
+/// Première échéance d'une cible que la boucle découvre.
+///
+/// Au démarrage, les cibles sont étalées sur leur période ([`initial_offset`]).
+/// Une cible neuve (créée, ou remise en service, après le démarrage) est due
+/// tout de suite : c'est elle que l'utilisateur regarde, et une première mesure
+/// qui tarderait d'une minute ressemble à une panne du produit.
+fn first_due(now: Instant, id: TargetId, interval: Duration, immediate: bool) -> Instant {
+    if immediate { now } else { now + initial_offset(id, interval) }
+}
+
 /// Décalage initial déterministe, réparti sur la période d'interrogation.
 ///
 /// Sans lui, toutes les cibles créées ensemble seraient interrogées à la même
@@ -262,6 +309,21 @@ mod tests {
         let interval = Duration::from_secs(60);
         let offsets: Vec<_> = (1..=5).map(|id| initial_offset(id, interval).as_secs()).collect();
         assert_eq!(offsets, vec![1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn a_fresh_target_is_due_at_once_a_known_one_is_spread() {
+        let now = Instant::now();
+        let interval = Duration::from_secs(60);
+        assert_eq!(first_due(now, 42, interval, true), now);
+        assert_eq!(first_due(now, 42, interval, false), now + Duration::from_secs(42));
+    }
+
+    #[test]
+    fn wake_moves_the_generation_forward() {
+        let before = WAKE.load(Ordering::Relaxed);
+        wake();
+        assert_ne!(WAKE.load(Ordering::Relaxed), before);
     }
 
     #[test]

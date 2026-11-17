@@ -3,10 +3,8 @@
 	/**
 	 * The watched pages of a `webchange` device, in one list. Pages that
 	 * changed come first, the most recently changed on top; each row carries
-	 * its latest change (kind, lines moved, when), a camera link to its
-	 * before/after screenshots when the headless browser captured some, a
-	 * "+N pages" fold when the same edit was found on other pages, and an
-	 * "earlier changes" fold. The pages that never changed are folded below.
+	 * its latest change (kind, lines moved, when), a "+N pages" fold when the
+	 * same edit was found on other pages, and an "earlier changes" fold. The pages that never changed are folded below.
 	 *
 	 * Every change row is a link to the change's own page. Given `onselect`
 	 * (the device panel's two-column layout), a plain click selects the change
@@ -23,7 +21,7 @@
 	import { formatDateTime, formatRelative, parseServerDate } from '#lib/format.js';
 	import { EmptyState, ErrorNotice, Plate, Skeleton, type Tone } from '#lib/ui/index.js';
 	import { m } from '#lib/paraglide/messages.js';
-	import { Camera, ChevronDown, ExternalLink, FileDiff, FileMinus, FilePlus, History, Search } from 'lucide-svelte';
+	import { ChevronDown, ExternalLink, FileDiff, FileMinus, FilePlus, History, Search } from 'lucide-svelte';
 	import { groupSameEdits, pagePath, shortenPath, stepIndex } from './format';
 
 	interface Props {
@@ -31,15 +29,13 @@
 		pages: WebchangePage[];
 		changes: WebchangeChange[];
 		loading: boolean;
-		/** The server has a headless browser: screenshots can exist. */
-		screenshotsAvailable: boolean;
 		/** Change shown next to the list, highlighted; `null` when nothing is. */
 		selectedId?: number | null;
 		/** Selects a change in place instead of following its link. */
-		onselect?: (change: WebchangeChange, screenshots: boolean) => void;
+		onselect?: (change: WebchangeChange) => void;
 	}
 
-	let { targetId, pages, changes, loading, screenshotsAvailable, selectedId = null, onselect }: Props = $props();
+	let { targetId, pages, changes, loading, selectedId = null, onselect }: Props = $props();
 
 	/** Below this, a filter box is more clutter than it's worth. */
 	const FILTER_THRESHOLD = 8;
@@ -169,8 +165,6 @@
 	// --- Helpers -------------------------------------------------------------
 	const hrefOf = (change: WebchangeChange) => `/targets/${targetId}/changes/${change.id}`;
 	const isoOf = (value: string): string | undefined => parseServerDate(value)?.toISOString();
-	/** Screenshots exist for a page when the server has a browser and took one. */
-	const hasShots = (url: string): boolean => screenshotsAvailable && (pageByUrl.get(url)?.latest_snapshot ?? null) !== null;
 
 	function statusOf(page: WebchangePage): { tone: Tone; label: string } | null {
 		if (page.last_checked === null) return { tone: 'ghost', label: m.devicesb_webchange_pages_not_checked() };
@@ -181,10 +175,10 @@
 
 	let list = $state<HTMLElement | null>(null);
 
-	function click(event: MouseEvent, change: WebchangeChange, screenshots: boolean) {
+	function click(event: MouseEvent, change: WebchangeChange) {
 		if (!onselect || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 		event.preventDefault();
-		onselect(change, screenshots);
+		onselect(change);
 	}
 
 	function keydown(event: KeyboardEvent) {
@@ -201,7 +195,7 @@
 		rows[next].focus();
 		const id = Number(rows[next].dataset.change);
 		const change = [...changes, ...Object.values(fetched).flat()].find((c) => c.id === id);
-		if (change) onselect(change, false);
+		if (change) onselect(change);
 	}
 
 	const actionClass =
@@ -222,7 +216,7 @@
 	<a
 		href={withBase(hrefOf(change))}
 		data-change={change.id}
-		onclick={(event) => click(event, change, false)}
+		onclick={(event) => click(event, change)}
 		aria-current={selected ? 'true' : undefined}
 		class={`flex min-h-12 min-w-0 flex-1 items-start gap-2.5 rounded-lg px-2 py-1.5 ${selected ? 'bg-surface-2 ring-1 ring-line-strong' : 'hover:bg-surface-2'}`}
 	>
@@ -278,17 +272,6 @@
 				{(grouped === 1 ? m.devicesb_webchange_timeline_more_one : m.devicesb_webchange_timeline_more_other)({ count: grouped })}
 				<ChevronDown class={`size-3.5 transition-transform ${unfolded.has(item.latest.id) ? 'rotate-180' : ''}`} aria-hidden="true" />
 			</button>
-		{/if}
-		{#if hasShots(item.url)}
-			<a
-				href={withBase(`${hrefOf(item.latest)}#screenshots`)}
-				class={actionClass}
-				title={m.devicesb_webchange_list_screenshots({ path: pagePath(item.url) })}
-				onclick={(event) => click(event, item.latest, true)}
-			>
-				<Camera class="size-4" aria-hidden="true" />
-				<span class="sr-only">{m.devicesb_webchange_list_screenshots({ path: pagePath(item.url) })}</span>
-			</a>
 		{/if}
 		{#if count > 0}
 			<button

@@ -1,0 +1,1 @@
+[{"id":"0d4f6c1e-8a2b-4c3d-9e5f-1a2b3c4d5e6f","realm":"master","displayName":"Keycloak","enabled":true,"sslRequired":"external"},{"id":"5e7a9b2c-1d3f-4e6a-8b9c-0d1e2f3a4b5c","realm":"labrealm","enabled":true,"sslRequired":"external"},{"id":"9a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d","realm":"lockedrealm","enabled":false,"sslRequired":"external"}]

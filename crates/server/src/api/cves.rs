@@ -6,6 +6,9 @@
 //! * `GET /security/cves` — les verdicts, exploitées d'abord.
 //! * `GET /security/cves/inventory` — ce qui est inventorié, et d'où.
 //! * `POST /security/cves/refresh` — relecture des sources (administrateur).
+//! * `POST /security/cves/targets` — contrôle CVE d'équipements précis, en
+//!   masse (administrateur) : un équipement écarté n'est plus inventorié ni
+//!   montré, jusqu'à sa réactivation.
 //! * `POST /security/cves/ignores`, `DELETE /security/cves/ignores/{target}/{cve}`
 //!   — accepter un risque sur un équipement, ou y revenir.
 //!
@@ -34,6 +37,7 @@ pub fn routes() -> Router<AppState> {
         .route("/security/cves/inventory", get(inventory))
         .route("/security/cves/settings", get(settings).put(set_settings))
         .route("/security/cves/refresh", post(refresh))
+        .route("/security/cves/targets", post(set_targets))
         .route("/security/cves/ignores", post(add_ignore))
         .route("/security/cves/ignores/{target_id}/{cve_id}", delete(remove_ignore))
 }
@@ -93,6 +97,49 @@ async fn refresh(
     }
     vulns::request_refresh();
     Ok((StatusCode::ACCEPTED, Json(serde_json::json!({ "refreshing": true }))))
+}
+
+// ------------------------------------------------- contrôle par équipement
+
+/// Nombre maximal d'équipements par requête.
+pub const MAX_TARGETS_PER_REQUEST: usize = 500;
+
+#[derive(Debug, Deserialize)]
+pub struct CveTargetsInput {
+    pub target_ids: Vec<TargetId>,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CveTargetsResult {
+    /// Équipements dont le réglage a changé.
+    pub updated: u64,
+}
+
+/// `POST /api/security/cves/targets` : active ou coupe le contrôle CVE de
+/// plusieurs équipements. Les identifiants inconnus sont ignorés, ceux qui ont
+/// déjà le réglage demandé ne comptent pas dans `updated`.
+async fn set_targets(
+    State(state): State<AppState>,
+    _: AdminIdentity,
+    Json(input): Json<CveTargetsInput>,
+) -> ApiResult<Json<CveTargetsResult>> {
+    if input.target_ids.is_empty() {
+        return Err(ApiError::BadRequest("Select at least one monitor.".into()));
+    }
+    if input.target_ids.len() > MAX_TARGETS_PER_REQUEST {
+        return Err(ApiError::BadRequest(format!(
+            "At most {MAX_TARGETS_PER_REQUEST} monitors can be changed at once."
+        )));
+    }
+    let unique: HashSet<TargetId> = input.target_ids.into_iter().collect();
+    let ids: Vec<TargetId> = unique.into_iter().collect();
+    let updated = db::targets::set_cve_scan(&state.pool, &ids, input.enabled).await?;
+    if input.enabled && updated > 0 && vulns::enabled(&state.pool).await? {
+        // Les résultats reviennent au prochain calcul : autant le lancer tout de suite.
+        vulns::request_refresh();
+    }
+    Ok(Json(CveTargetsResult { updated }))
 }
 
 // ---------------------------------------------------------------- verdicts

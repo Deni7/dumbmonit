@@ -7,9 +7,11 @@
 	 *   address (`POST /api/agent/tls/check`) and says what answered. An
 	 *   unpublished Docker port is the first cause of "the agent could not
 	 *   reach the server", so the fix is spelled out with the real ports.
-	 * - Through a relay: the server cannot see the site's network; it waits
-	 *   until the relay reports that its gateway listens (it opens it at its
-	 *   next report), and reminds which firewall port to open on the relay.
+	 * - Through a relay: the server cannot see the site's network. The relay
+	 *   opens its gateway as soon as it is told (within seconds), then tests it
+	 *   itself at the site's address, as a machine of the site would, and
+	 *   reports the outcome. The command shows once that test passes; a failed
+	 *   test is explained instead. An older relay only says it listens.
 	 *
 	 * The command (`children`) shows once the channel answers, or when the
 	 * administrator chooses to see it anyway (a check made from the server can
@@ -48,8 +50,8 @@
 				base_url: baseUrl,
 				...(relayId !== null ? { relay_id: relayId, relay_host: relayHost } : {})
 			});
-			// A relay opens its gateway at its next report: look again shortly.
-			if (result.relay && !result.relay.listening) timer = setTimeout(run, 5000);
+			// A relay opens its gateway, then tests it: look again until it passes.
+			if (result.relay && relayStateOf(result.relay) !== 'ready') timer = setTimeout(run, 5000);
 			return true;
 		} catch (cause) {
 			error = cause;
@@ -66,11 +68,24 @@
 		};
 	});
 
+	type RelayState = 'waiting' | 'testing' | 'unreachable' | 'ready';
+	/** Where a relay's gateway stands: closed, listening but not tested at this address yet, failing, or answering. */
+	function relayStateOf(relay: NonNullable<AgentChannelCheck['relay']>): RelayState {
+		if (!relay.listening) return 'waiting';
+		// An older relay does not test its gateway: listening is all it can say.
+		if (!relay.self_check) return 'ready';
+		if (relay.reachable === true) return 'ready';
+		if (relay.reachable === false) return 'unreachable';
+		return 'testing';
+	}
+	const relayState = $derived(result?.relay ? relayStateOf(result.relay) : null);
+	const relayAddress = $derived(result?.relay ? `${result.relay.host}:${result.relay.port}` : '');
+
 	const address = $derived(result?.host && result.port ? `${result.host}:${result.port}` : '');
 	const port = $derived(String(result?.relay?.port ?? result?.port ?? 8443));
 	const mapping = $derived(`${result?.port ?? 8443}:${result?.listen_port ?? 8443}`);
 	const ready = $derived(
-		showAnyway || error !== null || (result !== null && (!result.enabled || (result.relay ? result.relay.listening : result.outcome === 'ok')))
+		showAnyway || error !== null || (result !== null && (!result.enabled || (result.relay ? relayState === 'ready' : result.outcome === 'ok')))
 	);
 	const firewall = $derived(
 		[
@@ -108,10 +123,25 @@
 	{:else if result && !result.enabled}
 		<p class="text-sm text-ink-2">{m.deviceform_channelcheck_disabled()}</p>
 	{:else if result?.relay}
-		{#if result.relay.listening}
+		{#if relayState === 'ready'}
 			<p class="flex items-start gap-2 text-sm text-ink">
 				<RadioTower class="mt-0.5 size-4 shrink-0 text-signal-ink" aria-hidden="true" />
 				{m.deviceform_channelcheck_relay_ready({ relay: result.relay.relay_name, port })}
+			</p>
+		{:else if relayState === 'unreachable'}
+			<div role="alert" class="grid gap-2 rounded-[var(--radius-card)] border border-warning/50 bg-warning-soft px-3 py-3">
+				<p class="flex items-start gap-2 text-sm font-semibold text-warning-ink">
+					<AlertTriangle class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+					{m.deviceform_channelcheck_relay_unreachable_title({ relay: result.relay.relay_name, address: relayAddress })}
+				</p>
+				<p class="max-w-prose text-sm break-words text-ink">
+					{m.deviceform_channelcheck_relay_unreachable_body({ error: result.relay.check_error ?? '', port })}
+				</p>
+			</div>
+		{:else if relayState === 'testing'}
+			<p class="flex items-start gap-2 text-sm text-ink">
+				<Led tone="ghost" size="sm" blink />
+				{m.deviceform_channelcheck_relay_testing({ relay: result.relay.relay_name, address: relayAddress })}
 			</p>
 		{:else}
 			<p class="flex items-start gap-2 text-sm text-ink">

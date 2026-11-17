@@ -50,6 +50,9 @@ pub struct TargetView {
     pub via_agent: Option<TargetId>,
     pub interval_secs: u64,
     pub enabled: bool,
+    /// Contrôle des failles connues (CVE) actif pour cet équipement ; vrai par
+    /// défaut (voir `api/cves.rs`).
+    pub cve_scan: bool,
     pub tags: BTreeMap<String, String>,
     pub credential_kind: String,
     /// Un secret est enregistré : le formulaire l'annonce, laisser le champ
@@ -123,6 +126,7 @@ impl TargetView {
             via_agent,
             interval_secs: target.interval.as_secs(),
             enabled: target.enabled,
+            cve_scan: true,
             tags: target.tags,
             credential_kind: target.credential.kind_label().to_string(),
             has_secret: target.credential.has_secret(),
@@ -169,6 +173,10 @@ pub struct TargetPayload {
     pub interval_secs: Option<u64>,
     #[serde(default)]
     pub enabled: Option<bool>,
+    /// Contrôle des failles connues (CVE) de cet équipement. Absent : inchangé
+    /// (actif à la création).
+    #[serde(default)]
+    pub cve_scan: Option<bool>,
     #[serde(default)]
     pub tags: BTreeMap<String, String>,
     /// Dossier plat et libre ; vide ou `null` : aucun dossier. Absent lors d'une
@@ -242,6 +250,10 @@ impl TargetPayload {
             )));
         }
         if state.collectors.get(&self.kind).is_none() {
+            // Le type d'un paquet communautaire absent : dire lequel installer.
+            if let Some(message) = dumbmonit_collectors::pack_to_install(&self.kind) {
+                return Err(ApiError::BadRequest(message));
+            }
             return Err(ApiError::BadRequest(format!(
                 "Unknown monitor type \"{}\" (available: {})",
                 self.kind,
@@ -371,6 +383,7 @@ pub async fn list(
     let places = super::locations::assignments(&state.pool).await?;
     let mut multisite = db::multisite::all(&state.pool).await?;
     let owners = clients::target_clients(&state.pool).await?;
+    let cve_off = db::targets::cve_scan_off(&state.pool).await?;
     let admin = who.is_admin();
     Ok(Json(
         targets
@@ -380,10 +393,12 @@ pub async fn list(
                 let location = places.get(&target.id).copied();
                 let sites = multisite.remove(&target.id);
                 let client = owners.get(&target.id).copied();
+                let cve_scan = !cve_off.contains(&target.id);
                 TargetView::new(target, status)
                     .at(location)
                     .sites(sites)
                     .client(client)
+                    .cve(cve_scan)
                     .for_reader(admin)
             })
             .collect(),
@@ -400,11 +415,13 @@ pub async fn get_one(
     let location = super::locations::location_of(&state.pool, id).await?;
     let sites = db::multisite::get(&state.pool, id).await?;
     let client = clients::target_client(&state.pool, id).await?;
+    let cve_scan = db::targets::cve_scan_of(&state.pool, id).await?;
     Ok(Json(
         TargetView::new(target, status)
             .at(location)
             .sites(sites)
             .client(client)
+            .cve(cve_scan)
             .for_reader(who.is_admin()),
     ))
 }
@@ -420,6 +437,11 @@ impl TargetView {
 
     fn sites(mut self, multisite: Option<MultisiteConfig>) -> Self {
         self.multisite = multisite;
+        self
+    }
+
+    fn cve(mut self, cve_scan: bool) -> Self {
+        self.cve_scan = cve_scan;
         self
     }
 
@@ -490,6 +512,7 @@ pub async fn create(
     let location = payload.location_id.flatten();
     let multisite = payload.multisite.clone().flatten();
     let wanted_client = payload.client_id;
+    let cve_scan = payload.cve_scan.unwrap_or(true);
     let input = payload.validate(&state, None)?;
     let client = clients::target_client_for(&state.pool, &access, wanted_client)
         .await
@@ -510,6 +533,9 @@ pub async fn create(
     if multisite.is_some() {
         db::multisite::set(&state.pool, id, multisite.as_ref()).await?;
     }
+    if !cve_scan {
+        db::targets::set_cve_scan(&state.pool, &[id], false).await?;
+    }
     let target = load(&state, id).await?;
     crate::packs::apply_thresholds(&state.pool, &target).await;
 
@@ -522,7 +548,11 @@ pub async fn create(
     // Le relais fait partie du statut, pas de la cible : sans lui, la réponse
     // dirait `via_agent: null` alors qu'il vient d'être enregistré.
     let status = db::targets::statuses(&state.pool).await?.remove(&id);
-    let view = TargetView::new(target, status).at(location).sites(multisite).client(Some(client));
+    let view = TargetView::new(target, status)
+        .at(location)
+        .sites(multisite)
+        .client(Some(client))
+        .cve(cve_scan);
     Ok((StatusCode::CREATED, Json(view)))
 }
 
@@ -538,6 +568,7 @@ pub async fn update(
     let new_location = payload.location_id;
     let new_multisite = payload.multisite.clone();
     let wanted_client = payload.client_id;
+    let new_cve_scan = payload.cve_scan;
     let before = load(&state, id).await?;
     let current_client =
         clients::target_client(&state.pool, id).await?.ok_or_else(|| not_found(id))?;
@@ -610,6 +641,12 @@ pub async fn update(
     if let Some(location) = new_location {
         super::locations::set_location(&state.pool, &[id], location).await?;
     }
+    if let Some(cve_scan) = new_cve_scan {
+        db::targets::set_cve_scan(&state.pool, &[id], cve_scan).await?;
+        if cve_scan {
+            crate::vulns::request_refresh();
+        }
+    }
     if multisite != multisite_before {
         db::multisite::set(&state.pool, id, multisite.as_ref()).await?;
     }
@@ -622,7 +659,14 @@ pub async fn update(
     crate::packs::apply_thresholds(&state.pool, &target).await;
     let status = db::targets::statuses(&state.pool).await?.remove(&id);
     let location = super::locations::location_of(&state.pool, id).await?;
-    Ok(Json(TargetView::new(target, status).at(location).sites(multisite).client(Some(client))))
+    let cve_scan = db::targets::cve_scan_of(&state.pool, id).await?;
+    Ok(Json(
+        TargetView::new(target, status)
+            .at(location)
+            .sites(multisite)
+            .client(Some(client))
+            .cve(cve_scan),
+    ))
 }
 
 /// Mode MSP : un équipement ne dépend (parent, relais, emplacements de sonde)
@@ -890,13 +934,9 @@ pub async fn delete(
 /// Éteint sans bruit les alertes d'une cible qui vient d'être supprimée ou
 /// mise en pause. Un échec ne fait pas échouer la requête : le moteur d'alerting
 /// écarte de toute façon ces alertes à son prochain cycle.
-/// Ce qui reste d'une cible supprimée hors de sa ligne : alertes, captures,
-/// séries.
+/// Ce qui reste d'une cible supprimée hors de sa ligne : alertes, séries.
 pub(crate) async fn forget(state: &AppState, id: TargetId) {
     forget_alerts(state, id).await;
-    // Les captures d'écran d'une surveillance de site sont des fichiers : la
-    // cascade de la base ne les atteint pas.
-    crate::webchange::store::forget_files(&state.config.data_dir, id).await;
     spawn_series_deletion(state.clone(), id);
 }
 

@@ -12,18 +12,23 @@ mod client;
 mod collect;
 mod commands;
 mod config;
+mod failover;
 mod gateway;
 mod identity;
 // Le journal du service Windows ; compilé partout pour être testé sous Linux.
 #[cfg(any(windows, test))]
 mod logfile;
 mod logs;
+mod mux;
+mod proxy;
 mod relay;
+mod relay_offline;
 mod remediation;
 mod run;
 mod selfupdate;
 mod sentinel;
 mod shutdown;
+mod spool;
 #[cfg(test)]
 mod testsupport;
 mod tls;

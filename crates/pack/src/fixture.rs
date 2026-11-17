@@ -6,6 +6,7 @@
 //! shelly-plug/
 //!   pack.yaml
 //!   fixtures/status.json     une réponse par source, nommée d'après son id
+//!                            (.json, .xml, .txt ou .prom)
 //!   expected.prom            ce que l'extraction doit en tirer
 //! ```
 //!
@@ -21,7 +22,7 @@ use dumbmonit_proto::{MetricKind, Sample};
 use crate::{METRIC_PREFIX, Pack};
 
 /// Extensions reconnues pour une fixture, dans l'ordre de recherche.
-pub const FIXTURE_EXTENSIONS: &[&str] = &["json", "txt", "prom"];
+pub const FIXTURE_EXTENSIONS: &[&str] = &["json", "xml", "txt", "prom"];
 
 /// Nom du fichier de référence, à la racine du paquet.
 pub const EXPECTED: &str = "expected.prom";

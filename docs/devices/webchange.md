@@ -3,8 +3,7 @@
 Watch the *content* of a web page, or of a whole site, and be told when it
 changes: a pricing or terms page, a documentation site, a supplier's
 maintenance notice, a public announcement page, or your own site after a
-deployment. Each change is kept with the text before and after, a line diff
-and, when a browser is available, a screenshot of each version.
+deployment. Each change is kept with the text before and after, a line diff.
 
 What is compared is the **visible text** of each page, not its HTML: scripts,
 styles, comments, `noscript`, `svg` and `template` blocks are dropped, white
@@ -156,48 +155,11 @@ rule, or raise its severity, in **Alerts → Rules**. See
 
 The metrics appear once the first check is done.
 
-## Screenshots
-
-The DumbMonit image has no browser: screenshots come from an optional headless
-Chromium, driven over the Chrome DevTools Protocol. Add one as a `browser`
-service next to DumbMonit in `docker-compose.yml`, and point the server at it:
-
-```yaml
-services:
-  dumbmonit:
-    environment:
-      DUMBMONIT_BROWSER_URL: http://browser:9222
-  browser:
-    image: chromedp/headless-shell:stable
-    shm_size: 256m
-    restart: unless-stopped
-```
-
-Then run `docker compose up -d`. Nothing publishes the browser's port: only the
-DumbMonit server talks to it, over the Compose network.
-
-`DUMBMONIT_BROWSER_URL` points DumbMonit at the browser (any Chromium started
-with `--remote-debugging-port`, for example `chromedp/headless-shell`; the
-server reads `/json/version` and talks to the address the host name resolves
-to).
-
-A screenshot is taken only when a page gets a new snapshot (the reference, and
-every change), never on an unchanged check: a 1366 × 900 window, the full page
-down to 5000 pixels, as JPEG. The **Screenshots** option turns them off for one
-monitor. Without a browser, or when it does not answer, the text comparison
-works the same and the snapshots simply have no image; the monitor page says
-so.
-
-The browser loads the page the way a visitor would, with its scripts: what it
-shows can differ from the text DumbMonit compared, which is the HTML the server
-sent.
-
 ## Storage
 
-The text of each snapshot is kept in the database (1 MB at most per page);
-screenshots are files under `/data/webchange/<device id>/`. Per monitor, the
+The text of each snapshot is kept in the database (1 MB at most per page). Per monitor, the
 last 500 changes are kept; a snapshot is kept while it is the latest of a
-page or a kept change refers to it, and everything else, files included, is
+page or a kept change refers to it, and everything else is
 removed after each check. Deleting the monitor removes all of it.
 
 ## Watch a website for changes
@@ -209,8 +171,6 @@ The steps below are the ones the notice next to the form shows.
 2. To follow a whole site or section, set "Scope" to "site".
 
 3. List lines that change at every visit (a clock, a counter) in "Ignore lines", as regular expressions.
-
-4. For a screenshot of each version, follow the "Screenshots" section of this page.
 
 !!! warning
     Only the text the server sends is compared: pages drawn by JavaScript or behind a login are not followed.
@@ -233,7 +193,6 @@ cannot go through a relay agent.
 | Compare menus, header and footer (`keep_page_chrome`) | `false` | Compare the site's navigation, header, footer and sidebars too. |
 | Ignore query strings (`ignore_query`) | `false` | Site scope: addresses that differ only by their `?…` part are one page. |
 | User agent (`user_agent`) | — | Sent instead of `DumbMonit/<version>`. |
-| Screenshots (`screenshots`) | `true` | Keep a screenshot of each new version, when a browser is configured. |
 | Check every (`check_interval_minutes`) | `60` | Minutes between two checks, 5 to 10080. |
 | Accept an unverifiable certificate (`insecure_tls`) | `false` | For a site of your own behind a self-signed certificate. |
 | Allow loopback and link-local targets (`allow_private_targets`) | `false` | Reach a site served by the DumbMonit host itself. |

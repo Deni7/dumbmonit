@@ -1,15 +1,22 @@
 //! Routes du port des agents.
 //!
 //! Le protocole des agents (lots, commandes, relais) y est servi tel que sur
-//! le port de l'interface, mais derrière un certificat client valable. Seul
-//! l'enrôlement s'en passe : c'est lui qui le délivre, contre le jeton
-//! d'enrôlement. Rien d'autre n'est servi ici — ni interface, ni version, ni
-//! documentation de l'API : un inconnu qui se connecte n'apprend rien.
+//! le port de l'interface, mais derrière un certificat client valable. Deux
+//! choses s'en passent :
+//!
+//! - l'enrôlement, qui délivre ce certificat contre le jeton d'enrôlement ;
+//! - les fichiers d'installation (`/install.sh`, `/install.ps1`,
+//!   `/download/…`), publics de toute façon sur le port de l'interface : une
+//!   machine d'un site distant s'installe ainsi par ce seul port. La commande
+//!   épingle la clé du certificat de ce port (`curl --pinnedpubkey`, rappel de
+//!   validation en PowerShell) et l'empreinte SHA-256 de chaque binaire.
+//!
+//! Rien d'autre n'est servi ici — ni interface, ni version, ni documentation
+//! de l'API.
 //!
 //! Un agent relais y ouvre aussi les tunnels des agents de son site
-//! ([`super::tunnel`]). À travers un tunnel, et seulement ainsi, une machine du
-//! site lit les fichiers d'installation (`/install.sh`, `/install.ps1`,
-//! `/download/…`) : sa commande vise `https://relais:8443`, la passerelle du
+//! ([`super::tunnel`]). Les machines du site y lisent les mêmes fichiers à
+//! travers lui : leur commande vise `https://relais:8443`, la passerelle du
 //! relais la porte jusqu'ici, et la session TLS (épinglée par la commande) va
 //! de la machine au serveur — le relais ne voit que du chiffré.
 
@@ -27,8 +34,8 @@ use axum::{Extension, Json, Router};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use dumbmonit_proto::{
-    AGENT_SECRET_HEADER, AGENT_TLS_HEADER, CERT_REFUSED, RELAY_TUNNEL_PATH, RELAY_TUNNEL_PROTOCOL,
-    TargetId, TlsCertificate, TlsEnrolRequest, TlsRenewRequest,
+    AGENT_SECRET_HEADER, AGENT_TLS_HEADER, CERT_REFUSED, RELAY_MUX_PROTOCOL, RELAY_TUNNEL_PATH,
+    RELAY_TUNNEL_PROTOCOL, TargetId, TlsCertificate, TlsEnrolRequest, TlsRenewRequest,
 };
 use serde_json::json;
 
@@ -60,7 +67,8 @@ pub fn router(state: AppState) -> Router {
         .route(&under_api(RELAY_TUNNEL_PATH), get(open_tunnel))
         .route_layer(middleware::from_fn_with_state(state.clone(), require_certificate));
     let open = Router::new().route("/agent/tls/enroll", post(enrol));
-    // Fichiers d'installation, pour les machines du site d'un relais.
+    // Fichiers d'installation, sans certificat client : machines d'un site
+    // distant (un seul port) et machines derrière un relais.
     let site = Router::new()
         .route("/install.sh", get(site_install_sh))
         .route("/install.ps1", get(site_install_ps1))
@@ -158,9 +166,31 @@ async fn is_relay(state: &AppState, target_id: TargetId) -> anyhow::Result<bool>
         .is_some_and(|host| host.relay || host.relay_wanted))
 }
 
+/// Ce qu'un relais demande par `Upgrade:`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TunnelKind {
+    /// Un tunnel pour une seule connexion ([`RELAY_TUNNEL_PROTOCOL`]).
+    Single,
+    /// La connexion multiplexée ([`RELAY_MUX_PROTOCOL`]).
+    Multiplexed,
+}
+
+/// Lit `Upgrade:` : le protocole demandé, s'il est l'un des nôtres.
+fn tunnel_kind(upgrade: Option<&str>) -> Option<TunnelKind> {
+    let upgrade = upgrade?.trim();
+    if upgrade.eq_ignore_ascii_case(RELAY_TUNNEL_PROTOCOL) {
+        Some(TunnelKind::Single)
+    } else if upgrade.eq_ignore_ascii_case(RELAY_MUX_PROTOCOL) {
+        Some(TunnelKind::Multiplexed)
+    } else {
+        None
+    }
+}
+
 /// `GET /api/agent/relay/tunnel` (mise à niveau HTTP) : tunnel d'un agent du
-/// site de ce relais vers ce port. Réservé à un relais authentifié par son
-/// certificat, et jamais depuis un tunnel.
+/// site de ce relais vers ce port, ou connexion multiplexée qui portera ceux de
+/// tout le site. Réservé à un relais authentifié par son certificat, et jamais
+/// depuis un tunnel.
 async fn open_tunnel(
     State(state): State<AppState>,
     Extension(cert): Extension<AgentCert>,
@@ -170,17 +200,22 @@ async fn open_tunnel(
     if cert.via_relay.is_some() {
         return error(StatusCode::FORBIDDEN, "A tunnel cannot be opened through another tunnel.");
     }
-    let wanted = request
-        .headers()
-        .get(header::UPGRADE)
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|value| value.eq_ignore_ascii_case(RELAY_TUNNEL_PROTOCOL));
-    if !wanted {
+    // Une mise à niveau n'existe qu'en HTTP/1.1 : un relais la demande par une
+    // connexion à part, jamais par celle, en HTTP/2, de ses requêtes.
+    if request.version() != axum::http::Version::HTTP_11 {
         return error(
-            StatusCode::UPGRADE_REQUIRED,
-            "This route only opens a relay tunnel (Upgrade: dumbmonit-tunnel/1).",
+            StatusCode::HTTP_VERSION_NOT_SUPPORTED,
+            "Relay tunnels are opened over HTTP/1.1.",
         );
     }
+    let kind = tunnel_kind(request.headers().get(header::UPGRADE).and_then(|v| v.to_str().ok()));
+    let Some(kind) = kind else {
+        return error(
+            StatusCode::UPGRADE_REQUIRED,
+            "This route only opens a relay tunnel \
+             (Upgrade: dumbmonit-tunnel/1 or dumbmonit-mux/1).",
+        );
+    };
     match is_relay(&state, cert.target_id).await {
         Ok(true) => {}
         Ok(false) => return error(StatusCode::FORBIDDEN, NOT_A_RELAY),
@@ -204,26 +239,33 @@ async fn open_tunnel(
     tokio::spawn(async move {
         match upgrade.await {
             Ok(upgraded) => {
-                grant.attach(hyper_util::rt::TokioIo::new(upgraded), relay, addr).await;
+                let upgraded = hyper_util::rt::TokioIo::new(upgraded);
+                match kind {
+                    TunnelKind::Single => grant.attach(upgraded, relay, addr).await,
+                    TunnelKind::Multiplexed => grant.multiplex(state, upgraded, relay, addr).await,
+                }
             }
             Err(cause) => tracing::debug!(relay, %cause, "agent relay: tunnel upgrade failed"),
         }
     });
+    let protocol = match kind {
+        TunnelKind::Single => RELAY_TUNNEL_PROTOCOL,
+        TunnelKind::Multiplexed => RELAY_MUX_PROTOCOL,
+    };
     let mut response = Response::new(Body::empty());
     *response.status_mut() = StatusCode::SWITCHING_PROTOCOLS;
     let headers = response.headers_mut();
     headers.insert(header::CONNECTION, HeaderValue::from_static("upgrade"));
-    headers.insert(header::UPGRADE, HeaderValue::from_static(RELAY_TUNNEL_PROTOCOL));
+    headers.insert(header::UPGRADE, HeaderValue::from_static(protocol));
     response
 }
 
-/// Garde des fichiers d'installation : seulement à travers le tunnel d'un
-/// relais qui l'est encore. En direct, ce port ne sert rien de tel (les
-/// commandes directes visent le port de l'interface). `None` : servi.
+/// Garde des fichiers d'installation. En direct, ils sont servis à qui les
+/// demande, comme sur le port de l'interface : rien n'y est secret (le jeton
+/// voyage dans les arguments de la commande, jamais dans l'URL). À travers le
+/// tunnel d'un relais, seulement si celui-ci l'est encore. `None` : servi.
 async fn site_files_refused(state: &AppState, peer: Option<&AgentPeer>) -> Option<Response> {
-    let Some(relay) = peer.and_then(|peer| peer.via_relay) else {
-        return Some(not_found().await);
-    };
+    let relay = peer.and_then(|peer| peer.via_relay)?;
     match is_relay(state, relay).await {
         Ok(true) => None,
         Ok(false) => Some(error(StatusCode::FORBIDDEN, NOT_A_RELAY)),
@@ -418,4 +460,20 @@ async fn not_found() -> Response {
 
 fn error(status: StatusCode, message: &str) -> Response {
     (status, Json(json!({ "error": message }))).into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_relay_asks_for_a_tunnel_or_for_the_multiplexed_connection_and_nothing_else() {
+        assert_eq!(tunnel_kind(Some("dumbmonit-tunnel/1")), Some(TunnelKind::Single));
+        assert_eq!(tunnel_kind(Some(" DumbMonit-Mux/1 ")), Some(TunnelKind::Multiplexed));
+        assert_eq!(tunnel_kind(Some("websocket")), None);
+        // Une liste n'est pas lue : le relais demande un protocole à la fois,
+        // comme le serveur antérieur l'attendait.
+        assert_eq!(tunnel_kind(Some("dumbmonit-mux/1, dumbmonit-tunnel/1")), None);
+        assert_eq!(tunnel_kind(None), None);
+    }
 }

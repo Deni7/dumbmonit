@@ -13,6 +13,7 @@ pub mod env;
 mod eventlog;
 mod logs;
 mod push;
+mod relay_offline;
 pub mod remediation;
 mod sample;
 mod selfupdate;
@@ -26,7 +27,7 @@ pub use command::{
     AgentCommand, CMD_AGENT_UNINSTALL, CMD_CONTAINER_RESTART, CMD_CONTAINER_UPDATE, CMD_PROBE,
     COMMAND_MAX_AGE_SECS, COMMAND_RESULT_MAX_BYTES, COMMAND_RESULT_TRUNCATED, COMMANDS_PATH,
     CommandReport, CommandStatus, NetconfigCapture, ProbeJob, ProbeOutcome, RELAY_PATH,
-    RELAY_POLL_HOLD_SECS, truncate_result,
+    RELAY_POLL_HOLD_SECS, RELAY_RESYNC_HEADER, truncate_result,
 };
 pub use credential::{
     Credential, CredentialInput, Resolved, SnmpV3Auth, SnmpV3AuthInput, SnmpV3AuthProtocol,
@@ -54,9 +55,14 @@ pub use logs::{
 };
 pub use push::{
     AGENT_KEY_HEADER, AGENT_SECRET_HEADER, AGENT_SECRET_PREFIX, AgentIdentity, BINDING_MISMATCH,
-    DeclaredMonitor, ENROLMENT_PENDING, ENROLMENT_REJECTED, INGEST_PATH, InstalledPackage,
-    MAX_BATCH_SAMPLES, MAX_DECLARED_MONITORS, MAX_INVENTORY_PACKAGES, PUSH_PROTOCOL_VERSION,
-    PushAck, PushBatch, RelaySetting, SoftwareInventory, TOKEN_PREFIX,
+    DeclaredMonitor, ENROLMENT_PENDING, ENROLMENT_REJECTED, GatewayCheck, INGEST_PATH,
+    InstalledPackage, MAX_BATCH_SAMPLES, MAX_DECLARED_MONITORS, MAX_GATEWAY_CHECK_ERROR,
+    MAX_INVENTORY_PACKAGES, MAX_SERVER_LINK_TEXT, PUSH_PROTOCOL_VERSION, PushAck, PushBatch,
+    RelaySetting, ServerLink, SoftwareInventory, TOKEN_PREFIX,
+};
+pub use relay_offline::{
+    BacklogAck, BacklogResult, MAX_BACKLOG_RESULTS, PlannedProbe, RELAY_BACKLOG_PATH,
+    RELAY_PLAN_PATH, RelayBacklog, RelayPlan,
 };
 pub use remediation::{CMD_SCRIPT_RUN, CMD_SERVICE_RESTART, DeclaredScript, RemediationInfo};
 pub use sample::{MetricKind, Sample};
@@ -73,9 +79,10 @@ pub use target::{
     looks_secret,
 };
 pub use tls::{
-    AGENT_TLS_HEADER, AGENT_TLS_SERVER_NAME, CERT_REFUSED, CLIENT_CERT_DAYS,
-    DEFAULT_AGENT_TLS_PORT, DEFAULT_RELAY_GATEWAY_PORT, MTLS_REQUIRED, RELAY_TUNNEL_PATH,
-    RELAY_TUNNEL_PROTOCOL, RENEW_BEFORE_DAYS, TLS_ENROL_PATH, TLS_RENEW_PATH, TlsCertificate,
-    TlsEnrolRequest, TlsOffer, TlsRenewRequest, agent_channel_url, is_pin, normalise_pin,
+    AGENT_ALPN, AGENT_TLS_HEADER, AGENT_TLS_SERVER_NAME, CERT_REFUSED, CLIENT_CERT_DAYS,
+    DEFAULT_AGENT_TLS_PORT, DEFAULT_RELAY_GATEWAY_PORT, MTLS_REQUIRED, RELAY_MUX_PROTOCOL,
+    RELAY_TUNNEL_PATH, RELAY_TUNNEL_PROTOCOL, RENEW_BEFORE_DAYS, TLS_ENROL_PATH, TLS_RENEW_PATH,
+    TlsCertificate, TlsEnrolRequest, TlsOffer, TlsRenewRequest, agent_channel_url, is_pin,
+    normalise_pin,
 };
 pub use version::{Version, is_older};

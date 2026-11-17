@@ -132,6 +132,11 @@ pub async fn probe(addr: SocketAddr) -> Result<(), String> {
 
 /// Point d'entrée de la sous-commande ; renvoie le code de sortie du processus.
 pub fn run() -> i32 {
+    // Serveur de secours en attente : aucun port n'est ouvert, c'est voulu. Il
+    // est sain tant qu'il tient son état à jour (voir `ha`).
+    if crate::ha::cli::standby_is_healthy() {
+        return 0;
+    }
     let bind = env_var("DUMBMONIT_BIND").unwrap_or_else(|| "0.0.0.0:8080".into());
     let Some(addr) = target_from_bind(&bind) else {
         eprintln!("healthcheck: invalid DUMBMONIT_BIND \"{bind}\"");

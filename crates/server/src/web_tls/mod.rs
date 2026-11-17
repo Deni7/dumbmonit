@@ -38,6 +38,10 @@ use serde::Serialize;
 
 pub use listener::{WebIo, WebListener, WebPeer, listen};
 
+pub(crate) use listener::{
+    FIRST_BYTE_TIMEOUT, HANDSHAKE_TIMEOUT, TLS_HANDSHAKE_RECORD, WebFeed, redirect_plain,
+};
+
 use crate::state::AppState;
 
 /// Certificat autosigné (table `settings`, [`cert::StoredCert`] en JSON).

@@ -39,6 +39,8 @@ pub fn detect(config: &Config) -> AgentIdentity {
         // tentative) : `run::Agent::new`.
         self_update: None,
         relay_gateway: None,
+        relay_gateway_check: None,
+        server_link: None,
         // Relu du disque à chaque démarrage : ajouter un manifeste demande de
         // redémarrer l'agent, comme toute modification de agent.yaml.
         remediation: Some(crate::remediation::describe(&config.actions)),
@@ -169,12 +171,15 @@ mod tests {
             databases: crate::collect::databases::DatabasesConfig::default(),
             perf_counters: crate::collect::perf_counters::PerfCountersConfig::default(),
             max_buffered_samples: 100,
+            buffer_max_mb: 0,
             secret_path: std::path::PathBuf::from("/inexistant/agent-secret"),
             tls_url: None,
             ca_pin: None,
             server_pin: None,
             plain_server_url: false,
+            fallback_servers: Vec::new(),
             log_level: tracing::Level::INFO,
+            proxy: crate::proxy::ProxyConfig::default(),
             deprecated_env: Vec::new(),
         }
     }

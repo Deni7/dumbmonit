@@ -8,7 +8,8 @@
 //!
 //! Une lecture obligatoire — la page de la grappe — et une facultative, la
 //! page du nœud interrogé (durée de fonctionnement), qu'un serveur plus ancien
-//! peut ne pas servir sans faire échouer le reste. Les familles de métriques
+//! peut ne pas servir sans faire échouer le reste ; un serveur récent publie la
+//! durée de fonctionnement sur la page de la grappe, lue à défaut. Les familles de métriques
 //! ont changé de nom d'une version à l'autre (`disk` devenu `drive`) : les deux
 //! noms sont lus, et une famille absente ne produit simplement pas de mesure.
 //!
@@ -134,11 +135,13 @@ pub fn samples(cluster: &Exposition, node: Option<&Exposition>, ts_ms: i64) -> V
     let mut out = Vec::new();
 
     if let Some(line) = cluster.first("minio_software_version_info") {
-        out.push(
-            g("minio_version_info", 1.0)
-                .with_label("version", line.label("version").unwrap_or(""))
-                .with_label("commit", line.label("commit").unwrap_or("")),
-        );
+        let mut info =
+            g("minio_version_info", 1.0).with_label("version", line.label("version").unwrap_or(""));
+        // Les versions récentes ne publient plus le commit : pas d'étiquette vide.
+        if let Some(commit) = line.label("commit").filter(|commit| !commit.is_empty()) {
+            info = info.with_label("commit", commit);
+        }
+        out.push(info);
     }
 
     let online = cluster.sum("minio_cluster_nodes_online_total");
@@ -231,10 +234,27 @@ pub fn samples(cluster: &Exposition, node: Option<&Exposition>, ts_ms: i64) -> V
         out.push(counter("minio_s3_requests_5xx_total", errors, ts_ms));
     }
 
-    if let Some(uptime) = node.and_then(|page| page.sum("minio_node_process_uptime_seconds")) {
+    if let Some(uptime) = uptime(cluster, node) {
         out.push(g("minio_uptime_seconds", uptime));
     }
     out
+}
+
+const UPTIME: &str = "minio_node_process_uptime_seconds";
+
+/// La durée de fonctionnement du processus. Les versions récentes ne la
+/// publient plus sur la page du nœud mais sur celle de la grappe, une ligne par
+/// serveur (étiquette `server`) : on garde la plus courte, celle du serveur
+/// redémarré le plus récemment, la seule qui trahit un redémarrage.
+fn uptime(cluster: &Exposition, node: Option<&Exposition>) -> Option<f64> {
+    if let Some(value) = node.and_then(|page| page.sum(UPTIME)) {
+        return Some(value);
+    }
+    cluster
+        .family(UPTIME)
+        .map(|line| line.value)
+        .filter(|value| value.is_finite() && *value >= 0.0)
+        .reduce(f64::min)
 }
 
 #[cfg(test)]
@@ -252,6 +272,11 @@ mod tests {
     // une réparation récente avec des échecs, une réplication en échec.
     const CLUSTER_TXT: &str = include_str!("testdata/cluster.txt");
     const NODE_TXT: &str = include_str!("testdata/node.txt");
+    // Extrait de `/minio/v2/metrics/cluster` d'un MinIO RELEASE.2026-11-09 réel
+    // (un nœud, un disque, deux buckets, un objet de six octets) : l'uptime y
+    // figure, la page du nœud ne le publie plus, et la version n'a plus de
+    // commit. Le nom du serveur dans l'étiquette `server` est fictif.
+    const CLUSTER_2026: &str = include_str!("testdata/cluster_2026-11-09.txt");
 
     #[test]
     fn grappe_et_noeud() {
@@ -273,6 +298,30 @@ mod tests {
         assert_eq!(value(&s, "minio_s3_requests_total", &[]), 10_000.0);
         assert_eq!(value(&s, "minio_s3_requests_5xx_total", &[]), 7.0);
         assert_eq!(value(&s, "minio_uptime_seconds", &[]), 86_400.0);
+    }
+
+    #[test]
+    fn l_uptime_se_lit_sur_la_page_de_la_grappe_et_le_commit_vide_est_omis() {
+        let s = samples(&Exposition::parse(CLUSTER_2026), None, 0);
+        assert!((value(&s, "minio_uptime_seconds", &[]) - 295.7).abs() < 1e-6);
+        let info = find(&s, "minio_version_info", &[]).unwrap();
+        assert_eq!(info.labels["version"], "2026-11-09T00-10-40Z");
+        assert!(!info.labels.contains_key("commit"), "pas d'étiquette vide");
+        assert_eq!(value(&s, "minio_nodes_online", &[]), 1.0);
+        assert_eq!(value(&s, "minio_drives", &[]), 1.0);
+        assert_eq!(value(&s, "minio_capacity_raw_bytes", &[]), 512_470_736_896.0);
+        assert!((value(&s, "minio_capacity_raw_used_percent", &[]) - 33.408).abs() < 0.01);
+        assert_eq!(value(&s, "minio_buckets", &[]), 2.0);
+        assert_eq!(value(&s, "minio_s3_requests_4xx_total", &[]), 5.0);
+        // Plusieurs serveurs : le plus récemment redémarré.
+        let multi = Exposition::parse(
+            "minio_node_process_uptime_seconds{server=\"a:9000\"} 900\n\
+             minio_node_process_uptime_seconds{server=\"b:9000\"} 40\n",
+        );
+        assert_eq!(value(&samples(&multi, None, 0), "minio_uptime_seconds", &[]), 40.0);
+        // La page du nœud, quand elle existe, reste prioritaire.
+        let node = Exposition::parse(NODE_TXT);
+        assert_eq!(value(&samples(&multi, Some(&node), 0), "minio_uptime_seconds", &[]), 86_400.0);
     }
 
     #[test]
@@ -312,6 +361,10 @@ mod tests {
         let error = MinioCollector::new().probe(&target).await.unwrap_err();
         assert!(matches!(error, ProbeError::Auth(_)), "{error}");
         assert!(!error.means_down());
+        // Le 403 d'un jeton inexistant ne dit pas que MinIO l'a « accepté ».
+        let message = error.to_string();
+        assert!(message.contains("wrong or expired"), "{message}");
+        assert!(!message.contains("accepted"), "{message}");
     }
 
     #[tokio::test]

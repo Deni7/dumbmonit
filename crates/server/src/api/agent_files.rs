@@ -329,6 +329,42 @@ mod tests {
         assert!(INSTALL_PS1.contains("$lignes.Add(\"relay: true\")"));
     }
 
+    /// Un relais ouvre le port de sa passerelle sur son pare-feu, au seul
+    /// sous-réseau local, et la désinstallation le referme.
+    #[test]
+    fn the_scripts_open_the_gateway_port_to_the_local_subnet_only_and_undo_it() {
+        assert!(INSTALL_SH.contains("--open-gateway) OPEN_GATEWAY=1 ;;"));
+        assert!(INSTALL_SH.contains("[ \"$RELAY\" -eq 1 ] && OPEN_GATEWAY=1"));
+        assert!(INSTALL_SH.contains("source address=\\\"$reseau\\\""), "firewalld, sous-réseau");
+        assert!(INSTALL_SH.contains("ufw allow from \"$reseau\" to any port"), "ufw, sous-réseau");
+        assert!(INSTALL_SH.contains("--remove-rich-rule="));
+        assert!(INSTALL_SH.contains("ufw delete allow from"));
+        // La désinstallation défait ce qui a été posé, avant d'effacer le dossier.
+        let uninstall = INSTALL_SH.split("if [ \"$UNINSTALL\" -eq 1 ]; then").nth(1).unwrap();
+        let undo = uninstall.find("annuler_pare_feu").expect("règles retirées");
+        assert!(undo < uninstall.find("rm -rf \"$CONFIG_DIR\"").unwrap());
+
+        assert!(INSTALL_PS1.contains("[switch]$OpenGateway"));
+        assert!(INSTALL_PS1.contains("-RemoteAddress LocalSubnet"));
+        assert!(INSTALL_PS1.contains("remoteip=localsubnet"));
+        assert!(INSTALL_PS1.contains("if (-not ($OpenGateway -or $Relay)) { return }"));
+        let uninstall = INSTALL_PS1.split("if ($Uninstall) {").nth(1).unwrap();
+        assert!(uninstall.contains("Remove-RegleParefeu"));
+    }
+
+    /// Le mandataire sortant donné à l'installateur sert aux téléchargements et
+    /// finit dans agent.yaml, entre apostrophes (des identifiants peuvent y être).
+    #[test]
+    fn the_scripts_take_an_outbound_proxy_and_write_it_quoted() {
+        assert!(INSTALL_SH.contains("--proxy=*)    PROXY="));
+        assert!(INSTALL_SH.contains("--no-proxy=*) NO_PROXY_LIST="));
+        assert!(INSTALL_SH.contains("export https_proxy HTTPS_PROXY"));
+        assert!(INSTALL_SH.contains("echo \"proxy: '$(echo \"$PROXY\" | sed \"s/'/''/g\")'\""));
+        assert!(INSTALL_PS1.contains("[string]$Proxy"));
+        assert!(INSTALL_PS1.contains("[Net.WebRequest]::DefaultWebProxy = $mandataire"));
+        assert!(INSTALL_PS1.contains("$lignes.Add(\"proxy: '$($Proxy -replace \"'\", \"''\")'\")"));
+    }
+
     /// La vérification est obligatoire : sans empreinte, ou sans outil pour la
     /// calculer, rien n'est installé, sauf échappatoire explicite et bruyante.
     #[test]
@@ -419,7 +455,14 @@ mod tests {
         assert!(INSTALL_PS1.contains("$lignes.Add(\"server_pin: $PinnedKey\")"));
         assert!(INSTALL_PS1.contains("ServerCertificateValidationCallback"));
         assert!(INSTALL_PS1.contains("-notmatch '^https://'"));
-        assert!(!INSTALL_PS1.contains("http://"));
+        // Seul le mandataire sortant s'écrit en http:// (l'agent y fait passer son propre TLS).
+        for ligne in INSTALL_PS1
+            .lines()
+            .filter(|l| l.contains("http://") && !l.trim_start().starts_with('#'))
+        {
+            let l = ligne.to_lowercase();
+            assert!(l.contains("proxy") || l.contains("mandataire"), "URL en clair : {ligne}");
+        }
     }
 
     #[test]

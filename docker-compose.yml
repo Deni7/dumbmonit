@@ -8,6 +8,11 @@ services:
       # Encrypted agent channel (TLS 1.3 + client certificates). The only port
       # agents on other networks need; the web port can stay private.
       - "8443:8443"
+      # Optional single port: web UI, API and agents on 443 (agents are told
+      # apart by TLS ALPN). Set DUMBMONIT_SINGLE_PORT: "443" under
+      # `environment` and net.ipv4.ip_unprivileged_port_start: "443" under
+      # `sysctls`; keep 8443 until every agent is up to date.
+      # - "443:443"
       # Central logs (off by default; turn on with DUMBMONIT_SYSLOG_ENABLED /
       # DUMBMONIT_TRAPS_ENABLED under `environment`, and the log store in
       # Settings > System). Unprivileged ports: the container runs as non-root.

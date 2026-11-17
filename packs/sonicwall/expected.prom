@@ -1,0 +1,8 @@
+# TYPE dumbmonit_sonicwall_interface_link_up gauge
+dumbmonit_sonicwall_interface_link_up{interface="X0",zone="LAN"} 1
+dumbmonit_sonicwall_interface_link_up{interface="X1",zone="WAN"} 0
+dumbmonit_sonicwall_interface_link_up{interface="X2",zone="DMZ"} 1
+dumbmonit_sonicwall_interface_link_up{interface="X3",zone=""} 0
+dumbmonit_sonicwall_interface_link_up{interface="X4",zone="Unassigned"} 0
+# TYPE dumbmonit_sonicwall_version_info gauge
+dumbmonit_sonicwall_version_info{model="NSa 2700",version="SonicOS Enhanced 7.0.1-5111"} 1

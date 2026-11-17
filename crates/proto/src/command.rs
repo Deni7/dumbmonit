@@ -52,13 +52,21 @@ pub const RELAY_PATH: &str = "/api/agent/relay";
 /// se compte ainsi en millisecondes, sans que l'agent ne martèle le serveur.
 pub const RELAY_POLL_HOLD_SECS: u64 = 25;
 
+/// En-tête d'une réponse à la demande de sondes d'un relais : le réglage de
+/// ce relais vient de changer dans l'interface (passerelle ouverte, adresse
+/// du site). L'attente longue est alors rendue aussitôt, et le relais envoie
+/// un lot sans attendre sa période : l'accusé de réception porte le nouveau
+/// réglage. Un agent antérieur l'ignore et l'applique à son lot suivant.
+pub const RELAY_RESYNC_HEADER: &str = "x-dumbmonit-relay-resync";
+
 /// Une sonde à exécuter par un agent relais, telle qu'elle voyage dans les
 /// arguments d'une commande [`CMD_PROBE`].
 ///
 /// La cible est transmise entière, secret compris : c'est l'agent qui va se
 /// présenter à l'équipement. Le canal est celui des mesures (jeton porteur, et
-/// TLS dès que le serveur est publié derrière un mandataire), et rien de tout
-/// cela n'est jamais écrit sur disque, ni côté serveur ni côté agent.
+/// TLS dès que le serveur est publié derrière un mandataire). Le serveur n'en
+/// écrit rien sur disque ; le relais n'en garde qu'une copie chiffrée, celle
+/// de son planning pour les coupures du lien ([`crate::RelayPlan`]).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProbeJob {
     pub target: Target,

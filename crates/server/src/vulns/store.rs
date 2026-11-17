@@ -550,7 +550,7 @@ pub async fn findings(pool: &SqlitePool) -> sqlx::Result<Vec<FindingRow>> {
     let rows = sqlx::query(
         "SELECT f.target_id, f.component, f.cve_id, f.installed_version, f.fixed_version, \
          f.state, f.reason, f.source, f.first_seen FROM cve_findings f \
-         JOIN targets t ON t.id = f.target_id",
+         JOIN targets t ON t.id = f.target_id WHERE t.cve_scan = 1",
     )
     .fetch_all(pool)
     .await?;
@@ -573,7 +573,7 @@ pub async fn findings(pool: &SqlitePool) -> sqlx::Result<Vec<FindingRow>> {
 pub async fn components(pool: &SqlitePool) -> sqlx::Result<Vec<ComponentRow>> {
     let rows = sqlx::query(
         "SELECT c.target_id, c.component, c.version, c.origin FROM cve_components c \
-         JOIN targets t ON t.id = c.target_id",
+         JOIN targets t ON t.id = c.target_id WHERE t.cve_scan = 1",
     )
     .fetch_all(pool)
     .await?;

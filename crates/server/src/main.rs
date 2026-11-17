@@ -28,6 +28,17 @@ fn main() -> Result<()> {
         std::process::exit(dumbmonit_server::healthcheck::run());
     }
 
+    // `dumbmonit ha status|promote` : état et promotion du serveur de secours,
+    // par des fichiers de `/data/ha` — ni base ni réseau.
+    if args.first().map(String::as_str) == Some("ha") {
+        #[cfg(unix)]
+        if let Err(error) = dumbmonit_server::privileges::drop_if_root() {
+            eprintln!("ha: cannot drop root: {error}");
+            std::process::exit(1);
+        }
+        std::process::exit(dumbmonit_server::ha::cli::run(&args[1..]));
+    }
+
     init_tracing();
 
     let config = Config::from_env().context("invalid configuration")?;
@@ -74,6 +85,18 @@ async fn run(mut config: Config, startup: Startup) -> Result<()> {
     ensure_data_dir_writable(&config.data_dir, startup).await?;
 
     let secret = resolve_secret(&config).await?;
+    // Serveur de secours (`DUMBMONIT_HA_DIR`) : en attente, on reste ici — ni
+    // base ouverte, ni VictoriaMetrics, ni port, ni sonde — jusqu'à la
+    // promotion ; actif, le bail est tenu et la base locale est la bonne.
+    // `docker stop` l'arrête aussi en attente : le processus est souvent le
+    // PID 1 du conteneur, qui ignore SIGTERM sans gestionnaire.
+    let ha = tokio::select! {
+        started = dumbmonit_server::ha::start(&config, &secret) => started?,
+        () = shutdown_signal() => {
+            info!("stopped while waiting as the standby server");
+            return Ok(());
+        }
+    };
     if config.demo {
         // Démonstration publique : la base repart de zéro à chaque démarrage, et
         // rien ne doit jamais partir vers l'extérieur (voir `demo`).
@@ -87,6 +110,10 @@ async fn run(mut config: Config, startup: Startup) -> Result<()> {
     }
     let pool = db::open_with(&config.database_path(), config.db_pool_size).await?;
     let cipher = db::init_cipher(&pool, &secret).await?;
+    // Réplique de la base vers le répertoire partagé, pour le serveur en attente.
+    if let Some(ha) = &ha {
+        ha.spawn_replication(pool.clone());
+    }
     if config.reset_password {
         auth::reset_password(&pool).await?;
         warn!(
@@ -101,6 +128,9 @@ async fn run(mut config: Config, startup: Startup) -> Result<()> {
         warn!(?error, "webhook headers could not be moved to secrets");
     }
     info!(database = %config.database_path().display(), "database ready");
+    // Les captures d'écran des sites surveillés ont été retirées : leurs
+    // fichiers ne servent plus.
+    dumbmonit_server::webchange::store::remove_legacy_screenshots(&config.data_dir).await;
     // Journaux du serveur : fichiers quotidiens dans `/data/logs` et
     // destinations configurées. Ce qui a été émis depuis le démarrage attendait
     // en file et y est écrit en premier.
@@ -122,6 +152,9 @@ async fn run(mut config: Config, startup: Startup) -> Result<()> {
     let setup_code = config.setup_code.get_or_insert_with(auth::setup_code::generate).clone();
     if !config.demo && auth::users::count(&pool).await? == 0 {
         auth::setup_code::announce(&setup_code);
+        // Départ du chronomètre du premier lancement (Réglages → À propos).
+        let boot = dumbmonit_server::first_run::Milestone::FirstBoot;
+        dumbmonit_server::first_run::record(&pool, boot).await;
     }
 
     let victoria_url = config.effective_victoria_url();
@@ -189,6 +222,9 @@ async fn run(mut config: Config, startup: Startup) -> Result<()> {
     // apportent, que le collecteur SNMP doit connaître dès sa construction. Leurs
     // collecteurs HTTP sont enregistrés plus bas, dans l'étage d'exécution.
     let packs = dumbmonit_server::packs::load_enabled(&pool).await?;
+    // Meraki, PAN-OS, SonicWall et UniFi Protect sont devenus des paquets : leurs
+    // cibles prennent le type du paquet avant que le planificateur ne les lise.
+    dumbmonit_server::packs::convert_moved_kinds(&pool).await?;
 
     // Une vérification de site interrompue par un arrêt du serveur a laissé son
     // verrou : il est levé avant que le collecteur ne reprenne.
@@ -321,6 +357,15 @@ async fn run(mut config: Config, startup: Startup) -> Result<()> {
         .context("web port listener")?;
     info!(%bind, "interface available over HTTPS (plain HTTP is redirected, never served)");
 
+    // Port unique (facultatif) : interface et agents sur une seule écoute,
+    // aiguillés par ALPN ; les deux ports ci-dessus restent ouverts.
+    if state.config.single_listen.is_some() && !state.config.demo {
+        let single = dumbmonit_server::single_port::listen(state.clone(), &listener)
+            .await
+            .context("single port")?;
+        info!(bind = %single, "single port: interface and agents (sorted by ALPN)");
+    }
+
     // `ConnectInfo` : l'adresse du client, pour les compteurs de tentatives et
     // le journal d'audit (voir `auth::client_ip`).
     let state_for_shutdown = state.clone();
@@ -342,6 +387,10 @@ async fn run(mut config: Config, startup: Startup) -> Result<()> {
     // VictoriaLogs et l'historique long terme d'abord, les mesures brutes en
     // dernier.
     state_for_shutdown.storage().stop_all().await;
+    // Dernière réplique, puis bail rendu : l'autre serveur peut prendre la main.
+    if let Some(ha) = &ha {
+        ha.shutdown(&state_for_shutdown.pool).await;
+    }
 
     info!("clean shutdown");
     Ok(())

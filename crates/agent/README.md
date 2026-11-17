@@ -59,6 +59,7 @@ tags:                      # étiquettes libres, préfixées « tag_ » côté s
 docker: true               # inventaire des conteneurs (défaut : true)
 docker_socket: /var/run/docker.sock
 max_buffered_samples: 20000
+buffer_max_mb: 256         # tampon disque des coupures, en Mo (0 : mémoire seule)
 log_level: info
 ```
 
@@ -124,9 +125,14 @@ relevés en mémoire, avec leur horodatage d'origine. Ils repartent dès que la
 liaison revient : un redémarrage de serveur ne creuse pas de trou dans les
 graphes.
 
-Le tampon est borné (`max_buffered_samples`, environ une heure par défaut) et
-sacrifie les mesures les plus anciennes quand il déborde — l'outil de
-surveillance ne doit jamais devenir la panne.
+Dès qu'un envoi échoue, ce qui attend passe dans un tampon disque (`spool/`, à
+côté du secret de liaison), où chaque cycle suivant est écrit au fil de l'eau :
+une coupure de courant pendant la panne ne perd rien. Le tampon disque est borné
+(`buffer_max_mb`, 256 Mo compressés par défaut), la mémoire aussi
+(`max_buffered_samples`) ; pleins, ils sacrifient les mesures les plus
+anciennes — l'outil de surveillance ne doit jamais devenir la panne. Un relais
+continue en plus de sonder son site d'après son planning gardé chiffré, et
+renvoie les résultats au retour du serveur (`src/relay_offline.rs`).
 
 Les tentatives d'envoi sont espacées par un délai qui double à chaque échec, de 5
 secondes à 5 minutes, avec une part aléatoire : cent agents ne se jettent pas

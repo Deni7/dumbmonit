@@ -35,7 +35,6 @@
 	let { target }: Props = $props();
 
 	let pages = $state<WebchangePage[]>([]);
-	let screenshotsAvailable = $state(true);
 	/** Pages found when Max pages stopped the last crawl; `null` when the whole site was read. */
 	let found = $state<number | null>(null);
 	let pagesError = $state<unknown>(null);
@@ -48,8 +47,6 @@
 	let wide = $state(false);
 	/** Change picked in the list; the newest one shown when unset. */
 	let pickedId = $state<number | null>(null);
-	/** The picked change is read from its screenshots (camera button) rather than its text. */
-	let screenshotsFirst = $state(false);
 	const selectedId = $derived(pickedId ?? changes[0]?.id ?? null);
 	/** The other pages the selected change's edit was also made on. */
 	const sameEdit = $derived.by(() => {
@@ -84,7 +81,6 @@
 		if (mine !== generation) return;
 		if (pagesResult.status === 'fulfilled') {
 			pages = pagesResult.value.pages;
-			screenshotsAvailable = pagesResult.value.screenshots_available;
 			found = pagesResult.value.found;
 			pagesError = null;
 		} else pagesError = pagesResult.reason;
@@ -115,9 +111,8 @@
 		}
 	}
 
-	function select(change: WebchangeChange, screenshots: boolean) {
+	function select(change: WebchangeChange) {
 		pickedId = change.id;
-		screenshotsFirst = screenshots;
 	}
 
 	$effect(() => {
@@ -130,7 +125,6 @@
 			pagesError = null;
 			changesError = null;
 			pickedId = null;
-			screenshotsFirst = false;
 			justChecked = false;
 		});
 		void refresh();
@@ -172,7 +166,7 @@
 		{/if}
 	{/snippet}
 
-	{#if checkError || justChecked || found !== null || !screenshotsAvailable}
+	{#if checkError || justChecked || found !== null}
 		<div class="flex flex-col gap-1.5 border-b border-line px-4 py-2.5">
 			{#if checkError}
 				<ErrorNotice error={checkError} title={m.devicesb_webchange_panel_check_error()} onretry={checkNow} />
@@ -183,19 +177,6 @@
 				<p class="flex items-start gap-1.5 text-[0.8125rem] text-warning-ink">
 					<TriangleAlert class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
 					<span>{m.devicesb_webchange_panel_truncated({ read: pages.length, found })}</span>
-				</p>
-			{/if}
-			{#if !screenshotsAvailable}
-				<p class="text-[0.8125rem] text-ink-2">
-					{m.devicesb_webchange_panel_no_browser()}
-					<a
-						href="https://dumbmonit.selfhostr.io/docs/devices/webchange/"
-						target="_blank"
-						rel="noopener noreferrer"
-						class="text-ink underline"
-					>
-						{m.devicesb_webchange_panel_setup_guide()}
-					</a>
 				</p>
 			{/if}
 		</div>
@@ -215,7 +196,6 @@
 					{pages}
 					{changes}
 					{loading}
-					{screenshotsAvailable}
 					selectedId={split ? selectedId : null}
 					onselect={split ? select : undefined}
 				/>
@@ -226,8 +206,7 @@
 						targetId={target.id}
 						changeId={selectedId}
 						{sameEdit}
-						{screenshotsFirst}
-						onselect={(change) => select(change, false)}
+						onselect={select}
 					/>
 				</div>
 			{/if}

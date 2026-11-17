@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use axum::Router;
-use axum::http::{HeaderMap, StatusCode, header};
+use axum::http::{HeaderMap, Method, StatusCode, Uri, header};
 use axum::response::IntoResponse;
 use axum::routing::get;
 use dumbmonit_pack::{Pack, PackCollector};
@@ -182,4 +182,96 @@ async fn un_identifiant_dun_autre_type_est_une_erreur_de_configuration() {
     target.credential = Credential::None;
     let error = collector.probe(&target).await.unwrap_err();
     assert!(matches!(error, ProbeError::Config(_)), "{error:?}");
+}
+
+/// Une session ouverte avant les sources, refermée après ; une source
+/// facultative refusée ne fait rien échouer.
+const SESSION_PACK: &str = r#"
+schema: 1
+id: fake-session
+version: 1.0.0
+label: Fake session
+credentials: [username_password]
+options:
+  - key: route
+    label: Route
+    default: ok
+session:
+  login:
+    path: /auth
+    method: POST
+    auth: basic
+  logout:
+    path: /auth
+    method: DELETE
+sources:
+  - id: status
+    type: http
+    path: /{{option.route}}
+  - id: extra
+    type: http
+    path: /denied
+    optional: true
+metrics:
+  - name: value
+    source: status
+    json: $.value
+  - name: extra
+    source: extra
+    json: $.value
+"#;
+
+async fn serve_session(seen: Arc<Mutex<Vec<String>>>) -> SocketAddr {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("port libre");
+    let address = listener.local_addr().expect("adresse locale");
+    let handler = move |method: Method, uri: Uri, headers: HeaderMap| {
+        let seen = seen.clone();
+        async move {
+            seen.lock().unwrap().push(format!("{method} {}", uri.path()));
+            let basic = headers.contains_key(header::AUTHORIZATION);
+            match (method.as_str(), uri.path()) {
+                ("POST", "/auth") if basic => StatusCode::OK.into_response(),
+                ("POST", "/auth") => StatusCode::UNAUTHORIZED.into_response(),
+                ("DELETE", "/auth") => StatusCode::OK.into_response(),
+                ("GET", "/ok") => {
+                    ([(header::CONTENT_TYPE, "application/json")], r#"{"value": 42}"#)
+                        .into_response()
+                }
+                ("GET", "/denied") => StatusCode::UNAUTHORIZED.into_response(),
+                _ => StatusCode::NOT_FOUND.into_response(),
+            }
+        }
+    };
+    let router = Router::new().fallback(handler);
+    tokio::spawn(async move { axum::serve(listener, router).await.expect("faux service") });
+    address
+}
+
+async fn probe_session(
+    address: SocketAddr,
+    route: &str,
+) -> Result<Vec<dumbmonit_proto::Sample>, ProbeError> {
+    let collector = PackCollector::new(Arc::new(Pack::parse(SESSION_PACK).expect("paquet valide")));
+    let mut target = target(address, &[ALLOW, ("route", route)]);
+    target.credential = Credential::UsernamePassword { username: "u".into(), password: "p".into() };
+    collector.probe(&target).await
+}
+
+#[tokio::test]
+async fn la_session_entoure_les_sources_et_une_source_facultative_refusee_est_passee() {
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let address = serve_session(seen.clone()).await;
+    let samples = probe_session(address, "ok").await.expect("mesure");
+    assert_eq!(samples.len(), 1);
+    assert_eq!(samples[0].metric, "fake_session_value");
+    assert_eq!(*seen.lock().unwrap(), ["POST /auth", "GET /ok", "GET /denied", "DELETE /auth"]);
+}
+
+#[tokio::test]
+async fn la_session_est_refermee_meme_quand_une_source_echoue() {
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let address = serve_session(seen.clone()).await;
+    let error = probe_session(address, "missing").await.unwrap_err();
+    assert!(error.to_string().contains("HTTP 404"), "{error}");
+    assert_eq!(*seen.lock().unwrap(), ["POST /auth", "GET /missing", "DELETE /auth"]);
 }

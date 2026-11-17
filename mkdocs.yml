@@ -5,14 +5,12 @@ docs_dir: docs
 exclude_docs: |
   requirements.txt
 
-# One language per build, chosen by READTHEDOCS_LANGUAGE (English by default): see
-# hooks/rtd_language.py. site_url, theme.language, the search language, the language
-# switcher (extra.alternate) and the navigation titles are set there.
-# Published twice: on the product website under /docs/ (DUMBMONIT_DOCS_BASE, built by
-# the website build) and on Read the Docs as a mirror (the site_url below).
-# The header carries the website's navigation (overrides/partials/header.html).
+# English only (the web UI is the translated part). Published twice: on the product website
+# under /docs/ (DUMBMONIT_DOCS_BASE, built by the website build) and on Read the Docs as a
+# mirror (the site_url below). The header carries the website's navigation
+# (overrides/partials/header.html, hooks/site_nav.py).
 hooks:
-  - hooks/rtd_language.py
+  - hooks/site_nav.py
 
 validation:
   links:
@@ -75,13 +73,16 @@ plugins:
 nav:
   - Home: index.md
   - Install:
+      - First alert in five minutes: install/quickstart.md
       - Docker: install/docker.md
+      - Kubernetes: install/kubernetes.md
       - HTTPS and encryption: install/https.md
       - Network ports: install/ports.md
       - Add your first monitor: install/first-device.md
       - Monitor a remote site: install/remote-site.md
       - Agent channel security: install/agent-security.md
       - Backup and restore: install/backup.md
+      - High availability: install/high-availability.md
       - Watching DumbMonit itself: install/self-monitoring.md
       - Sentinel mode: install/sentinel.md
       - Server logs: install/logs.md
@@ -104,11 +105,11 @@ nav:
       - pfSense: devices/pfsense.md
       - FortiGate: devices/fortigate.md
       - Sophos Firewall: devices/sophos.md
-      - Cisco Meraki: devices/meraki.md
+      - Cisco Meraki (community pack): devices/meraki.md
       - TP-Link Omada: devices/omada.md
       - Aruba Central: devices/arubacentral.md
-      - Palo Alto PAN-OS: devices/paloalto.md
-      - SonicWall SonicOS: devices/sonicwall.md
+      - Palo Alto PAN-OS (community pack): devices/paloalto.md
+      - SonicWall SonicOS (community pack): devices/sonicwall.md
       - OpenVPN server: devices/openvpn.md
       - UniFi Network: devices/unifi.md
       - Home Assistant: devices/homeassistant.md
@@ -174,7 +175,7 @@ nav:
       - Lidarr (beta): devices/lidarr.md
       - Prowlarr (beta): devices/prowlarr.md
       - qBittorrent (beta): devices/qbittorrent.md
-      - UniFi Protect (beta): devices/unifiprotect.md
+      - UniFi Protect (community pack): devices/unifiprotect.md
       - Frigate NVR (beta): devices/frigate.md
       - Keycloak (beta): devices/keycloak.md
       - authentik (beta): devices/authentik.md
@@ -246,5 +247,6 @@ nav:
       - Assurance case: development/assurance-case.md
       - Reproducible builds: development/reproducible-builds.md
       - Signing the agent binaries: development/agent-signing.md
+      - PostgreSQL plan: development/postgres-plan.md
       - Roadmap: development/roadmap.md
   - FAQ: faq.md

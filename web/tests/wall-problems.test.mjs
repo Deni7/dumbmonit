@@ -51,6 +51,10 @@ test('long probe errors are said short', () => {
 		code: 'agent_silent',
 		seconds: 272703
 	});
+	assert.deepEqual(shortCause('Monitor unreachable: relay unreachable: no measurement for 12 min (limit 90 s)'), {
+		code: 'relay_silent',
+		seconds: 12 * 60
+	});
 	assert.deepEqual(shortCause('Monitor unreachable: connection refused (limit 3 s)'), { code: 'text', text: 'Connection refused' });
 	assert.deepEqual(shortCause('Timed out after 5s'), { code: 'text', text: 'Timed out after 5s' });
 });

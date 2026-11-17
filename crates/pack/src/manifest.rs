@@ -43,6 +43,10 @@ pub struct Manifest {
     pub credentials: Vec<CredentialSpec>,
     #[serde(default)]
     pub options: Vec<OptionSpec>,
+    /// Ouverture (et fermeture) d'une session autour des sources, pour les
+    /// API qui l'exigent ; absente : chaque source se suffit à elle-même.
+    #[serde(default)]
+    pub session: Option<SessionSpec>,
     #[serde(default)]
     pub sources: Vec<SourceSpec>,
     #[serde(default)]
@@ -156,6 +160,8 @@ pub enum Method {
     #[default]
     Get,
     Post,
+    /// Seulement pour fermer une session (`session.logout`) : une source lit.
+    Delete,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
@@ -175,6 +181,8 @@ pub enum Auth {
 pub enum Format {
     Json,
     Text,
+    /// Lu comme du JSON une fois converti (voir `SourceSpec::lists`).
+    Xml,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -196,6 +204,15 @@ pub struct SourceSpec {
     /// `http` seulement ; `json` par défaut.
     #[serde(default)]
     pub format: Option<Format>,
+    /// `xml` seulement : éléments toujours lus comme des listes, même quand la
+    /// réponse n'en porte qu'un (`entry`).
+    #[serde(default)]
+    pub lists: Vec<String>,
+    /// Une source facultative qui répond par un refus ou une erreur HTTP ne
+    /// produit rien, sans faire échouer l'interrogation. Une panne réelle
+    /// (équipement injoignable, délai dépassé) reste une panne.
+    #[serde(default)]
+    pub optional: bool,
     /// `prometheus` seulement : familles retenues telles quelles.
     #[serde(default)]
     pub keep: Vec<String>,
@@ -206,6 +223,32 @@ pub struct SourceSpec {
     /// l'expression est écarté (pseudo-systèmes de fichiers, interfaces virtuelles).
     #[serde(default)]
     pub drop: BTreeMap<String, String>,
+}
+
+/// Une session ouverte avant les sources et refermée après, même en cas
+/// d'échec. Elle tient à l'adresse de la cible et à ses en-têtes (le serveur
+/// garde la session par client, comme SonicOS) : aucun jeton n'est recopié
+/// d'une réponse vers les requêtes suivantes.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SessionSpec {
+    pub login: SessionRequest,
+    #[serde(default)]
+    pub logout: Option<SessionRequest>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SessionRequest {
+    pub path: String,
+    #[serde(default)]
+    pub method: Method,
+    #[serde(default)]
+    pub headers: BTreeMap<String, String>,
+    #[serde(default)]
+    pub body: Option<String>,
+    #[serde(default)]
+    pub auth: Auth,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
@@ -237,6 +280,10 @@ pub struct MetricSpec {
     pub prom: Option<String>,
     #[serde(default)]
     pub scale: Option<f64>,
+    /// La valeur est une date, écrite en secondes Unix : `rfc3339`, ou un
+    /// motif strftime (`%B %d, %Y`). Exclut `map`.
+    #[serde(default)]
+    pub date: Option<String>,
     /// Valeur textuelle → nombre (`on: 1`, `off: 0`).
     #[serde(default)]
     pub map: BTreeMap<Scalar, f64>,
@@ -257,6 +304,14 @@ pub struct DiscoverSpec {
     /// Étiquette → JSONPath relatif à la ligne (`$.name`).
     #[serde(default)]
     pub labels: BTreeMap<String, String>,
+    /// Liste imbriquée dans chaque ligne (`$.uplinks[*]`) : les métriques sont
+    /// alors lues sur chacun de ses éléments, qui gardent les étiquettes de leur
+    /// ligne. `max_rows` borne le total.
+    #[serde(default)]
+    pub each: Option<String>,
+    /// Étiquette → JSONPath relatif à l'élément de `each`.
+    #[serde(default)]
+    pub each_labels: BTreeMap<String, String>,
     pub metrics: Vec<RowMetricSpec>,
 }
 
@@ -274,10 +329,13 @@ pub struct RowMetricSpec {
     pub help: String,
     #[serde(default)]
     pub kind: Kind,
-    /// JSONPath relatif à la ligne.
+    /// JSONPath relatif à la ligne (ou à l'élément de `each`).
     pub json: String,
     #[serde(default)]
     pub scale: Option<f64>,
+    /// Comme `MetricSpec::date`.
+    #[serde(default)]
+    pub date: Option<String>,
     #[serde(default)]
     pub map: BTreeMap<Scalar, f64>,
 }

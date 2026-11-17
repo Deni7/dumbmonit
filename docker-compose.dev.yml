@@ -12,8 +12,6 @@ services:
       # The embedded VictoriaMetrics listens on the loopback by default; open it
       # inside the container so the port below reaches it.
       DUMBMONIT_VM_LISTEN: 0.0.0.0:8428
-      # Optional, from the shell (no .env needed): DUMBMONIT_BROWSER_URL, ...
-      DUMBMONIT_BROWSER_URL: ${DUMBMONIT_BROWSER_URL:-}
     ports:
       # Loopback only: the embedded VictoriaMetrics has no authentication, and
       # its admin API (series deletion) must not be reachable from the LAN.

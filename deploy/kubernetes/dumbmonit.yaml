@@ -1,0 +1,152 @@
+# DumbMonit on Kubernetes, plain manifests (same layout as deploy/helm/dumbmonit).
+#
+#   kubectl create namespace dumbmonit
+#   kubectl -n dumbmonit create secret generic dumbmonit-secret \
+#     --from-literal=DUMBMONIT_SECRET="$(openssl rand -hex 24)"
+#   kubectl apply -f dumbmonit.yaml
+#
+# ONE replica only: SQLite has a single writer.
+# The agent channel (8443) is mTLS end to end: expose it with the LoadBalancer /
+# NodePort Service below, never through an Ingress that terminates TLS.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dumbmonit
+  namespace: dumbmonit
+  labels:
+    app.kubernetes.io/name: dumbmonit
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dumbmonit
+  namespace: dumbmonit
+  labels:
+    app.kubernetes.io/name: dumbmonit
+spec:
+  type: ClusterIP
+  ports:
+    - name: https
+      port: 8080
+      targetPort: https
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: dumbmonit
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dumbmonit-agents
+  namespace: dumbmonit
+  labels:
+    app.kubernetes.io/name: dumbmonit
+spec:
+  type: LoadBalancer # or NodePort
+  # externalTrafficPolicy: Local
+  ports:
+    - name: agents
+      port: 8443
+      targetPort: agents
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: dumbmonit
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: dumbmonit
+  namespace: dumbmonit
+  labels:
+    app.kubernetes.io/name: dumbmonit
+spec:
+  replicas: 1
+  serviceName: dumbmonit
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dumbmonit
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dumbmonit
+    spec:
+      serviceAccountName: dumbmonit
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+        sysctls:
+          - name: net.ipv4.ping_group_range # ICMP ping monitors without privileges
+            value: "0 2147483647"
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: dumbmonit
+          image: ghcr.io/selfhostr/dumbmonit:0.17.1
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: https
+              containerPort: 8080
+              protocol: TCP
+            - name: agents
+              containerPort: 8443
+              protocol: TCP
+          env:
+            - name: DUMBMONIT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: dumbmonit-secret
+                  key: DUMBMONIT_SECRET
+            # - name: DUMBMONIT_PUBLIC_URL
+            #   value: https://monit.example.com
+            # Read by recent DumbMonit versions only.
+            # - name: DUMBMONIT_AGENT_PUBLIC_URL
+            #   value: https://agents.example.com:8443
+            # External VictoriaMetrics (the bundled one is then not started):
+            # - name: DUMBMONIT_VM_URL
+            #   value: http://victoria-metrics.monitoring.svc:8428
+          startupProbe:
+            httpGet: {path: /api/health, port: https, scheme: HTTPS}
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: {path: /api/health, port: https, scheme: HTTPS}
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: {path: /api/health, port: https, scheme: HTTPS}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 10Gi

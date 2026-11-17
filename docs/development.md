@@ -73,7 +73,7 @@ at once: they wipe `.svelte-kit/output`.
 
 ## Translations
 
-The web UI is translated by pull request, like any other contribution. The source language is English (`web/messages/en.json`: flat keys, `{param}` placeholders); each other language is one file, `web/messages/<locale>.json`, compiled by [Paraglide JS](https://paraglidejs.com) into tree-shaken message functions under `web/src/lib/paraglide/` (generated, untracked).
+The documentation is in English only; the web UI is translated into nine languages. The web UI is translated by pull request, like any other contribution. The source language is English (`web/messages/en.json`: flat keys, `{param}` placeholders); each other language is one file, `web/messages/<locale>.json`, compiled by [Paraglide JS](https://paraglidejs.com) into tree-shaken message functions under `web/src/lib/paraglide/` (generated, untracked).
 
 1. Edit `web/messages/<locale>.json` (`fr`, `de`, `es`, `it`, `pt`, `pt-BR`, `ru`, `zh-Hans`), or copy `en.json` to add a new locale.
 2. Keep every key and every `{variable}` of `en.json`; translate only the values. Never put HTML markup in a message.
@@ -105,9 +105,101 @@ bad look.
 `ghcr.io/selfhostr/dumbmonit`: `:edge` on every push to `main`, `:X.Y.Z`,
 `:X.Y`, `:X` and `:latest` on every `v*` tag.
 
+The agent binaries are signed (Ed25519) by `release.yml` with the repository
+secret `AGENT_SIGNING_KEY`; the matching public keys, several during a
+rotation, are in `crates/agent/signing/release-keys.pem`. Maintainer procedure:
+[Signing the agent binaries](development/agent-signing.md).
+
 Integration tests live in `crates/server/tests/`; pure modules (metric
 conversion, option parsing, alert state machine, silences) are tested in place
 without network.
+
+### Upgrade test
+
+`.github/workflows/upgrade.yml` checks that an existing install survives an
+update. It builds the image of the commit, then runs `scripts/upgrade-test.sh`
+twice, side by side: from the last published release, which fails the job, and
+from the last release of the previous minor version, which only warns (the
+project defines no oldest supported version). It runs on every push to `dev` and
+`main`, and on pull requests into them that touch the crates, the Dockerfile,
+`profiles/`, `integrations/` or the test itself. It is also the release gate:
+a tag on `main` is only published after a green run of it.
+
+Each run starts the old image on a fresh `/data` volume and creates real data
+through the API: an administrator, an operator and a viewer, two teams,
+monitors of several kinds (HTTP, TCP with a parent, ping, SNMP and Proxmox with
+encrypted credentials, Home Assistant with an encrypted token, a heartbeat, a
+simulated agent that pushes 30 minutes of history), rules (one built-in rule
+switched off), silences, an ntfy channel with an encrypted token, a status page
+with an incident, instance and notification settings, an API token. A small mock
+service (`scripts/upgrade-test/mock.py`) plays Home Assistant and ntfy and
+records the tokens it is shown. After the metrics have accumulated, the old
+image exports a backup and stops cleanly.
+
+The candidate image then starts on the same volume and the test checks that it is
+healthy and logs no error, that every object reads back with the same values and
+ids, that each user can still sign in, that the encrypted secrets are readable
+(the Home Assistant probe and the channel test must present the right tokens to
+the mock, and a backup export, which decrypts every secret, must succeed), that
+the heartbeat URL, the agent token and binding, the API token and the public
+status page still work, that the VictoriaMetrics history is complete and that
+monitoring resumed. Finally the backup made by the old version is restored on a
+fresh instance of the candidate, which must come out with the same configuration
+and working secrets.
+
+To run it locally you need Docker on Linux (the mock service is reached through
+the gateway of a temporary Docker network), `curl`, `git` and `python3`:
+
+```bash
+scripts/upgrade-test.sh                                   # last release -> ghcr.io/selfhostr/dumbmonit:edge
+scripts/upgrade-test.sh dumbmonit-dev                      # last release -> an image you built
+OLD_IMAGE=previous-minor scripts/upgrade-test.sh dumbmonit-dev
+OLD_IMAGE=ghcr.io/selfhostr/dumbmonit:0.16.1 scripts/upgrade-test.sh dumbmonit-dev
+KEEP=1 UPGRADE_LOG_DIR=./upgrade-logs scripts/upgrade-test.sh dumbmonit-dev   # keep everything to debug
+```
+
+It takes about four minutes, most of it waiting for the old version to collect
+metrics. On failure it prints the last lines of the logs of the old, new and
+restored containers and of the mock service; the complete logs are in
+`UPGRADE_LOG_DIR` (in CI, the `upgrade-test-logs` artifact). The `[ok]`, `[KO]`
+and `[..]` lines tell what was verified, what broke and what an old version could
+not create (not covered, not blocking). The seed data, the checks and the fields
+compared live in `scripts/upgrade-test/data.py`: when you add a setting that must
+survive updates, create it in `phase_seed` and read it back in `snapshot`.
+## End-to-end tests
+
+`web/e2e/` holds Playwright journeys that drive the real image in Chromium, on
+a desktop viewport and on a 390 px phone: first-run setup, adding an HTTP
+monitor, a webhook channel, an outage and its recovery (alert, webhook, public
+status page), the wall, sign-out and sign-in. Any unexpected console error or
+uncaught exception fails a step. CI runs them in `.github/workflows/e2e.yml`
+and keeps the screenshots, traces and the server log of a failed run.
+
+The suite starts its own container on an empty volume (one per project), plus
+two small servers on your machine: the monitored service and a webhook
+receiver. Docker is the only requirement besides Node.
+
+```bash
+docker build -t dumbmonit-candidate:ci .      # or any image: E2E_IMAGE=...
+cd web
+npm ci
+npm run test:e2e:install                      # Chromium and its system libraries, once
+npm run test:e2e                              # both projects, one after the other
+npm run test:e2e -- --project=mobile          # one project
+npm run test:e2e -- --headed --debug          # watch it
+npx playwright show-report ../playwright-report
+```
+
+Variables: `E2E_IMAGE` (default `dumbmonit-candidate:ci`), `E2E_HOST` (name the
+container uses to reach your machine, default `host.docker.internal`, mapped to
+the host gateway), `E2E_SETUP_CODE`. `E2E_BASE_URL` targets an instance that is
+already running instead (it must be fresh, started with that setup code and
+`DUMBMONIT_ALERT_INTERVAL_SECS=10`). A firewall that blocks the Docker bridge
+towards the host stops the monitor and the webhook from working.
+
+The journeys are serial and share one instance: a failed step skips the next
+ones. Prefer roles and labels for selectors; add a `data-testid` only when none
+fits.
 
 ## Adding a collector
 

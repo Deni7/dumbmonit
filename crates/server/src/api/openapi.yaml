@@ -155,7 +155,7 @@ tags:
   - name: Heartbeats
     description: Push monitors — the secret URL a job calls.
   - name: Website changes
-    description: Pages, changes, line diffs and screenshots of a `webchange` device.
+    description: Pages, changes and line diffs of a `webchange` device.
   - name: Websites
     description: Last reading, tracked SEO metadata and confirmed changes of a `website` device.
   - name: Network configuration backups
@@ -192,6 +192,10 @@ tags:
       Music on the wall display: what plays on the connected Spotify account,
       the link every wall plays, and connecting Spotify (Authorization Code +
       PKCE). Refresh tokens never leave the server.
+  - name: Wall weather
+    description: >-
+      The outside temperature and weather icon beside the wall's date. The
+      server asks Open-Meteo (browsers never do), only once a place is chosen.
   - name: Prometheus compatibility
     description: Read access for an existing Prometheus or Grafana, outside `/api`.
   - name: OpenTelemetry
@@ -5205,6 +5209,11 @@ paths:
           required: false
           schema: { type: string }
           description: Address the site reaches the relay at; the one set on the relay, else its host name.
+        - name: agent_port_only
+          in: query
+          required: false
+          schema: { type: boolean, default: false }
+          description: "Commands that use the agent port only (a remote site): the install scripts and binaries are read on the agent port, pinned by the key of its certificate, next to the encrypted channel."
       responses:
         "200":
           description: Install parameters.
@@ -5357,6 +5366,9 @@ paths:
                       host: { type: string }
                       port: { type: integer }
                       listening: { type: boolean }
+                      self_check: { type: boolean, description: The relay tests its own gateway (up-to-date agent). }
+                      reachable: { type: [boolean, "null"], description: "Outcome of the relay's last test of its gateway at this address; null: not tested there yet." }
+                      check_error: { type: [string, "null"] }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
@@ -5368,7 +5380,8 @@ paths:
       summary: Automatic agent updates (admin only)
       description: >-
         Settings, the agent binaries this server ships (with their signature
-        state), the canary rollout gate and, for each agent, its version and
+        state), the rollout (canary agents first, or ordered waves, with the
+        pause and the automatic stop) and, for each agent, its version and
         update status. This is the agent binary itself, not Docker containers.
       security: [{ cookieAuth: [] }]
       x-token-scope: none
@@ -5413,6 +5426,81 @@ paths:
         Every agent able to replace itself and older than this server's build
         gets the update at its next report, outside the window and the canary
         rollout, and retries a version that failed.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "200":
+          description: Update state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgentUpdates" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/agent/updates/rollout:
+    put:
+      operationId: setAgentUpdateRollout
+      tags: [Agents]
+      summary: Set the rollout waves of the agent updates
+      description: >-
+        Without waves (the default) the rollout is the historical one: canary
+        agents first, then everyone. With waves, agents are ordered: each wave
+        takes, among the agents the previous waves did not take, a number of
+        agents (`count`), enough agents to reach a share of the fleet
+        (`percent`, cumulative), or those of a `site`, a `group` (the folder of
+        the device) or a `tag`. The agents no wave takes form a last implicit
+        wave; agents marked canary are always in the first one. A wave opens
+        once the previous one has no agent left to update and its last agent
+        has run the new build for `delay_minutes`. If, in a wave, the share of
+        agents that failed (failed, rolled back or refused) among those that
+        tried reaches `max_failure_percent`, the propagation stops until
+        `resume`. Agents whose updates are turned off are in no wave (their
+        version is pinned). Omitted fields are unchanged; `waves: []` goes back
+        to the historical rollout.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgentUpdateRolloutChange" }
+      responses:
+        "200":
+          description: Update state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgentUpdates" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/agent/updates/rollout/pause:
+    post:
+      operationId: pauseAgentUpdateRollout
+      tags: [Agents]
+      summary: Pause the rollout
+      description: >-
+        No agent gets an automatic offer until `resume`. "Update now" still works.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "200":
+          description: Update state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgentUpdates" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/agent/updates/rollout/resume:
+    post:
+      operationId: resumeAgentUpdateRollout
+      tags: [Agents]
+      summary: Resume the rollout after a pause or an automatic stop
+      description: >-
+        Resuming a stop forgives the failures already reported, so the stop does
+        not trigger again at once; the agents that failed stay on their version
+        until "Update now".
       security: [{ cookieAuth: [] }]
       x-token-scope: none
       responses:
@@ -6558,9 +6646,7 @@ paths:
       summary: Pages followed by a website watch
       description: >-
         Every page seen by the checks of a `webchange` device, removed pages
-        included (with their last error). `screenshots_available` is true when
-        a browser is configured (`DUMBMONIT_BROWSER_URL`) and answers.
-        `404` when the device is not a website watch.
+        included (with their last error). `404` when the device is not a website watch.
       x-token-scope: read
       responses:
         "200":
@@ -6636,32 +6722,6 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/WebchangeChangeDetail" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /api/targets/{id}/webchange/snapshots/{snapshot_id}/screenshot:
-    parameters:
-      - $ref: "#/components/parameters/TargetId"
-      - name: snapshot_id
-        in: path
-        required: true
-        schema: { type: integer, format: int64 }
-    get:
-      operationId: getWebchangeScreenshot
-      tags: [Website changes]
-      summary: The screenshot of a snapshot
-      description: >-
-        A JPEG image, cacheable forever by the browser (a snapshot never
-        changes). `404` when the snapshot has no screenshot or belongs to
-        another device.
-      x-token-scope: read
-      responses:
-        "200":
-          description: The image.
-          content:
-            image/jpeg:
-              schema: { type: string, format: binary }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -8843,6 +8903,45 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
 
+  /api/security/cves/targets:
+    post:
+      operationId: setCveScanTargets
+      tags: [Security]
+      summary: Turn the CVE check on or off for several devices
+      description: >-
+        A device whose check is off is no longer inventoried, and its results
+        disappear from the list, the summary and the alerts; they come back when
+        the check is turned on again. Unknown ids are ignored, repeated ids count
+        once. At most 500 ids per request. Administrators only.
+      x-token-scope: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_ids, enabled]
+              properties:
+                target_ids:
+                  type: array
+                  minItems: 1
+                  maxItems: 500
+                  items: { type: integer, format: int64 }
+                enabled: { type: boolean }
+      responses:
+        "200":
+          description: How many devices actually changed (those already in the requested state do not count).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [updated]
+                properties:
+                  updated: { type: integer }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /api/security/cves/ignores:
     post:
       operationId: ignoreCve
@@ -9506,6 +9605,73 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
+
+  # ---------------------------------------------------------- wall weather
+  /api/wall/weather:
+    get:
+      operationId: getWallWeather
+      tags: [Wall weather]
+      summary: The wall's place and unit, and the weather there now
+      description: >-
+        Without a place nothing is asked of anyone and `current` is null. When
+        Open-Meteo does not answer, `current` is null too (the wall then shows
+        nothing). Cached on the server for at least ten minutes.
+      x-token-scope: read
+      responses:
+        "200":
+          description: The setting and, when a place is chosen, the weather.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WallWeather" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    put:
+      operationId: setWallWeather
+      tags: [Wall weather]
+      summary: "Choose the place and the unit (`place: null` turns the weather off)"
+      x-token-scope: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                place:
+                  oneOf:
+                    - { $ref: "#/components/schemas/WallWeatherPlace" }
+                    - { type: "null" }
+                unit: { type: string, enum: [c, f], default: c }
+      responses:
+        "200":
+          description: The new setting and the weather there.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WallWeather" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/wall/weather/places:
+    get:
+      operationId: searchWallWeatherPlaces
+      tags: [Wall weather]
+      summary: Look a city up by name (administrators)
+      x-token-scope: read
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 2, maxLength: 80 } }
+        - { name: lang, in: query, required: false, schema: { type: string, example: fr } }
+      responses:
+        "200":
+          description: Up to six places.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/WallWeatherPlace" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "502": { description: The weather service did not answer. }
 
   # ---------------------------------------------------------- on-call
   /api/oncall/people:
@@ -11580,7 +11746,8 @@ components:
       type: object
       required: [base_url, checksums, linux_template, windows_template]
       properties:
-        base_url: { type: string, description: "`https://` URL of the web port, or of a relay's gateway (install scripts and binaries)." }
+        base_url: { type: string, description: "`https://` URL of the web port, of the agent port (`agent_port_only`), or of a relay's gateway (install scripts and binaries)." }
+        agent_port_only: { type: boolean, description: "True when scripts, binaries and the encrypted channel all use the agent port: the only port a remote site needs." }
         agent_url: { type: [string, "null"], description: "URL of the encrypted agent channel, `https://host:8443`." }
         ca_pin: { type: [string, "null"], description: SHA-256 fingerprint of the agent certificate authority. }
         checksums:
@@ -11614,6 +11781,7 @@ components:
           oneOf:
             - type: "null"
             - $ref: "#/components/schemas/RelayRoute"
+        open_gateway: { type: boolean, description: "The installed machine will be a relay: the commands carry `--open-gateway` / `-OpenGateway`, and the installer opens the gateway port on the local firewall, to the local subnet only." }
     RelayRoute:
       type: object
       required: [relay_id, relay_name, host, port, listening]
@@ -11625,6 +11793,28 @@ components:
         host: { type: string, description: Address of the relay as seen from its site. }
         port: { type: integer, description: Port of its gateway. }
         listening: { type: boolean, description: The relay reports its gateway open on that port. }
+        self_check: { type: boolean, description: The relay tests its own gateway (up-to-date agent). }
+        reachable: { type: [boolean, "null"], description: "Outcome of the relay's last test of its gateway at host:port: it connected to it as a machine of the site would and reached this server through it. null: not tested at this address yet." }
+        check_error: { type: [string, "null"], description: What failed, as the relay reports it. }
+    GatewayCheck:
+      type: object
+      required: [address, ok, checked_at_ms]
+      description: A relay's test of its own gateway, at the address the site dials.
+      properties:
+        address: { type: string, description: "`host:port` tested." }
+        ok: { type: boolean }
+        error: { type: [string, "null"] }
+        checked_at_ms: { type: integer, format: int64 }
+    ServerLink:
+      type: object
+      required: [active, servers, url]
+      description: "Address of the server an agent uses among those of its configuration (`server_url`, then `server_urls`), as its last batch reported it."
+      properties:
+        active: { type: integer, description: "Rank of the address in use: 0 for the primary, 1 or more for a backup server." }
+        servers: { type: integer, description: "Number of addresses configured, the primary included." }
+        url: { type: string, description: "Address in use (`https://host:port`)." }
+        since_ms: { type: [integer, "null"], format: int64, description: When the agent moved to a backup server (Unix milliseconds); absent on the primary. }
+        primary_error: { type: [string, "null"], description: Last error seen on the primary; absent on the primary. }
     AgentChannel:
       type: object
       required: [enabled, required, required_setting, protocol, key_exchange, agents]
@@ -11670,6 +11860,49 @@ components:
         window: { type: string, enum: [any, maintenance, manual] }
         canary_minutes: { type: integer, minimum: 0, maximum: 10080 }
         allow_unsigned: { type: boolean }
+    AgentUpdateWave:
+      description: >-
+        One wave. `count`: that many more agents; `percent`: enough agents so that
+        the waves so far cover that share of the fleet (1 to 100); `site`: the
+        agents that declare this site; `group`: the agents whose device is in this
+        folder; `tag`: the agents whose device carries this tag (with this value
+        when given). Names compare without regard to case.
+      oneOf:
+        - type: object
+          required: [by, value]
+          properties:
+            by: { const: count }
+            value: { type: integer, minimum: 1, maximum: 100000 }
+        - type: object
+          required: [by, value]
+          properties:
+            by: { const: percent }
+            value: { type: integer, minimum: 1, maximum: 100 }
+        - type: object
+          required: [by, value]
+          properties:
+            by: { const: site }
+            value: { type: string, minLength: 1, maxLength: 80 }
+        - type: object
+          required: [by, value]
+          properties:
+            by: { const: group }
+            value: { type: string, minLength: 1, maxLength: 80 }
+        - type: object
+          required: [by, key]
+          properties:
+            by: { const: tag }
+            key: { type: string, minLength: 1, maxLength: 80 }
+            value: { type: [string, "null"], maxLength: 80 }
+    AgentUpdateRolloutChange:
+      type: object
+      properties:
+        waves:
+          type: array
+          maxItems: 20
+          items: { $ref: "#/components/schemas/AgentUpdateWave" }
+        delay_minutes: { type: integer, minimum: 0, maximum: 10080, description: Minutes between the end of a wave and the opening of the next (default 60). }
+        max_failure_percent: { type: integer, minimum: 0, maximum: 100, description: Share of failed agents in a wave that stops the propagation; 0 never stops (default 20). }
     AgentUpdates:
       type: object
       required: [settings, version, binaries, rollout, agents]
@@ -11689,12 +11922,46 @@ components:
               signed: { type: boolean }
         rollout:
           type: object
-          required: [canaries, canaries_updated, open]
+          required: [canaries, canaries_updated, open, policy, paused, waves]
           properties:
             canaries: { type: integer }
             canaries_updated: { type: integer }
-            open: { type: boolean, description: Agents that are not canaries may update. }
-            reason: { type: [string, "null"] }
+            open: { type: boolean, description: Agents that are not canaries may update (every wave is open, nothing is paused or stopped). }
+            reason: { type: [string, "null"], description: Why the other agents wait, without waves. }
+            policy:
+              type: object
+              required: [waves, delay_minutes, max_failure_percent]
+              properties:
+                waves:
+                  type: array
+                  items: { $ref: "#/components/schemas/AgentUpdateWave" }
+                delay_minutes: { type: integer }
+                max_failure_percent: { type: integer }
+            paused: { type: boolean }
+            halted:
+              type: [object, "null"]
+              description: The propagation stopped because too many agents failed in a wave.
+              properties:
+                wave: { type: integer, description: Rank of that wave, from 1. }
+                failed: { type: integer }
+                attempted: { type: integer }
+            waves:
+              type: array
+              description: The waves in order, the implicit last one included (`select` is null). Empty without waves.
+              items:
+                type: object
+                required: [members, updated, failed, state]
+                properties:
+                  select:
+                    oneOf:
+                      - { $ref: "#/components/schemas/AgentUpdateWave" }
+                      - { type: "null" }
+                  members: { type: integer }
+                  updated: { type: integer }
+                  failed: { type: integer }
+                  state: { type: string, enum: [done, active, waiting, upcoming] }
+            current_wave: { type: [integer, "null"], description: Rank, from 1, of the wave being updated. }
+            next_wave_at: { type: [string, "null"], description: When the next wave opens, if only its delay holds it back (UTC, no suffix). }
         agents:
           type: array
           items:
@@ -11710,9 +11977,10 @@ components:
               enabled: { type: [boolean, "null"], description: Per-agent override; null follows the global setting. }
               canary: { type: boolean }
               requested: { type: boolean, description: Update now was asked and has not been answered yet. }
+              wave: { type: [integer, "null"], description: "Rank, from 1, of the agent's wave; null without waves or when it is in none." }
               status:
                 type: string
-                enum: [up_to_date, pending, updating, failed, refused, disabled, manual, waiting_window, waiting_canary, newer, legacy, container, read_only, disabled_locally, unsupported, no_binary, unsigned]
+                enum: [up_to_date, pending, updating, failed, refused, disabled, manual, waiting_window, waiting_canary, waiting_wave, paused, halted, newer, legacy, container, read_only, disabled_locally, unsupported, no_binary, unsigned]
               reason: { type: [string, "null"] }
               last:
                 type: [object, "null"]
@@ -11735,6 +12003,7 @@ components:
         client_id: { type: [integer, "null"], format: int64, description: "MSP mode: the client the token enrols into. Absent: the default client." }
         relay_id: { type: [integer, "null"], format: int64, description: "Install through this relay agent (a site behind a firewall): the commands point at its gateway, which the server asks the relay to open. The relay must belong to the same client." }
         relay_host: { type: [string, "null"], maxLength: 253, description: Address the site reaches the relay at (host name or IP, no scheme or port). }
+        agent_port_only: { type: boolean, default: false, description: "Commands that use the agent port only (a remote site). Always on for a relay token." }
     CreatedAgentToken:
       allOf:
         - $ref: "#/components/schemas/AgentToken"
@@ -11822,6 +12091,11 @@ components:
             with whether the server found it in place. Omitted when the type needs nothing. The
             interface writes the sentences from `id` and shows the notice while `satisfied` is false.
           items: { $ref: "#/components/schemas/Requirement" }
+        beta:
+          type: boolean
+          description: >-
+            The integration is in beta: still being tested on real installations. Omitted when
+            false. The interface shows a badge on its tile.
     MetricDescription:
       type: object
       required: [name, kind]
@@ -11866,8 +12140,8 @@ components:
       properties:
         id:
           type: string
-          description: "Stable identifier: `browser` (headless Chromium for website-change screenshots) or `icmp` (ICMP echo sockets for ping)."
-        satisfied: { type: boolean, description: "True when the server found the requirement met (browser answering, ICMP socket opened)." }
+          description: "Stable identifier: `icmp` (ICMP echo sockets for ping)."
+        satisfied: { type: boolean, description: "True when the server found the requirement met (ICMP socket opened)." }
         doc_url: { type: string, description: Documentation section that explains it. }
         compose_snippet: { type: string, description: YAML to add to docker-compose.yml, as is. }
     SetupDescription:
@@ -12175,6 +12449,21 @@ components:
         has_target: { type: boolean }
         has_channel: { type: boolean }
         notification_confirmed: { type: boolean }
+        first_run: { $ref: "#/components/schemas/FirstRunTimings" }
+    FirstRunTimings:
+      type: object
+      description: >-
+        When this instance first passed each step, UTC without suffix; `null` until it
+        has. Recorded locally, never sent anywhere. Steps after the account are only
+        recorded when the account creation was (instances set up by an older version
+        stay empty).
+      properties:
+        first_boot_at: { type: [string, "null"], description: First start without an account. }
+        setup_at: { type: [string, "null"], description: First administrator created. }
+        first_target_at: { type: [string, "null"] }
+        first_channel_at: { type: [string, "null"] }
+        first_notification_at: { type: [string, "null"], description: First message that really left a channel, a test included. }
+        first_alert_at: { type: [string, "null"], description: First real alert delivered by the engine. }
     OnboardingPatch:
       type: object
       properties:
@@ -12219,6 +12508,7 @@ components:
         client_id: { type: integer, format: int64, description: "MSP mode: the client of the target (`1`, the default client, otherwise)." }
         interval_secs: { type: integer }
         enabled: { type: boolean }
+        cve_scan: { type: boolean, description: "Known-vulnerability (CVE) check is on for this device. `true` by default; `false` keeps it out of the scan and of `GET /api/security/cves*`." }
         tags:
           type: object
           additionalProperties: { type: string }
@@ -12372,6 +12662,7 @@ components:
         client_id: { type: integer, format: int64, description: "MSP mode: the client of the target. Absent on `POST`: the client chosen in the header, the only client of the account, or the default client. Only an MSP administrator changes it on `PUT`; the targets depending on it move along." }
         interval_secs: { type: integer, minimum: 10, default: 60 }
         enabled: { type: boolean, default: true }
+        cve_scan: { type: boolean, default: true, description: "Known-vulnerability (CVE) check of this device. Absent on `PUT` keeps the setting. For several devices at once, see `POST /api/security/cves/targets`." }
         tags:
           type: object
           description: Type options go here under their key.
@@ -12720,6 +13011,14 @@ components:
             kind: { const: once }
             starts_at: { type: string, format: date-time }
             ends_at: { type: string, format: date-time }
+        - type: object
+          description: >-
+            Silence with no end of its own ("seen, I am on it"): open from `starts_at`, lifted by
+            the server when the monitor answers again. Requires `target_id`.
+          required: [kind, starts_at]
+          properties:
+            kind: { const: recovery }
+            starts_at: { type: string, format: date-time }
         - type: object
           required: [kind, days, start_minute, end_minute]
           properties:
@@ -13767,6 +14066,15 @@ components:
         gateway_port: { type: [integer, "null"], description: Port the relay reports its gateway listening on. }
         gateway_host: { type: [string, "null"], description: Address the agents of its site reach it at. }
         gateway_tunnels: { type: integer, description: Agents of its site connected through it right now. }
+        gateway_check:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/GatewayCheck"
+        server_link:
+          description: "Server the agent uses when its configuration lists several (`server_urls`); null with a single address."
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ServerLink"
     RebindWindow:
       type: object
       required: [rebind_until, minutes]
@@ -14073,9 +14381,8 @@ components:
 
     WebchangePages:
       type: object
-      required: [screenshots_available, found, pages]
+      required: [found, pages]
       properties:
-        screenshots_available: { type: boolean }
         found:
           type: [integer, "null"]
           description: "Pages found (read and still queued) when **Max pages** stopped the last crawl; null when the crawl was not stopped by it, or when the last check failed."
@@ -14114,12 +14421,11 @@ components:
 
     WebchangeSnapshot:
       type: object
-      required: [id, fetched_at, title, has_screenshot]
+      required: [id, fetched_at, title]
       properties:
         id: { type: integer, format: int64 }
         fetched_at: { type: string, description: "UTC, without suffix." }
         title: { type: [string, "null"] }
-        has_screenshot: { type: boolean }
 
     WebchangeDiffLine:
       type: object
@@ -15457,6 +15763,33 @@ components:
         link: { type: string }
         set_by: { type: string }
         set_at: { type: string, description: UTC, without suffix. }
+    WallWeatherPlace:
+      type: object
+      required: [name, latitude, longitude]
+      properties:
+        name: { type: string, maxLength: 100 }
+        region: { type: [string, "null"] }
+        country: { type: [string, "null"] }
+        latitude: { type: number, minimum: -90, maximum: 90 }
+        longitude: { type: number, minimum: -180, maximum: 180 }
+    WallWeather:
+      type: object
+      required: [place, unit, current]
+      properties:
+        place:
+          oneOf:
+            - { $ref: "#/components/schemas/WallWeatherPlace" }
+            - { type: "null" }
+        unit: { type: string, enum: [c, f] }
+        current:
+          oneOf:
+            - type: object
+              required: [temperature, condition, is_day]
+              properties:
+                temperature: { type: integer, description: Outside temperature in the chosen unit, rounded. }
+                condition: { type: string, enum: [clear, partly_cloudy, cloudy, fog, rain, snow, thunder] }
+                is_day: { type: boolean }
+            - { type: "null" }
     WallMusic:
       type: object
       required: [spotify, speaker_name, can_control]

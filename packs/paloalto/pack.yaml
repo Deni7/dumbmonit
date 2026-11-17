@@ -1,0 +1,277 @@
+# Palo Alto Networks PAN-OS (PA-Series and VM-Series firewalls), through the XML
+# API: operational requests only, the API key sent in the X-PAN-KEY header (never
+# in the URL). Formerly a built-in type.
+#
+# Every command is a GET on /api/ with the command already encoded in the query
+# string. Only `show system info` is required; the other reads are optional, so a
+# role that refuses one, or a firewall without HA, does not fail the probe.
+schema: 1
+id: paloalto
+version: 1.0.0
+requires: ">=0.17"
+label: Palo Alto PAN-OS
+summary: A PAN-OS firewall through its XML API — interfaces without link, HA pair degraded or out of sync, session table filling up, management CPU and memory, licenses expiring.
+examples: [PA-440 / PA-1400 / PA-3400, VM-Series, PAN-OS 10.x / 11.x]
+address_hint: firewall.lan
+scheme: https
+default_port: 443
+setup:
+  title: Give DumbMonit an API key limited to operational requests
+  steps:
+    - "Device → Admin Roles → Add: a role named DumbMonit. On the Web UI tab disable everything; on the XML API tab enable only Operational Requests; on the REST API tab disable everything."
+    - Device → Administrators → Add an administrator dumbmonit with the role DumbMonit and a long random password, then Commit.
+    - "Generate its API key from the DumbMonit host:\ncurl -k -X POST https://firewall.lan/api/ -d type=keygen -d user=dumbmonit --data-urlencode password=<password>"
+    - In DumbMonit, enter the firewall address and paste the key (the text between <key> and </key>) as API key. Turn on "Accept an unverifiable certificate" while the firewall keeps its factory certificate.
+  permissions:
+    - XML API → Operational Requests only
+    - Web UI and REST API disabled
+  warning: >-
+    The last configuration commit is not watched: PAN-OS lists its jobs in no
+    documented order, which a pack cannot sort.
+  doc_url: https://docs.paloaltonetworks.com/pan-os/11-0/pan-os-panorama-api/about-the-pan-os-xml-api/structure-of-a-pan-os-xml-api-request/api-authentication-and-security
+credentials:
+  - kind: api_token
+    label: API key
+    help: The key returned by type=keygen for the DumbMonit administrator.
+
+sources:
+  - id: system
+    type: http
+    path: "/api/?type=op&cmd=%3Cshow%3E%3Csystem%3E%3Cinfo%3E%3C%2Finfo%3E%3C%2Fsystem%3E%3C%2Fshow%3E"
+    auth: none
+    headers:
+      X-PAN-KEY: "{{credential.token}}"
+    format: xml
+  # The output of `top`, inside the XML answer: read as text.
+  - id: resources
+    type: http
+    path: "/api/?type=op&cmd=%3Cshow%3E%3Csystem%3E%3Cresources%3E%3C%2Fresources%3E%3C%2Fsystem%3E%3C%2Fshow%3E"
+    auth: none
+    headers:
+      X-PAN-KEY: "{{credential.token}}"
+    format: text
+    optional: true
+  - id: sessions
+    type: http
+    path: "/api/?type=op&cmd=%3Cshow%3E%3Csession%3E%3Cinfo%3E%3C%2Finfo%3E%3C%2Fsession%3E%3C%2Fshow%3E"
+    auth: none
+    headers:
+      X-PAN-KEY: "{{credential.token}}"
+    format: xml
+    optional: true
+  - id: ha
+    type: http
+    path: "/api/?type=op&cmd=%3Cshow%3E%3Chigh-availability%3E%3Cstate%3E%3C%2Fstate%3E%3C%2Fhigh-availability%3E%3C%2Fshow%3E"
+    auth: none
+    headers:
+      X-PAN-KEY: "{{credential.token}}"
+    format: xml
+    optional: true
+  - id: licenses
+    type: http
+    path: "/api/?type=op&cmd=%3Crequest%3E%3Clicense%3E%3Cinfo%3E%3C%2Finfo%3E%3C%2Flicense%3E%3C%2Frequest%3E"
+    auth: none
+    headers:
+      X-PAN-KEY: "{{credential.token}}"
+    format: xml
+    lists: [entry]
+    optional: true
+  - id: interfaces
+    type: http
+    path: "/api/?type=op&cmd=%3Cshow%3E%3Cinterface%3Eall%3C%2Finterface%3E%3C%2Fshow%3E"
+    auth: none
+    headers:
+      X-PAN-KEY: "{{credential.token}}"
+    format: xml
+    lists: [entry]
+    optional: true
+
+metrics:
+  - name: version_info
+    help: Always 1; the PAN-OS version, model and name are its labels.
+    source: system
+    json: "$.response.result.system['sw-version']"
+    map: { "*": 1 }
+    labels:
+      version: "$['sw-version']"
+      model: $.model
+      system_name: $.hostname
+  # Management plane, from `top`.
+  - name: cpu_idle_percent
+    help: Idle share of the management plane CPU.
+    source: resources
+    regex: 'Cpu\(s\):[^\n]*?([\d.]+)\s*%?id'
+  - name: memory_total_kib
+    source: resources
+    regex: 'Mem\s*:\s*([\d.]+)k?\s+total'
+  - name: memory_free_kib
+    source: resources
+    regex: 'Mem\s*:[^\n]*?([\d.]+)k?\s+free'
+  - name: memory_cache_kib
+    help: Buffers and page cache, which the kernel gives back when needed.
+    source: resources
+    regex: 'Mem\s*:[^\n]*?([\d.]+)k?\s+buff/cache'
+  # Sessions.
+  - name: sessions
+    help: Active sessions.
+    source: sessions
+    json: "$.response.result['num-active']"
+  - name: sessions_max
+    help: Capacity of the session table.
+    source: sessions
+    json: "$.response.result['num-max']"
+  - name: session_setup_rate
+    help: New sessions per second.
+    source: sessions
+    json: $.response.result.cps
+  - name: packets_per_second
+    source: sessions
+    json: $.response.result.pps
+  - name: throughput_kbps
+    source: sessions
+    json: $.response.result.kbps
+  # High availability: without a pair, only ha_enabled (0) is written.
+  - name: ha_enabled
+    source: ha
+    json: $.response.result.enabled
+    map: { "yes": 1, "no": 0 }
+  - name: ha_local_functional
+    help: 0 when this firewall reports its HA state as suspended or non-functional.
+    source: ha
+    json: "$.response.result.group['local-info'].state"
+    map: { suspended: 0, non-functional: 0, "*": 1 }
+  - name: ha_peer_up
+    help: 1 when the peer is active or passive.
+    source: ha
+    json: "$.response.result.group['peer-info'].state"
+    map: { active: 1, passive: 1, active-primary: 1, active-secondary: 1, "*": 0 }
+  - name: ha_peer_connected
+    help: 1 when the HA link to the peer is up.
+    source: ha
+    json: "$.response.result.group['peer-info']['conn-status']"
+    map: { up: 1, "*": 0 }
+  - name: ha_in_sync
+    help: 1 when the running configuration is synchronized with the peer.
+    source: ha
+    json: "$.response.result.group['running-sync']"
+    map: { synchronized: 1, "*": 0 }
+
+discover:
+  - name: licenses
+    source: licenses
+    rows: $.response.result.licenses.entry[*]
+    labels:
+      license: $.feature
+    metrics:
+      - name: license_expired
+        json: $.expired
+        map: { "yes": 1, "no": 0 }
+      # "Never" is not a date: a perpetual license has no expiration sample.
+      - name: license_expiration_timestamp_seconds
+        help: When the license or subscription expires (Unix seconds, midnight UTC).
+        json: $.expires
+        date: "%B %d, %Y"
+  # Link of each physical port.
+  - name: ports
+    source: interfaces
+    rows: $.response.result.hw.entry[*]
+    labels:
+      interface: $.name
+    metrics:
+      - name: interface_link_up
+        json: $.state
+        map: { up: 1, down: 0 }
+      - name: interface_speed_mbps
+        json: $.speed
+  # Logical interfaces and their zone: a port without zone needs no link.
+  - name: zones
+    source: interfaces
+    rows: $.response.result.ifnet.entry[*]
+    labels:
+      interface: $.name
+      zone: $.zone
+    metrics:
+      - name: interface_info
+        help: Always 1; the interface and its zone are its labels.
+        json: $.name
+        map: { "*": 1 }
+
+rules:
+  - name: interface_down
+    title: Palo Alto interface without link
+    description: >-
+      A Palo Alto firewall interface bound to a zone has no link: cable,
+      transceiver or the device in front.
+    expr: '(1 - dumbmonit_paloalto_interface_link_up) and on (target, interface) dumbmonit_paloalto_interface_info{zone!=""}'
+    op: ">"
+    threshold: 0
+    for: 5m
+    severity: warning
+  - name: ha_peer_lost
+    title: Palo Alto HA peer lost
+    description: >-
+      The peer of a Palo Alto HA pair is no longer active or passive, or the HA
+      link to it is down: there is no standby any more.
+    expr: dumbmonit_paloalto_ha_peer_up * dumbmonit_paloalto_ha_peer_connected
+    op: "<"
+    threshold: 1
+    for: 2m
+    severity: critical
+  - name: ha_out_of_sync
+    title: Palo Alto HA out of sync
+    description: >-
+      The running configuration of a Palo Alto HA pair is not synchronized: a
+      failover would run another configuration.
+    expr: dumbmonit_paloalto_ha_in_sync
+    op: "<"
+    threshold: 1
+    for: 15m
+    severity: warning
+  - name: ha_not_functional
+    title: Palo Alto HA member not functional
+    description: This Palo Alto firewall reports its HA state as suspended or non-functional.
+    expr: dumbmonit_paloalto_ha_local_functional
+    op: "<"
+    threshold: 1
+    for: 5m
+    severity: critical
+  - name: session_table_full
+    title: Palo Alto session table filling up
+    description: >-
+      The session table of a Palo Alto firewall has stayed above 90 % of its
+      capacity for ten minutes: new sessions will be refused when it is full.
+    expr: dumbmonit_paloalto_sessions / dumbmonit_paloalto_sessions_max * 100
+    op: ">"
+    threshold: 90
+    for: 10m
+    severity: warning
+    unit: "%"
+  - name: cpu_high
+    title: Palo Alto management CPU high
+    description: The management plane CPU of a Palo Alto firewall has stayed above 90 % for fifteen minutes.
+    expr: 100 - dumbmonit_paloalto_cpu_idle_percent
+    op: ">"
+    threshold: 90
+    for: 15m
+    severity: warning
+    unit: "%"
+  - name: memory_high
+    title: Palo Alto management memory high
+    description: The management plane memory of a Palo Alto firewall has stayed above 90 % for fifteen minutes.
+    expr: >-
+      (dumbmonit_paloalto_memory_total_kib - dumbmonit_paloalto_memory_free_kib
+      - dumbmonit_paloalto_memory_cache_kib) / dumbmonit_paloalto_memory_total_kib * 100
+    op: ">"
+    threshold: 90
+    for: 15m
+    severity: warning
+    unit: "%"
+  - name: license_expiring
+    title: Palo Alto license expiring
+    description: A license or subscription of a Palo Alto firewall expires in less than 30 days, or has expired.
+    expr: (dumbmonit_paloalto_license_expiration_timestamp_seconds - time()) / 86400
+    op: "<"
+    threshold: 30
+    for: 1h
+    severity: warning
+    unit: d

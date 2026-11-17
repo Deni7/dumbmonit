@@ -50,7 +50,6 @@ async fn le_catalogue_des_types_reste_identique_a_linstantane() {
     let pool = db::open(&config.database_path()).await.expect("ouverture de la base");
     let mut config = config;
     config.probe_timeout = Duration::from_secs(5);
-    config.browser_url = None;
     let mut registry = collectors::builtin(&pool, &config, &[]);
     registry.register(Arc::new(Inconnu));
     let app = common::build_with_registry(dir, config, pool, registry).await;
@@ -66,11 +65,11 @@ async fn le_catalogue_des_types_reste_identique_a_linstantane() {
     // La version du serveur (User-Agent par défaut) change à chaque publication :
     // l'instantané la remplace par un repère pour ne pas avoir à le réécrire.
     let body = body.replace(VERSION, "<version>");
-    // Les prérequis dépendent de la machine (ICMP permis ou non, navigateur
-    // joignable ou non) : ils sont retirés de l'instantané et vérifiés à part.
+    // Les prérequis dépendent de la machine (ICMP permis ou non) : ils sont
+    // retirés de l'instantané et vérifiés à part.
     let (body, mut removed) = strip_requirements(&body);
     removed.sort();
-    assert_eq!(removed, ["browser", "icmp"], "seuls webchange et ping déclarent un prérequis");
+    assert_eq!(removed, ["icmp"], "seul ping déclare un prérequis");
     let body = &body;
 
     if std::env::var_os("DUMBMONIT_BLESS").is_some() {

@@ -6,13 +6,15 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use dumbmonit_proto::{
-    AGENT_KEY_HEADER, AGENT_SECRET_HEADER, AGENT_TLS_HEADER, AgentCommand, CERT_REFUSED,
-    COMMANDS_PATH, CommandReport, INGEST_PATH, LOGS_PATH, LogBatch, ProbeOutcome, PushAck,
-    PushBatch, RELAY_PATH, RELAY_TUNNEL_PATH, RELAY_TUNNEL_PROTOCOL, TLS_ENROL_PATH,
-    TLS_RENEW_PATH, TlsCertificate, TlsEnrolRequest, TlsOffer, TlsRenewRequest,
+    AGENT_KEY_HEADER, AGENT_SECRET_HEADER, AGENT_TLS_HEADER, AgentCommand, BacklogAck,
+    CERT_REFUSED, COMMANDS_PATH, CommandReport, INGEST_PATH, LOGS_PATH, LogBatch, ProbeOutcome,
+    PushAck, PushBatch, RELAY_BACKLOG_PATH, RELAY_MUX_PROTOCOL, RELAY_PATH, RELAY_PLAN_PATH,
+    RELAY_RESYNC_HEADER, RELAY_TUNNEL_PATH, RELAY_TUNNEL_PROTOCOL, RelayBacklog, RelayPlan,
+    TLS_ENROL_PATH, TLS_RENEW_PATH, TlsCertificate, TlsEnrolRequest, TlsOffer, TlsRenewRequest,
 };
 use tokio::sync::Notify;
 
+use crate::proxy::ProxyConfig;
 use crate::tls::{self, Pins};
 
 /// Ce qui peut arriver à un envoi, et surtout ce qu'il faut en faire.
@@ -68,7 +70,12 @@ impl std::fmt::Display for PushError {
 
 /// Le chemin vers le serveur : client HTTP et racine des URL.
 struct Channel {
+    /// Toutes les requêtes : en HTTP/2 sur le canal chiffré quand le serveur le
+    /// propose, une seule connexion pour les lots, les commandes et le relais.
     http: reqwest::Client,
+    /// Mises à niveau du relais (tunnels, connexion multiplexée) : HTTP/1.1,
+    /// une connexion à part. Seulement sur le canal chiffré.
+    upgrade: Option<reqwest::Client>,
     /// Racine du serveur, sans barre oblique finale.
     base_url: String,
     /// Vrai sur le canal chiffré (TLS 1.3, autorité épinglée).
@@ -102,6 +109,14 @@ pub struct PushClient {
     /// la boucle des mesures en attente de reprise repart aussitôt que le relais
     /// a retrouvé le serveur, et inversement.
     reachable: Arc<Notify>,
+    /// Demande d'un lot sans attendre la période : réglage du relais changé
+    /// côté serveur, passerelle ouverte ou essayée. Un seul jeton en attente
+    /// (`notify_one`) : plusieurs demandes rapprochées donnent un seul lot.
+    report_now: Arc<Notify>,
+    /// Mandataire sortant vers le serveur, résolu (voir `proxy.rs`) : chaque
+    /// client HTTP du canal le reprend, celui du canal chiffré compris — la
+    /// session TLS de l'agent passe alors par `CONNECT`, de bout en bout.
+    proxy: Arc<ProxyConfig>,
 }
 
 impl PushClient {
@@ -111,8 +126,10 @@ impl PushClient {
         secret: Option<String>,
         timeout: Duration,
     ) -> Result<Self> {
+        let proxy = Arc::new(ProxyConfig::default());
         let channel = Channel {
-            http: http_client(timeout, None)?,
+            http: http_client(timeout, None, &proxy)?,
+            upgrade: None,
             base_url: server_url.trim_end_matches('/').to_string(),
             encrypted: false,
         };
@@ -125,7 +142,26 @@ impl PushClient {
             secret: Arc::new(RwLock::new(secret)),
             legacy_key: Arc::new(AtomicBool::new(false)),
             reachable: Arc::new(Notify::new()),
+            report_now: Arc::new(Notify::new()),
+            proxy,
         })
+    }
+
+    /// Passe par ce mandataire (déjà résolu) pour joindre le serveur. À appeler
+    /// avant [`PushClient::pin_server`] et [`PushClient::use_tls`], qui le
+    /// reprennent.
+    pub fn with_proxy(mut self, proxy: ProxyConfig) -> Result<Self> {
+        self.proxy = Arc::new(proxy);
+        let channel = Channel {
+            http: http_client(self.timeout, None, &self.proxy)?,
+            upgrade: None,
+            base_url: self.channel().base_url.clone(),
+            encrypted: false,
+        };
+        if let Ok(mut held) = self.channel.write() {
+            *held = Arc::new(channel);
+        }
+        Ok(self)
     }
 
     /// Canal courant.
@@ -176,9 +212,11 @@ impl PushClient {
     /// Passe au canal chiffré : `url` du port des agents, certificat client
     /// s'il y en a un. Plus aucune requête ne part en clair ensuite.
     pub fn use_tls(&self, url: &str, identity: Option<(Vec<u8>, Vec<u8>)>) -> Result<()> {
-        let config = tls::client_config(self.pins.clone(), identity)?;
+        let config = tls::client_config(self.pins.clone(), identity.clone())?;
+        let upgrade = tls::upgrade_config(self.pins.clone(), identity)?;
         let channel = Channel {
-            http: http_client(self.timeout, Some(config))?,
+            http: http_client(self.timeout, Some(config), &self.proxy)?,
+            upgrade: Some(upgrade_client(self.timeout, upgrade, &self.proxy)?),
             base_url: url.trim_end_matches('/').to_string(),
             encrypted: true,
         };
@@ -194,7 +232,8 @@ impl PushClient {
     pub fn pin_server(&self, pin: &str) -> Result<()> {
         let config = tls::pinned_key_config(pin)?;
         let channel = Channel {
-            http: http_client(self.timeout, Some(config))?,
+            http: http_client(self.timeout, Some(config), &self.proxy)?,
+            upgrade: None,
             base_url: self.channel().base_url.clone(),
             encrypted: false,
         };
@@ -235,7 +274,7 @@ impl PushClient {
     ) -> Result<TlsCertificate, PushError> {
         let config = tls::client_config(self.pins.clone(), None)
             .map_err(|error| PushError::Transport(format!("{error:#}")))?;
-        let http = http_client(self.timeout, Some(config))
+        let http = http_client(self.timeout, Some(config), &self.proxy)
             .map_err(|error| PushError::Transport(format!("{error:#}")))?;
         let target = format!("{}{TLS_ENROL_PATH}", url.trim_end_matches('/'));
         let response = self
@@ -270,6 +309,17 @@ impl PushClient {
     /// Note une réponse favorable et réveille qui attendait le serveur.
     fn mark_reachable(&self) {
         self.reachable.notify_waiters();
+    }
+
+    /// Demande à la boucle des mesures d'envoyer un lot sans attendre sa
+    /// période.
+    pub fn request_report(&self) {
+        self.report_now.notify_one();
+    }
+
+    /// Signal « un lot est demandé », à attendre dans la boucle des mesures.
+    pub fn report_requested(&self) -> Arc<Notify> {
+        self.report_now.clone()
     }
 
     /// Requête vers un canal d'agent (commandes, relais) : jeton, secret de
@@ -349,6 +399,28 @@ impl PushClient {
             Some(secret) => request.header(AGENT_SECRET_HEADER, secret),
             None => request,
         }
+    }
+
+    /// Garde le canal (client HTTP, certificat client, épinglage) et change
+    /// seulement le serveur visé : bascule vers un serveur de secours, ou
+    /// retour à la primaire (voir `failover.rs`). Les deux partagent
+    /// l'autorité des agents : le même certificat y est reconnu.
+    pub fn retarget(&self, base_url: &str) {
+        let current = self.channel();
+        let channel = Channel {
+            http: current.http.clone(),
+            upgrade: current.upgrade.clone(),
+            base_url: base_url.trim_end_matches('/').to_string(),
+            encrypted: current.encrypted,
+        };
+        if let Ok(mut held) = self.channel.write() {
+            *held = Arc::new(channel);
+        }
+    }
+
+    /// Racine du serveur visé en ce moment, sans chemin.
+    pub fn base_url(&self) -> String {
+        self.channel().base_url.clone()
     }
 
     /// URL effectivement appelée, pour la journalisation de démarrage.
@@ -454,6 +526,11 @@ impl PushClient {
         let response = self
             .exchange(|| self.keyed(reqwest::Method::GET, &path, key, &query).timeout(timeout))
             .await?;
+        if response.headers().contains_key(RELAY_RESYNC_HEADER) {
+            // Le réglage de ce relais vient de changer : le prochain accusé de
+            // réception le porte, autant l'avoir tout de suite.
+            self.request_report();
+        }
         self.read_json(response).await
     }
 
@@ -488,6 +565,24 @@ impl PushClient {
             return Ok(false);
         }
         self.read_empty(response).await.map(|()| true)
+    }
+
+    /// Planning des sondes de ce relais, gardé pour les coupures du lien.
+    pub async fn fetch_plan(&self, key: &str) -> Result<RelayPlan, PushError> {
+        let response =
+            self.exchange(|| self.keyed(reqwest::Method::GET, RELAY_PLAN_PATH, key, "")).await?;
+        self.read_json(response).await
+    }
+
+    /// Lot de résultats obtenus pendant une coupure.
+    pub async fn send_backlog(
+        &self,
+        key: &str,
+        backlog: &RelayBacklog,
+    ) -> Result<BacklogAck, PushError> {
+        let post = || self.keyed(reqwest::Method::POST, RELAY_BACKLOG_PATH, key, "").json(backlog);
+        let response = self.exchange(post).await?;
+        self.read_json(response).await
     }
 }
 
@@ -527,17 +622,28 @@ impl PushClient {
     /// Jamais par l'ancien canal en clair : seul un relais authentifié par son
     /// certificat peut ouvrir un tunnel.
     pub async fn open_tunnel(&self) -> Result<reqwest::Upgraded, PushError> {
+        self.upgrade_to(RELAY_TUNNEL_PROTOCOL).await
+    }
+
+    /// Ouvre la connexion multiplexée du relais (voir `mux.rs`) : la même mise à
+    /// niveau, pour une connexion qui portera un flux par connexion d'agent du
+    /// site. Un serveur antérieur répond `426` (`PushError::Rejected`).
+    pub async fn open_mux(&self) -> Result<reqwest::Upgraded, PushError> {
+        self.upgrade_to(RELAY_MUX_PROTOCOL).await
+    }
+
+    async fn upgrade_to(&self, protocol: &'static str) -> Result<reqwest::Upgraded, PushError> {
         let channel = self.channel();
-        if !channel.encrypted {
+        let Some(http) = channel.upgrade.as_ref().filter(|_| channel.encrypted) else {
             return Err(PushError::Transport(
                 "the relay is not on the encrypted agent channel yet".to_string(),
             ));
-        }
+        };
         let target = format!("{}{RELAY_TUNNEL_PATH}", channel.base_url);
         let response = self
-            .identified(channel.http.get(target).bearer_auth(&self.token))
+            .identified(http.get(target).bearer_auth(&self.token))
             .header(reqwest::header::CONNECTION, "upgrade")
-            .header(reqwest::header::UPGRADE, RELAY_TUNNEL_PROTOCOL)
+            .header(reqwest::header::UPGRADE, protocol)
             .send()
             .await
             .map_err(|error| self.transport(&error))?;
@@ -599,8 +705,12 @@ fn rejection_of(status: reqwest::StatusCode, body: &str) -> PushError {
 
 /// Client HTTP d'un canal : en clair ou derrière l'ancien mandataire tel que
 /// configuré, ou, avec `tls`, canal chiffré strict — HTTPS seulement, sans
-/// redirection.
-fn http_client(timeout: Duration, tls: Option<rustls::ClientConfig>) -> Result<reqwest::Client> {
+/// redirection. `proxy` : le mandataire sortant, traversé par `CONNECT`.
+fn http_client(
+    timeout: Duration,
+    tls: Option<rustls::ClientConfig>,
+    proxy: &ProxyConfig,
+) -> Result<reqwest::Client> {
     let mut builder = reqwest::Client::builder()
         .timeout(timeout)
         // Le socket est réutilisé d'un envoi au suivant : sur un lien distant,
@@ -612,9 +722,40 @@ fn http_client(timeout: Duration, tls: Option<rustls::ClientConfig>) -> Result<r
         builder = builder
             .tls_backend_preconfigured(config)
             .https_only(true)
-            .redirect(reqwest::redirect::Policy::none());
+            .redirect(reqwest::redirect::Policy::none())
+            // En HTTP/2, toutes les requêtes passent par une seule connexion :
+            // une connexion morte (NAT, coupure) est détectée par un ping
+            // sans réponse plutôt qu'au délai de chaque requête.
+            .http2_keep_alive_interval(HTTP2_PING_INTERVAL)
+            .http2_keep_alive_timeout(HTTP2_PING_TIMEOUT);
     }
-    builder.build().context("building the HTTP client")
+    proxy.apply(builder)?.build().context("building the HTTP client")
+}
+
+/// Intervalle des pings HTTP/2 sur le canal chiffré.
+const HTTP2_PING_INTERVAL: Duration = Duration::from_secs(30);
+
+/// Délai de réponse à un ping HTTP/2 : au-delà, la connexion est abandonnée.
+const HTTP2_PING_TIMEOUT: Duration = Duration::from_secs(20);
+
+/// Client des mises à niveau du relais : HTTP/1.1 seul (une mise à niveau
+/// n'existe pas en HTTP/2), sans connexion gardée en réserve, et des sondes
+/// TCP pour qu'une connexion multiplexée muette (NAT) finisse par tomber.
+fn upgrade_client(
+    timeout: Duration,
+    tls: rustls::ClientConfig,
+    proxy: &ProxyConfig,
+) -> Result<reqwest::Client> {
+    let builder = reqwest::Client::builder()
+        .timeout(timeout)
+        .http1_only()
+        .pool_max_idle_per_host(0)
+        .tcp_keepalive(Duration::from_secs(60))
+        .user_agent(concat!("dumbmonit-agent/", env!("CARGO_PKG_VERSION")))
+        .tls_backend_preconfigured(tls)
+        .https_only(true)
+        .redirect(reqwest::redirect::Policy::none());
+    proxy.apply(builder)?.build().context("building the HTTP client")
 }
 
 /// Construit l'URL d'ingestion à partir de la racine du serveur.
@@ -641,7 +782,7 @@ fn commands_path(id: Option<i64>) -> String {
 /// Le message brut de `reqwest` commence par l'URL complète : tronqué par
 /// `systemctl status`, il ne montrait jamais la cause, et recopiait la clé de
 /// la machine quand elle voyageait encore dans l'URL.
-fn describe(error: &reqwest::Error) -> String {
+pub(crate) fn describe(error: &reqwest::Error) -> String {
     use std::error::Error as _;
     let nature = if error.is_timeout() {
         "timed out"
@@ -763,6 +904,22 @@ mod tests {
         // Quelqu'un peut ouvrir la fenêtre de réenrôlement pendant qu'on patiente.
         assert!(PushError::Forbidden("rebind me".into()).is_retryable());
         assert!(!PushError::Rejected { status: 400, message: "lot vide".into() }.is_retryable());
+    }
+
+    #[tokio::test]
+    async fn a_requested_report_waits_for_the_loop_and_close_requests_make_one_batch() {
+        let client = PushClient::new("http://serveur:8080", "dmon_x", None, Duration::from_secs(1))
+            .expect("client");
+        let signal = client.report_requested();
+        // Demandé avant que la boucle n'attende (fin de l'attente longue du
+        // relais pendant un envoi) : la demande est gardée.
+        client.clone().request_report();
+        client.request_report();
+        tokio::time::timeout(Duration::from_millis(100), signal.notified())
+            .await
+            .expect("demande gardée");
+        let again = tokio::time::timeout(Duration::from_millis(50), signal.notified()).await;
+        assert!(again.is_err(), "deux demandes rapprochées, un seul lot");
     }
 
     #[test]

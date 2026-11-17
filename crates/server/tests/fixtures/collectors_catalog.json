@@ -1242,6 +1242,24 @@
         "better": "lower"
       },
       {
+        "name": "agent_buffer_disk_bytes",
+        "label": "Disk buffer used",
+        "unit": "B",
+        "kind": "gauge",
+        "better": "lower"
+      },
+      {
+        "name": "agent_relay_buffered_results",
+        "label": "Relay results buffered",
+        "kind": "gauge"
+      },
+      {
+        "name": "agent_relay_dropped_results",
+        "label": "Relay results dropped",
+        "kind": "counter",
+        "better": "lower"
+      },
+      {
         "name": "container_count",
         "label": "Containers",
         "kind": "gauge"
@@ -2075,14 +2093,16 @@
           "arubacentral_devices_poor_health"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "authentik",
-    "label": "authentik (beta)",
+    "label": "authentik",
     "summary": "Readiness, workers, failed system tasks, outpost connections, version updates, users.",
     "examples": [
-      "authentik 2025.x"
+      "authentik 2025.10 and later",
+      "authentik 2025.8 and earlier"
     ],
     "credential_types": [
       "api_token"
@@ -2138,7 +2158,7 @@
           "optional": true
         }
       ],
-      "warning": "authentik has no read-only role for its system pages: the token's user must be allowed into the interface, so keep the key only in DumbMonit. Pages the token cannot read are skipped, not failed.",
+      "warning": "authentik has no read-only role for its system pages: the token's user must be allowed into the interface, so keep the key only in DumbMonit. Pages the token cannot read are skipped; a page this authentik version does not have counts as a scrape error.",
       "doc_url": "https://dumbmonit.selfhostr.io/docs/devices/authentik/"
     },
     "options": [
@@ -2284,7 +2304,8 @@
           "authentik_version_info"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "aws",
@@ -3384,7 +3405,8 @@
           "ceph_pgs_unclean"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "cloudflare",
@@ -4617,7 +4639,8 @@
           "duplicati_backup_target_bytes"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "elasticsearch",
@@ -5679,7 +5702,7 @@
   },
   {
     "kind": "frigate",
-    "label": "Frigate NVR (beta)",
+    "label": "Frigate NVR",
     "summary": "Cameras that stopped delivering frames, detector speed and hangs, frame rates, recording storage, updates.",
     "examples": [
       "Frigate 0.14 and later"
@@ -5903,7 +5926,8 @@
           "frigate_storage_used_percent"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "gitlab",
@@ -7937,9 +7961,11 @@
         "queue.read\nJob queues (job.read on older Immich)",
         "session.read\nDevices and their last connection",
         "asset.read\nLast backup",
-        "user.read\nThe account that owns the key"
+        "user.read\nThe account that owns the key",
+        "adminUser.read\nNeeds a key from an account with access to Administration: the list of accounts",
+        "adminSession.read\nNeeds a key from an account with access to Administration: every account's phones and tablets"
       ],
-      "warning": "Create the key from an account that can open Administration, or photo counts and job queues are skipped; \"last backup\" is the whole library's latest upload, the same for every device.",
+      "warning": "Create the key from an account with access to Administration: it then covers the phones and tablets of every user, and photo counts and job queues are read. With an ordinary account only its own devices are read. \"Last backup\" is the whole library's latest upload, the same for every device.",
       "doc_url": "https://dumbmonit.selfhostr.io/docs/devices/immich/"
     },
     "options": [
@@ -9510,7 +9536,7 @@
   },
   {
     "kind": "keycloak",
-    "label": "Keycloak (beta)",
+    "label": "Keycloak",
     "summary": "Readiness and database health, version, realms (disabled ones), active sessions and users per realm.",
     "examples": [
       "Keycloak 25 and later",
@@ -9530,7 +9556,7 @@
       {
         "kind": "username_password",
         "label": "Client ID / secret",
-        "help": "A service-account client with read-only roles. DumbMonit asks for a token at each probe.",
+        "help": "A service-account client with read-only roles and the kc-admin-api client scope. DumbMonit asks for a token at each probe.",
         "fields": [
           {
             "key": "username",
@@ -9560,7 +9586,8 @@
       "steps": [
         "Run Keycloak with health checks on, with the option below. From Keycloak 25 they answer on the management port 9000.\nKC_HEALTH_ENABLED=true",
         "Optional, for realms, sessions and users: in the master realm, create a client named as follows, with Client authentication and Service accounts roles on, and Standard flow off.\ndumbmonit",
-        "On that client's Service accounts roles tab, assign the client roles listed below, then copy the secret from its Credentials tab.",
+        "On that client's Client scopes tab, choose Add client scope and add the scope named as follows as Default. From Keycloak 26.8.2 the admin API refuses tokens without it.\nkc-admin-api",
+        "On that client's Service accounts roles tab, assign the roles below from the client of each realm to read (master-realm, or homelab-realm for a realm named homelab), then copy the secret from its Credentials tab.",
         "In DumbMonit, enter Keycloak's address and the client ID and secret, or choose None (health checks only)."
       ],
       "ports": [
@@ -9587,8 +9614,10 @@
         }
       ],
       "permissions": [
-        "view-realm\nMaster-realm client role: realms and their state",
-        "view-users\nMaster-realm client role: user counts"
+        "view-realm\nPer realm: realms and their state",
+        "view-users\nPer realm: user counts",
+        "view-clients\nPer realm: session counts. Without it Keycloak hides them, and DumbMonit reports an error instead of zero",
+        "manage-realm (optional)\nOn master-realm only: version, uptime and memory. A powerful role: leave it out unless you need these"
       ],
       "warning": "Keycloak 24 and earlier serve the health checks on the main port: set the health port option to same. Health checks must be enabled on the server, or DumbMonit reports a missing /health/ready.",
       "doc_url": "https://dumbmonit.selfhostr.io/docs/devices/keycloak/"
@@ -9803,7 +9832,8 @@
           "keycloak_realm_offline_sessions"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "kopia",
@@ -10056,7 +10086,8 @@
           "kopia_source_last_snapshot_bytes"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "kubernetes",
@@ -10376,7 +10407,7 @@
   },
   {
     "kind": "lidarr",
-    "label": "Lidarr (beta)",
+    "label": "Lidarr",
     "summary": "Health warnings, failing download clients and indexers, download queue errors, library disk space, updates.",
     "examples": [
       "Lidarr"
@@ -10581,7 +10612,8 @@
           "lidarr_queue_total"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "loki",
@@ -11484,7 +11516,7 @@
   },
   {
     "kind": "mailcow",
-    "label": "mailcow (beta)",
+    "label": "mailcow",
     "summary": "Stopped containers, Postfix queue size and age, mail volume, mailboxes near their quota.",
     "examples": [
       "mailcow: dockerized"
@@ -11700,7 +11732,8 @@
           "limit": "10"
         }
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "mdaemon",
@@ -11960,207 +11993,6 @@
         "title": "Response time",
         "metrics": [
           "mdaemon_service_response_seconds"
-        ]
-      }
-    ]
-  },
-  {
-    "kind": "meraki",
-    "label": "Cisco Meraki (beta)",
-    "summary": "Beta. A Cisco Meraki organization through the Dashboard API: devices offline, Internet uplinks that failed, license out of compliance or expiring, clients per network.",
-    "examples": [
-      "Meraki MX / MS / MR",
-      "Cisco Meraki cloud dashboard"
-    ],
-    "credential_types": [
-      "api_token"
-    ],
-    "credentials": [
-      {
-        "kind": "api_token",
-        "label": "API key",
-        "help": "The key of the read-only administrator created for DumbMonit, sent as a bearer token.",
-        "fields": [
-          {
-            "key": "token",
-            "label": "API key",
-            "help": "Generated under My profile → API access, shown once. Stored encrypted, never shown again.",
-            "placeholder": "",
-            "input": "password",
-            "choices": [],
-            "required": true
-          }
-        ]
-      }
-    ],
-    "address_hint": "api.meraki.com",
-    "default_port": 443,
-    "setup": {
-      "title": "Create a read-only API key for DumbMonit",
-      "steps": [
-        "In the Meraki dashboard, open Organization → Settings and tick Enable access to the Cisco Meraki Dashboard API.",
-        "Open Organization → Administrators → Add admin and create an administrator dedicated to DumbMonit, with Organization access set to Read-only.\ndumbmonit@example.com",
-        "Sign in as that administrator, open My profile → API access and click Generate new API key. Copy it: the dashboard shows it only once.",
-        "In DumbMonit, enter api.meraki.com as the address and paste the key as API key. Leave Organization empty to read the first organization the key sees."
-      ],
-      "ports": [
-        {
-          "port": 443,
-          "protocol": "tcp",
-          "direction": "to_device",
-          "purpose": "Meraki Dashboard API (HTTPS, api.meraki.com)",
-          "optional": false
-        }
-      ],
-      "permissions": [
-        "Organization access: Read-only\nLists devices, uplinks, licensing and clients, changes nothing"
-      ],
-      "warning": "A dormant device (not seen for a long time) is counted but never reported as down, and a WAN socket without a cable is not a failed uplink: only an uplink that lost its Internet access is.",
-      "doc_url": "https://dumbmonit.selfhostr.io/docs/devices/meraki/"
-    },
-    "options": [
-      {
-        "key": "organization",
-        "label": "Organization",
-        "help": "The ID or name of the organization to read. Empty: the first one the API key sees.",
-        "placeholder": "Acme Corp",
-        "default": "",
-        "required": false,
-        "input": "text",
-        "choices": [],
-        "group": ""
-      },
-      {
-        "key": "networks",
-        "label": "Networks",
-        "help": "Comma-separated network names or IDs to watch. Empty: every network of the organization.",
-        "placeholder": "Main office, Warehouse",
-        "default": "",
-        "required": false,
-        "input": "text",
-        "choices": [],
-        "group": ""
-      },
-      {
-        "key": "request_timeout_seconds",
-        "label": "Timeout per request (seconds)",
-        "help": "Time allowed for each call, from 1 to 120.",
-        "placeholder": "15",
-        "default": "15",
-        "required": false,
-        "input": "number",
-        "choices": [],
-        "group": ""
-      }
-    ],
-    "metrics": [
-      {
-        "name": "meraki_organization_info",
-        "label": "Organization",
-        "kind": "info"
-      },
-      {
-        "name": "meraki_license_ok",
-        "label": "License ok",
-        "unit": "bool",
-        "kind": "gauge"
-      },
-      {
-        "name": "meraki_license_status_info",
-        "label": "License status",
-        "kind": "info"
-      },
-      {
-        "name": "meraki_license_expiry_seconds",
-        "label": "License expiry",
-        "unit": "s",
-        "kind": "gauge"
-      },
-      {
-        "name": "meraki_network_clients",
-        "label": "Network clients",
-        "kind": "gauge"
-      },
-      {
-        "name": "meraki_clients",
-        "label": "Clients",
-        "kind": "gauge"
-      },
-      {
-        "name": "meraki_device_online",
-        "label": "Device online",
-        "unit": "bool",
-        "kind": "gauge"
-      },
-      {
-        "name": "meraki_device_offline",
-        "label": "Device offline",
-        "kind": "gauge",
-        "better": "lower"
-      },
-      {
-        "name": "meraki_device_alerting",
-        "label": "Device alerting",
-        "kind": "gauge"
-      },
-      {
-        "name": "meraki_device_last_report_age_seconds",
-        "label": "Device last report age",
-        "unit": "s",
-        "kind": "gauge"
-      },
-      {
-        "name": "meraki_devices",
-        "label": "Devices",
-        "kind": "gauge"
-      },
-      {
-        "name": "meraki_uplink_up",
-        "label": "Uplink up",
-        "unit": "bool",
-        "kind": "gauge"
-      },
-      {
-        "name": "meraki_uplink_failed",
-        "label": "Uplink failed",
-        "kind": "gauge",
-        "better": "lower"
-      },
-      {
-        "name": "meraki_uplink_failover",
-        "label": "Uplink failover",
-        "kind": "gauge"
-      },
-      {
-        "name": "meraki_uplinks_failed",
-        "label": "Uplinks failed",
-        "kind": "gauge",
-        "better": "lower"
-      }
-    ],
-    "views": [
-      {
-        "view": "stat",
-        "title": "Current values",
-        "metrics": [
-          "meraki_device_offline",
-          "meraki_uplinks_failed",
-          "meraki_license_ok",
-          "meraki_devices",
-          "meraki_license_expiry_seconds",
-          "meraki_device_alerting",
-          "meraki_device_last_report_age_seconds",
-          "meraki_uplink_up",
-          "meraki_uplink_failed",
-          "meraki_uplink_failover"
-        ]
-      },
-      {
-        "view": "timeseries",
-        "title": "Clients",
-        "metrics": [
-          "meraki_network_clients",
-          "meraki_clients"
         ]
       }
     ]
@@ -12786,7 +12618,8 @@
           "minio_capacity_usable_used_percent"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "mongodb",
@@ -15752,7 +15585,7 @@
   },
   {
     "kind": "omada",
-    "label": "TP-Link Omada (beta)",
+    "label": "TP-Link Omada",
     "summary": "Beta. A TP-Link Omada controller through its OpenAPI: devices disconnected, CPU and memory saturated, firmware updates offered, clients per site.",
     "examples": [
       "Omada software controller",
@@ -16064,7 +15897,8 @@
           "omada_device_memory_used_percent"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "openvpn",
@@ -17410,277 +17244,6 @@
           "ovh_dedicated_tasks_active",
           "ovh_item_ok",
           "ovh_figure"
-        ]
-      }
-    ]
-  },
-  {
-    "kind": "paloalto",
-    "label": "Palo Alto PAN-OS",
-    "summary": "Beta. A Palo Alto Networks firewall through the PAN-OS XML API: interfaces without link, HA peer lost or out of sync, session table filling up, management CPU and memory, licences expiring, failed commits.",
-    "examples": [
-      "PA-400 / PA-1400 series",
-      "VM-Series",
-      "PAN-OS 10.x and 11.x"
-    ],
-    "credential_types": [
-      "username_password",
-      "api_token"
-    ],
-    "credentials": [
-      {
-        "kind": "username_password",
-        "label": "User name and password",
-        "help": "The dumbmonit account: DumbMonit asks the firewall for an API key with it and keeps the key, the password only travels in a request body.",
-        "fields": [
-          {
-            "key": "username",
-            "label": "User name",
-            "help": "The read-only account created for DumbMonit.",
-            "placeholder": "dumbmonit",
-            "input": "text",
-            "choices": [],
-            "required": true
-          },
-          {
-            "key": "password",
-            "label": "Password",
-            "help": "",
-            "placeholder": "",
-            "input": "password",
-            "choices": [],
-            "required": true
-          }
-        ]
-      },
-      {
-        "kind": "api_token",
-        "label": "API key",
-        "help": "A key already generated for the dumbmonit account, sent in the X-PAN-KEY header.",
-        "fields": [
-          {
-            "key": "token",
-            "label": "API key",
-            "help": "As returned by the keygen request. Stored encrypted, never shown again.",
-            "placeholder": "",
-            "input": "password",
-            "choices": [],
-            "required": true
-          }
-        ]
-      }
-    ],
-    "address_hint": "pa.lan",
-    "default_port": 443,
-    "setup": {
-      "title": "Create a read-only XML API account for DumbMonit",
-      "steps": [
-        "Device → Admin Roles → Add: name the role as follows. On the XML API tab enable Operational Requests only; leave every other privilege, and the Web UI and Command Line tabs, disabled.\ndumbmonit-ro",
-        "Device → Administrators → Add: name the account as follows, set Authentication to a password, the type to Role Based and the role to the one above.\ndumbmonit",
-        "Click Commit: the role and the account exist only once committed.",
-        "In DumbMonit, enter the firewall address (pa.lan) with that user name and password, or with an API key you generated for that account."
-      ],
-      "ports": [
-        {
-          "port": 443,
-          "protocol": "tcp",
-          "direction": "to_device",
-          "purpose": "Management interface (HTTPS, default)",
-          "optional": false
-        }
-      ],
-      "permissions": [
-        "XML API → Operational Requests: enabled\nshow system info, resources, sessions, interfaces, HA state, jobs and licence info",
-        "Every other XML API privilege: disabled\nConfiguration, Commit, Export, Import, Report, Log and User-ID Agent are not needed",
-        "Web UI and Command Line: disabled\nThe account never signs in interactively"
-      ],
-      "warning": "The management interface ships a self-signed certificate: tick \"Accept an unverifiable certificate\" unless you installed your own.",
-      "doc_url": "https://dumbmonit.selfhostr.io/docs/devices/paloalto/"
-    },
-    "options": [
-      {
-        "key": "port",
-        "label": "Port",
-        "help": "Used if the address does not give a port: the HTTPS port of the management interface.",
-        "placeholder": "443",
-        "default": "443",
-        "required": false,
-        "input": "number",
-        "choices": [],
-        "group": ""
-      },
-      {
-        "key": "insecure_tls",
-        "label": "Accept an unverifiable certificate",
-        "help": "The device ships a self-signed certificate: enable this unless you installed one DumbMonit trusts.",
-        "placeholder": "",
-        "default": "false",
-        "required": false,
-        "input": "boolean",
-        "choices": [],
-        "group": ""
-      },
-      {
-        "key": "request_timeout_seconds",
-        "label": "Timeout per request (seconds)",
-        "help": "Time allowed for each call, from 1 to 120.",
-        "placeholder": "15",
-        "default": "15",
-        "required": false,
-        "input": "number",
-        "choices": [],
-        "group": ""
-      }
-    ],
-    "metrics": [
-      {
-        "name": "paloalto_version_info",
-        "label": "Version",
-        "kind": "info"
-      },
-      {
-        "name": "paloalto_uptime_seconds",
-        "label": "Uptime",
-        "unit": "s",
-        "kind": "gauge"
-      },
-      {
-        "name": "paloalto_cpu_usage_percent",
-        "label": "CPU usage",
-        "unit": "%",
-        "kind": "gauge",
-        "better": "lower",
-        "min": 0.0,
-        "max": 100.0
-      },
-      {
-        "name": "paloalto_memory_used_percent",
-        "label": "Memory used",
-        "unit": "%",
-        "kind": "gauge",
-        "better": "lower",
-        "min": 0.0,
-        "max": 100.0
-      },
-      {
-        "name": "paloalto_sessions",
-        "label": "Sessions",
-        "kind": "gauge"
-      },
-      {
-        "name": "paloalto_session_usage_percent",
-        "label": "Session usage",
-        "unit": "%",
-        "kind": "gauge",
-        "better": "lower",
-        "min": 0.0,
-        "max": 100.0
-      },
-      {
-        "name": "paloalto_sessions_max",
-        "label": "Sessions max",
-        "kind": "gauge"
-      },
-      {
-        "name": "paloalto_license_status_info",
-        "label": "License status",
-        "kind": "info"
-      },
-      {
-        "name": "paloalto_license_expiry_seconds",
-        "label": "License expiry",
-        "unit": "s",
-        "kind": "gauge"
-      },
-      {
-        "name": "paloalto_license_expired",
-        "label": "License expired",
-        "unit": "bool",
-        "kind": "gauge"
-      },
-      {
-        "name": "paloalto_interface_speed_mbps",
-        "label": "Interface speed mbps",
-        "unit": "Mbit/s",
-        "kind": "gauge"
-      },
-      {
-        "name": "paloalto_interface_link_up",
-        "label": "Interface link up",
-        "unit": "bool",
-        "kind": "gauge"
-      },
-      {
-        "name": "paloalto_interface_down",
-        "label": "Interface down",
-        "kind": "gauge",
-        "better": "lower"
-      },
-      {
-        "name": "paloalto_interfaces_down",
-        "label": "Interfaces down",
-        "kind": "gauge",
-        "better": "lower"
-      },
-      {
-        "name": "paloalto_ha_state_info",
-        "label": "HA state",
-        "kind": "info"
-      },
-      {
-        "name": "paloalto_ha_enabled",
-        "label": "HA enabled",
-        "unit": "bool",
-        "kind": "gauge"
-      },
-      {
-        "name": "paloalto_ha_peer_up",
-        "label": "HA peer up",
-        "unit": "bool",
-        "kind": "gauge"
-      },
-      {
-        "name": "paloalto_ha_in_sync",
-        "label": "HA in sync",
-        "unit": "bool",
-        "kind": "gauge"
-      },
-      {
-        "name": "paloalto_last_commit_ok",
-        "label": "Last commit ok",
-        "unit": "bool",
-        "kind": "gauge"
-      }
-    ],
-    "views": [
-      {
-        "view": "stat",
-        "title": "Current values",
-        "metrics": [
-          "paloalto_interfaces_down",
-          "paloalto_ha_in_sync",
-          "paloalto_license_expired",
-          "paloalto_sessions",
-          "paloalto_uptime_seconds",
-          "paloalto_license_expiry_seconds",
-          "paloalto_interface_link_up",
-          "paloalto_ha_peer_up",
-          "paloalto_last_commit_ok"
-        ]
-      },
-      {
-        "view": "timeseries",
-        "title": "CPU and memory",
-        "metrics": [
-          "paloalto_cpu_usage_percent",
-          "paloalto_memory_used_percent"
-        ]
-      },
-      {
-        "view": "timeseries",
-        "title": "Session table used",
-        "metrics": [
-          "paloalto_session_usage_percent"
         ]
       }
     ]
@@ -19411,6 +18974,8 @@
         "/api/v2/status/services GET\nStopped services",
         "/api/v2/system/version GET\npfSense version",
         "/api/v2/system/restapi/version GET\nOptional: updates of the REST API package",
+        "/api/v2/firewall/states/size GET\nOptional: state table usage",
+        "/api/v2/status/carp GET\nOptional: CARP maintenance mode",
         "/api/v2/auth/key POST\nOnly while creating the key, then remove it"
       ],
       "warning": "The REST API package is a community project, not part of pfSense: reinstall it after each pfSense upgrade. pfSense ships a self-signed certificate: tick \"Accept an unverifiable certificate\" unless you replaced it.",
@@ -22306,8 +21871,8 @@
   },
   {
     "kind": "prowlarr",
-    "label": "Prowlarr (beta)",
-    "summary": "Health warnings, indexers disabled after failures, disk space, updates.",
+    "label": "Prowlarr",
+    "summary": "Health warnings, indexers disabled after failures, updates.",
     "examples": [
       "Prowlarr"
     ],
@@ -22447,22 +22012,6 @@
         "kind": "gauge"
       },
       {
-        "name": "prowlarr_disk_used_percent",
-        "label": "Disk used",
-        "unit": "%",
-        "kind": "gauge",
-        "better": "lower",
-        "min": 0.0,
-        "max": 100.0
-      },
-      {
-        "name": "prowlarr_disk_free_bytes",
-        "label": "Disk free",
-        "unit": "B",
-        "kind": "gauge",
-        "better": "higher"
-      },
-      {
         "name": "prowlarr_indexers_disabled",
         "label": "Indexers disabled",
         "kind": "gauge"
@@ -22497,8 +22046,6 @@
           "prowlarr_health_errors",
           "prowlarr_health_warnings",
           "prowlarr_health_issue",
-          "prowlarr_disk_used_percent",
-          "prowlarr_disk_free_bytes",
           "prowlarr_indexers_disabled",
           "prowlarr_update_available",
           "prowlarr_version_info"
@@ -22511,7 +22058,8 @@
           "prowlarr_queue_total"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "proxmox",
@@ -24123,7 +23671,7 @@
   },
   {
     "kind": "qbittorrent",
-    "label": "qBittorrent (beta)",
+    "label": "qBittorrent",
     "summary": "Torrents in error or stalled, lost connectivity, download and upload speed, free space, torrents by state.",
     "examples": [
       "qBittorrent 4.x and 5.x"
@@ -24322,7 +23870,8 @@
           "qbittorrent_upload_speed_bytes"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "qnap",
@@ -24603,7 +24152,8 @@
           "qnap_disk_temperature_celsius"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "rabbitmq",
@@ -24946,7 +24496,7 @@
   },
   {
     "kind": "radarr",
-    "label": "Radarr (beta)",
+    "label": "Radarr",
     "summary": "Health warnings, failing download clients and indexers, download queue errors, library disk space, updates.",
     "examples": [
       "Radarr v5"
@@ -25151,7 +24701,8 @@
           "radarr_queue_total"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "radius",
@@ -27817,7 +27368,7 @@
   },
   {
     "kind": "sonarr",
-    "label": "Sonarr (beta)",
+    "label": "Sonarr",
     "summary": "Health warnings, failing download clients and indexers, download queue errors, library disk space, updates.",
     "examples": [
       "Sonarr v4"
@@ -28022,151 +27573,8 @@
           "sonarr_queue_total"
         ]
       }
-    ]
-  },
-  {
-    "kind": "sonicwall",
-    "label": "SonicWall SonicOS",
-    "summary": "Beta. A SonicWall firewall through the SonicOS 7 API: the link of every interface bound to a zone. Kept minimal on purpose: only the API paths SonicWall publishes are read.",
-    "examples": [
-      "SonicWall TZ / NSa / NSsp",
-      "SonicWall NSv",
-      "SonicOS 7.x"
     ],
-    "credential_types": [
-      "username_password"
-    ],
-    "credentials": [
-      {
-        "kind": "username_password",
-        "label": "User name and password",
-        "help": "The dumbmonit user, in a read-only group, sent as HTTP Basic.",
-        "fields": [
-          {
-            "key": "username",
-            "label": "User name",
-            "help": "The read-only user created for DumbMonit.",
-            "placeholder": "dumbmonit",
-            "input": "text",
-            "choices": [],
-            "required": true
-          },
-          {
-            "key": "password",
-            "label": "Password",
-            "help": "",
-            "placeholder": "",
-            "input": "password",
-            "choices": [],
-            "required": true
-          }
-        ]
-      }
-    ],
-    "address_hint": "sonicwall.lan",
-    "default_port": 443,
-    "setup": {
-      "title": "Create a read-only user for the SonicOS API",
-      "steps": [
-        "Device → Settings → Administration → Audit/SonicOS API: make sure HTTP Basic Access (RFC-2617) is on, then click Accept.",
-        "Device → Users → Local Users & Groups → Add User: name it as follows, give it a long random password and add it to the group SonicWall Read-Only Admins.\ndumbmonit",
-        "Allow HTTPS management on the interface DumbMonit reaches the firewall through (Device → Network → Interfaces → Configure → Management).",
-        "In DumbMonit, enter the firewall address (sonicwall.lan) with that user name and password."
-      ],
-      "ports": [
-        {
-          "port": 443,
-          "protocol": "tcp",
-          "direction": "to_device",
-          "purpose": "Management interface (HTTPS, default)",
-          "optional": false
-        }
-      ],
-      "permissions": [
-        "Group SonicWall Read-Only Admins\nThe account reads and changes nothing"
-      ],
-      "warning": "The management interface ships a self-signed certificate: tick \"Accept an unverifiable certificate\" unless you installed your own.",
-      "doc_url": "https://dumbmonit.selfhostr.io/docs/devices/sonicwall/"
-    },
-    "options": [
-      {
-        "key": "port",
-        "label": "Port",
-        "help": "Used if the address does not give a port: the HTTPS port of the management interface.",
-        "placeholder": "443",
-        "default": "443",
-        "required": false,
-        "input": "number",
-        "choices": [],
-        "group": ""
-      },
-      {
-        "key": "insecure_tls",
-        "label": "Accept an unverifiable certificate",
-        "help": "The device ships a self-signed certificate: enable this unless you installed one DumbMonit trusts.",
-        "placeholder": "",
-        "default": "false",
-        "required": false,
-        "input": "boolean",
-        "choices": [],
-        "group": ""
-      },
-      {
-        "key": "request_timeout_seconds",
-        "label": "Timeout per request (seconds)",
-        "help": "Time allowed for each call, from 1 to 120.",
-        "placeholder": "15",
-        "default": "15",
-        "required": false,
-        "input": "number",
-        "choices": [],
-        "group": ""
-      }
-    ],
-    "metrics": [
-      {
-        "name": "sonicwall_interfaces",
-        "label": "Interfaces",
-        "kind": "gauge"
-      },
-      {
-        "name": "sonicwall_interfaces_down",
-        "label": "Interfaces down",
-        "kind": "gauge",
-        "better": "lower"
-      },
-      {
-        "name": "sonicwall_interface_link_up",
-        "label": "Interface link up",
-        "unit": "bool",
-        "kind": "gauge"
-      },
-      {
-        "name": "sonicwall_interface_down",
-        "label": "Interface down",
-        "unit": "bool",
-        "kind": "gauge",
-        "better": "lower"
-      },
-      {
-        "name": "sonicwall_version_info",
-        "label": "Version",
-        "kind": "info"
-      }
-    ],
-    "views": [
-      {
-        "view": "stat",
-        "title": "Current values",
-        "metrics": [
-          "sonicwall_interfaces",
-          "sonicwall_interfaces_down",
-          "sonicwall_interface_link_up",
-          "sonicwall_interface_down",
-          "sonicwall_version_info"
-        ]
-      }
-    ]
+    "beta": true
   },
   {
     "kind": "sophos",
@@ -31056,208 +30464,6 @@
     ]
   },
   {
-    "kind": "unifiprotect",
-    "label": "UniFi Protect (beta)",
-    "summary": "Cameras offline or not recording, NVR disks and storage, recording switched off.",
-    "examples": [
-      "UNVR",
-      "Dream Machine Pro",
-      "Cloud Key Gen2+"
-    ],
-    "credential_types": [
-      "username_password"
-    ],
-    "credentials": [
-      {
-        "kind": "username_password",
-        "label": "Local user name / password",
-        "help": "A local UniFi OS user with the View Only role on Protect. Ubiquiti cloud accounts are refused.",
-        "fields": [
-          {
-            "key": "username",
-            "label": "User name",
-            "help": "",
-            "placeholder": "dumbmonit",
-            "input": "text",
-            "choices": [],
-            "required": true
-          },
-          {
-            "key": "password",
-            "label": "Password",
-            "help": "",
-            "placeholder": "",
-            "input": "password",
-            "choices": [],
-            "required": true
-          }
-        ]
-      }
-    ],
-    "address_hint": "unvr.lan",
-    "default_port": 443,
-    "setup": {
-      "title": "Create a local view-only user for Protect",
-      "steps": [
-        "In UniFi OS, open Admins & Users → Create New and create a local user named as follows, with no cloud account.\ndumbmonit",
-        "Give it access to the Protect application only, with the View Only role, and none to Network or other applications.",
-        "In DumbMonit, enter the console's address and that user name and password."
-      ],
-      "ports": [
-        {
-          "port": 443,
-          "protocol": "tcp",
-          "direction": "to_device",
-          "purpose": "UniFi OS (HTTPS, default)",
-          "optional": false
-        }
-      ],
-      "warning": "Use a local account: UniFi OS refuses Ubiquiti cloud accounts here. The console's certificate is usually self-signed: turn on the certificate option.",
-      "doc_url": "https://dumbmonit.selfhostr.io/docs/devices/unifiprotect/"
-    },
-    "options": [
-      {
-        "key": "scheme",
-        "label": "Protocol",
-        "help": "Used when the address does not start with http:// or https://.",
-        "placeholder": "",
-        "default": "https",
-        "required": false,
-        "input": "select",
-        "choices": [
-          "http",
-          "https"
-        ],
-        "group": ""
-      },
-      {
-        "key": "port",
-        "label": "Port",
-        "help": "Used if the address does not give a port. Choosing the other protocol without a port uses 80 or 443.",
-        "placeholder": "443",
-        "default": "443",
-        "required": false,
-        "input": "number",
-        "choices": [],
-        "group": ""
-      },
-      {
-        "key": "insecure_tls",
-        "label": "Accept an unverifiable certificate",
-        "help": "For a self-signed or private certificate: enable this if the connection is refused for that reason.",
-        "placeholder": "",
-        "default": "false",
-        "required": false,
-        "input": "boolean",
-        "choices": [],
-        "group": ""
-      },
-      {
-        "key": "request_timeout_seconds",
-        "label": "Timeout per request (seconds)",
-        "help": "Time allowed for each call, from 1 to 120. Photo and file counts are computed on every call on a large instance.",
-        "placeholder": "15",
-        "default": "15",
-        "required": false,
-        "input": "number",
-        "choices": [],
-        "group": ""
-      }
-    ],
-    "metrics": [
-      {
-        "name": "unifiprotect_storage_used_percent",
-        "label": "Storage used",
-        "unit": "%",
-        "kind": "gauge",
-        "better": "lower",
-        "min": 0.0,
-        "max": 100.0
-      },
-      {
-        "name": "unifiprotect_camera_online",
-        "label": "Camera online",
-        "unit": "bool",
-        "kind": "gauge"
-      },
-      {
-        "name": "unifiprotect_camera_recording",
-        "label": "Camera recording",
-        "unit": "bool",
-        "kind": "gauge"
-      },
-      {
-        "name": "unifiprotect_cameras_total",
-        "label": "Cameras",
-        "kind": "gauge"
-      },
-      {
-        "name": "unifiprotect_cameras_offline",
-        "label": "Cameras offline",
-        "kind": "gauge",
-        "better": "lower"
-      },
-      {
-        "name": "unifiprotect_cameras_not_recording",
-        "label": "Cameras not recording",
-        "kind": "gauge"
-      },
-      {
-        "name": "unifiprotect_recording_disabled",
-        "label": "Recording disabled",
-        "unit": "bool",
-        "kind": "gauge"
-      },
-      {
-        "name": "unifiprotect_storage_size_bytes",
-        "label": "Storage size",
-        "unit": "B",
-        "kind": "gauge"
-      },
-      {
-        "name": "unifiprotect_disks_total",
-        "label": "Disks",
-        "kind": "gauge"
-      },
-      {
-        "name": "unifiprotect_disks_unhealthy",
-        "label": "Disks unhealthy",
-        "kind": "gauge",
-        "better": "lower"
-      },
-      {
-        "name": "unifiprotect_version_info",
-        "label": "Version",
-        "kind": "info"
-      }
-    ],
-    "views": [
-      {
-        "view": "stat",
-        "title": "Current values",
-        "metrics": [
-          "unifiprotect_camera_online",
-          "unifiprotect_camera_recording",
-          "unifiprotect_cameras_total",
-          "unifiprotect_cameras_offline",
-          "unifiprotect_cameras_not_recording",
-          "unifiprotect_recording_disabled",
-          "unifiprotect_storage_size_bytes",
-          "unifiprotect_disks_total",
-          "unifiprotect_disks_unhealthy",
-          "unifiprotect_version_info"
-        ]
-      },
-      {
-        "view": "timeseries",
-        "title": "Storage used",
-        "metrics": [
-          "unifiprotect_storage_used_percent"
-        ]
-      }
-    ]
-  },
-  {
     "kind": "unraid",
     "label": "Unraid",
     "summary": "An Unraid server through its GraphQL API: array stopped, disks disabled or with errors, parity checks, cache pool usage, containers that should be running.",
@@ -31628,7 +30834,7 @@
   },
   {
     "kind": "vaultwarden",
-    "label": "Vaultwarden (beta)",
+    "label": "Vaultwarden",
     "summary": "Liveness, version, open sign-ups, and with the admin token disabled-account and two-step login counts.",
     "examples": [
       "Vaultwarden"
@@ -31802,7 +31008,8 @@
           "vaultwarden_version_info"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "veeam",
@@ -33007,8 +32214,7 @@
       "steps": [
         "In the address, paste the page to watch, with http:// or https://.",
         "To follow a whole site or section, set \"Scope\" to \"site\".",
-        "List lines that change at every visit (a clock, a counter) in \"Ignore lines\", as regular expressions.",
-        "For a screenshot of each version, follow the \"Screenshots\" section of this page."
+        "List lines that change at every visit (a clock, a counter) in \"Ignore lines\", as regular expressions."
       ],
       "ports": [
         {
@@ -33129,17 +32335,6 @@
         "default": "",
         "required": false,
         "input": "text",
-        "choices": [],
-        "group": ""
-      },
-      {
-        "key": "screenshots",
-        "label": "Screenshots",
-        "help": "Keep a screenshot of each new version. Needs the optional browser service (DUMBMONIT_BROWSER_URL); without it, only the text is kept.",
-        "placeholder": "",
-        "default": "true",
-        "required": false,
-        "input": "boolean",
         "choices": [],
         "group": ""
       },

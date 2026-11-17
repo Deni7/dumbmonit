@@ -25,7 +25,7 @@ scripts/agent-signing-key.sh            # writes ~/.dumbmonit-agent-signing/
 The script creates the Ed25519 key with OpenSSL (private key `0600` in a `0700`
 folder), checks the pair with a test signature made exactly as `release.yml`
 makes it, prints the public PEM block and the `gh secret set` command, and
-touches nothing else: neither the repository nor any GitHub secret. It refuses
+appends the public key to `crates/agent/signing/release-keys.pem` (the list of accepted keys, kept for rotation), and touches nothing else: no commit, no GitHub secret. It refuses
 to overwrite an existing key. By hand, the same key is:
 
 ```sh
@@ -33,14 +33,14 @@ openssl genpkey -algorithm ed25519 -out agent-signing.pem
 openssl pkey -in agent-signing.pem -pubout
 ```
 
-1. Add the **public** PEM block printed by the second command to
+1. Commit the **public** PEM block (added by the script, or by hand from the second command) in
    `crates/agent/signing/release-keys.pem` and commit it. Several keys may be
    listed.
 2. Store the **private** key as a repository secret (not an environment
    secret):
 
     ```sh
-    gh secret set AGENT_SIGNING_KEY < agent-signing.pem
+    gh secret set AGENT_SIGNING_KEY -R selfhostr/dumbmonit < agent-signing.pem
     ```
 
 3. Keep an offline backup of `agent-signing.pem`, then delete the local copy.

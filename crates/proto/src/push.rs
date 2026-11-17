@@ -171,7 +171,65 @@ pub struct AgentIdentity {
     /// sans passerelle, ou binaire antérieur).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub relay_gateway: Option<u16>,
+    /// Dernier essai de la passerelle par le relais lui-même, à l'adresse que
+    /// les machines du site composent. Absent : pas d'essai (pas de
+    /// passerelle, ou binaire antérieur).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relay_gateway_check: Option<GatewayCheck>,
+    /// Adresse du serveur en service, quand l'agent en connaît plusieurs
+    /// (`server_urls`) : primaire ou secours, et depuis quand. Absent : une
+    /// seule adresse configurée, ou binaire antérieur.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server_link: Option<ServerLink>,
 }
+
+/// Adresse du serveur que l'agent emploie, parmi celles de sa configuration
+/// (`server_url`, puis `server_urls`, dans l'ordre). L'agent passe à la
+/// suivante quand la sienne ne répond plus, et revient à la première dès
+/// qu'elle répond de nouveau.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ServerLink {
+    /// Rang de l'adresse en service : 0 pour la primaire.
+    pub active: u32,
+    /// Nombre d'adresses configurées, primaire comprise.
+    pub servers: u32,
+    /// Adresse en service (`https://hôte:port`, sans chemin).
+    pub url: String,
+    /// Moment du passage sur une adresse de secours, en millisecondes depuis
+    /// l'époque Unix. Absent sur la primaire.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub since_ms: Option<i64>,
+    /// Dernière erreur de la primaire, en anglais, telle que l'interface
+    /// l'affiche. Absent sur la primaire.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub primary_error: Option<String>,
+}
+
+/// Longueur maximale d'une adresse ou d'un message d'erreur de [`ServerLink`].
+pub const MAX_SERVER_LINK_TEXT: usize = 300;
+
+/// Essai de sa propre passerelle par un relais : il s'y connecte comme une
+/// machine du site, à l'adresse réglée dans l'interface (à défaut, sur la
+/// boucle locale), et mène la poignée de main TLS jusqu'au serveur à travers
+/// son propre tunnel. Réussi, il prouve l'écoute, la publication du port (un
+/// relais en conteneur) et le tunnel ; il ne dit rien d'un pare-feu entre les
+/// machines du site et le relais, que la machine ne traverse pas pour se
+/// joindre elle-même.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GatewayCheck {
+    /// Adresse essayée, `hôte:port`.
+    pub address: String,
+    /// Vrai si le serveur a répondu à travers la passerelle.
+    pub ok: bool,
+    /// Ce qui a échoué, en anglais, tel que l'interface l'affiche.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    /// Instant de l'essai, en millisecondes depuis l'époque Unix.
+    pub checked_at_ms: i64,
+}
+
+/// Longueur maximale du message d'échec d'un essai de passerelle.
+pub const MAX_GATEWAY_CHECK_ERROR: usize = 300;
 
 impl AgentIdentity {
     /// Clé d'identité utilisée pour retrouver la cible d'un envoi à l'autre.
@@ -405,6 +463,11 @@ pub struct RelaySetting {
     /// passerelle. `gateway_listen` dans l'agent.yaml du relais prime.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gateway_port: Option<u16>,
+    /// Adresse par laquelle les machines du site joignent le relais (IP ou nom
+    /// local), telle que réglée dans l'interface : le relais y essaie sa
+    /// passerelle. Absente : il l'essaie sur la boucle locale.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gateway_host: Option<String>,
 }
 
 #[cfg(test)]
@@ -431,7 +494,9 @@ mod tests {
             binding_supported: true,
             self_update: None,
             relay_gateway: None,
+            relay_gateway_check: None,
             remediation: None,
+            server_link: None,
         }
     }
 
@@ -565,6 +630,25 @@ mod tests {
     }
 
     #[test]
+    fn a_gateway_check_travels_with_the_identity_and_older_agents_omit_it() {
+        let mut id = identity();
+        let json = serde_json::to_value(&id).unwrap();
+        assert!(json.get("relay_gateway_check").is_none(), "absent : rien n'est écrit");
+        id.relay_gateway = Some(8443);
+        id.relay_gateway_check = Some(GatewayCheck {
+            address: "192.168.10.5:8443".into(),
+            ok: false,
+            error: Some("connection refused".into()),
+            checked_at_ms: 1_700_000_000_000,
+        });
+        let json = serde_json::to_value(&id).unwrap();
+        let back: AgentIdentity = serde_json::from_value(json).unwrap();
+        assert_eq!(back, id);
+        let older: RelaySetting = serde_json::from_str(r#"{"enabled":true}"#).unwrap();
+        assert_eq!(older.gateway_host, None);
+    }
+
+    #[test]
     fn an_acknowledgement_survives_a_round_trip() {
         let ack = PushAck {
             target_id: 7,
@@ -578,6 +662,7 @@ mod tests {
                 enabled: true,
                 site: Some("Lyon".into()),
                 gateway_port: Some(8443),
+                gateway_host: Some("192.168.10.5".into()),
             }),
             event_rules: Some(vec![EventLogRule {
                 id: 4,

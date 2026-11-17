@@ -347,6 +347,7 @@ pub async fn setup(
     }
 
     auth.remember_configured(true);
+    crate::first_run::record(&state.pool, crate::first_run::Milestone::Setup).await;
     tracing::info!(user = username, "first admin created");
     Ok(StatusCode::NO_CONTENT)
 }

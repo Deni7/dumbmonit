@@ -14,7 +14,7 @@ DumbMonit reads `/minio/v2/metrics/cluster` with the JWT that
 in the URL. The token opens the metrics pages and nothing else: no S3 access,
 no console, no other right. If MinIO runs with
 `MINIO_PROMETHEUS_AUTH_TYPE=public`, the pages need no token. The cluster page
-is required; `/minio/v2/metrics/node` (uptime of the node asked) is optional.
+is required; `/minio/v2/metrics/node` (uptime of the node asked, on older releases) is optional.
 Metric names changed across MinIO releases (`disk` became `drive`): both are
 read, and a family the server does not publish simply produces no figure. The
 console port (9001) is not used.
@@ -33,7 +33,7 @@ All metrics are prefixed `dumbmonit_minio_`.
 
 | Metric | Labels | Meaning |
 |---|---|---|
-| `version_info` | `version`, `commit` | Value 1. |
+| `version_info` | `version`, `commit` | Value 1. `commit` is left out on releases that no longer publish it. |
 | `nodes_online`, `nodes_offline` | | Nodes of the cluster. |
 | `drives_online`, `drives_offline`, `drives` | | Drives of the cluster. |
 | `capacity_raw_bytes`, `capacity_raw_free_bytes`, `capacity_raw_used_percent` | | Raw capacity. |
@@ -44,7 +44,7 @@ All metrics are prefixed `dumbmonit_minio_`.
 | `heal_active` | | 1 when healing was active in the last five minutes. |
 | `replication_failed_objects` | | Objects that failed to replicate (published when the server exposes it). |
 | `s3_requests_total`, `s3_requests_4xx_total`, `s3_requests_5xx_total` | | S3 request counters. 5xx are server errors; 4xx are client errors. |
-| `uptime_seconds` | | Uptime of the node answering. |
+| `uptime_seconds` | | Uptime of the MinIO process. Read from the node page on older releases, from the cluster page on recent ones (the shortest uptime when several servers report). |
 
 The [built-in rules](../alerting/rules.md#minio) that apply:
 
@@ -102,7 +102,7 @@ Address: the host name or IP of any node, `host:port`, or a URL. Options:
 
 ## Troubleshooting
 
-"MinIO accepted the credentials but refused … (403)": the token is wrong or
+"MinIO refused … (403)": the token is wrong, expired or
 was made for another server's key. Generate a new one.
 
 "does not look like MinIO cluster metrics": the address or port is not the S3

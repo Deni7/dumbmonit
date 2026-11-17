@@ -24,6 +24,12 @@
 //! auquel le relais est lui-même enrôlé, rien dans la connexion entrante ne
 //! peut la choisir. Le nombre de connexions simultanées et le débit de chaque
 //! tunnel sont bornés ; une connexion muette est coupée.
+//!
+//! Vers un serveur à jour, les tunnels ne sont plus des connexions : ce sont
+//! les flux d'une seule connexion multiplexée ([`crate::mux`]), ouverte au
+//! premier besoin et rouverte si elle tombe. Un serveur antérieur la refuse
+//! (`426`) : la passerelle ouvre alors un tunnel par connexion, comme avant,
+//! et retente la connexion multiplexée toutes les heures.
 
 use std::future::Future;
 use std::net::SocketAddr;
@@ -37,11 +43,23 @@ use tokio::task::JoinSet;
 use tokio::time::Instant;
 use tracing::{debug, info, warn};
 
-use crate::client::PushClient;
+use crate::client::{PushClient, PushError};
+use crate::mux::MuxHandle;
 use crate::shutdown::Shutdown;
 
-/// Connexions simultanées par défaut (tunnels et téléchargements confondus).
-pub const DEFAULT_MAX_CONNECTIONS: usize = 64;
+/// Connexions simultanées par défaut (tunnels et téléchargements confondus) :
+/// un agent à jour n'en garde qu'une (HTTP/2), et toutes passent par la même
+/// connexion multiplexée vers le serveur.
+pub const DEFAULT_MAX_CONNECTIONS: usize = 256;
+
+/// Plafond de `gateway_max_connections` : la moitié des flux qu'une connexion
+/// multiplexée accepte ([`crate::mux::MAX_STREAMS`]), pour que des flux en
+/// cours de fermeture ne la fassent jamais déborder.
+pub const MAX_CONNECTIONS: usize = 2048;
+
+/// Délai avant de retenter la connexion multiplexée auprès d'un serveur qui
+/// l'a refusée (antérieur à elle) : il a pu être mis à jour entre-temps.
+const MUX_RETRY: Duration = Duration::from_secs(3600);
 
 /// Débit par défaut de chaque tunnel, dans chaque sens, en Kio/s.
 pub const DEFAULT_RATE_KIB: u32 = 4096;
@@ -90,16 +108,67 @@ pub trait Upstream: Send + Sync + 'static {
 /// Le serveur, joint par le canal chiffré du relais.
 pub struct ServerUpstream {
     client: PushClient,
+    /// Connexion multiplexée vers le serveur, ou ce qu'on en sait.
+    mux: tokio::sync::Mutex<Multiplexed>,
+}
+
+/// Où en est la connexion multiplexée.
+enum Multiplexed {
+    /// Pas encore ouverte, ou tombée : ouverte au prochain besoin.
+    Closed,
+    Open(MuxHandle),
+    /// Refusée par le serveur : un tunnel par connexion jusqu'à cet instant.
+    Unsupported {
+        retry: Instant,
+    },
 }
 
 impl ServerUpstream {
     pub fn new(client: PushClient) -> Self {
-        Self { client }
+        Self { client, mux: tokio::sync::Mutex::new(Multiplexed::Closed) }
+    }
+
+    /// Un flux de la connexion multiplexée, ouverte au besoin. `Ok(None)` : le
+    /// serveur ne la connaît pas, il faut un tunnel à part.
+    async fn open_stream(&self) -> Result<Option<crate::mux::MuxStream>, String> {
+        let mut state = self.mux.lock().await;
+        let handle = match &*state {
+            Multiplexed::Open(handle) if handle.is_open() => Some(handle.clone()),
+            Multiplexed::Unsupported { retry } if Instant::now() < *retry => return Ok(None),
+            _ => None,
+        };
+        if let Some(handle) = handle {
+            if let Some(stream) = handle.open().await {
+                return Ok(Some(stream));
+            }
+            debug!("relay gateway: multiplexed connection lost, opening another one");
+        }
+        *state = Multiplexed::Closed;
+        match self.client.open_mux().await {
+            Ok(upgraded) => {
+                let handle = crate::mux::spawn(upgraded);
+                let stream = handle.open().await;
+                *state = Multiplexed::Open(handle);
+                debug!("relay gateway: multiplexed connection to the server open");
+                stream.map(Some).ok_or_else(|| "the multiplexed connection closed at once".into())
+            }
+            // Serveur antérieur à la connexion multiplexée : `426` (protocole de
+            // mise à niveau inconnu), ou pas de route du tout.
+            Err(PushError::Rejected { status: 404 | 405 | 426, .. }) => {
+                info!("relay gateway: the server predates multiplexing, one tunnel per connection");
+                *state = Multiplexed::Unsupported { retry: Instant::now() + MUX_RETRY };
+                Ok(None)
+            }
+            Err(error) => Err(error.to_string()),
+        }
     }
 }
 
 impl Upstream for ServerUpstream {
     async fn open(&self) -> Result<Box<dyn Io>, String> {
+        if let Some(stream) = self.open_stream().await? {
+            return Ok(Box::new(stream));
+        }
         let tunnel = self.client.open_tunnel().await.map_err(|error| error.to_string())?;
         Ok(Box::new(tunnel))
     }
@@ -121,7 +190,7 @@ pub async fn serve<U: Upstream>(
     let local = listener.local_addr().ok();
     info!(listen = ?local, max = config.max_connections, rate_kib = config.rate_kib,
         "relay gateway open for the agents of this site");
-    let slots = Arc::new(Semaphore::new(config.max_connections.max(1)));
+    let slots = Arc::new(Semaphore::new(config.max_connections.clamp(1, MAX_CONNECTIONS)));
     let rate = u64::from(config.rate_kib.max(1)) * 1024;
     let mut connections = JoinSet::new();
     loop {
@@ -291,11 +360,104 @@ impl Pace {
     }
 }
 
+/// Délai de l'essai de la passerelle par le relais lui-même : connexion,
+/// tunnel jusqu'au serveur et poignée de main TLS.
+pub const SELF_CHECK_TIMEOUT: Duration = Duration::from_secs(15);
+
+/// Adresse que le relais essaie : celle que les machines du site composent
+/// (réglée dans l'interface), à défaut la boucle locale, qui prouve au moins
+/// l'écoute et le tunnel.
+pub fn check_address(host: Option<&str>, port: u16) -> String {
+    let host = host.map(str::trim).filter(|host| !host.is_empty()).unwrap_or("127.0.0.1");
+    format!("{host}:{port}")
+}
+
+/// Le relais essaie sa propre passerelle comme le ferait une machine du site :
+/// `HEAD /install.sh` en HTTPS à `address`, le serveur reconnu à l'empreinte
+/// de son autorité (`pins`), sans certificat client et sans mandataire (c'est
+/// le réseau du site). N'importe quelle réponse HTTP prouve le chemin entier :
+/// écoute, publication du port d'un conteneur, tunnel, serveur.
+///
+/// Ce que l'essai ne voit pas : un pare-feu entre les machines du site et le
+/// relais, que celui-ci ne traverse pas pour se joindre lui-même.
+pub async fn self_check(address: &str, pins: Vec<String>) -> dumbmonit_proto::GatewayCheck {
+    let checked_at_ms = chrono::Utc::now().timestamp_millis();
+    let outcome: Result<(), String> = async {
+        let config = crate::tls::client_config(Arc::new(std::sync::RwLock::new(pins)), None)
+            .map_err(|error| format!("{error:#}"))?;
+        let http = reqwest::Client::builder()
+            .tls_backend_preconfigured(config)
+            .https_only(true)
+            .redirect(reqwest::redirect::Policy::none())
+            .no_proxy()
+            .timeout(SELF_CHECK_TIMEOUT)
+            .build()
+            .map_err(|error| format!("{error:#}"))?;
+        http.head(format!("https://{address}/install.sh"))
+            .send()
+            .await
+            .map(|_| ())
+            .map_err(|error| crate::client::describe(&error))
+    }
+    .await;
+    let limit = dumbmonit_proto::MAX_GATEWAY_CHECK_ERROR;
+    let error = outcome.err().map(|error| error.chars().take(limit).collect::<String>());
+    match &error {
+        None => debug!(address, "relay gateway answers at the site's address"),
+        Some(error) => warn!(address, error, "relay gateway not reachable at the site's address"),
+    }
+    dumbmonit_proto::GatewayCheck {
+        address: address.to_string(),
+        ok: error.is_none(),
+        error,
+        checked_at_ms,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use super::*;
+
+    #[test]
+    fn the_relay_tries_its_gateway_where_the_site_dials_it() {
+        assert_eq!(check_address(Some("192.168.10.5"), 8443), "192.168.10.5:8443");
+        assert_eq!(check_address(Some("[fd00::5]"), 9443), "[fd00::5]:9443");
+        assert_eq!(check_address(Some("  "), 8443), "127.0.0.1:8443", "à défaut, la boucle");
+        assert_eq!(check_address(None, 8443), "127.0.0.1:8443");
+    }
+
+    #[tokio::test]
+    async fn a_gateway_that_does_not_answer_is_reported_with_its_cause() {
+        // Un port qui vient de se libérer : rien n'y écoute.
+        let port = {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("port");
+            listener.local_addr().expect("adresse").port()
+        };
+        let address = check_address(None, port);
+        let check = self_check(&address, vec!["a".repeat(64)]).await;
+        assert_eq!(check.address, address);
+        assert!(!check.ok);
+        let error = check.error.expect("cause");
+        assert!(error.contains("cannot connect"), "{error}");
+        assert!(check.checked_at_ms > 0);
+    }
+
+    #[tokio::test]
+    async fn something_else_than_dumbmonit_on_the_port_fails_the_check() {
+        // Un service qui répond en clair : la poignée de main TLS échoue.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("port");
+        let port = listener.local_addr().expect("adresse").port();
+        tokio::spawn(async move {
+            while let Ok((mut socket, _)) = listener.accept().await {
+                let _ = socket.write_all(b"HTTP/1.1 400 Bad Request\r\n\r\n").await;
+            }
+        });
+        let check = self_check(&check_address(None, port), vec!["a".repeat(64)]).await;
+        assert!(!check.ok);
+        assert!(check.error.is_some());
+    }
 
     #[test]
     fn the_first_byte_tells_tls_from_http_from_anything_else() {

@@ -218,6 +218,14 @@ pub struct Bundle {
     /// `agent.enrolment` de `settings`, migration 0233).
     #[serde(default)]
     pub agent_enrolment: Option<Value>,
+    /// Météo du mur : lieu et unité (clé `wall.weather` de `settings`).
+    /// Absente tant qu'aucun lieu n'a été choisi.
+    #[serde(default)]
+    pub wall_weather: Option<Value>,
+    /// Déploiement par vagues des mises à jour automatiques des agents : vagues,
+    /// délai, seuil d'arrêt et pause (clé `agent.update_rollout` de `settings`).
+    #[serde(default)]
+    pub agent_update_rollout: Option<Value>,
 }
 
 impl Bundle {
@@ -281,6 +289,10 @@ pub struct BundleTarget {
     pub via_agent: Option<String>,
     pub interval_secs: i64,
     pub enabled: bool,
+    /// Contrôle des failles connues (CVE) de l'équipement (migration 0235).
+    /// Actif dans un lot écrit par un serveur qui ne le connaissait pas.
+    #[serde(default = "default_cve_scan", skip_serializing_if = "is_true")]
+    pub cve_scan: bool,
     #[serde(default)]
     pub tags: BTreeMap<String, String>,
     /// `Credential` en clair : c'est le lot entier qui est chiffré.
@@ -307,6 +319,14 @@ pub struct BundleTarget {
     /// 0009) : redémarrage, mise à jour, réserve aux fenêtres de maintenance.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub container_policies: Vec<BundleContainerPolicy>,
+}
+
+fn default_cve_scan() -> bool {
+    true
+}
+
+fn is_true(value: &bool) -> bool {
+    *value
 }
 
 /// Politique automatique d'un conteneur, par son nom.
@@ -1025,6 +1045,7 @@ mod tests {
                 via_agent: None,
                 interval_secs: 60,
                 enabled: true,
+                cve_scan: true,
                 tags: BTreeMap::new(),
                 credential: Some(serde_json::json!({"type": "snmp_v2c", "community": "s3cret"})),
                 group_name: "Rack A".to_string(),

@@ -14,7 +14,7 @@ below is shipped enabled on every instance.
 
 | Rule | What | Default threshold | Hold | Severity | Reminder |
 |---|---|---|---|---|---|
-| Monitor unreachable | No measurement received for more than three minutes. `bottomk by (target) (1, time() - tlast_over_time(dumbmonit_up[7d]))` | > 180 s | 1 min | Warning (`critical`) | 6 h |
+| Monitor unreachable | No measurement received for more than three minutes. `bottomk by (target) (1, time() - tlast_over_time(dumbmonit_up[7d]))` | > 180 s | 30 s | Warning (`critical`) | 6 h |
 | High CPU | CPU load sustained above 90%, averaged per monitor across SNMP, Proxmox and agent sources; clears below 85 %. | > 90 % | 10 min | Advisory (`warning`), escalates after 1 h | 6 h |
 | Unusual CPU | CPU load noticeably different from the usual at this time and day of the week (seasonal baseline). | score > 3.5 | 15 min | Info (`info`) | 6 h |
 | Disk almost full | Filesystem 90% full or more, per mount point (SNMP, Proxmox storages and root filesystems); clears below 88 %. | ≥ 90 % | 15 min | Advisory (`warning`), escalates after 24 h | 6 h |
@@ -51,7 +51,7 @@ Health series are 0 (OK), 1 (Warning) or 2 (Critical). An empty slot (`Absent`) 
 
 | Rule | What | Default threshold | Hold | Severity | Reminder |
 |---|---|---|---|---|---|
-| Service down | The service has not responded correctly for three minutes (`dumbmonit_probe_success{probe!="push"} == bool 0`). | > 0 | 3 min | Warning (`critical`) | 30 min |
+| Service down | The service has not responded correctly for two minutes (`dumbmonit_probe_success{probe!="push"} == bool 0`). | > 0 | 2 min | Warning (`critical`) | 30 min |
 | Heartbeat missed | The job has not called in within its expected interval plus grace period, or reported a failure itself (`dumbmonit_probe_success{probe="push"} == bool 0`; the delay is set per monitor, see [Heartbeat](../devices/push.md)). | > 0 | 2 min | Advisory (`warning`) | 6 h |
 | Service flapping | The service changed state more than six times in thirty minutes (`changes(dumbmonit_probe_success{probe!="push"}[30m])`). | > 6 | 5 min | Advisory (`warning`) | 1 h |
 | Slow service | The service takes more than three seconds to respond; failed checks are left out (`dumbmonit_probe_duration_seconds and dumbmonit_probe_success == 1`). | > 3 s | 10 min | Advisory (`warning`) | 6 h |
@@ -184,6 +184,13 @@ Reported by the agent; see [Agent](../devices/agent.md).
 | Proxmox security updates pending | At least one pending update comes from a security archive (`dumbmonit_proxmox_node_updates_security_pending`). | > 0 | 1 h | Advisory (`warning`) | 7 d |
 | Proxmox packages changed | The installed version of a Proxmox package changed between two probes — someone ran `apt upgrade` (`dumbmonit_proxmox_node_packages_changed`, published for one hour with the detail in its `changes` label: `pve1 · pve-manager 8.2.4→8.2.7`). Resolves by itself an hour later. | > 0 | 1 min | Info (`info`) | 24 h |
 | Node certificate expiring | A Proxmox node certificate expires in less than fourteen days (`dumbmonit_proxmox_node_certificate_expiry_days`). | < 14 d | 1 h | Advisory (`warning`) | 24 h |
+| Proxmox storage inactive | An enabled storage is not active on a node (unreachable share, unmounted disk, backup server down): backups to it and disks on it fail (`dumbmonit_proxmox_storage_active`). | < 1 | 10 min | Advisory (`warning`) | 6 h |
+| Proxmox node needs a reboot | A newer kernel has been installed on a node for three days without a reboot: the node still runs the old one (`dumbmonit_proxmox_node_reboot_required`). | > 0 | 3 d | Info (`info`) | 7 d |
+| Proxmox subscription expired | The subscription of a node is expired, invalid or suspended: the enterprise repository stops serving updates (`dumbmonit_proxmox_node_subscription_info`). | > 0 | 1 h | Advisory (`warning`) | 7 d |
+| Proxmox replication overdue | A storage replication job is more than six hours behind its schedule: the copy on the other node is getting older (`dumbmonit_proxmox_replication_job_next_sync_seconds`). | > 6 h | 15 min | Advisory (`warning`) | 12 h |
+| Proxmox backup job not running | An enabled backup job has not run for more than eight days (`dumbmonit_proxmox_backup_job_last_run_age_seconds`). | > 8 d | 1 h | Advisory (`warning`) | 24 h |
+| Proxmox guest not in any backup job | A VM or container has been in no backup job for a day (`dumbmonit_proxmox_backup_covered`). | < 1 | 24 h | Info (`info`) | 7 d |
+| Proxmox tasks failed | Tasks failed on a node in the last six hours (guest start, migration, restore…). Backups have their own rule (`dumbmonit_proxmox_node_tasks_failed`). | > 0 | 5 min | Info (`info`) | 24 h |
 
 ### Proxmox Backup Server
 
@@ -210,6 +217,11 @@ Reported by the agent; see [Agent](../devices/agent.md).
 | PBS certificate expiring | The certificate served by the backup server expires in less than three weeks (`dumbmonit_pbs_node_certificate_expires_seconds`). Needs the `certificates` option. | < 21 d | 1 h | Advisory (`warning`) | 48 h |
 | PBS restart pending after upgrade | The package was upgraded but the running daemon is still the old one (`dumbmonit_pbs_node_running_version_stale`). | > 0 | 6 h | Info (`info`) | 7 d |
 | PBS updates pending | More than twenty package updates are pending on the backup server (`dumbmonit_pbs_node_updates_pending`). | > 20 | 1 h | Info (`info`) | 7 d |
+| PBS datastore unavailable | A datastore cannot be opened: backups to it and restores from it fail. A removable datastore that is simply unmounted does not fire (`dumbmonit_pbs_datastore_available`). | < 1 | 5 min | Warning (`critical`) | 1 h |
+| PBS datastore left in maintenance mode | A datastore has been in maintenance mode (read-only or offline) for more than a day: it may have been left there by mistake (`dumbmonit_pbs_datastore_maintenance`). | > 0 | 24 h | Advisory (`warning`) | 24 h |
+| PBS root file system almost full | The root file system of the backup server is more than 90 % full: tasks stop starting when it fills up, whatever space the datastores have left. Clears below 85 % (`dumbmonit_pbs_node_rootfs_percent`). | > 90 % | 15 min | Advisory (`warning`) | 12 h |
+| PBS scheduled job not running | An enabled sync or prune job that has a schedule has not run for more than eight days. A job that stops running does not fail, so no other rule sees it (`dumbmonit_pbs_job_last_run_age_seconds`). | > 8 d | 1 h | Advisory (`warning`) | 24 h |
+| PBS subscription expired | The subscription of the backup server is expired, invalid or suspended: the enterprise repository stops serving updates (`dumbmonit_pbs_node_subscription_info`). | > 0 | 1 h | Advisory (`warning`) | 7 d |
 
 ### Proxmox Datacenter Manager
 
@@ -268,6 +280,14 @@ Reported by the agent; see [Agent](../devices/agent.md).
 | Firewall left in CARP maintenance mode | CARP has been left in persistent maintenance mode (`dumbmonit_opnsense_carp_maintenance_mode`): this firewall handed its virtual addresses to its partner and will not take them back on its own. | > 0 | 1 h | Info (`info`) | 24 h |
 | Firewall reboot pending | An update is installed but needs a reboot to take effect (`dumbmonit_opnsense_firmware_reboot_required`). | > 0 | 1 h | Info (`info`) | 7 d |
 | Firewall updates pending | The firewall has packages waiting to be updated (`dumbmonit_opnsense_firmware_updates_pending`). It is the most exposed machine on the network. | > 0 | 1 h | Info (`info`) | 7 d |
+| OPNsense certificate expiring | A certificate the firewall uses (web interface, captive portal, VPN) expires in less than 14 days (`dumbmonit_opnsense_certificate_expiry_seconds`). | < 14 d | 1 h | Advisory (`warning`) | 24 h |
+| OPNsense certificate expired | A certificate the firewall uses has expired: clients now refuse it (`dumbmonit_opnsense_certificate_expiry_seconds`). | < 0 | 10 min | Warning (`critical`) | 12 h |
+| OPNsense disk almost full | The firewall's disk is more than 90 % full: logs, captures and updates will fail. Clears below 85 % (`dumbmonit_opnsense_disk_used_percent`). | > 90 % | 15 min | Advisory (`warning`) | 12 h |
+| OPNsense CPU high | The firewall's processor has stayed above 90 % for fifteen minutes. Clears below 80 % (`dumbmonit_opnsense_cpu_percent`). | > 90 % | 15 min | Advisory (`warning`) | 6 h |
+| OPNsense swap in use | The firewall has used more than half of its swap for an hour: it is short of memory (`dumbmonit_opnsense_swap_used_percent`). | > 50 % | 1 h | Advisory (`warning`) | 24 h |
+| OPNsense packet filter disabled | The packet filter (pf) is disabled: the firewall no longer filters or translates anything (`dumbmonit_opnsense_pf_enabled`). | < 1 | 5 min | Warning (`critical`) | 1 h |
+| OPNsense interface errors | An interface logged more than 100 receive or transmit errors in fifteen minutes: check the cable, the SFP module and the duplex setting (`dumbmonit_opnsense_interface_errors_in` + `dumbmonit_opnsense_interface_errors_out`). | > 100 | 15 min | Advisory (`warning`) | 24 h |
+| OPNsense update mirror unreachable | The firewall has been unable to reach its update mirror for twelve hours: it will not learn about security updates (`dumbmonit_opnsense_firmware_connection_ok`). | < 1 | 12 h | Info (`info`) | 7 d |
 
 ### TrueNAS
 
@@ -286,6 +306,13 @@ Reported by the agent; see [Agent](../devices/agent.md).
 | NAS snapshots stale | An enabled periodic snapshot task has not run for more than eight days (`dumbmonit_truenas_snapshot_task_last_run_age_seconds`): a task that stops running does not fail, it goes quiet. | > 8 d | 1 h | Advisory (`warning`) | 24 h |
 | TrueNAS alert raised | TrueNAS itself has raised an alert of level ERROR or above (`dumbmonit_truenas_alerts`). Its own sentence is on the monitor page. | > 0 | 10 min | Advisory (`warning`) | 12 h |
 | NAS service stopped | A service set to start with the NAS is stopped (`dumbmonit_truenas_service_running`). A service switched off on purpose has no series. | < 1 | 10 min | Advisory (`warning`) | 6 h |
+| NAS certificate expiring | The certificate that serves the TrueNAS web interface expires in less than 14 days: browsers, apps and replication peers will refuse it (`dumbmonit_truenas_certificate_expiry_days{in_use="1"}`). | < 14 d | 1 h | Advisory (`warning`) | 24 h |
+| NAS certificate expired | The certificate that serves the TrueNAS web interface expires in less than 2 days, or already has (`dumbmonit_truenas_certificate_expiry_days{in_use="1"}`). | < 2 d | 15 min | Warning (`critical`) | 12 h |
+| NAS boot pool degraded | The boot pool is no longer healthy: the NAS still boots from the remaining device, until that one fails too (`dumbmonit_truenas_boot_pool_healthy`). | < 1 | 10 min | Advisory (`warning`) | 12 h |
+| NAS boot pool almost full | The boot pool is more than 85 % full: old boot environments pile up with every update and block the next one. Clears below 80 % (`dumbmonit_truenas_boot_pool_used_percent`). | > 85 % | 1 h | Advisory (`warning`) | 24 h |
+| NAS remote backup task failed | The last run of a cloud sync, rsync or cloud backup task failed: the remote copy is getting older (`dumbmonit_truenas_backup_task_failed`). | > 0 | 10 min | Advisory (`warning`) | 12 h |
+| NAS app crashed | An app is in the crashed state (`dumbmonit_truenas_app_crashed`). | > 0 | 10 min | Advisory (`warning`) | 6 h |
+| NAS virtual machine stopped | A virtual machine set to start with the NAS is not running (`dumbmonit_truenas_vm_running`). | < 1 | 10 min | Advisory (`warning`) | 6 h |
 
 ### Synology DSM
 
@@ -308,6 +335,20 @@ Reported by the agent; see [Agent](../devices/agent.md).
 | Active Backup task disabled | The task has no schedule, or its continuous backup is paused (`dumbmonit_abb_task_enabled == bool 0`): it will not back up anything until someone runs it. | > 0 | 1 h | Info (`info`) | 7 d |
 | Active Backup device overdue | A device has gone longer without a successful Active Backup for Business run than its own rhythm allows, off-days excluded (`dumbmonit_abb_device_overdue`, see [Synology](../devices/synology.md#how-overdue-is-judged)). | > 0 | 30 min | Advisory (`warning`) | 24 h |
 | Active Backup device failing | The last two or more attempts of a device failed (`dumbmonit_abb_device_consecutive_failures`); a cancelled run counts as neither. | ≥ 2 | 10 min | Warning (`critical`) | 24 h |
+| Synology system partition crashed | DSM reports its system partition as crashed: the NAS may not survive a reboot. Check Storage Manager (`dumbmonit_synology_system_crashed`). | > 0 | 5 min | Warning (`critical`) | 1 h |
+| Synology system partition needs repair | DSM says its system partition needs repair; Storage Manager offers to repair it (`dumbmonit_synology_system_need_repair`). | > 0 | 30 min | Advisory (`warning`) | 12 h |
+| Synology CPU sustained high | The processor of the NAS has stayed above 90 % for fifteen minutes; a data scrubbing or an indexing run usually ends well before. Clears below 85 % (`dumbmonit_synology_cpu_usage_percent`). | > 90 % | 15 min | Advisory (`warning`) | 6 h |
+| Synology swap heavily used | More than 60 % of the swap has been in use for an hour: the NAS is short of memory (`dumbmonit_synology_swap_usage_percent`). | > 60 % | 1 h | Info (`info`) | 24 h |
+| Synology DSM update available | A DSM update is available (`dumbmonit_synology_update_available`). | > 0 | 1 h | Info (`info`) | 7 d |
+| Synology Hyper Backup failed | The last run of a Hyper Backup task failed (unreachable destination, checksum error…). A run in progress, a cancelled run or a task that never ran does not fire (`dumbmonit_synology_backup_last_result`). | ≥ 2 | 10 min | Advisory (`warning`) | 12 h |
+| Synology Hyper Backup success too old | No successful run of a Hyper Backup task for more than eight days: it is disabled, suspended or never gets to run. A monthly task needs a longer limit (`dumbmonit_synology_backup_last_success_age_seconds`). | > 8 d | 1 h | Info (`info`) | 7 d |
+| Synology volume read-only | A volume is read-only: nothing can write to it (file system errors or a degraded volume). Check Storage Manager (`dumbmonit_synology_volume_read_only`). | > 0 | 5 min | Warning (`critical`) | 1 h |
+| Synology volume locked | An encrypted volume is locked: its shared folders are unavailable until the key is entered or the key vault is mounted (`dumbmonit_synology_volume_locked`). | > 0 | 10 min | Advisory (`warning`) | 6 h |
+| Synology volume out of inodes | A volume has no free inode left: no file can be created, even with free space (`dumbmonit_synology_volume_inode_full`). | > 0 | 10 min | Advisory (`warning`) | 12 h |
+| Synology data scrubbing overdue | The last data scrubbing of a storage pool ended more than 200 days ago: schedule a regular one in Storage Manager (`dumbmonit_synology_pool_scrub_age_seconds`). | > 200 d | 1 h | Info (`info`) | 30 d |
+| Synology certificate expiring | A DSM certificate expires in less than 14 days: its automatic renewal is probably failing (`dumbmonit_synology_certificate_expires_in_seconds`). | < 14 d | 1 h | Advisory (`warning`) | 24 h |
+| Synology certificate about to expire | A DSM certificate expires in less than 3 days, or already has (`dumbmonit_synology_certificate_expires_in_seconds`). | < 3 d | 10 min | Warning (`critical`) | 6 h |
+| Synology certificate broken | DSM marks a certificate as broken: its key or its chain cannot be read (`dumbmonit_synology_certificate_broken`). | > 0 | 1 h | Advisory (`warning`) | 24 h |
 
 ### Log and metrics servers
 
@@ -390,7 +431,7 @@ CI/CD runners, a scheduled task that stopped running.
 
 ### Media, identity and mail applications
 
-Sonarr, Radarr, Lidarr, Prowlarr, qBittorrent, UniFi Protect, Frigate, Keycloak, authentik, Vaultwarden and mailcow ([monitors](../devices/index.md)). These keep answering while the service they provide is broken: a download client down, a camera dropped, a database gone behind a login page. An application that does not answer at all is Monitor unreachable.
+Sonarr, Radarr, Lidarr, Prowlarr, qBittorrent, Frigate, Keycloak, authentik, Vaultwarden and mailcow ([monitors](../devices/index.md)). These keep answering while the service they provide is broken: a download client down, a camera dropped, a database gone behind a login page. An application that does not answer at all is Monitor unreachable. UniFi Protect became a community pack: its rules come with the pack ([UniFi Protect](../devices/unifiprotect.md)).
 
 | Rule | What | Default threshold | Hold | Severity | Reminder |
 |---|---|---|---|---|---|
@@ -407,16 +448,11 @@ Sonarr, Radarr, Lidarr, Prowlarr, qBittorrent, UniFi Protect, Frigate, Keycloak,
 | Lidarr disk almost full | A disk Lidarr reports is more than 90 % full (`dumbmonit_lidarr_disk_used_percent`); clears below 88 %. | > 90 % | 30 min | Advisory (`warning`) | 24 h |
 | Lidarr update available | A newer Lidarr release exists (`dumbmonit_lidarr_update_available`). | > 0 | 1 h | Info (`info`) | 7 d |
 | Prowlarr health error | Prowlarr reports an error on its System → Status page: a failing download client or indexer, a missing root folder (`dumbmonit_prowlarr_health_errors`). | > 0 | 15 min | Advisory (`warning`) | 6 h |
-| Prowlarr disk almost full | A disk Prowlarr reports is more than 90 % full (`dumbmonit_prowlarr_disk_used_percent`); clears below 88 %. | > 90 % | 30 min | Advisory (`warning`) | 24 h |
 | Prowlarr update available | A newer Prowlarr release exists (`dumbmonit_prowlarr_update_available`). | > 0 | 1 h | Info (`info`) | 7 d |
 | Prowlarr indexers disabled | Prowlarr disabled indexers after repeated failures (`dumbmonit_prowlarr_indexers_disabled`): Sonarr, Radarr and Lidarr stop finding releases through them. | > 0 | 1 h | Advisory (`warning`) | 24 h |
 | qBittorrent torrents in error | Torrents are in error or have lost their files (`dumbmonit_qbittorrent_torrents_errored`). | > 0 | 15 min | Advisory (`warning`) | 24 h |
 | qBittorrent disconnected | qBittorrent is firewalled or disconnected (`dumbmonit_qbittorrent_connected == bool 0`): nothing is downloaded or seeded. | > 0 | 15 min | Advisory (`warning`) | 6 h |
 | qBittorrent free space low | Less than 5 GiB free in the download folder (`dumbmonit_qbittorrent_free_space_bytes / 1073741824`); clears above 6 GiB. | < 5 GiB | 30 min | Advisory (`warning`) | 24 h |
-| Protect camera offline | A UniFi Protect camera is disconnected from its NVR (`dumbmonit_unifiprotect_camera_online == bool 0`). The notification names the camera. | > 0 | 5 min | Advisory (`warning`) | 6 h |
-| Protect camera not recording | A camera is connected and set to record but does not (`dumbmonit_unifiprotect_cameras_not_recording`). | > 0 | 15 min | Advisory (`warning`) | 6 h |
-| Protect NVR disk unhealthy | The NVR reports a failing disk (`dumbmonit_unifiprotect_disks_unhealthy`). | > 0 | 5 min | Warning (`critical`) | 1 h |
-| Protect recording disabled | Recording is switched off on the NVR (`dumbmonit_unifiprotect_recording_disabled`). | > 0 | 10 min | Advisory (`warning`) | 6 h |
 | Frigate camera offline | A camera delivers no frames to Frigate (`dumbmonit_frigate_camera_online == bool 0`). The notification names the camera. | > 0 | 5 min | Advisory (`warning`) | 6 h |
 | Frigate detector stuck | A detector has been on the same inference for more than 30 seconds (`dumbmonit_frigate_detector_busy_seconds`). | > 30 s | 2 min | Advisory (`warning`) | 1 h |
 | Frigate storage almost full | The disk holding the recordings is more than 90 % full (`dumbmonit_frigate_storage_used_percent`); clears below 88 %. | > 90 % | 30 min | Advisory (`warning`) | 24 h |
@@ -436,7 +472,7 @@ Sonarr, Radarr, Lidarr, Prowlarr, qBittorrent, UniFi Protect, Frigate, Keycloak,
 
 ### Client devices
 
-One rule, shared by every integration that tracks client devices connecting and backing up — Immich's phones, tablets and desktops ([monitors](../devices/immich.md)), Proxmox Backup Server's backed-up machines, one per backup group ([monitors](../devices/pbs.md)), and Veeam's protected computers and VMs, one per object with a restore point ([monitors](../devices/veeam.md)), today; more to follow. Each integration computes the gap to its own target's staleness window (`device_stale_days`, 3 days by default) and publishes it as `dumbmonit_client_device_stale_seconds`, labelled `device`, `type`, `os`, `user`, `kind` and `signal` (`connection` or `backup`); this one rule then fires for any of them, naming the monitor in the notification. Synology Active Backup for Business tracks its own monitors separately, through a rhythm-aware mechanism (`synology_abb_device_*`) rather than this generic family — see [Synology](../devices/synology.md).
+One rule, shared by every integration that tracks client devices connecting and backing up — Immich's phones and tablets (all users with an administrator key) ([monitors](../devices/immich.md)), Proxmox Backup Server's backed-up machines, one per backup group ([monitors](../devices/pbs.md)), and Veeam's protected computers and VMs, one per object with a restore point ([monitors](../devices/veeam.md)), today; more to follow. Each integration computes the gap to its own target's staleness window (`device_stale_days`, 3 days by default) and publishes it as `dumbmonit_client_device_stale_seconds`, labelled `device`, `type`, `os`, `user`, `kind` and `signal` (`connection` or `backup`); this one rule then fires for any of them, naming the monitor in the notification. Synology Active Backup for Business tracks its own monitors separately, through a rhythm-aware mechanism (`synology_abb_device_*`) rather than this generic family — see [Synology](../devices/synology.md).
 
 | Rule | What | Default threshold | Hold | Severity | Reminder |
 |---|---|---|---|---|---|
@@ -520,6 +556,12 @@ Series carry the `interface` or `sensor` label, so a notification names the port
 | UniFi device waiting for adoption | A device appeared on the network and waits to be adopted in UniFi (`dumbmonit_unifi_devices{state="pending"}`). | > 0 | 30 min | Info (`info`) | 24 h |
 | UniFi firmware update available | A firmware update is available for UniFi devices (`dumbmonit_unifi_devices_upgradable`). | > 0 | 1 h | Info (`info`) | 7 d |
 | UniFi alarms | UniFi logged critical events or raised alarms in the last 24 hours (`dumbmonit_unifi_alarms`). Only read with a View Only account. | > 0 | 5 min | Advisory (`warning`) | 24 h |
+| UniFi subsystem in error | A UniFi subsystem (Wi-Fi, LAN or VPN) reports an error in the controller's health view. Internet and the WAN links have their own rules (`dumbmonit_unifi_subsystem_status`: 2). | ≥ 2 | 10 min | Advisory (`warning`) | 6 h |
+| UniFi device overheating | A UniFi device reports that it is overheating (`dumbmonit_unifi_device_overheating`). | > 0 | 5 min | Advisory (`warning`) | 6 h |
+| UniFi PoE budget nearly used | A switch draws more than 90 % of its PoE budget: the next device plugged in may not be powered. Clears below 80 % (`dumbmonit_unifi_device_poe_used_watts` / `dumbmonit_unifi_device_poe_budget_watts`). | > 90 % | 15 min | Advisory (`warning`) | 24 h |
+| UniFi Wi-Fi channel saturated | The channel of an access point radio has been busy more than 80 % of the time for thirty minutes: Wi-Fi is slow for everyone on it. Clears below 65 % (`dumbmonit_unifi_radio_channel_utilization_percent`). | > 80 % | 30 min | Advisory (`warning`) | 24 h |
+| UniFi Wi-Fi clients with a weak signal | More than 40 % of the Wi-Fi clients, with at least five connected, have a signal weaker than -75 dBm: the access points are badly placed or too few (`dumbmonit_unifi_wifi_clients_weak_signal` / `dumbmonit_unifi_wifi_clients`). | > 40 % | 1 h | Info (`info`) | 7 d |
+| UniFi port errors | A switch port logged more than 100 receive or transmit errors in fifteen minutes: check the cable and the connectors (`dumbmonit_unifi_port_rx_errors_total` + `dumbmonit_unifi_port_tx_errors_total`). | > 100 | 15 min | Advisory (`warning`) | 24 h |
 
 ### Home Assistant
 
@@ -551,6 +593,8 @@ Series carry the `interface` or `sensor` label, so a notification names the port
 | vSphere datastore inaccessible | A vSphere datastore is inaccessible: the VMs stored on it cannot run (`dumbmonit_vsphere_datastore_accessible`). | < 1 | 5 min | Warning (`critical`) | 1 h |
 | vSphere VM tools not running | VMware Tools are installed but not running in a powered-on VM: the guest may be hung (`dumbmonit_vsphere_vm_tools_status == 2`). VMs without Tools do not fire. | > 0 | 30 min | Info (`info`) | 24 h |
 | vSphere red alarm | vSphere raised a red alarm that nobody acknowledged (`dumbmonit_vsphere_alarm{status="red"}`, one series per alarm, named after the alarm and the object). | > 0 | 5 min | Advisory (`warning`) | 6 h |
+| vSphere VM snapshot too old | The oldest snapshot of a VM is more than three days old: snapshots grow, slow the VM down and can fill the datastore. VMware recommends keeping none beyond 72 hours (`dumbmonit_vsphere_vm_snapshot_oldest_age_seconds`). | > 3 d | 1 h | Advisory (`warning`) | 24 h |
+| vSphere VM disks need consolidation | vSphere reports that the disks of a VM need consolidation: a snapshot removal left delta files behind, and they keep growing (`dumbmonit_vsphere_vm_consolidation_needed`). | > 0 | 1 h | Advisory (`warning`) | 24 h |
 
 ### Databases, message broker and security engine
 
@@ -703,6 +747,13 @@ See [pfSense](../devices/pfsense.md). Gateways are labelled `gateway`, interface
 | pfSense interface without link | An enabled pfSense interface has no link: cable, switch port or network card (`dumbmonit_pfsense_interface_down`). | > 0 | 5 min | Advisory (`warning`) | 6 h |
 | pfSense service stopped | A pfSense service that is enabled is not running: DNS resolver, VPN, NTP… (`dumbmonit_pfsense_service_stopped`). | > 0 | 5 min | Advisory (`warning`) | 6 h |
 | pfSense disk nearly full | The pfSense disk is more than 90 % full: logs, reports and package updates stop being written (`dumbmonit_pfsense_disk_used_percent`). | > 90 % | 30 min | Advisory (`warning`) | 1 d |
+| pfSense state table nearly full | pf tracks more than 80 % of the connections it is allowed: past the limit the firewall drops new connections with no other symptom. Clears below 70 % (`dumbmonit_pfsense_states_used_percent`). | > 80 % | 10 min | Advisory (`warning`) | 6 h |
+| pfSense network buffers nearly exhausted | More than 90 % of the network buffers are in use: a firewall that runs out stops forwarding while its processor is still idle. Clears below 80 % (`dumbmonit_pfsense_mbuf_used_percent`). | > 90 % | 10 min | Advisory (`warning`) | 6 h |
+| pfSense temperature high | The temperature pfSense reads has stayed above 85 °C for ten minutes: the box is about to slow itself down. Clears at 78 °C (`dumbmonit_pfsense_temperature_celsius`). | > 85 °C | 10 min | Advisory (`warning`) | 6 h |
+| pfSense CPU high | The processor has stayed above 90 % for fifteen minutes. Clears below 80 % (`dumbmonit_pfsense_cpu_usage_percent`). | > 90 % | 15 min | Advisory (`warning`) | 6 h |
+| pfSense swap in use | pfSense has used more than half of its swap for an hour: it is short of memory (`dumbmonit_pfsense_swap_used_percent`). | > 50 % | 1 h | Advisory (`warning`) | 24 h |
+| pfSense interface errors | An interface logged more than 100 receive or transmit errors in fifteen minutes: check the cable, the SFP module and the duplex setting (`dumbmonit_pfsense_interface_errors_in_total` + `dumbmonit_pfsense_interface_errors_out_total`). | > 100 | 15 min | Advisory (`warning`) | 24 h |
+| pfSense CARP maintenance mode left on | CARP has been left in persistent maintenance mode for an hour: this firewall handed its virtual addresses to its partner and will not take them back on its own (`dumbmonit_pfsense_carp_maintenance_mode`). | > 0 | 1 h | Info (`info`) | 24 h |
 
 ### Unraid
 
@@ -718,6 +769,13 @@ See [Unraid](../devices/unraid.md). Disks are labelled `disk` and `role` (`parit
 | Unraid parity check overdue | The last Unraid parity check is more than 40 days old: a monthly check was missed (`dumbmonit_unraid_parity_check_age_seconds`). | > 40 d | 1 h | Advisory (`warning`) | 1 d |
 | Unraid cache nearly full | An Unraid cache pool is more than 90 % full: writes fall back to the slow array, or fail (`dumbmonit_unraid_disk_used_percent{role="cache"}`). | > 90 % | 30 min | Advisory (`warning`) | 1 d |
 | Unraid container stopped | A Docker container set to start with the array is not running (`dumbmonit_unraid_container_autostart_stopped`). | > 0 | 10 min | Advisory (`warning`) | 6 h |
+| Unraid VM crashed | Unraid reports a virtual machine as crashed (`dumbmonit_unraid_vm_crashed`). | > 0 | 5 min | Advisory (`warning`) | 6 h |
+| Unraid alert unread | Unraid raised a notification of the highest importance (alert) that nobody has read: failed disk, overheating, array error… (`dumbmonit_unraid_notifications_unread{importance="alert"}`). | > 0 | 10 min | Advisory (`warning`) | 24 h |
+| Unraid array nearly full | The array is more than 95 % full: writes to the shares will soon fail. Clears below 93 % (`dumbmonit_unraid_array_used_percent`). | > 95 % | 1 h | Advisory (`warning`) | 24 h |
+| Unraid memory nearly exhausted | More than 95 % of the memory has been in use for fifteen minutes: Unraid runs from memory, and containers or VMs are killed when it runs out. Clears below 90 % (`dumbmonit_unraid_memory_used_percent`). | > 95 % | 15 min | Advisory (`warning`) | 6 h |
+| Unraid license problem | Unraid reports a license problem (expired trial, key that does not match the flash drive, missing key file…): the array may refuse to start after the next stop (`dumbmonit_unraid_registration_ok`). | < 1 | 30 min | Advisory (`warning`) | 24 h |
+| Unraid trial ending | The trial license ends in less than three days: after it, the array no longer starts (`dumbmonit_unraid_trial_expiry_seconds`). | < 3 d | 1 h | Advisory (`warning`) | 24 h |
+| Unraid OS updates eligibility ending | The license stops being eligible for Unraid OS updates in less than 30 days. The server keeps working; it only stops receiving new versions (`dumbmonit_unraid_os_updates_expiry_seconds`). | < 30 d | 1 h | Info (`info`) | 7 d |
 
 ### Veeam Backup & Replication
 
@@ -730,6 +788,11 @@ See [Veeam Backup & Replication](../devices/veeam.md). Jobs are labelled `job` a
 | Veeam backup too old | No successful run of a job scheduled at least daily for more than two days (`dumbmonit_veeam_job_last_success_age_seconds`). | > 2 d | 1 h | Advisory (`warning`) | 1 d |
 | Veeam repository nearly full | A Veeam backup repository is more than 90 % full: the next jobs will fail for lack of space (`dumbmonit_veeam_repository_used_percent`). | > 90 % | 30 min | Advisory (`warning`) | 1 d |
 | Veeam license expiring | The Veeam license expires in less than 30 days: jobs stop at the end of the grace period (`dumbmonit_veeam_license_expiry_seconds`). | < 30 d | 1 h | Advisory (`warning`) | 1 d |
+| Veeam support expiring | The Veeam support contract expires in less than 30 days: after that date the server receives no more updates and no vendor support (`dumbmonit_veeam_support_expiry_seconds`). | < 30 d | 1 h | Info (`info`) | 24 h |
+| Veeam repository offline | A backup repository is offline: the jobs that write to it fail, and its restore points cannot be read. Needs API revision `1.2-rev0` or later (`dumbmonit_veeam_repository_online`). | < 1 | 10 min | Warning (`critical`) | 6 h |
+| Veeam license expired or invalid | The Veeam license is no longer valid: jobs stop once the grace period ends. Only when the account can read the license (`dumbmonit_veeam_license_valid`). | < 1 | 30 min | Warning (`critical`) | 24 h |
+| Veeam configuration backup disabled | The backup of Veeam's own configuration is disabled: without it, a lost backup server has to be rebuilt by hand (`dumbmonit_veeam_config_backup_enabled`). | < 1 | 24 h | Info (`info`) | 7 d |
+| Veeam configuration backup too old | The configuration backup is enabled but has not succeeded for more than seven days (`dumbmonit_veeam_config_backup_last_success_age_seconds`). | > 7 d | 1 h | Advisory (`warning`) | 24 h |
 
 ### Windows without an agent
 
@@ -883,14 +946,7 @@ See [Sophos Firewall](../devices/sophos.md).
 
 ### Cisco Meraki
 
-See [Cisco Meraki](../devices/meraki.md) (beta). Devices are labelled `device`, `serial`, `model` and `network`, uplinks `interface`.
-
-| Rule | What | Default threshold | Hold | Severity | Reminder |
-|---|---|---|---|---|---|
-| Meraki device offline | A Cisco Meraki device has been offline (out of reach of the cloud dashboard) for ten minutes. Dormant devices, unseen for a long time, are left out (`dumbmonit_meraki_device_offline`). | > 0 | 10 min | Advisory (`warning`) | 6 h |
-| Meraki uplink failed | A Meraki router lost the Internet access of a configured uplink (the wired and cellular sockets without a cable are not counted) (`dumbmonit_meraki_uplink_failed`). | > 0 | 5 min | Advisory (`warning`) | 6 h |
-| Meraki license problem | The Meraki license is not in compliance (expired, missing or out of compliance): the dashboard may stop managing the devices (`dumbmonit_meraki_license_ok`). | < 1 | 1 h | Advisory (`warning`) | 1 d |
-| Meraki license expiring | A Meraki license expires in less than 30 days (`dumbmonit_meraki_license_expiry_seconds`). | < 30 d | 1 h | Advisory (`warning`) | 1 d |
+Now a community pack: its rules come with the pack, under the uid `pack:meraki:<name>`. See [Cisco Meraki](../devices/meraki.md).
 
 ### TP-Link Omada
 
@@ -918,23 +974,12 @@ Read over SNMP by the Stormshield profile; see [Stormshield SNS](../devices/snmp
 | Stormshield HA link faulty | A link between the nodes of a Stormshield HA cluster is faulty (`dumbmonit_stormshield_ha_faulty_links`). | > 0 | 5 min | Advisory (`warning`) | 6 h |
 ### Palo Alto PAN-OS
 
-See [Palo Alto PAN-OS](../devices/paloalto.md) (beta). Interfaces are labelled `interface` and `zone`, licences `license`.
-
-| Palo Alto interface without link | A Palo Alto firewall interface bound to a zone has no link: cable, transceiver or the device in front (`dumbmonit_paloalto_interface_down`). | > 0 | 5 min | Advisory (`warning`) | 6 h |
-| Palo Alto HA peer lost | The peer of a Palo Alto HA pair is no longer active or passive, or the HA link to it is down: there is no standby any more (`dumbmonit_paloalto_ha_peer_up`). | < 1 | 2 min | Warning (`critical`) | 6 h |
-| Palo Alto HA out of sync | The running configuration of a Palo Alto HA pair is not synchronized: a failover would run another configuration (`dumbmonit_paloalto_ha_in_sync`). | < 1 | 15 min | Advisory (`warning`) | 6 h |
-| Palo Alto HA member not functional | This Palo Alto firewall reports its HA state as suspended or non-functional (`dumbmonit_paloalto_ha_local_functional`). | < 1 | 5 min | Warning (`critical`) | 6 h |
-| Palo Alto session table filling up | The session table of a Palo Alto firewall has stayed above 90 % of its capacity for ten minutes: new sessions will be refused when it is full (`dumbmonit_paloalto_session_usage_percent`). | > 90 % | 10 min | Advisory (`warning`) | 6 h |
-| Palo Alto management CPU high | The management plane CPU of a Palo Alto firewall has stayed above 90 % for fifteen minutes (`dumbmonit_paloalto_cpu_usage_percent`). | > 90 % | 15 min | Advisory (`warning`) | 6 h |
-| Palo Alto management memory high | The management plane memory of a Palo Alto firewall has stayed above 90 % for fifteen minutes (`dumbmonit_paloalto_memory_used_percent`). | > 90 % | 15 min | Advisory (`warning`) | 6 h |
-| Palo Alto licence expiring | A licence or subscription of a Palo Alto firewall expires in less than 30 days, or has expired (`dumbmonit_paloalto_license_expiry_seconds`). | < 30 d | 1 h | Advisory (`warning`) | 1 d |
-| Palo Alto commit failed | The last configuration commit of a Palo Alto firewall failed: the running configuration is not the one that was saved (`dumbmonit_paloalto_last_commit_ok`). | < 1 | 5 min | Info (`info`) | 1 d |
+Now a community pack: its rules come with the pack, under the uid `pack:paloalto:<name>`. See [Palo Alto PAN-OS](../devices/paloalto.md).
 
 ### SonicWall SonicOS
 
-See [SonicWall SonicOS](../devices/sonicwall.md) (beta).
+Now a community pack: its rules come with the pack, under the uid `pack:sonicwall:<name>`. See [SonicWall SonicOS](../devices/sonicwall.md).
 
-| SonicWall interface without link | A SonicWall interface bound to a zone has no link (`dumbmonit_sonicwall_interface_down`). | > 0 | 5 min | Advisory (`warning`) | 6 h |
 ### QNAP QTS
 
 See [QNAP QTS / QuTS hero](../devices/qnap.md). Volumes are labelled `volume`, disks `disk` and `model`.
