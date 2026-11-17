@@ -46,6 +46,19 @@ n'y a pas de fichier de configuration à monter.
 La rétention de référence (60 jours) et la période d'apprentissage de 14
 jours ne sont pas configurables.
 
+### Haute disponibilité {#high-availability}
+
+Désactivée sans `DUMBMONIT_HA_DIR`. Voir
+[Haute disponibilité](../install/high-availability.md).
+
+| Variable | Défaut | Sens |
+|---|---|---|
+| `DUMBMONIT_HA_DIR` | *(non défini : désactivée)* | Répertoire partagé par l'actif et le serveur en attente (bail, répliques de la base), chemin absolu dans le conteneur. |
+| `DUMBMONIT_HA_NODE` | *(obligatoire avec le répertoire)* | Nom de ce serveur, différent sur chacun : 1 à 32 minuscules, chiffres, `-` ou `_`. |
+| `DUMBMONIT_HA_ROLE` | *(obligatoire avec le répertoire)* | `primary` ou `standby`. |
+| `DUMBMONIT_HA_TAKEOVER_MINUTES` | *(non défini : manuelle)* | Reprise automatique après ce nombre de minutes sans battement, 2 au moins. |
+| `DUMBMONIT_HA_SNAPSHOT_SECS` | `30` | Période de réplication de la base, de 10 à 3600 secondes. |
+
 ### Anciens noms `EZYMONIT_*`
 
 DumbMonit s'appelait EzyMonit jusqu'en septembre 2026. Chaque variable

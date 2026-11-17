@@ -7,6 +7,28 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Standby server (active/passive), off by default.** With `DUMBMONIT_HA_DIR` (a directory both
+  servers write, NFS or SMB), `DUMBMONIT_HA_NODE` and `DUMBMONIT_HA_ROLE` (`primary`/`standby`), a
+  second server waits on another machine. A lease file says which one is active: the active server
+  renews it every 10 s and stops at once (exit 75, restarted as the standby) if another holds it.
+  Every `DUMBMONIT_HA_SNAPSHOT_SECS` (30) it publishes a consistent copy of its database; the
+  standby copies it, checks its SHA-256, its integrity and that its own instance secret decrypts
+  it, and meanwhile opens neither its database nor a port and probes nothing. It becomes active on
+  `dumbmonit ha promote` (refused while the active one renews its lease, unless `--force`), on its
+  own after `DUMBMONIT_HA_TAKEOVER_MINUTES` without a heartbeat (the active server fences itself
+  after half of it), or at once for the primary when the lease was released by a clean stop. The
+  agent authority, the HTTPS certificate and every credential are in the database: agents reach
+  the new active server without re-enrolment. `dumbmonit ha status` shows both sides. Requires a
+  VictoriaMetrics shared by both (`DUMBMONIT_VM_URL`) and the same instance secret. See
+  [High availability](docs/install/high-availability.md), with a two-node Compose example and why
+  Litestream and LiteFS were not chosen.
+- **Agents: backup servers.** `server_urls` in `agent.yaml` (or `DUMBMONIT_AGENT_URLS`) lists the
+  servers after `server_url`/`tls_url`, which keep their meaning. After three failed attempts in a
+  row the agent moves to the next address with the same certificate, tries the primary every two
+  minutes and goes back as soon as it answers as an active server. The machine page shows which
+  server it reports to and since when (migration 0242).
+- **Plan for PostgreSQL as an option** (not implemented): what it would take and cost, in
+  [docs/development/postgres-plan.md](docs/development/postgres-plan.md).
 - **One port for a remote site.** The agent port (8443) now also serves `install.sh`, `install.ps1`
   and the agent binaries, without a client certificate (like enrolment). The install command shown
   for a relay uses that port only: script, binary and encrypted channel come from

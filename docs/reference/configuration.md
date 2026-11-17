@@ -81,6 +81,19 @@ configuration file to mount.
 Baseline retention (60 days) and the 14-day learning period are not
 configurable.
 
+### High availability {#high-availability}
+
+Off unless `DUMBMONIT_HA_DIR` is set. See
+[High availability](../install/high-availability.md).
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `DUMBMONIT_HA_DIR` | *(unset: off)* | Directory shared by the active server and the standby (lease, database replicas), absolute path in the container. |
+| `DUMBMONIT_HA_NODE` | *(required with the directory)* | Name of this server, different on each: 1 to 32 lowercase letters, digits, `-` or `_`. |
+| `DUMBMONIT_HA_ROLE` | *(required with the directory)* | `primary` or `standby`. |
+| `DUMBMONIT_HA_TAKEOVER_MINUTES` | *(unset: manual)* | Automatic takeover after this many minutes without a heartbeat, 2 at least. |
+| `DUMBMONIT_HA_SNAPSHOT_SECS` | `30` | Database replication period, 10 to 3600 seconds. |
+
 ### Former `EZYMONIT_*` names
 
 DumbMonit was called EzyMonit until September 2026. Every `DUMBMONIT_*`
