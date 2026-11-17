@@ -390,6 +390,27 @@ impl PushClient {
         }
     }
 
+    /// Garde le canal (client HTTP, certificat client, épinglage) et change
+    /// seulement le serveur visé : bascule vers un serveur de secours, ou
+    /// retour à la primaire (voir `failover.rs`). Les deux partagent
+    /// l'autorité des agents : le même certificat y est reconnu.
+    pub fn retarget(&self, base_url: &str) {
+        let current = self.channel();
+        let channel = Channel {
+            http: current.http.clone(),
+            base_url: base_url.trim_end_matches('/').to_string(),
+            encrypted: current.encrypted,
+        };
+        if let Ok(mut held) = self.channel.write() {
+            *held = Arc::new(channel);
+        }
+    }
+
+    /// Racine du serveur visé en ce moment, sans chemin.
+    pub fn base_url(&self) -> String {
+        self.channel().base_url.clone()
+    }
+
     /// URL effectivement appelée, pour la journalisation de démarrage.
     pub fn url(&self) -> String {
         ingest_url(&self.channel().base_url)
