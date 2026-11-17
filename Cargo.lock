@@ -1307,10 +1307,13 @@ name = "dumbmonit-agent"
 version = "0.17.1"
 dependencies = [
  "anyhow",
+ "aws-lc-rs",
  "base64 0.23.1",
  "chrono",
+ "crc32fast",
  "dumbmonit-collectors",
  "dumbmonit-proto",
+ "flate2",
  "hex",
  "libc",
  "rcgen",

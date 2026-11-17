@@ -6,10 +6,11 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use dumbmonit_proto::{
-    AGENT_KEY_HEADER, AGENT_SECRET_HEADER, AGENT_TLS_HEADER, AgentCommand, CERT_REFUSED,
-    COMMANDS_PATH, CommandReport, INGEST_PATH, LOGS_PATH, LogBatch, ProbeOutcome, PushAck,
-    PushBatch, RELAY_PATH, RELAY_RESYNC_HEADER, RELAY_TUNNEL_PATH, RELAY_TUNNEL_PROTOCOL,
-    TLS_ENROL_PATH, TLS_RENEW_PATH, TlsCertificate, TlsEnrolRequest, TlsOffer, TlsRenewRequest,
+    AGENT_KEY_HEADER, AGENT_SECRET_HEADER, AGENT_TLS_HEADER, AgentCommand, BacklogAck,
+    CERT_REFUSED, COMMANDS_PATH, CommandReport, INGEST_PATH, LOGS_PATH, LogBatch, ProbeOutcome,
+    PushAck, PushBatch, RELAY_BACKLOG_PATH, RELAY_PATH, RELAY_PLAN_PATH, RELAY_RESYNC_HEADER,
+    RELAY_TUNNEL_PATH, RELAY_TUNNEL_PROTOCOL, RelayBacklog, RelayPlan, TLS_ENROL_PATH,
+    TLS_RENEW_PATH, TlsCertificate, TlsEnrolRequest, TlsOffer, TlsRenewRequest,
 };
 use tokio::sync::Notify;
 
@@ -532,6 +533,25 @@ impl PushClient {
             return Ok(false);
         }
         self.read_empty(response).await.map(|()| true)
+    }
+
+    /// Planning des sondes de ce relais, gardé pour les coupures du lien.
+    pub async fn fetch_plan(&self, key: &str) -> Result<RelayPlan, PushError> {
+        let response = self
+            .exchange(|| self.keyed(reqwest::Method::GET, RELAY_PLAN_PATH, key, ""))
+            .await?;
+        self.read_json(response).await
+    }
+
+    /// Lot de résultats obtenus pendant une coupure.
+    pub async fn send_backlog(
+        &self,
+        key: &str,
+        backlog: &RelayBacklog,
+    ) -> Result<BacklogAck, PushError> {
+        let post = || self.keyed(reqwest::Method::POST, RELAY_BACKLOG_PATH, key, "").json(backlog);
+        let response = self.exchange(post).await?;
+        self.read_json(response).await
     }
 }
 

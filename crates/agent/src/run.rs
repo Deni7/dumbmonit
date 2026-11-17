@@ -5,8 +5,8 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use dumbmonit_proto::{
-    AgentIdentity, AgentUpdateOffer, MAX_BATCH_SAMPLES, PushBatch, RelaySetting, Sample,
-    SoftwareInventory,
+    AgentIdentity, AgentUpdateOffer, MAX_BATCH_SAMPLES, MetricKind, PushBatch, RelaySetting,
+    Sample, SoftwareInventory,
 };
 use tokio::time::Instant;
 use tracing::{debug, info, warn};
@@ -38,10 +38,12 @@ use crate::collect::{SystemProbe, agent_samples, services};
 use crate::commands::CommandRunner;
 use crate::config::{Config, MIN_INTERVAL_SECS};
 use crate::logs::LogRunner;
-use crate::relay::RelayRunner;
+use crate::relay::{Offline, RelayRunner};
+use crate::relay_offline::{Backlog, PlanStore};
 use crate::selfupdate::{AfterStop, SelfUpdater};
 use crate::sentinel::SentinelRunner;
 use crate::shutdown::Shutdown;
+use crate::spool::Spool;
 use crate::tls::TlsState;
 
 /// Délai avant une nouvelle tentative d'enrôlement ou de renouvellement sur le
@@ -76,6 +78,10 @@ pub(crate) const BACKOFF_MAX: Duration = Duration::from_secs(30);
 /// Quelques mégaoctets : de quoi couvrir un redémarrage pendant une coupure,
 /// pas de quoi remplir un disque.
 const MAX_PERSISTED_SAMPLES: usize = 20_000;
+
+/// Pause entre deux lots de rattrapage tirés du tampon disque : le retard part
+/// vite, sans prendre toute la liaison d'un petit site.
+const CATCHUP_PAUSE: Duration = Duration::from_millis(250);
 
 /// Délai maximal d'un envoi. Généreux, car un lot de rattrapage est volumineux et
 /// part parfois sur une liaison lente.
@@ -149,8 +155,11 @@ pub struct Agent {
     /// Commandes du serveur : redémarrage ou mise à jour d'un conteneur.
     commands: CommandRunner,
     /// Boucle du relais, lancée après le premier lot accepté — avant, le
-    /// serveur ne nous connaît pas encore et refuserait la demande.
+    /// serveur ne nous connaît pas encore et refuserait la demande —, ou dès
+    /// le démarrage pour un relais qui l'était à son dernier arrêt.
     relay: Option<tokio::task::JoinHandle<()>>,
+    /// Tampon disque des résultats du relais, ouvert avec lui.
+    relay_backlog: Option<Backlog>,
     /// Mode relais réglé depuis l'interface, tel que le dernier accusé de
     /// réception le porte. `None` tant que le serveur n'en a rien dit (serveur
     /// antérieur) : seule la configuration locale compte alors.
@@ -279,7 +288,8 @@ impl Agent {
         );
         Ok(Self {
             interval: config.interval,
-            buffer: PendingBuffer::new(config.max_buffered_samples),
+            buffer: PendingBuffer::new(config.max_buffered_samples)
+                .with_spool(open_sample_spool(&config)),
             probe: SystemProbe::new(&config.probe),
             health: SystemHealthProbe::new(&config.system_health),
             docker: DockerProbe::new(&config.docker_socket, config.docker_max_containers),
@@ -307,6 +317,7 @@ impl Agent {
             backoff: Backoff::new(BACKOFF_BASE, BACKOFF_MAX),
             commands,
             relay: None,
+            relay_backlog: None,
             server_relay: None,
             gateway: None,
             gateway_failed: None,
@@ -401,6 +412,26 @@ impl Agent {
             self.buffer.dropped(),
             now_ms,
         ));
+        samples.extend(self.buffer_samples(now_ms));
+        samples
+    }
+
+    /// Ce que le tampon disque occupe, et ce que le relais y garde.
+    fn buffer_samples(&self, now_ms: i64) -> Vec<Sample> {
+        let mut samples = Vec::new();
+        if self.buffer.has_spool() {
+            let bytes = self.buffer.disk_bytes() as f64;
+            samples.push(Sample::new("agent_buffer_disk_bytes", bytes, MetricKind::Gauge, now_ms));
+        }
+        if let Some(backlog) = &self.relay_backlog {
+            let stats = backlog.stats();
+            let pending = stats.pending() as f64;
+            let dropped = stats.dropped() as f64;
+            samples.extend([
+                Sample::new("agent_relay_buffered_results", pending, MetricKind::Gauge, now_ms),
+                Sample::new("agent_relay_dropped_results", dropped, MetricKind::Counter, now_ms),
+            ]);
+        }
         samples
     }
 
@@ -503,6 +534,13 @@ impl Agent {
             None => info!("modules: auto-detected (set 'modules' in agent.yaml to choose)"),
         }
         self.restore_pending();
+        // Relais au dernier arrêt : il reprend tout de suite, sans attendre
+        // un serveur peut-être injoignable — c'est tout l'intérêt du planning
+        // gardé. Le premier accusé de réception dira s'il doit le rester.
+        if self.config.buffer_max_mb > 0 && self.plan_store().exists() {
+            info!("this agent was a relay when it stopped: relaying resumes right away");
+            self.start_relay(&shutdown);
+        }
         // La sentinelle repart seule, sans attendre le serveur (peut-être en panne).
         self.sentinel.resume(&shutdown);
         self.probe.warm_up().await;
@@ -556,12 +594,19 @@ impl Agent {
                             if self.apply_update().await {
                                 break;
                             }
-                            Instant::now()
+                            if self.buffer.catching_up() {
+                                Instant::now() + CATCHUP_PAUSE
+                            } else {
+                                Instant::now()
+                            }
                         }
                         FlushOutcome::Idle => Instant::now(),
                         FlushOutcome::Failed(error) => {
                             let delay = self.backoff.next_delay();
                             self.note_failure(&error, delay);
+                            // La panne commence peut-être : ce qui attend passe
+                            // sur le disque, et la suite y ira au fil de l'eau.
+                            self.buffer.spill();
                             Instant::now() + delay
                         }
                     };
@@ -677,15 +722,10 @@ impl Agent {
         }
         match (self.relay_wanted(), self.relay.is_some()) {
             (true, false) => {
-                let runner = RelayRunner::new(
-                    self.client.clone(),
-                    self.identity.key(),
-                    RELAY_REQUEST_TIMEOUT,
-                );
                 if !self.config.relay {
                     info!(site = ?self.relay_site(), "relay mode switched on from the server");
                 }
-                self.relay = Some(tokio::spawn(runner.run(shutdown.clone())));
+                self.start_relay(shutdown);
             }
             (false, true) => {
                 // L'attente longue est simplement abandonnée ; une sonde déjà
@@ -693,10 +733,58 @@ impl Agent {
                 if let Some(handle) = self.relay.take() {
                     handle.abort();
                 }
+                // Plus relais : ni planning (il porte les identifiants des
+                // équipements), ni résultats en attente ne restent sur le disque.
+                self.plan_store().forget();
+                if let Some(backlog) = self.relay_backlog.take() {
+                    backlog.clear();
+                }
+                self.buffer.set_disk_limit(disk_limit(self.config.buffer_max_mb));
                 info!("relay mode switched off from the server");
             }
             _ => {}
         }
+    }
+
+    /// Lance la boucle du relais, avec de quoi tenir une coupure du lien
+    /// quand le tampon disque est actif.
+    fn start_relay(&mut self, shutdown: &Shutdown) {
+        let mut runner =
+            RelayRunner::new(self.client.clone(), self.identity.key(), RELAY_REQUEST_TIMEOUT);
+        if let Some(backlog) = self.open_relay_backlog() {
+            runner = runner.with_offline(Offline { store: self.plan_store(), backlog });
+        }
+        self.relay = Some(tokio::spawn(runner.run(shutdown.clone())));
+    }
+
+    /// Planning du relais, à côté du secret de liaison.
+    fn plan_store(&self) -> PlanStore {
+        PlanStore::beside(&self.config.secret_path)
+    }
+
+    /// Tampon des résultats du relais : les trois quarts de la borne du
+    /// disque, le reste pour les mesures de la machine elle-même.
+    fn open_relay_backlog(&mut self) -> Option<Backlog> {
+        if self.config.buffer_max_mb == 0 {
+            return None;
+        }
+        if self.relay_backlog.is_none() {
+            let total = disk_limit(self.config.buffer_max_mb);
+            let dir = spool_dir(&self.config.secret_path).join("relay");
+            match Backlog::open(&dir, total / 4 * 3) {
+                Ok(backlog) => self.relay_backlog = Some(backlog),
+                Err(error) => {
+                    warn!(
+                        path = %dir.display(),
+                        %error,
+                        "cannot open the relay buffer: results probed during an outage will be lost"
+                    );
+                    return None;
+                }
+            }
+            self.buffer.set_disk_limit(total / 4);
+        }
+        self.relay_backlog.clone()
     }
 
     /// Adresse où la passerelle doit écouter : `gateway_listen` en local, qui
@@ -851,6 +939,8 @@ impl Agent {
                     );
                 }
                 self.backoff.reset();
+                self.buffer.commit();
+                self.buffer.resume();
                 self.binding_refused = false;
                 self.note_approved();
                 debug!(target = ack.target_id, accepted = ack.accepted, "batch accepted");
@@ -917,6 +1007,7 @@ impl Agent {
                     // Une mesure seule ne se coupe plus : la garder bloquerait
                     // tout le tampon derrière elle.
                     warn!(reason = message, "measurement too large for the server, dropped");
+                    self.buffer.commit();
                     return FlushOutcome::Sent { count };
                 }
                 self.buffer.restore(batch.samples);
@@ -937,6 +1028,7 @@ impl Agent {
                 // Le serveur a compris et refusé : réémettre à l'identique ne ferait
                 // que reproduire le refus, en gardant le tampon plein pour rien.
                 warn!(%error, dropped = count, "batch rejected by the server, dropped");
+                self.buffer.commit();
                 self.forget_inventory(batch.inventory.as_ref());
                 self.eventlog.acknowledge(batch.event_log.as_ref());
                 FlushOutcome::Sent { count }
@@ -1189,6 +1281,9 @@ impl Agent {
         if self.buffer.is_empty() {
             return;
         }
+        // Sur le disque d'abord : un envoi coupé par le délai n'emporte alors
+        // rien avec lui.
+        self.buffer.spill();
         if let Ok(FlushOutcome::Sent { count }) =
             tokio::time::timeout(SHUTDOWN_FLUSH_TIMEOUT, self.flush()).await
         {
@@ -1197,9 +1292,17 @@ impl Agent {
         if self.buffer.is_empty() {
             return;
         }
-        // Le serveur n'a pas répondu (ou pas pour tout) : ce qui reste attend le
-        // prochain démarrage sur disque plutôt que d'être perdu.
         let pending = self.buffer.len();
+        if self.buffer.has_spool() {
+            info!(
+                pending,
+                bytes = self.buffer.disk_bytes(),
+                "the server did not answer before shutdown: measurements kept in the disk buffer"
+            );
+            return;
+        }
+        // Sans tampon disque : ce qui reste attend le prochain démarrage dans
+        // un fichier plutôt que d'être perdu.
         let path = self.pending_path();
         match self.buffer.save(&path, MAX_PERSISTED_SAMPLES) {
             Ok(kept) => info!(
@@ -1294,6 +1397,38 @@ impl Agent {
                 "sampling period adjusted by the server"
             );
             self.interval = wanted;
+        }
+    }
+}
+
+/// Répertoire des tampons disque, à côté du secret de liaison : le seul
+/// endroit où l'agent sait pouvoir écrire, et celui qu'on monte en volume pour
+/// un agent en conteneur.
+fn spool_dir(secret_path: &std::path::Path) -> std::path::PathBuf {
+    secret_path.with_file_name("spool")
+}
+
+/// Borne du tampon disque, en octets.
+fn disk_limit(megabytes: u64) -> u64 {
+    megabytes.saturating_mul(1024 * 1024)
+}
+
+/// Tampon disque des mesures de la machine. Impossible à ouvrir (droits,
+/// disque en lecture seule) : l'agent continue avec la mémoire seule.
+fn open_sample_spool(config: &Config) -> Option<Spool> {
+    if config.buffer_max_mb == 0 {
+        return None;
+    }
+    let dir = spool_dir(&config.secret_path).join("samples");
+    match Spool::open(&dir, disk_limit(config.buffer_max_mb)) {
+        Ok(spool) => Some(spool),
+        Err(error) => {
+            warn!(
+                path = %dir.display(),
+                %error,
+                "cannot open the disk catch-up buffer: measurements are kept in memory only"
+            );
+            None
         }
     }
 }
@@ -1410,6 +1545,7 @@ mod tests {
             databases: crate::collect::databases::DatabasesConfig::default(),
             perf_counters: crate::collect::perf_counters::PerfCountersConfig::default(),
             max_buffered_samples: 1_000,
+            buffer_max_mb: 0,
             secret_path: std::path::PathBuf::from("/inexistant/agent-secret"),
             tls_url: None,
             ca_pin: None,

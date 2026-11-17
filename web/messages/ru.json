@@ -9025,6 +9025,7 @@
 	"wall_player_stop_aria": "Остановить музыку на всех стенах",
 	"wall_player_title": "Плеер {label}",
 	"wall_problems_agent_silent": "Агент молчит {duration}",
+	"wall_problems_relay_silent": "Ретранслятор недоступен {duration}",
 	"wall_problems_aria": "Проблемы",
 	"wall_problems_more": "Ещё проблем: {count}, см. «Оповещения»",
 	"wall_problems_no_data": "Нет данных {duration}",

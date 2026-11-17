@@ -47,6 +47,9 @@ metrics:
   - { name: agent_collect_seconds, label: "Collection time", unit: "s" }
   - { name: agent_buffered_samples, label: "Buffered samples" }
   - { name: agent_dropped_samples, label: "Dropped samples", kind: counter, better: "lower" }
+  - { name: agent_buffer_disk_bytes, label: "Disk buffer used", unit: "B", better: "lower" }
+  - { name: agent_relay_buffered_results, label: "Relay results buffered" }
+  - { name: agent_relay_dropped_results, label: "Relay results dropped", kind: counter, better: "lower" }
   - { name: container_count, label: "Containers" }
   - { name: container_running_count, label: "Containers running" }
   - { name: agent_zfs_pool_used_percent, label: "ZFS pool used", unit: "%", better: "lower", entity: "pool", min: 0, max: 100 }

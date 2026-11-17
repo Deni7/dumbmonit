@@ -49,7 +49,7 @@ cannot write into another machine's series, even by forging its labels.
 | Windows performance counters | `agent_perf_counter`, one series per counter listed in `perf_counters` | `counter` |
 | MDaemon (Windows) | `mdaemon_queue_messages`, `mdaemon_queue_frozen`, `mdaemon_sessions_active`, `mdaemon_sessions_total`, `mdaemon_messages_total`, `mdaemon_filtered_messages_total`, `mdaemon_server_active`, `mdaemon_running`, `mdaemon_uptime_seconds` — see [MDaemon](mdaemon.md#mail-queues-through-the-agent) | `queue`, `protocol`, `filter`, `verdict`, `server` |
 | Hyper-V (Windows) | `hyperv_vms_health_ok`, `hyperv_vms_health_critical`, `hyperv_host_cpu_percent`, `hyperv_host_cpu_guest_percent`, `hyperv_partitions`; per VM `hyperv_vm_physical_memory_megabytes`, `hyperv_vm_guest_visible_memory_megabytes`, `hyperv_vm_memory_pressure_percent`; per virtual disk `hyperv_vhd_read_bytes_per_second`, `hyperv_vhd_write_bytes_per_second`, `hyperv_vhd_latency_seconds`, `hyperv_vhd_queue_length`, `hyperv_vhd_errors_total` — see [Hyper-V hosts](#hyper-v-hosts) | `vm`, `disk` |
-| Agent | `agent_collect_seconds`, `agent_buffered_samples`, `agent_dropped_samples` | |
+| Agent | `agent_collect_seconds`, `agent_buffered_samples`, `agent_dropped_samples`, `agent_buffer_disk_bytes`; relays: `agent_relay_buffered_results`, `agent_relay_dropped_results` | |
 
 A series that cannot be measured is **absent**, never zero: no `smartctl`, no
 `agent_disk_*`; no readable probe, no `agent_sensor_*`; no ZFS, no
@@ -769,6 +769,7 @@ perf_counters:             # Windows: performance counters to publish
   - path: '\Processor(_Total)\% Processor Time'
     name: cpu_total        # value of the "counter" label; the path when omitted
 max_buffered_samples: 20000
+buffer_max_mb: 256         # disk buffer for outages, in MB (0 = memory only)
 log_level: info
 ```
 
@@ -1198,14 +1199,31 @@ cannot let a new one in.
 
 ## Outages and diagnostics
 
-When the server is unreachable, the agent keeps measuring and buffers its
-readings in memory with their original timestamps. They are sent as soon as
-the link is back: a server restart leaves no hole in the graphs. The buffer is
-bounded (`max_buffered_samples`, about an hour by default) and drops the oldest
-readings when full. Retries back off from 2 to 30 seconds with jitter, and resume at once when
-the relay channel reaches the server again. Measurements still waiting at
-shutdown are kept on disk (`pending-samples.json`, next to the binding secret)
-and sent at the next start.
+When the server is unreachable, the agent keeps measuring and keeps its
+readings with their original timestamps. They are sent as soon as the link is
+back: a server restart or a WAN outage leaves no hole in the graphs.
+
+- **In memory while all is well.** A batch leaves every cycle and nothing is
+  written to disk (an SD card does not take every reading).
+- **On disk as soon as a send fails.** What was waiting moves to a disk buffer
+  (`spool/` next to the binding secret), and every following cycle is written
+  there as it is collected, each record checksummed and flushed to disk. A
+  power cut during the outage loses nothing that was already collected; a
+  record torn by the cut is detected and dropped at the next start.
+- **Bounded.** The disk buffer is capped by `buffer_max_mb` (environment
+  `DUMBMONIT_AGENT_BUFFER_MAX_MB`, default 256 MB, compressed: several days for
+  an ordinary machine). When full, the oldest readings go first, and
+  `agent_dropped_samples` counts what was lost. `0` turns the disk buffer off
+  (memory only, `max_buffered_samples`, about an hour). An empty buffer takes
+  no space.
+- **Catch-up.** Once the server answers, the backlog is sent oldest first, in
+  batches with a short pause between them so the link stays usable; the
+  server takes timestamps up to 30 days old. A batch resent because its
+  acknowledgement was lost is de-duplicated by the time-series database.
+
+Retries back off from 2 to 30 seconds with jitter, and resume at once when the
+relay channel reaches the server again. A relay also keeps probing its site
+during an outage: see [Remote site](../install/remote-site.md#when-the-link-to-the-server-drops).
 
 ```sh
 dumbmonit-agent --dry-run          # print the readings, send nothing

@@ -8849,6 +8849,7 @@
 	"wall_player_stop_aria": "Stop the music on every wall",
 	"wall_player_title": "{label} player",
 	"wall_problems_agent_silent": "Agent silent for {duration}",
+	"wall_problems_relay_silent": "Relay unreachable for {duration}",
 	"wall_problems_aria": "Problems",
 	"wall_problems_more": "{count} more problems: see Alerts",
 	"wall_problems_no_data": "No data for {duration}",

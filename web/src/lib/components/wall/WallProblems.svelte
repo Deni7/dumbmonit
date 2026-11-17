@@ -51,6 +51,7 @@
 			const cause = shortCause(row.detail || '');
 			if (cause.code === 'no_data') return m.wall_problems_no_data({ duration: formatDuration(cause.seconds) });
 			if (cause.code === 'agent_silent') return m.wall_problems_agent_silent({ duration: formatDuration(cause.seconds) });
+			if (cause.code === 'relay_silent') return m.wall_problems_relay_silent({ duration: formatDuration(cause.seconds) });
 			return cause.text || row.plate;
 		}
 		if (row.parent) return m.wall_problems_parent_down({ rule: row.alert.rule_name, parent: row.parent.name });

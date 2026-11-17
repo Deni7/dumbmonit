@@ -46,7 +46,7 @@ autre, même en falsifiant ses labels.
 | Compteurs de performance Windows | `agent_perf_counter`, une série par compteur listé dans `perf_counters` | `counter` |
 | MDaemon (Windows) | `mdaemon_queue_messages`, `mdaemon_queue_frozen`, `mdaemon_sessions_active`, `mdaemon_sessions_total`, `mdaemon_messages_total`, `mdaemon_filtered_messages_total`, `mdaemon_server_active`, `mdaemon_running`, `mdaemon_uptime_seconds` — voir [MDaemon](mdaemon.md#mail-queues-through-the-agent) | `queue`, `protocol`, `filter`, `verdict`, `server` |
 | Hyper-V (Windows) | `hyperv_vms_health_ok`, `hyperv_vms_health_critical`, `hyperv_host_cpu_percent`, `hyperv_host_cpu_guest_percent`, `hyperv_partitions` ; par VM `hyperv_vm_physical_memory_megabytes`, `hyperv_vm_guest_visible_memory_megabytes`, `hyperv_vm_memory_pressure_percent` ; par disque virtuel `hyperv_vhd_read_bytes_per_second`, `hyperv_vhd_write_bytes_per_second`, `hyperv_vhd_latency_seconds`, `hyperv_vhd_queue_length`, `hyperv_vhd_errors_total` — voir [Hôtes Hyper-V](#hyper-v-hosts) | `vm`, `disk` |
-| Agent | `agent_collect_seconds`, `agent_buffered_samples`, `agent_dropped_samples` | |
+| Agent | `agent_collect_seconds`, `agent_buffered_samples`, `agent_dropped_samples`, `agent_buffer_disk_bytes` ; relais : `agent_relay_buffered_results`, `agent_relay_dropped_results` | |
 
 Une série qui ne peut pas être mesurée est **absente**, jamais zéro : pas
 de `smartctl`, pas de `agent_disk_*` ; pas de sonde lisible, pas de
@@ -767,6 +767,7 @@ perf_counters:             # Windows : compteurs de performance à publier
   - path: '\Processor(_Total)\% Processor Time'
     name: cpu_total        # valeur du label "counter" ; le chemin quand omis
 max_buffered_samples: 20000
+buffer_max_mb: 256         # tampon disque des coupures, en Mo (0 = mémoire seule)
 log_level: info
 ```
 
@@ -1223,16 +1224,35 @@ nouvelle.
 
 ## Pannes et diagnostics
 
-Quand le serveur est inaccessible, l'agent continue de mesurer et met ses
-lectures en tampon mémoire avec leurs horodatages d'origine. Elles sont
-envoyées dès que le lien revient : un redémarrage de serveur ne laisse
-aucun trou dans les graphiques. Le tampon est borné (`max_buffered_samples`,
-environ une heure par défaut) et abandonne les lectures les plus
-anciennes quand il est plein. Les tentatives reculent de 2 à
-30 secondes avec du jitter, et reprennent aussitôt que le canal du relais
-retrouve le serveur. Les mesures encore en attente à l'arrêt sont gardées sur
-disque (`pending-samples.json`, à côté du secret de liaison) et envoyées au
-démarrage suivant.
+Quand le serveur est inaccessible, l'agent continue de mesurer et garde ses
+lectures avec leurs horodatages d'origine. Elles sont envoyées dès que le lien
+revient : un redémarrage de serveur ou une coupure du WAN ne laisse aucun trou
+dans les graphiques.
+
+- **En mémoire tant que tout va bien.** Un lot part à chaque cycle, rien n'est
+  écrit sur le disque (une carte SD n'encaisse pas chaque mesure).
+- **Sur le disque dès qu'un envoi échoue.** Ce qui attendait passe dans un
+  tampon disque (`spool/`, à côté du secret de liaison), et chaque cycle
+  suivant y est écrit au fil de l'eau, chaque enregistrement avec sa somme de
+  contrôle et forcé sur le disque. Une coupure de courant pendant la panne ne
+  perd rien de ce qui était déjà relevé ; un enregistrement tronqué par la
+  coupure est repéré et écarté au démarrage suivant.
+- **Borné.** Le tampon disque est plafonné par `buffer_max_mb` (variable
+  `DUMBMONIT_AGENT_BUFFER_MAX_MB`, 256 Mo par défaut, compressé : plusieurs
+  jours pour une machine ordinaire). Plein, il sacrifie les lectures les plus
+  anciennes, et `agent_dropped_samples` compte ce qui a été perdu. `0` coupe le
+  tampon disque (mémoire seule, `max_buffered_samples`, environ une heure). Un
+  tampon vide n'occupe aucune place.
+- **Rattrapage.** Dès que le serveur répond, le retard part du plus ancien au
+  plus récent, par lots séparés d'une courte pause pour que le lien reste
+  utilisable ; le serveur accepte des horodatages jusqu'à 30 jours en arrière.
+  Un lot renvoyé parce que son accusé de réception s'est perdu est dédoublonné
+  par la base de séries.
+
+Les tentatives reculent de 2 à 30 secondes avec du jitter, et reprennent
+aussitôt que le canal du relais retrouve le serveur. Un relais continue aussi
+de sonder son site pendant une coupure : voir
+[Site distant](../install/remote-site.fr.md#quand-le-lien-avec-le-serveur-tombe).
 
 ```sh
 dumbmonit-agent --dry-run          # affiche les lectures, n'envoie rien
