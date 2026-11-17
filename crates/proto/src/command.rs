@@ -64,8 +64,9 @@ pub const RELAY_RESYNC_HEADER: &str = "x-dumbmonit-relay-resync";
 ///
 /// La cible est transmise entière, secret compris : c'est l'agent qui va se
 /// présenter à l'équipement. Le canal est celui des mesures (jeton porteur, et
-/// TLS dès que le serveur est publié derrière un mandataire), et rien de tout
-/// cela n'est jamais écrit sur disque, ni côté serveur ni côté agent.
+/// TLS dès que le serveur est publié derrière un mandataire). Le serveur n'en
+/// écrit rien sur disque ; le relais n'en garde qu'une copie chiffrée, celle
+/// de son planning pour les coupures du lien ([`crate::RelayPlan`]).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProbeJob {
     pub target: Target,

@@ -58,6 +58,14 @@ rcgen = { version = "0.14", default-features = false, features = ["aws_lc_rs"] }
 sha2 = "0.11"
 hex = "0.4"
 base64 = "0.23"
+# Planning du relais chiffré sur disque (AES-256-GCM, `relay_offline.rs`) :
+# le même moteur que rustls, déjà compilé, rien de plus dans le binaire.
+aws-lc-rs = { version = "1", default-features = false, features = ["aws-lc-sys"] }
+
+# Tampon disque (`spool.rs`) : charges compressées (zlib) et somme de contrôle
+# par enregistrement. Déjà dans l'arbre de dépendances (collecteurs, serveur).
+flate2 = "1.1"
+crc32fast = "1.5"
 
 # Couche multiplateforme d'accès aux compteurs système.
 sysinfo = { version = "0.39", default-features = false, features = [

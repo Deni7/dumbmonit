@@ -1242,6 +1242,24 @@
         "better": "lower"
       },
       {
+        "name": "agent_buffer_disk_bytes",
+        "label": "Disk buffer used",
+        "unit": "B",
+        "kind": "gauge",
+        "better": "lower"
+      },
+      {
+        "name": "agent_relay_buffered_results",
+        "label": "Relay results buffered",
+        "kind": "gauge"
+      },
+      {
+        "name": "agent_relay_dropped_results",
+        "label": "Relay results dropped",
+        "kind": "counter",
+        "better": "lower"
+      },
+      {
         "name": "container_count",
         "label": "Containers",
         "kind": "gauge"

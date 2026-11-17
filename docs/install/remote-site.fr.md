@@ -248,6 +248,64 @@ plus du parent que vous avez pu régler) : quand le relais lui-même est
 sort — pour le relais. Le parent que vous avez réglé explicitement garde
 son rôle et gagne quand les deux sont en panne.
 
+L'alerte du relais le dit : sa surveillance affiche *relay unreachable: no
+measurement for …* (message du serveur, en anglais), et le moniteur de salle
+montre **Relais injoignable depuis …** — une ligne pour tout le site, pas une
+par équipement.
+
+## Quand le lien avec le serveur tombe
+
+Un relais ne s'arrête pas à la première coupure du WAN : il continue de sonder
+son site et ne perd rien.
+
+1. **Il garde son planning.** Tant que le serveur répond, le relais lui
+   redemande toutes les quelques minutes la liste des surveillances qu'il
+   sonde, avec leur période et les identifiants nécessaires. Il la range
+   chiffrée à côté de son secret de liaison (`relay-plan.enc`, AES-256-GCM,
+   avec une clé aléatoire qui lui est propre dans `relay-plan.key`, lisible du
+   seul compte de l'agent).
+2. **Il sonde seul.** Quand le serveur ne répond plus depuis environ 35
+   secondes, le relais planifie lui-même chaque surveillance, à sa période
+   habituelle, avec les mêmes collecteurs et le même plafond de concurrence.
+3. **Il garde les résultats sur disque.** Chaque résultat part dans un tampon
+   disque (`spool/relay/`), écrit au fil de l'eau, avec sa somme de contrôle,
+   forcé sur le disque : une coupure de courant sur le site ne perd rien de ce
+   qui a déjà été sondé. Le tampon partage le `buffer_max_mb` de l'agent
+   (256 Mo par défaut, compressé ; trois quarts pour les résultats du relais,
+   un quart pour les mesures de la machine elle-même). Plein, il sacrifie les
+   résultats les plus anciens ; `agent_relay_dropped_results` les compte, et le
+   serveur journalise la perte au retour du relais.
+4. **Il rattrape.** Dès que le serveur répond, il reprend la planification, et
+   le relais lui renvoie ce qu'il a gardé, du plus ancien au plus récent, par
+   lots de 200 résultats au plus séparés d'une pause. Chaque résultat porte ses
+   horodatages d'origine : les graphiques du site se comblent d'eux-mêmes.
+   Chaque résultat a un numéro de séquence ; un lot envoyé deux fois (accusé de
+   réception perdu avec le lien) est reconnu et n'est pas réécrit. Un résultat
+   pour un équipement qui ne passe plus par ce relais est ignoré.
+
+Pendant la coupure, le site apparaît comme une seule alerte, celle du relais
+(voir plus haut), et les équipements derrière lui comme `suppressed`. Leur état
+courant n'est pas réécrit par le passé : dès que le serveur les sonde de
+nouveau, leur statut est celui du présent, et leur historique est complet.
+
+Un résultat que le relais a obtenu lien établi mais n'a pas pu rendre (le lien
+est tombé entre-temps) est gardé de la même façon plutôt que perdu. Un
+équipement qui n'a pas répondu pendant la coupure laisse un trou, exactement
+comme si le serveur l'avait sondé.
+
+**Ce que protège le chiffrement.** Le planning gardé contient les identifiants
+des équipements du site. Le chiffrer protège contre la fuite du fichier seul :
+copie du répertoire de données sans le fichier de clé, sauvegarde partielle,
+disque récupéré d'un ancien relais. Il ne protège pas contre qui peut lire tout
+le répertoire de l'agent avec ses droits ou ceux d'un administrateur : il y
+trouverait la clé, mais aussi le certificat et le secret de liaison de l'agent,
+qui lui permettent de toute façon de demander ce même planning au serveur.
+Contre cela, ce sont les permissions de la machine qui protègent, pas la
+cryptographie. Couper le mode relais efface le planning, sa clé et les
+résultats en attente ; un relais révoqué (jeton ou certificat refusé) efface
+aussitôt son planning. `buffer_max_mb: 0` désactive tout cela : le relais ne
+sonde plus que quand le serveur le lui demande.
+
 ## Sonder depuis le serveur et plusieurs relais
 
 Un moniteur n'a pas à choisir entre le serveur et un relais : il peut être sondé depuis les deux, ou depuis plusieurs relais, avec un quorum et un tour de confirmation avant toute alerte. Voir [Sonder depuis plusieurs emplacements](../devices/services.fr.md#sonder-depuis-plusieurs-emplacements).
@@ -286,3 +344,6 @@ Un moniteur n'a pas à choisir entre le serveur et un relais : il peut être son
   anciens que cette fonctionnalité ignorent `relay: true`, et le serveur
   rapporte leurs sondes comme en délai dépassé. Réinstallez avec le binaire
   ou l'image actuels.
+- Pendant une coupure, le relais ne sonde que ce que son dernier planning
+  listait : une surveillance ajoutée entre-temps attend le serveur. Les sondes
+  multi-emplacements et les sauvegardes de configuration restent au serveur.

@@ -46,6 +46,13 @@ pub const MIN_INTERVAL_SECS: u64 = 5;
 /// jamais menacer la machine surveillée.
 pub const DEFAULT_MAX_BUFFERED_SAMPLES: usize = 20_000;
 
+/// Borne par défaut du tampon disque, en mégaoctets (`buffer_max_mb`).
+///
+/// Les mesures y sont compressées : 256 Mo couvrent plusieurs jours de coupure
+/// pour une machine ordinaire, et plusieurs heures pour un relais qui sonde
+/// quelques dizaines d'équipements. Le tampon vide n'occupe rien.
+pub const DEFAULT_BUFFER_MAX_MB: u64 = 256;
+
 /// Chemin du socket Docker sur les systèmes de type Unix.
 pub const DEFAULT_DOCKER_SOCKET: &str = "/var/run/docker.sock";
 
@@ -151,6 +158,7 @@ struct FileConfig {
     mdaemon: Option<FlagOrAuto>,
     hyperv: Option<FlagOrAuto>,
     max_buffered_samples: Option<usize>,
+    buffer_max_mb: Option<u64>,
     log_level: Option<String>,
     proxy: Option<String>,
     no_proxy: Option<Patterns>,
@@ -343,6 +351,10 @@ pub struct Config {
     /// Compteurs de performance Windows : liste libre, jeux MDaemon et Hyper-V.
     pub perf_counters: PerfCountersConfig,
     pub max_buffered_samples: usize,
+    /// Borne du tampon disque (mesures de la machine et résultats du relais),
+    /// en mégaoctets ; zéro le désactive : l'agent ne garde alors que la
+    /// mémoire, comme avant.
+    pub buffer_max_mb: u64,
     /// Fichier où l'agent range le secret de liaison que le serveur lui
     /// attribue. À côté de la configuration par défaut, pour qu'un déplacement
     /// de l'une emmène l'autre.
@@ -385,6 +397,7 @@ impl fmt::Debug for Config {
             .field("gateway", &self.gateway)
             .field("probe", &self.probe)
             .field("max_buffered_samples", &self.max_buffered_samples)
+            .field("buffer_max_mb", &self.buffer_max_mb)
             .field("log_level", &self.log_level)
             .field("proxy", &self.proxy)
             .field("system_health", &self.system_health)
@@ -857,6 +870,12 @@ impl Config {
         if max_buffered_samples == 0 {
             bail!("the catch-up buffer cannot be zero");
         }
+        let buffer_max_mb = match env.get("DUMBMONIT_AGENT_BUFFER_MAX_MB") {
+            Some(raw) => raw.trim().parse::<u64>().with_context(|| {
+                format!("DUMBMONIT_AGENT_BUFFER_MAX_MB: invalid value '{raw}'")
+            })?,
+            None => file.buffer_max_mb.unwrap_or(DEFAULT_BUFFER_MAX_MB),
+        };
 
         let log_level = match env.get("DUMBMONIT_AGENT_LOG").or(file.log_level) {
             Some(raw) => parse_level(&raw)?,
@@ -929,6 +948,7 @@ impl Config {
             databases,
             perf_counters,
             max_buffered_samples,
+            buffer_max_mb,
             secret_path: Self::resolve_secret_path(&env, config_path),
             log_level,
             proxy,
@@ -1446,6 +1466,23 @@ mod tests {
         assert!(Config::merge(plain, env(&[])).is_err(), "jamais de canal des agents en clair");
         let short = FileConfig { ca_pin: Some("abcd".into()), ..file_with_url_and_token() };
         assert!(Config::merge(short, env(&[])).is_err(), "une empreinte tronquée est refusée");
+    }
+
+    #[test]
+    fn the_disk_buffer_bound_comes_from_the_file_or_the_environment() {
+        let config = Config::merge(file_with_url_and_token(), env(&[])).expect("configuration");
+        assert_eq!(config.buffer_max_mb, DEFAULT_BUFFER_MAX_MB);
+
+        let file = FileConfig { buffer_max_mb: Some(64), ..file_with_url_and_token() };
+        assert_eq!(Config::merge(file, env(&[])).expect("configuration").buffer_max_mb, 64);
+
+        let file = FileConfig { buffer_max_mb: Some(64), ..file_with_url_and_token() };
+        let config = Config::merge(file, env(&[("DUMBMONIT_AGENT_BUFFER_MAX_MB", "0")]))
+            .expect("configuration");
+        assert_eq!(config.buffer_max_mb, 0, "zéro coupe le tampon disque");
+
+        let bad = env(&[("DUMBMONIT_AGENT_BUFFER_MAX_MB", "beaucoup")]);
+        assert!(Config::merge(file_with_url_and_token(), bad).is_err());
     }
 
     #[test]

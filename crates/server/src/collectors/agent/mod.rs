@@ -230,11 +230,19 @@ impl Collector for AgentCollector {
                     "agent went silent"
                 );
             }
-            return Err(ProbeError::Unreachable(format!(
+            let silence = format!(
                 "no measurement for {} (limit {})",
                 human_duration(age),
                 human_duration(deadline)
-            )));
+            );
+            // Un relais muet, c'est tout son site qui n'est plus observé : ses
+            // équipements sont tenus derrière lui (une seule alerte, la
+            // sienne), et le message le dit. L'interface lit ce préfixe.
+            let relay = store::host(&self.pool, target.id).await.ok().flatten();
+            if relay.is_some_and(|host| host.relay) {
+                return Err(ProbeError::Unreachable(format!("relay unreachable: {silence}")));
+            }
+            return Err(ProbeError::Unreachable(silence));
         }
         if verdict == Freshness::Grace {
             tracing::debug!(target = target.id, "server just restarted, waiting for this agent");
@@ -396,6 +404,22 @@ mod tests {
         // C'est cette qualification qui alimente l'alerte « équipement injoignable »
         // et l'anti-cascade : une erreur de configuration ne les déclencherait pas.
         assert!(error.means_down(), "erreur inattendue : {error}");
+    }
+
+    #[tokio::test]
+    async fn a_silent_relay_says_so_for_its_whole_site() {
+        let now = chrono::Utc::now().timestamp_millis();
+        let (pool, _dir) = pool_with_agent(Some(now - 600_000)).await;
+        sqlx::query("UPDATE agent_hosts SET relay = 1").execute(&pool).await.expect("relais");
+
+        let error = AgentCollector::new(pool).probe(&target(30)).await.unwrap_err();
+        assert!(error.means_down(), "erreur inattendue : {error}");
+        // Le préfixe que l'interface traduit (« Relais injoignable depuis … »).
+        let message = error.to_string();
+        assert!(
+            message.starts_with("Monitor unreachable: relay unreachable: no measurement for"),
+            "message : {message}"
+        );
     }
 
     #[tokio::test]

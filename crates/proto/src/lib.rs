@@ -13,6 +13,7 @@ pub mod env;
 mod eventlog;
 mod logs;
 mod push;
+mod relay_offline;
 pub mod remediation;
 mod sample;
 mod selfupdate;
@@ -58,6 +59,10 @@ pub use push::{
     InstalledPackage, MAX_BATCH_SAMPLES, MAX_DECLARED_MONITORS, MAX_GATEWAY_CHECK_ERROR,
     MAX_INVENTORY_PACKAGES, PUSH_PROTOCOL_VERSION, PushAck, PushBatch, RelaySetting,
     SoftwareInventory, TOKEN_PREFIX,
+};
+pub use relay_offline::{
+    BacklogAck, BacklogResult, MAX_BACKLOG_RESULTS, PlannedProbe, RELAY_BACKLOG_PATH,
+    RELAY_PLAN_PATH, RelayBacklog, RelayPlan,
 };
 pub use remediation::{CMD_SCRIPT_RUN, CMD_SERVICE_RESTART, DeclaredScript, RemediationInfo};
 pub use sample::{MetricKind, Sample};

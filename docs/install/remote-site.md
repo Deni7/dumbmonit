@@ -233,6 +233,60 @@ shown as `suppressed` with `suppressed_by` = the relay, and only one
 notification goes out — for the relay. The parent you set explicitly keeps its
 role and wins when both are down.
 
+The relay's own alert says so: its monitor reads *relay unreachable: no
+measurement for …*, and the room monitor shows **Relay unreachable for …** —
+one line for the whole site, not one per device.
+
+## When the link to the server drops
+
+A relay does not stop at the first WAN outage: it keeps probing its site and
+loses nothing.
+
+1. **It keeps its schedule.** While the server answers, the relay fetches the
+   list of monitors it probes, with their intervals and the credentials they
+   need, every few minutes. It stores it encrypted next to its binding secret
+   (`relay-plan.enc`, AES-256-GCM, with a random key of its own in
+   `relay-plan.key`, readable by the agent account only).
+2. **It probes on its own.** When the server has not answered for about 35
+   seconds, the relay schedules every monitor itself, at its usual interval,
+   with the same collectors and the same concurrency cap.
+3. **It keeps the results on disk.** Each result goes into a disk buffer
+   (`spool/relay/`), written as it comes, checksummed and flushed: a power cut
+   at the site loses nothing already probed. The buffer shares the agent's
+   `buffer_max_mb` (default 256 MB, compressed; three quarters for the relay's
+   results, one quarter for the machine's own readings). When full, the oldest
+   results go first; `agent_relay_dropped_results` counts them, and the server
+   logs the loss when the relay comes back.
+4. **It catches up.** As soon as the server answers, it takes the scheduling
+   back, and the relay sends what it kept, oldest first, in batches of at most
+   200 results with a pause between them. Every result carries its original
+   timestamps: the graphs of the site fill in by themselves. Each result has a
+   sequence number; a batch sent twice (its acknowledgement lost with the link)
+   is recognised and not written again. A result for a device that no longer
+   goes through this relay is ignored.
+
+During the outage, the site shows as one alert, the relay's (see above), and
+the devices behind it as `suppressed`. Their current state is not rewritten
+from the past: once the server probes them again, their status is the
+present one, and their history is complete.
+
+A result that the relay obtained while the link was up but could not report
+(the link dropped in between) is kept the same way rather than lost. A device
+that did not answer during the outage leaves a gap, exactly as it would have
+with the server probing it.
+
+**What the encryption protects.** The stored schedule holds the credentials
+of the site's devices. Encrypting it protects against the file leaking on its
+own: a copy of the data directory without the key file, a partial backup, a
+disk recovered from an old relay. It does not protect against someone who can
+read the agent's whole directory with its rights or an administrator's: they
+would find the key, but also the agent certificate and binding secret, which
+let them fetch the same schedule from the server anyway. Against that, the
+machine's permissions protect, not cryptography. Switching relay mode off
+erases the schedule, its key and the results waiting; a revoked relay (token
+or certificate refused) erases its schedule at once. `buffer_max_mb: 0` turns
+all this off: the relay then probes only when the server asks.
+
 ## Probing from the server and several relays
 
 A monitor does not have to choose between the server and one relay: it can be probed from both, or from several relays, with a quorum and a confirmation round before any alert. See [Probing from several locations](../devices/services.md#probing-from-several-locations).
@@ -268,5 +322,8 @@ A monitor does not have to choose between the server and one relay: it can be pr
 - A relay agent needs the collectors compiled in: agents older than this
   feature ignore `relay: true`, and the server reports their probes as timed
   out. Reinstall with the current binary or image.
+- During an outage, the relay probes only what its last schedule listed:
+  monitors added meanwhile wait for the server. Probes from several locations
+  and configuration backups are left to the server.
 
 Which ports to open, and which never to expose: see [Network ports](ports.md).

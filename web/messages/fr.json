@@ -8764,6 +8764,7 @@
 	"wall_player_stop_aria": "Arrêter la musique sur tous les murs",
 	"wall_player_title": "Lecteur {label}",
 	"wall_problems_agent_silent": "Agent muet depuis {duration}",
+	"wall_problems_relay_silent": "Relais injoignable depuis {duration}",
 	"wall_problems_aria": "Problèmes",
 	"wall_problems_more": "{count} autres problèmes : voir Alertes",
 	"wall_problems_no_data": "Aucune donnée depuis {duration}",

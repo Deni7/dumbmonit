@@ -113,6 +113,8 @@ mod tests {
         "/api/agent/relay",
         "/api/agent/relay/{id}",
         "/api/agent/relay/discovery/{id}",
+        "/api/agent/relay/plan",
+        "/api/agent/relay/backlog",
         "/api/agent/update/download/{name}",
         "/api/auth/oidc/start",
         "/api/auth/oidc/callback",

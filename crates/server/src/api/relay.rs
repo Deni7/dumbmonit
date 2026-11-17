@@ -16,7 +16,8 @@ use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use dumbmonit_proto::{
-    AgentCommand, ProbeOutcome, RELAY_POLL_HOLD_SECS, RELAY_RESYNC_HEADER, TargetId,
+    AgentCommand, BacklogAck, MAX_BACKLOG_RESULTS, ProbeOutcome, RELAY_POLL_HOLD_SECS,
+    RELAY_RESYNC_HEADER, RelayBacklog, RelayPlan, TargetId,
 };
 use serde::{Deserialize, Serialize};
 
@@ -50,6 +51,10 @@ pub fn agent_routes() -> Router<AppState> {
         // Attention à l'ordre : la route fixe du compte rendu de découverte
         // d'abord, pour qu'elle ne soit pas happée par `{id}`.
         .route("/agent/relay/discovery/{id}", post(discovery_report))
+        // Relais hors ligne : le planning qu'il garde, le rattrapage qu'il
+        // renvoie. Routes fixes, prioritaires sur `{id}`.
+        .route("/agent/relay/plan", get(plan))
+        .route("/agent/relay/backlog", post(backlog))
         .route("/agent/relay/{id}", post(report))
 }
 
@@ -136,6 +141,45 @@ async fn report(
     };
     relay::settle(&state, job, JobResult::Done(outcome)).await;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// `GET /api/agent/relay/plan` : le planning des sondes de ce relais, qu'il
+/// garde chiffré pour sonder seul pendant une coupure du lien.
+///
+/// Les identifiants des équipements y figurent, comme dans chaque sonde : même
+/// contrôle d'identité que la demande de sondes.
+async fn plan(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    cert: Option<Extension<AgentCert>>,
+    Query(query): Query<KeyQuery>,
+) -> Result<Json<RelayPlan>, Rejection> {
+    let (token_id, agent_id) = authenticate(&state, &headers, &query.key, cert.as_deref()).await?;
+    let plan = relay::plan_for(&state, agent_id).await?;
+    agent::touch_token(&state.pool, token_id).await?;
+    tracing::debug!(agent = agent_id, probes = plan.probes.len(), "relay plan handed out");
+    Ok(Json(plan))
+}
+
+/// `POST /api/agent/relay/backlog` : résultats obtenus par le relais pendant une
+/// coupure, renvoyés par lots avec leurs horodatages d'origine. Un lot déjà
+/// reçu est écarté sur ses numéros de séquence (voir
+/// [`relay::ingest_backlog`]).
+async fn backlog(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    cert: Option<Extension<AgentCert>>,
+    Query(query): Query<KeyQuery>,
+    Json(backlog): Json<RelayBacklog>,
+) -> Result<Json<BacklogAck>, Rejection> {
+    let (_, agent_id) = authenticate(&state, &headers, &query.key, cert.as_deref()).await?;
+    if backlog.results.len() > MAX_BACKLOG_RESULTS {
+        return Err(agent::IngestError::BadRequest(format!(
+            "At most {MAX_BACKLOG_RESULTS} results per catch-up batch."
+        ))
+        .into());
+    }
+    Ok(Json(relay::ingest_backlog(&state, agent_id, backlog).await?))
 }
 
 /// `POST /api/agent/relay/discovery/{id}?key=…` : compte rendu progressif d'un

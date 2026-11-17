@@ -8764,6 +8764,7 @@
 	"wall_player_stop_aria": "Ferma la musica su tutte le pareti",
 	"wall_player_title": "Player {label}",
 	"wall_problems_agent_silent": "Agente muto da {duration}",
+	"wall_problems_relay_silent": "Relay irraggiungibile da {duration}",
 	"wall_problems_aria": "Problemi",
 	"wall_problems_more": "Altri {count} problemi: vedi Avvisi",
 	"wall_problems_no_data": "Nessun dato da {duration}",

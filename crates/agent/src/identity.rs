@@ -170,6 +170,7 @@ mod tests {
             databases: crate::collect::databases::DatabasesConfig::default(),
             perf_counters: crate::collect::perf_counters::PerfCountersConfig::default(),
             max_buffered_samples: 100,
+            buffer_max_mb: 0,
             secret_path: std::path::PathBuf::from("/inexistant/agent-secret"),
             tls_url: None,
             ca_pin: None,

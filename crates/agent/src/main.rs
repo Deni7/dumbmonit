@@ -21,11 +21,13 @@ mod logs;
 mod mux;
 mod proxy;
 mod relay;
+mod relay_offline;
 mod remediation;
 mod run;
 mod selfupdate;
 mod sentinel;
 mod shutdown;
+mod spool;
 #[cfg(test)]
 mod testsupport;
 mod tls;

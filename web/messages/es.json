@@ -8764,6 +8764,7 @@
 	"wall_player_stop_aria": "Detener la música en todas las paredes",
 	"wall_player_title": "Reproductor de {label}",
 	"wall_problems_agent_silent": "Agente en silencio desde hace {duration}",
+	"wall_problems_relay_silent": "Relé inaccesible desde hace {duration}",
 	"wall_problems_aria": "Problemas",
 	"wall_problems_more": "{count} problemas más: ver Alertas",
 	"wall_problems_no_data": "Sin datos desde hace {duration}",

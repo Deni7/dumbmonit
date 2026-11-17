@@ -9,18 +9,30 @@
 //!
 //! Indépendant de la boucle de collecte : une sonde lente ne retarde jamais les
 //! mesures de la machine, et inversement.
+//!
+//! Coupure du lien (voir [`crate::relay_offline`]) : le relais garde une copie
+//! chiffrée de son planning ; passé [`OFFLINE_AFTER`] sans réponse du serveur,
+//! il sonde seul d'après elle et range les résultats sur disque, puis les
+//! renvoie par lots au retour du serveur. Un compte rendu qui n'a pas pu
+//! partir est rangé de même, plutôt que perdu.
 
 use std::sync::Arc;
 use std::time::Duration;
 
 use dumbmonit_collectors::Registry;
-use dumbmonit_proto::{AgentCommand, ProbeJob, ProbeOutcome, RELAY_POLL_HOLD_SECS};
+use dumbmonit_proto::{
+    AgentCommand, MTLS_REQUIRED, ProbeJob, ProbeOutcome, RELAY_POLL_HOLD_SECS, RelayPlan, TargetId,
+};
 use tokio::sync::Semaphore;
+use tokio::task::JoinHandle;
 use tokio::time::Instant;
 use tracing::{debug, info, warn};
 
 use crate::backoff::Backoff;
-use crate::client::PushClient;
+use crate::client::{PushClient, PushError};
+use crate::relay_offline::{
+    Backlog, OFFLINE_AFTER, OfflineSchedule, PLAN_REFRESH, PLAN_RETRY, PlanStore,
+};
 use crate::shutdown::Shutdown;
 
 /// Attente longue demandée au serveur. Le client lui laisse une marge pour
@@ -47,6 +59,19 @@ const MAX_PROBE_TIMEOUT: Duration = Duration::from_secs(120);
 /// Délai laissé aux sondes en cours à l'arrêt.
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(15);
 
+/// Serveur antérieur, qui ne remet pas de planning : on ne le lui redemande
+/// pas avant.
+const PLAN_UNSUPPORTED_RETRY: Duration = Duration::from_secs(3600);
+
+/// Réveil de la planification locale quand le planning ne prévoit rien.
+const OFFLINE_IDLE: Duration = Duration::from_secs(60);
+
+/// Ce dont le relais a besoin pour tenir une coupure du lien.
+pub struct Offline {
+    pub store: PlanStore,
+    pub backlog: Backlog,
+}
+
 /// Boucle du relais, à lancer dans sa propre tâche.
 pub struct RelayRunner {
     client: PushClient,
@@ -54,6 +79,15 @@ pub struct RelayRunner {
     registry: Arc<Registry>,
     permits: Arc<Semaphore>,
     backoff: Backoff,
+    /// `None` : tampon disque désactivé, le relais ne tient pas les coupures.
+    offline: Option<Offline>,
+    /// Dernier planning connu, relu sur le disque au démarrage.
+    plan: Option<Arc<RelayPlan>>,
+    next_plan_at: Instant,
+    /// Planification locale, pendant une coupure.
+    offline_task: Option<JoinHandle<()>>,
+    /// Renvoi du tampon, après une coupure.
+    drain_task: Option<JoinHandle<()>>,
 }
 
 impl RelayRunner {
@@ -64,7 +98,19 @@ impl RelayRunner {
             registry: Arc::new(Registry::remote(request_timeout)),
             permits: Arc::new(Semaphore::new(MAX_CONCURRENT_PROBES)),
             backoff: Backoff::new(BACKOFF_BASE, BACKOFF_MAX),
+            offline: None,
+            plan: None,
+            next_plan_at: Instant::now(),
+            offline_task: None,
+            drain_task: None,
         }
+    }
+
+    /// Tenir les coupures du lien : planning gardé, tampon des résultats.
+    pub fn with_offline(mut self, offline: Offline) -> Self {
+        self.plan = offline.store.load().map(Arc::new);
+        self.offline = Some(offline);
+        self
     }
 
     /// Types d'équipements que ce relais sait interroger.
@@ -73,9 +119,17 @@ impl RelayRunner {
     }
 
     pub async fn run(mut self, mut shutdown: Shutdown) {
-        info!(kinds = ?self.kinds(), "relay mode enabled: waiting for probes from the server");
+        info!(
+            kinds = ?self.kinds(),
+            planned = self.plan.as_ref().map_or(0, |plan| plan.probes.len()),
+            "relay mode enabled: waiting for probes from the server"
+        );
         let reachable = self.client.reachable();
         let mut down_since: Option<Instant> = None;
+        // Dernière réponse du serveur sur ce canal. Le démarrage compte comme
+        // telle : un relais qui redémarre en pleine coupure sonde seul passé
+        // le délai, sans attendre un serveur qui ne vient pas.
+        let mut last_ok = Instant::now();
         loop {
             // Après une panne, un simple coup d'œil sans attente : la reprise se
             // constate (et se journalise) aussitôt, pas au bout d'une attente
@@ -89,6 +143,7 @@ impl RelayRunner {
             };
             match jobs {
                 Ok(jobs) => {
+                    last_ok = Instant::now();
                     if let Some(since) = down_since.take() {
                         info!(
                             attempts = self.backoff.attempts(),
@@ -97,9 +152,16 @@ impl RelayRunner {
                         );
                     }
                     self.backoff.reset();
+                    self.stop_offline();
                     for job in jobs {
                         self.spawn(job, &shutdown);
                     }
+                    tokio::select! {
+                        biased;
+                        _ = shutdown.wait() => break,
+                        _ = self.refresh_plan() => {}
+                    }
+                    self.start_drain(&shutdown);
                 }
                 Err(error) => {
                     let delay = self.backoff.next_delay();
@@ -112,6 +174,15 @@ impl RelayRunner {
                         info!(%error, attempt, retry_in_s, "relay channel still down");
                     } else {
                         debug!(%error, attempt, retry_in_s, "relay channel still down");
+                    }
+                    if refused(&error) {
+                        // Le serveur répond, et refuse : ce n'est pas une
+                        // coupure. Rien ne doit plus sonder en son nom, et les
+                        // identifiants n'ont plus à rester sur ce disque.
+                        self.stop_offline();
+                        self.forget_plan();
+                    } else if last_ok.elapsed() >= OFFLINE_AFTER {
+                        self.start_offline(&shutdown);
                     }
                     tokio::select! {
                         biased;
@@ -126,12 +197,105 @@ impl RelayRunner {
 
         // Les sondes en vol finissent (ou pas) dans le délai : leur compte rendu
         // arrivera, ou le serveur constatera l'échéance.
+        if let Some(task) = self.offline_task.take() {
+            task.abort();
+        }
+        if let Some(task) = self.drain_task.take() {
+            task.abort();
+        }
         let _ = tokio::time::timeout(
             SHUTDOWN_TIMEOUT,
             self.permits.acquire_many(MAX_CONCURRENT_PROBES as u32),
         )
         .await;
         info!("relay stopped");
+    }
+
+    /// Redemande le planning au serveur quand il a vieilli, et le range.
+    async fn refresh_plan(&mut self) {
+        let Some(offline) = &self.offline else { return };
+        if Instant::now() < self.next_plan_at {
+            return;
+        }
+        match self.client.fetch_plan(&self.key).await {
+            Ok(plan) => {
+                if let Err(error) = offline.store.save(&plan) {
+                    warn!(error = %format!("{error:#}"), "cannot store the relay plan");
+                }
+                debug!(probes = plan.probes.len(), "relay plan refreshed");
+                self.plan = Some(Arc::new(plan));
+                self.next_plan_at = Instant::now() + PLAN_REFRESH;
+            }
+            Err(PushError::Rejected { status: 404 | 405, .. }) => {
+                debug!("this server does not hand out relay plans (older version)");
+                self.next_plan_at = Instant::now() + PLAN_UNSUPPORTED_RETRY;
+            }
+            Err(error) => {
+                debug!(%error, "cannot refresh the relay plan");
+                self.next_plan_at = Instant::now() + PLAN_RETRY;
+            }
+        }
+    }
+
+    /// Oublie le planning, en mémoire et sur le disque.
+    fn forget_plan(&mut self) {
+        if let Some(offline) = &self.offline
+            && (self.plan.take().is_some() || offline.store.exists())
+        {
+            offline.store.forget();
+            info!("relay plan forgotten: the server refuses this relay");
+        }
+        self.next_plan_at = Instant::now();
+    }
+
+    /// Le serveur ne répond plus : le relais sonde seul d'après son planning.
+    fn start_offline(&mut self, shutdown: &Shutdown) {
+        if self.offline_task.as_ref().is_some_and(|task| !task.is_finished()) {
+            return;
+        }
+        let (Some(offline), Some(plan)) = (&self.offline, &self.plan) else { return };
+        if plan.probes.is_empty() {
+            return;
+        }
+        warn!(
+            devices = plan.probes.len(),
+            "server unreachable: the relay keeps probing its site from its stored plan, \
+             results are kept on disk until the server is back"
+        );
+        let task = offline_loop(
+            plan.clone(),
+            self.registry.clone(),
+            self.permits.clone(),
+            offline.backlog.clone(),
+            shutdown.clone(),
+        );
+        self.offline_task = Some(tokio::spawn(task));
+    }
+
+    /// Le serveur répond de nouveau : il reprend la planification. Les sondes
+    /// locales déjà parties finissent et rangent leur résultat.
+    fn stop_offline(&mut self) {
+        if let Some(task) = self.offline_task.take() {
+            task.abort();
+            info!("server reachable again: probing handed back to the server");
+        }
+    }
+
+    /// Renvoie le tampon des résultats, dans sa propre tâche, s'il y a lieu.
+    fn start_drain(&mut self, shutdown: &Shutdown) {
+        let Some(offline) = &self.offline else { return };
+        if self.drain_task.as_ref().is_some_and(|task| !task.is_finished())
+            || offline.backlog.is_empty()
+        {
+            return;
+        }
+        let backlog = offline.backlog.clone();
+        let client = self.client.clone();
+        let key = self.key.clone();
+        let shutdown = shutdown.clone();
+        self.drain_task = Some(tokio::spawn(async move {
+            backlog.drain(&client, &key, shutdown).await;
+        }));
     }
 
     /// Exécute une sonde dans sa propre tâche, sous le plafond de concurrence.
@@ -153,14 +317,92 @@ impl RelayRunner {
         let key = self.key.clone();
         let registry = self.registry.clone();
         let permits = self.permits.clone();
+        // Un serveur qui remet un planning sait aussi reprendre un compte
+        // rendu par le tampon ; sans planning, inutile de le garder.
+        let backlog =
+            self.offline.as_ref().filter(|_| self.plan.is_some()).map(|o| o.backlog.clone());
         tokio::spawn(async move {
             let Ok(_permit) = permits.acquire().await else { return };
             let id = command.id;
+            let started_at_ms = chrono::Utc::now().timestamp_millis();
             let outcome = execute(&registry, &command).await;
-            if let Err(error) = client.report_probe(&key, id, &outcome).await {
+            let Err(error) = client.report_probe(&key, id, &outcome).await else { return };
+            // Lien coupé entre la sonde et son compte rendu, ou sonde échue
+            // entre-temps côté serveur : les mesures valent toujours, elles
+            // partiront avec le rattrapage.
+            let kept = match (backlog, keepable(&command)) {
+                (Some(backlog), Some(target_id)) => backlog.keep(target_id, started_at_ms, outcome),
+                _ => false,
+            };
+            if kept {
+                debug!(id, %error, "probe outcome not delivered, kept for the catch-up");
+            } else {
                 warn!(id, %error, "cannot report the probe outcome");
             }
         });
+    }
+}
+
+/// Vrai pour un refus franc du serveur (jeton, certificat, machine) : il
+/// répond, ce n'est pas une coupure. Le passage au canal chiffré n'en est pas
+/// un : il se règle de lui-même au lot suivant.
+fn refused(error: &PushError) -> bool {
+    match error {
+        PushError::Unauthorized | PushError::CertificateRefused => true,
+        PushError::Forbidden(message) => message != MTLS_REQUIRED,
+        _ => false,
+    }
+}
+
+/// Équipement dont le résultat vaut d'être gardé pour le rattrapage : une
+/// mesure ordinaire, pas une identification ni un relevé de configuration.
+fn keepable(command: &AgentCommand) -> Option<TargetId> {
+    let job = ProbeJob::from_command(command).ok()?;
+    if job.discover || job.target.kind == dumbmonit_collectors::netconfig::KIND {
+        return None;
+    }
+    Some(job.target.id)
+}
+
+/// Planification locale pendant une coupure : chaque équipement du planning à
+/// sa période, sous le même plafond de concurrence que les sondes du serveur.
+async fn offline_loop(
+    plan: Arc<RelayPlan>,
+    registry: Arc<Registry>,
+    permits: Arc<Semaphore>,
+    backlog: Backlog,
+    mut shutdown: Shutdown,
+) {
+    let mut schedule = OfflineSchedule::default();
+    loop {
+        let now = Instant::now();
+        for probe in schedule.due(&plan, now) {
+            let probe = probe.clone();
+            let registry = registry.clone();
+            let permits = permits.clone();
+            let backlog = backlog.clone();
+            tokio::spawn(async move {
+                let Ok(_permit) = permits.acquire().await else { return };
+                let started_at_ms = chrono::Utc::now().timestamp_millis();
+                let target_id = probe.target.id;
+                let command = ProbeJob {
+                    target: probe.target,
+                    timeout_secs: probe.timeout_secs,
+                    discover: false,
+                }
+                .into_command(0, started_at_ms);
+                let outcome = execute(&registry, &command).await;
+                if backlog.keep(target_id, started_at_ms, outcome) {
+                    debug!(target = target_id, "offline probe kept for the catch-up");
+                }
+            });
+        }
+        let wake = schedule.next_wake().unwrap_or(now + OFFLINE_IDLE);
+        tokio::select! {
+            biased;
+            _ = shutdown.wait() => break,
+            _ = tokio::time::sleep_until(wake) => {}
+        }
     }
 }
 

@@ -8676,6 +8676,7 @@
 	"wall_player_stop_aria": "停止所有墙屏的音乐",
 	"wall_player_title": "{label} 播放器",
 	"wall_problems_agent_silent": "代理已 {duration} 未上报",
+	"wall_problems_relay_silent": "中继已 {duration} 无法连接",
 	"wall_problems_aria": "问题",
 	"wall_problems_more": "另有 {count} 个问题：见告警页",
 	"wall_problems_no_data": "{duration} 无数据",

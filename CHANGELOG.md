@@ -56,6 +56,29 @@ All notable changes to this project are documented here. The format follows
   goes through a TLS-terminating proxy. Non-root, read-only root filesystem, HTTPS health probes,
   optional NetworkPolicy and PodDisruptionBudget, external VictoriaMetrics. CI lints, renders and
   validates it with kubeconform. See the new Kubernetes page in the installation guide.
+- **A relay keeps probing through a WAN outage, and loses nothing.** The relay keeps a copy of its
+  schedule (monitors, intervals, credentials), refreshed every few minutes from
+  `GET /api/agent/relay/plan` and stored encrypted next to its binding secret (AES-256-GCM, random
+  key of its own, readable by the agent account only). When the server has not answered for about
+  35 s, the relay schedules its site's monitors itself; each result goes to a disk buffer, written
+  as it comes. Once the server is back, it takes the scheduling back and the relay sends the
+  results in batches (`POST /api/agent/relay/backlog`, at most 200, with a pause between them),
+  with their original timestamps: the site's graphs fill in. Each result has a sequence number, so
+  a batch sent twice is not written twice. A result probed online but not reported (link dropped
+  in between) is kept the same way. Switching relay mode off erases schedule, key and backlog; a
+  relay whose token or certificate is refused erases its schedule at once.
+- **Agents buffer on disk during an outage.** As soon as a send fails, what was waiting in memory
+  goes to a disk buffer (`spool/` next to the binding secret), and every following cycle is written
+  there as it is collected — checksummed records, flushed to disk, torn records dropped at the
+  next start: a power cut during the outage loses nothing already collected. Bounded by
+  `buffer_max_mb` (`DUMBMONIT_AGENT_BUFFER_MAX_MB`, default 256 MB, compressed; shared three
+  quarters / one quarter with the relay's results); the oldest go first and
+  `agent_dropped_samples` / `agent_relay_dropped_results` count the loss; `0` keeps memory only.
+  Nothing is written while the server answers. New metrics `agent_buffer_disk_bytes`,
+  `agent_relay_buffered_results`, `agent_relay_dropped_results`.
+- **One alert for a site whose relay is unreachable.** The relay's own message reads *relay
+  unreachable: no measurement for …*, shown on the room monitor as *Relay unreachable for …*; its
+  devices stay `suppressed` behind it as before.
 - **One port for a remote site.** The agent port (8443) now also serves `install.sh`, `install.ps1`
   and the agent binaries, without a client certificate (like enrolment). The install command shown
   for a relay uses that port only: script, binary and encrypted channel come from
