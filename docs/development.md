@@ -166,6 +166,40 @@ and `[..]` lines tell what was verified, what broke and what an old version coul
 not create (not covered, not blocking). The seed data, the checks and the fields
 compared live in `scripts/upgrade-test/data.py`: when you add a setting that must
 survive updates, create it in `phase_seed` and read it back in `snapshot`.
+## End-to-end tests
+
+`web/e2e/` holds Playwright journeys that drive the real image in Chromium, on
+a desktop viewport and on a 390 px phone: first-run setup, adding an HTTP
+monitor, a webhook channel, an outage and its recovery (alert, webhook, public
+status page), the wall, sign-out and sign-in. Any unexpected console error or
+uncaught exception fails a step. CI runs them in `.github/workflows/e2e.yml`
+and keeps the screenshots, traces and the server log of a failed run.
+
+The suite starts its own container on an empty volume (one per project), plus
+two small servers on your machine: the monitored service and a webhook
+receiver. Docker is the only requirement besides Node.
+
+```bash
+docker build -t dumbmonit-candidate:ci .      # or any image: E2E_IMAGE=...
+cd web
+npm ci
+npm run test:e2e:install                      # Chromium and its system libraries, once
+npm run test:e2e                              # both projects, one after the other
+npm run test:e2e -- --project=mobile          # one project
+npm run test:e2e -- --headed --debug          # watch it
+npx playwright show-report ../playwright-report
+```
+
+Variables: `E2E_IMAGE` (default `dumbmonit-candidate:ci`), `E2E_HOST` (name the
+container uses to reach your machine, default `host.docker.internal`, mapped to
+the host gateway), `E2E_SETUP_CODE`. `E2E_BASE_URL` targets an instance that is
+already running instead (it must be fresh, started with that setup code and
+`DUMBMONIT_ALERT_INTERVAL_SECS=10`). A firewall that blocks the Docker bridge
+towards the host stops the monitor and the webhook from working.
+
+The journeys are serial and share one instance: a failed step skips the next
+ones. Prefer roles and labels for selectors; add a `data-testid` only when none
+fits.
 
 ## Adding a collector
 
