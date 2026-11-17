@@ -455,7 +455,14 @@ mod tests {
         assert!(INSTALL_PS1.contains("$lignes.Add(\"server_pin: $PinnedKey\")"));
         assert!(INSTALL_PS1.contains("ServerCertificateValidationCallback"));
         assert!(INSTALL_PS1.contains("-notmatch '^https://'"));
-        assert!(!INSTALL_PS1.contains("http://"));
+        // Seul le mandataire sortant s'écrit en http:// (l'agent y fait passer son propre TLS).
+        for ligne in INSTALL_PS1
+            .lines()
+            .filter(|l| l.contains("http://") && !l.trim_start().starts_with('#'))
+        {
+            let l = ligne.to_lowercase();
+            assert!(l.contains("proxy") || l.contains("mandataire"), "URL en clair : {ligne}");
+        }
     }
 
     #[test]

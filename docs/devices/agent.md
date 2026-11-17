@@ -12,7 +12,7 @@ From the agent to the DumbMonit server:
 | Port | Protocol | Purpose |
 |---|---|---|
 | 8443 | TCP | Readings and commands: the encrypted agent channel (TLS 1.3 and a client certificate) |
-| 8080 | TCP | Install script and agent download, at install time (HTTPS; 443 behind a reverse proxy) |
+| 8080 | TCP | Install script and agent download, at install and update time (HTTPS; 443 behind a reverse proxy) |
 
 A remote site can do without 8080: the agent port also serves the install
 script and the binaries, and the command shown for a relay uses 8443 only (see
