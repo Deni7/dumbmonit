@@ -811,6 +811,7 @@ a container without mounting a file:
 |---|---|
 | `DUMBMONIT_AGENT_CONFIG` | Path of the configuration file |
 | `DUMBMONIT_AGENT_URL` | Server URL |
+| `DUMBMONIT_AGENT_URLS` | Backup servers, comma-separated (see [Backup servers](#backup-servers)) |
 | `DUMBMONIT_AGENT_TOKEN` | Enrollment token |
 | `DUMBMONIT_AGENT_SECRET_FILE` | Where to keep the binding secret (default: `agent-secret`, next to the configuration file) |
 | `DUMBMONIT_AGENT_INTERVAL_SECS` | Sampling period |

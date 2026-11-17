@@ -812,6 +812,7 @@ utilisable dans un conteneur sans monter un fichier :
 |---|---|
 | `DUMBMONIT_AGENT_CONFIG` | Chemin du fichier de configuration |
 | `DUMBMONIT_AGENT_URL` | URL du serveur |
+| `DUMBMONIT_AGENT_URLS` | Serveurs de secours, séparés par des virgules (voir [Serveurs de secours](#backup-servers)) |
 | `DUMBMONIT_AGENT_TOKEN` | Jeton d'enrôlement |
 | `DUMBMONIT_AGENT_SECRET_FILE` | Où garder le secret de liaison (défaut : `agent-secret`, à côté du fichier de configuration) |
 | `DUMBMONIT_AGENT_INTERVAL_SECS` | Période d'échantillonnage |
