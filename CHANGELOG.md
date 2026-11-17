@@ -5,6 +5,8 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## 0.18.0 — 2026-11-17
+
 ### Added
 
 - **Outside weather on the wall.** An administrator can pick a city (searched by name) and a unit
@@ -26,6 +28,125 @@ All notable changes to this project are documented here. The format follows
   roll back. A rollout can be paused and resumed, and an agent whose updates are off keeps its
   version. Nothing changes until waves are configured. The settings are part of the backup
   (`PUT /api/agent/updates/rollout`, `POST .../pause`, `POST .../resume`).
+
+- **Integration packs read more APIs.** `format: xml` (converted to JSON, with `lists` for elements
+  that are always lists), `date:` for metrics that are dates (written in Unix seconds, compared with
+  `time()` by rules), `optional: true` for sources a role or a licence may refuse, `each` to read a
+  list nested in each discovered row, `"*"` in a `map` for every other text value, and a `session`
+  opened before the sources and always closed after them.
+
+### Changed
+
+- **Documentation is now English only.** The translated pages are gone; the interface stays translated in nine languages.
+- **Public status pages: leaner, in the console's own look.** The page uses the console's tokens,
+  surfaces and type, tighter header, banner and service rows, in the light or dark of the visitor's
+  system (the page's Theme setting still forces one). The history bar's colour legend is gone: hover,
+  focus or tap a segment for a tooltip with the date, the state in words, the downtime and the
+  incidents of that day. The pigeon animation, the summary line, the per-period uptime figures under
+  each service, the "Simple mode" setting and every mention of the product (footer, version tag)
+  are removed from the page; each service keeps its uptime on its row. The API still accepts
+  `simple`.
+- **A clearer "Add a monitor" screen.** The "Most common" block is gone: every integration now sits
+  under a category (servers, network, virtualization, storage, databases, web, checks, mail, metrics
+  and logs, security, cloud, apps, media and home, community packs). The search box has filter chips
+  that combine with the text: by category, no login needed, beta and community packs. A beta
+  integration shows a **Beta** badge instead of "(beta)" in its name, a line at the top explains it,
+  and community packs get their own badge and a short explanation with a link to the docs. The
+  catalogue (`GET /api/collectors`) gains a `beta` field.
+- **A leaner wall.** The health river, the mean time to resolve, the response time and the on-call
+  rota are gone from the wall (the home page keeps the river). The strip along the foot keeps three
+  figures: monitors up, availability and open alerts. The wall is always Night: the Day theme and
+  its button are removed, and a saved or linked `light`/`day` choice reads as Night.
+- **Immich: stale-device check limited to phones and tablets, for every user.** Browsers and
+  computers no longer count in the device metrics, the "Client device stale" rule or the monitor's
+  table; only iOS and Android app sessions do. With an administrator API key (plus the
+  `adminUser.read` and `adminSession.read` permissions), the phones of all users are read, each
+  labelled with its owner; without them the key owner's own devices are read as before. Existing
+  monitors keep working unchanged.
+- **Overview, "Needs attention".** Ages read "3d ago", "2h ago" (number glued to the unit, spaced
+  with a non-breaking space where the language does so) and are larger and darker. An alert row has
+  a labelled "Acknowledge" button: it stops the reminders until the alert resolves and takes the row
+  out of the list; the alert stays on the Alerts page, where it can be un-acknowledged.
+- **"Acknowledge" on a monitor row of "Needs attention".** The small cross menu now ends with
+  "Acknowledge": seen, I am on it. The row leaves the list and nothing is sent for that monitor
+  until it answers again; the server then lifts the acknowledgement by itself, so the next outage
+  notifies as usual. While it lasts it shows on the monitor's page ("Snoozed until it is back to
+  normal", with Lift) and in the maintenance windows. New schedule kind `recovery` on
+  `POST /api/alerts/silences`; it is not counted as planned maintenance on public status pages,
+  agent updates or automatic remediation.
+- **The health river fills its card:** strips take the available height, and more of them show when
+  there is room, at any width.
+- The monitor-count lines ("reporting, unreachable, suppressed by parent" and the severity
+  breakdown) are gone from the wall header, next to the problem total; the "suppressed by parent"
+  counter no longer appears anywhere.
+- The "Scan my network" descriptions no longer say it only finds SNMP devices: the scan finds live
+  devices, checks their open ports and recognises products.
+
+- **Unraid goes deeper.** New readings: licence state and type, trial and OS-update expiry dates,
+  uptime, CPU, memory and swap use. New built-in rules: a crashed VM, unread Unraid alerts, an array
+  almost full (95 %), memory above 95 %, a licence problem, a trial ending within 3 days and OS
+  updates ending within 30 days.
+- **pfSense goes deeper.** New readings: firewall state table (entries, limit, percent used) and
+  CARP status with its maintenance mode. New built-in rules: state table above 80 %, mbuf clusters
+  above 90 %, temperature above 85 °C, CPU above 90 %, swap above 50 %, interface errors and CARP
+  left in maintenance mode. The two new readings need two optional privileges on the API user
+  (`/api/v2/firewall/states/size` and `/api/v2/status/carp`); without them everything else keeps
+  working.
+- **Veeam goes deeper.** New readings: whether each repository is online (API revision `1.2-rev0`
+  and later) and the state of the configuration backup (enabled, encrypted, age of the last
+  success). New built-in rules: repository offline, invalid licence, configuration backup disabled
+  and configuration backup older than 7 days.
+- **vSphere goes deeper.** New readings per VM: number of snapshots, age of the oldest one and
+  whether disks need consolidation. New built-in rules: a snapshot older than 3 days and a VM
+  waiting for consolidation.
+- **Docs: every built-in rule of ten integrations is now listed, in nine languages.** The pages for
+  Proxmox VE, Proxmox Backup Server, TrueNAS, Synology, Unraid, UniFi Network, pfSense, OPNsense,
+  Veeam and vSphere each carry the full table of their rules (threshold, delay, severity, reminder)
+  and a "Known limits" section; the rules reference gains 68 rows that were missing, and a few
+  broken or incomplete tables in the translations are repaired.
+- **Agent signing key setup is one step shorter.** `scripts/agent-signing-key.sh` now appends the
+  new public key to the list of accepted keys (rotation keeps the old ones) and prints the exact
+  `gh secret set AGENT_SIGNING_KEY -R selfhostr/dumbmonit` command; a release built without the
+  secret now says so in the job summary as well as in an annotation.
+- **Your first alert, in the setup wizard.** The wizard now opens on one screen with the whole
+  road to a first alert: type one address (an URL becomes a website check, a host a ping,
+  `host:port` a TCP port), pick where alerts go in one click (ntfy with a private topic already
+  filled in, Discord, Telegram, email, webhook, or any other channel), then **Send a test alert**.
+  It replaces the separate "Get notified" step. New docs page:
+  [First alert in five minutes](https://dumbmonit.selfhostr.io/docs/install/quickstart/).
+- **First-run stopwatch.** The instance records, once, when it started without an account, when
+  the administrator was created, the first monitor, the first channel, the first message delivered
+  (a test counts) and the first real alert delivered. Shown in Settings → System → About → First
+  run and in `GET /api/onboarding` (`first_run`). Kept on the instance only, never sent anywhere,
+  not part of backups; instances set up by an older version stay empty.
+
+
+- **A new monitor is probed at once.** Creating, editing or resuming a monitor wakes the scheduler,
+  and a monitor added while the server runs gets its first probe right away instead of after up
+  to 15 s of reload plus up to a whole interval. Large imports keep the usual spreading after the
+  first twenty.
+- **Shorter waits before the first message, same protection against false alarms.** On new
+  instances, *Service down* fires after two minutes of failed checks instead of three (still at
+  least three failures in a row at the default interval) and *Monitor unreachable* confirms its
+  three-minute threshold on the next 30 s cycle instead of waiting one more minute. Rules already
+  in place keep their delays. The default grouping window drops from 60 s to 30 s (one evaluation
+  cycle) for instances that never changed it. A website that goes down is now reported in under
+  4 minutes, a silent device in under 4.5 minutes (5.5 minutes before).
+- **Notification channels:** a new channel left unnamed takes the name of its kind.
+
+- **One typeface family everywhere: Inter and JetBrains Mono.** The console, the status pages, the
+  topology exports and the documentation now use Inter (headings in semibold) and JetBrains Mono
+  for code and figures, replacing Geist and Bricolage Grotesque. Both are open source (SIL OFL 1.1)
+  and served from DumbMonit itself; the documentation no longer loads anything from Google Fonts.
+
+### Removed
+
+- **Screenshots of website changes.** The website-change monitor no longer takes screenshots, and
+  the optional headless Chromium (`DUMBMONIT_BROWSER_URL`, the `browser` service of the Compose
+  examples) is no longer used: you can remove both from your `docker-compose.yml`. Text and HTML
+  comparison, the before/after line diff and alerts are unchanged. Screenshots already stored are
+  deleted at startup, and their database column is dropped.
+
 ### Fixed
 
 - **Vaultwarden 1.37.** Disabled accounts and accounts without two-step login are counted again
@@ -153,119 +274,6 @@ All notable changes to this project are documented here. The format follows
   which the server still serves; the server offers HTTP/2 only to clients that announce the agent
   protocol, so installers and older agents still get HTTP/1.1.
 
-### Changed
-
-- **Documentation is now English only.** The translated pages are gone; the interface stays translated in nine languages.
-- **Public status pages: leaner, in the console's own look.** The page uses the console's tokens,
-  surfaces and type, tighter header, banner and service rows, in the light or dark of the visitor's
-  system (the page's Theme setting still forces one). The history bar's colour legend is gone: hover,
-  focus or tap a segment for a tooltip with the date, the state in words, the downtime and the
-  incidents of that day. The pigeon animation, the summary line, the per-period uptime figures under
-  each service, the "Simple mode" setting and every mention of the product (footer, version tag)
-  are removed from the page; each service keeps its uptime on its row. The API still accepts
-  `simple`.
-- **A clearer "Add a monitor" screen.** The "Most common" block is gone: every integration now sits
-  under a category (servers, network, virtualization, storage, databases, web, checks, mail, metrics
-  and logs, security, cloud, apps, media and home, community packs). The search box has filter chips
-  that combine with the text: by category, no login needed, beta and community packs. A beta
-  integration shows a **Beta** badge instead of "(beta)" in its name, a line at the top explains it,
-  and community packs get their own badge and a short explanation with a link to the docs. The
-  catalogue (`GET /api/collectors`) gains a `beta` field.
-- **A leaner wall.** The health river, the mean time to resolve, the response time and the on-call
-  rota are gone from the wall (the home page keeps the river). The strip along the foot keeps three
-  figures: monitors up, availability and open alerts. The wall is always Night: the Day theme and
-  its button are removed, and a saved or linked `light`/`day` choice reads as Night.
-- **Immich: stale-device check limited to phones and tablets, for every user.** Browsers and
-  computers no longer count in the device metrics, the "Client device stale" rule or the monitor's
-  table; only iOS and Android app sessions do. With an administrator API key (plus the
-  `adminUser.read` and `adminSession.read` permissions), the phones of all users are read, each
-  labelled with its owner; without them the key owner's own devices are read as before. Existing
-  monitors keep working unchanged.
-- **Overview, "Needs attention".** Ages read "3d ago", "2h ago" (number glued to the unit, spaced
-  with a non-breaking space where the language does so) and are larger and darker. An alert row has
-  a labelled "Acknowledge" button: it stops the reminders until the alert resolves and takes the row
-  out of the list; the alert stays on the Alerts page, where it can be un-acknowledged.
-- **"Acknowledge" on a monitor row of "Needs attention".** The small cross menu now ends with
-  "Acknowledge": seen, I am on it. The row leaves the list and nothing is sent for that monitor
-  until it answers again; the server then lifts the acknowledgement by itself, so the next outage
-  notifies as usual. While it lasts it shows on the monitor's page ("Snoozed until it is back to
-  normal", with Lift) and in the maintenance windows. New schedule kind `recovery` on
-  `POST /api/alerts/silences`; it is not counted as planned maintenance on public status pages,
-  agent updates or automatic remediation.
-- **The health river fills its card:** strips take the available height, and more of them show when
-  there is room, at any width.
-- The monitor-count lines ("reporting, unreachable, suppressed by parent" and the severity
-  breakdown) are gone from the wall header, next to the problem total; the "suppressed by parent"
-  counter no longer appears anywhere.
-- The "Scan my network" descriptions no longer say it only finds SNMP devices: the scan finds live
-  devices, checks their open ports and recognises products.
-
-- **Unraid goes deeper.** New readings: licence state and type, trial and OS-update expiry dates,
-  uptime, CPU, memory and swap use. New built-in rules: a crashed VM, unread Unraid alerts, an array
-  almost full (95 %), memory above 95 %, a licence problem, a trial ending within 3 days and OS
-  updates ending within 30 days.
-- **pfSense goes deeper.** New readings: firewall state table (entries, limit, percent used) and
-  CARP status with its maintenance mode. New built-in rules: state table above 80 %, mbuf clusters
-  above 90 %, temperature above 85 °C, CPU above 90 %, swap above 50 %, interface errors and CARP
-  left in maintenance mode. The two new readings need two optional privileges on the API user
-  (`/api/v2/firewall/states/size` and `/api/v2/status/carp`); without them everything else keeps
-  working.
-- **Veeam goes deeper.** New readings: whether each repository is online (API revision `1.2-rev0`
-  and later) and the state of the configuration backup (enabled, encrypted, age of the last
-  success). New built-in rules: repository offline, invalid licence, configuration backup disabled
-  and configuration backup older than 7 days.
-- **vSphere goes deeper.** New readings per VM: number of snapshots, age of the oldest one and
-  whether disks need consolidation. New built-in rules: a snapshot older than 3 days and a VM
-  waiting for consolidation.
-- **Docs: every built-in rule of ten integrations is now listed, in nine languages.** The pages for
-  Proxmox VE, Proxmox Backup Server, TrueNAS, Synology, Unraid, UniFi Network, pfSense, OPNsense,
-  Veeam and vSphere each carry the full table of their rules (threshold, delay, severity, reminder)
-  and a "Known limits" section; the rules reference gains 68 rows that were missing, and a few
-  broken or incomplete tables in the translations are repaired.
-- **Agent signing key setup is one step shorter.** `scripts/agent-signing-key.sh` now appends the
-  new public key to the list of accepted keys (rotation keeps the old ones) and prints the exact
-  `gh secret set AGENT_SIGNING_KEY -R selfhostr/dumbmonit` command; a release built without the
-  secret now says so in the job summary as well as in an annotation.
-- **Your first alert, in the setup wizard.** The wizard now opens on one screen with the whole
-  road to a first alert: type one address (an URL becomes a website check, a host a ping,
-  `host:port` a TCP port), pick where alerts go in one click (ntfy with a private topic already
-  filled in, Discord, Telegram, email, webhook, or any other channel), then **Send a test alert**.
-  It replaces the separate "Get notified" step. New docs page:
-  [First alert in five minutes](https://dumbmonit.selfhostr.io/docs/install/quickstart/).
-- **First-run stopwatch.** The instance records, once, when it started without an account, when
-  the administrator was created, the first monitor, the first channel, the first message delivered
-  (a test counts) and the first real alert delivered. Shown in Settings → System → About → First
-  run and in `GET /api/onboarding` (`first_run`). Kept on the instance only, never sent anywhere,
-  not part of backups; instances set up by an older version stay empty.
-
-### Changed
-
-- **A new monitor is probed at once.** Creating, editing or resuming a monitor wakes the scheduler,
-  and a monitor added while the server runs gets its first probe right away instead of after up
-  to 15 s of reload plus up to a whole interval. Large imports keep the usual spreading after the
-  first twenty.
-- **Shorter waits before the first message, same protection against false alarms.** On new
-  instances, *Service down* fires after two minutes of failed checks instead of three (still at
-  least three failures in a row at the default interval) and *Monitor unreachable* confirms its
-  three-minute threshold on the next 30 s cycle instead of waiting one more minute. Rules already
-  in place keep their delays. The default grouping window drops from 60 s to 30 s (one evaluation
-  cycle) for instances that never changed it. A website that goes down is now reported in under
-  4 minutes, a silent device in under 4.5 minutes (5.5 minutes before).
-- **Notification channels:** a new channel left unnamed takes the name of its kind.
-
-- **One typeface family everywhere: Inter and JetBrains Mono.** The console, the status pages, the
-  topology exports and the documentation now use Inter (headings in semibold) and JetBrains Mono
-  for code and figures, replacing Geist and Bricolage Grotesque. Both are open source (SIL OFL 1.1)
-  and served from DumbMonit itself; the documentation no longer loads anything from Google Fonts.
-
-### Removed
-
-- **Screenshots of website changes.** The website-change monitor no longer takes screenshots, and
-  the optional headless Chromium (`DUMBMONIT_BROWSER_URL`, the `browser` service of the Compose
-  examples) is no longer used: you can remove both from your `docker-compose.yml`. Text and HTML
-  comparison, the before/after line diff and alerts are unchanged. Screenshots already stored are
-  deleted at startup, and their database column is dropped.
-### Fixed
 
 - **authentik 2025.10 and later: workers and tasks are measured again.** authentik moved them to
   `/api/v3/tasks/workers/` and `/api/v3/tasks/schedules/`; DumbMonit reads those first and falls
@@ -292,14 +300,6 @@ All notable changes to this project are documented here. The format follows
   the official integration API with an API key, which reports cameras connected or not, but neither
   recording nor recorder disks. Aruba Central and QNAP stay built in (token from another host,
   session cookie in the URL).
-
-### Added
-
-- **Integration packs read more APIs.** `format: xml` (converted to JSON, with `lists` for elements
-  that are always lists), `date:` for metrics that are dates (written in Unix seconds, compared with
-  `time()` by rules), `optional: true` for sources a role or a licence may refuse, `each` to read a
-  list nested in each discovered row, `"*"` in a `map` for every other text value, and a `session`
-  opened before the sources and always closed after them.
 
 ## 0.17.1 — 2026-11-04
 

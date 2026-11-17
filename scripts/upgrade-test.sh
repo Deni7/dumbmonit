@@ -329,7 +329,8 @@ step "Vérifications de démarrage"
 [ "$(jfield 'd["victoria"]["ok"]' <"$WORK/health")" = True ] && check ok "VictoriaMetrics saine" \
   || check KO "VictoriaMetrics : $(cat "$WORK/health")"
 # Les migrations s'appliquent avant « database ready » ; un échec arrête le serveur.
-docker logs "$C_NEW" 2>&1 | strip_colors | grep -q 'database ready' \
+# grep sans -q : avec pipefail, -q ferme le tube tôt et docker logs meurt de SIGPIPE.
+docker logs "$C_NEW" 2>&1 | strip_colors | grep 'database ready' >/dev/null \
   && check ok "migrations appliquées (database ready)" \
   || check KO "« database ready » absent du journal"
 
