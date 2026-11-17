@@ -1,0 +1,4 @@
+# TYPE dumbmonit_unifiprotect_camera_online gauge
+dumbmonit_unifiprotect_camera_online{camera="Entrance",camera_id="66d025b301ebc903e4000001"} 1
+dumbmonit_unifiprotect_camera_online{camera="Garage",camera_id="66d025b301ebc903e4000002"} 0
+dumbmonit_unifiprotect_camera_online{camera="Garden",camera_id="66d025b301ebc903e4000003"} 1

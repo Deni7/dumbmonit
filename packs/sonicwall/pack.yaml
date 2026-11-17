@@ -1,0 +1,88 @@
+# SonicWall SonicOS 7, through the SonicOS API. Formerly a built-in type (beta).
+#
+# Built from what SonicWall publishes about the API, without a device to try it:
+# deliberately minimal. The session is opened with HTTP Basic (POST
+# /api/sonicos/auth) and always closed afterwards (DELETE): SonicOS allows a
+# single API session at a time. The shape of the interface status varies across
+# versions, so every object carrying a name and a status is read as an interface.
+schema: 1
+id: sonicwall
+version: 1.0.0
+requires: ">=0.17"
+label: SonicWall SonicOS
+summary: A SonicWall firewall through the SonicOS 7 API — the link of every interface bound to a zone.
+examples: [SonicWall TZ / NSa / NSsp, SonicWall NSv, SonicOS 7.x]
+address_hint: sonicwall.lan
+scheme: https
+default_port: 443
+setup:
+  title: Give DumbMonit a read-only account on the SonicOS API
+  steps:
+    - Device → Settings → Administration → Audit/SonicOS API → enable the SonicOS API and RFC-2617 HTTP Basic Access authentication.
+    - "Device → Users → Local Users & Groups → Add User: name it as follows, give it a long random password and add it to the group SonicWall Read-Only Admins.\ndumbmonit"
+    - In DumbMonit, enter the firewall address (sonicwall.lan) with that user name and password. Turn on "Accept an unverifiable certificate" while the firewall keeps its factory certificate.
+  permissions:
+    - "Group SonicWall Read-Only Admins\nThe account reads and changes nothing"
+  warning: >-
+    SonicOS allows one API session at a time: while DumbMonit reads the
+    firewall (a few seconds per minute), another API client is refused.
+  doc_url: https://www.sonicwall.com/support/technical-documentation/docs/sonicos-7-0-0-0-api/Content/SonicOS_API_Guide/API_Authentication/rfc-2617-http-basic-authentication.htm
+credentials:
+  - kind: username_password
+    label: User name and password
+    help: The dumbmonit user, in a read-only group, sent as HTTP Basic.
+
+session:
+  login:
+    path: /api/sonicos/auth
+    method: POST
+    auth: basic
+  logout:
+    path: /api/sonicos/auth
+    method: DELETE
+    auth: none
+
+sources:
+  - id: interfaces
+    type: http
+    path: /api/sonicos/reporting/interfaces/ipv4/status
+    auth: basic
+  - id: version
+    type: http
+    path: /api/sonicos/version
+    auth: basic
+    optional: true
+
+metrics:
+  - name: version_info
+    help: Always 1; the firmware version and model are its labels.
+    source: version
+    json: $.firmware_version
+    map: { "*": 1 }
+    labels:
+      version: $.firmware_version
+      model: $.model
+
+discover:
+  - name: interfaces
+    source: interfaces
+    rows: "$..[?@.name && @.status]"
+    labels:
+      interface: $.name
+      zone: $.zone
+    metrics:
+      # "1 Gbps Full Duplex", "100 Mbps Half Duplex"…: anything but a lost link is up.
+      - name: interface_link_up
+        help: 1 when the interface has a link, 0 when it reports none.
+        json: $.status
+        map: { No link: 0, Link Down: 0, Disconnected: 0, "*": 1 }
+
+rules:
+  - name: interface_down
+    title: SonicWall interface without link
+    description: A SonicWall interface bound to a zone has no link.
+    expr: '1 - dumbmonit_sonicwall_interface_link_up{zone!="", zone!="Unassigned"}'
+    op: ">"
+    threshold: 0
+    for: 5m
+    severity: warning

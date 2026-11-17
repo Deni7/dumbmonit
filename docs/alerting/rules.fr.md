@@ -438,7 +438,7 @@ de tourner.
 
 ### Applications médias, identité et messagerie {#media-identity-and-mail-applications}
 
-Sonarr, Radarr, Lidarr, Prowlarr, qBittorrent, UniFi Protect, Frigate, Keycloak, authentik, Vaultwarden et mailcow ([surveillances](../devices/index.md)). Elles continuent de répondre alors que le service qu'elles rendent est cassé : un client de téléchargement tombé, une caméra décrochée, une base de données disparue derrière une page de connexion. Une application qui ne répond plus du tout est Surveillance inaccessible.
+Sonarr, Radarr, Lidarr, Prowlarr, qBittorrent, Frigate, Keycloak, authentik, Vaultwarden et mailcow ([surveillances](../devices/index.md)). Elles continuent de répondre alors que le service qu'elles rendent est cassé : un client de téléchargement tombé, une caméra décrochée, une base de données disparue derrière une page de connexion. Une application qui ne répond plus du tout est Surveillance inaccessible. UniFi Protect est devenu un pack communautaire : ses règles arrivent avec le pack ([UniFi Protect](../devices/unifiprotect.md)).
 
 | Règle | Quoi | Seuil par défaut | Maintien | Gravité | Rappel |
 |---|---|---|---|---|---|
@@ -460,10 +460,6 @@ Sonarr, Radarr, Lidarr, Prowlarr, qBittorrent, UniFi Protect, Frigate, Keycloak,
 | qBittorrent torrents in error | Des torrents sont en erreur ou ont perdu leurs fichiers (`dumbmonit_qbittorrent_torrents_errored`). | > 0 | 15 min | Avis (`warning`) | 24 h |
 | qBittorrent disconnected | qBittorrent est « firewalled » ou déconnecté (`dumbmonit_qbittorrent_connected == bool 0`) : rien n'est téléchargé ni partagé. | > 0 | 15 min | Avis (`warning`) | 6 h |
 | qBittorrent free space low | Moins de 5 Gio libres dans le dossier de téléchargement (`dumbmonit_qbittorrent_free_space_bytes / 1073741824`) ; se rétablit au-dessus de 6 Gio. | < 5 GiB | 30 min | Avis (`warning`) | 24 h |
-| Protect camera offline | Une caméra UniFi Protect est déconnectée de son NVR (`dumbmonit_unifiprotect_camera_online == bool 0`). La notification nomme la caméra. | > 0 | 5 min | Avis (`warning`) | 6 h |
-| Protect camera not recording | Une caméra est connectée et réglée pour enregistrer, mais n'enregistre pas (`dumbmonit_unifiprotect_cameras_not_recording`). | > 0 | 15 min | Avis (`warning`) | 6 h |
-| Protect NVR disk unhealthy | Le NVR signale un disque défaillant (`dumbmonit_unifiprotect_disks_unhealthy`). | > 0 | 5 min | Avertissement (`critical`) | 1 h |
-| Protect recording disabled | L'enregistrement est coupé sur le NVR (`dumbmonit_unifiprotect_recording_disabled`). | > 0 | 10 min | Avis (`warning`) | 6 h |
 | Frigate camera offline | Une caméra ne livre aucune image à Frigate (`dumbmonit_frigate_camera_online == bool 0`). La notification nomme la caméra. | > 0 | 5 min | Avis (`warning`) | 6 h |
 | Frigate detector stuck | Un détecteur est sur la même inférence depuis plus de 30 secondes (`dumbmonit_frigate_detector_busy_seconds`). | > 30 s | 2 min | Avis (`warning`) | 1 h |
 | Frigate storage almost full | Le disque des enregistrements est plein à plus de 90 % (`dumbmonit_frigate_storage_used_percent`) ; se rétablit sous 88 %. | > 90 % | 30 min | Avis (`warning`) | 24 h |
@@ -1007,14 +1003,7 @@ Voir [Sophos Firewall](../devices/sophos.md).
 
 ### Cisco Meraki {#cisco-meraki}
 
-Voir [Cisco Meraki](../devices/meraki.md) (bêta). Les appareils sont étiquetés `device`, `serial`, `model` et `network`, les liaisons `interface`.
-
-| Règle | Quoi | Seuil par défaut | Maintien | Gravité | Rappel |
-|---|---|---|---|---|---|
-| Appareil Meraki hors ligne | Un appareil Cisco Meraki est hors ligne (injoignable par le dashboard cloud) depuis dix minutes. Les appareils dormants, non vus depuis longtemps, sont ignorés (`dumbmonit_meraki_device_offline`). | > 0 | 10 min | Avis (`warning`) | 6 h |
-| Liaison Meraki en échec | Un routeur Meraki a perdu l'accès à Internet d'une liaison configurée (les prises filaires et cellulaires sans câble ne comptent pas) (`dumbmonit_meraki_uplink_failed`). | > 0 | 5 min | Avis (`warning`) | 6 h |
-| Problème de licence Meraki | La licence Meraki n'est pas conforme (expirée, absente ou hors conformité) : le dashboard peut cesser de gérer les appareils (`dumbmonit_meraki_license_ok`). | < 1 | 1 h | Avis (`warning`) | 1 j |
-| Licence Meraki bientôt expirée | Une licence Meraki expire dans moins de 30 jours (`dumbmonit_meraki_license_expiry_seconds`). | < 30 j | 1 h | Avis (`warning`) | 1 j |
+Devenu un pack communautaire : ses règles arrivent avec le pack, sous l'uid `pack:meraki:<nom>`. Voir [Cisco Meraki](../devices/meraki.md).
 
 ### TP-Link Omada {#tp-link-omada}
 
@@ -1042,23 +1031,12 @@ Lu en SNMP par le profil Stormshield ; voir [Stormshield SNS](../devices/snmp.md
 | Lien HA Stormshield défaillant | Un lien entre les nœuds d'un cluster HA Stormshield est défaillant (`dumbmonit_stormshield_ha_faulty_links`). | > 0 | 5 min | Avis (`warning`) | 6 h |
 ### Palo Alto PAN-OS {#palo-alto-pan-os}
 
-Voir [Palo Alto PAN-OS](../devices/paloalto.md) (bêta). Les interfaces sont étiquetées `interface` et `zone`, les licences `license`.
-
-| Interface Palo Alto sans lien | Une interface de pare-feu Palo Alto rattachée à une zone n'a pas de lien : câble, transceiver ou l'appareil en face (`dumbmonit_paloalto_interface_down`). | > 0 | 5 min | Avis (`warning`) | 6 h |
-| Pair HA Palo Alto perdu | Le pair d'une paire HA Palo Alto n'est plus actif ni passif, ou le lien HA vers lui est coupé : il n'y a plus de secours (`dumbmonit_paloalto_ha_peer_up`). | < 1 | 2 min | Avertissement (`critical`) | 6 h |
-| HA Palo Alto désynchronisé | La configuration courante d'une paire HA Palo Alto n'est pas synchronisée : un basculement ferait tourner une autre configuration (`dumbmonit_paloalto_ha_in_sync`). | < 1 | 15 min | Avis (`warning`) | 6 h |
-| Membre HA Palo Alto non fonctionnel | Ce pare-feu Palo Alto indique un état HA suspendu ou non fonctionnel (`dumbmonit_paloalto_ha_local_functional`). | < 1 | 5 min | Avertissement (`critical`) | 6 h |
-| Table des sessions Palo Alto qui se remplit | La table des sessions d'un pare-feu Palo Alto est restée au-dessus de 90 % de sa capacité pendant dix minutes : les nouvelles sessions seront refusées quand elle sera pleine (`dumbmonit_paloalto_session_usage_percent`). | > 90 % | 10 min | Avis (`warning`) | 6 h |
-| CPU de gestion Palo Alto élevé | Le CPU du plan de gestion d'un pare-feu Palo Alto est resté au-dessus de 90 % pendant quinze minutes (`dumbmonit_paloalto_cpu_usage_percent`). | > 90 % | 15 min | Avis (`warning`) | 6 h |
-| Mémoire de gestion Palo Alto élevée | La mémoire du plan de gestion d'un pare-feu Palo Alto est restée au-dessus de 90 % pendant quinze minutes (`dumbmonit_paloalto_memory_used_percent`). | > 90 % | 15 min | Avis (`warning`) | 6 h |
-| Licence Palo Alto arrivant à expiration | Une licence ou un abonnement d'un pare-feu Palo Alto expire dans moins de 30 jours, ou a expiré (`dumbmonit_paloalto_license_expiry_seconds`). | < 30 j | 1 h | Avis (`warning`) | 1 j |
-| Validation Palo Alto en échec | La dernière validation de configuration d'un pare-feu Palo Alto a échoué : la configuration courante n'est pas celle qui a été enregistrée (`dumbmonit_paloalto_last_commit_ok`). | < 1 | 5 min | Info (`info`) | 1 j |
+Devenu un pack communautaire : ses règles arrivent avec le pack, sous l'uid `pack:paloalto:<nom>`. Voir [Palo Alto PAN-OS](../devices/paloalto.md).
 
 ### SonicWall SonicOS {#sonicwall-sonicos}
 
-Voir [SonicWall SonicOS](../devices/sonicwall.md) (bêta).
+Devenu un pack communautaire : ses règles arrivent avec le pack, sous l'uid `pack:sonicwall:<nom>`. Voir [SonicWall SonicOS](../devices/sonicwall.md).
 
-| Interface SonicWall sans lien | Une interface SonicWall rattachée à une zone n'a pas de lien (`dumbmonit_sonicwall_interface_down`). | > 0 | 5 min | Avis (`warning`) | 6 h |
 ### QNAP QTS {#qnap-qts}
 
 Voir [QNAP QTS / QuTS hero](../devices/qnap.md). Les volumes portent le label `volume`, les disques `disk` et `model`.

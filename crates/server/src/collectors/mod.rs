@@ -42,13 +42,12 @@ pub use dumbmonit_collectors::{
 pub use dumbmonit_collectors::{
     ArrCollector, AuthentikCollector, ForgejoCollector, FrigateCollector, GitlabCollector,
     ImmichCollector, JellyfinCollector, KeycloakCollector, MailcowCollector, NextcloudCollector,
-    PaperlessCollector, PlexCollector, ProtectCollector, QbittorrentCollector,
-    VaultwardenCollector, selfhosted,
+    PaperlessCollector, PlexCollector, QbittorrentCollector, VaultwardenCollector, selfhosted,
 };
 pub use dumbmonit_collectors::{
-    ArubaCentralCollector, FortigateCollector, PaloaltoCollector, PfsenseCollector,
-    SonicwallCollector, SophosCollector, TailscaleCollector, UnraidCollector, VeeamCollector,
-    arubacentral, fortigate, paloalto, pfsense, sonicwall, sophos, tailscale, unraid, veeam,
+    ArubaCentralCollector, FortigateCollector, PfsenseCollector, SophosCollector,
+    TailscaleCollector, UnraidCollector, VeeamCollector, arubacentral, fortigate, pfsense, sophos,
+    tailscale, unraid, veeam,
 };
 pub use dumbmonit_collectors::{
     CaddyCollector, DomainCollector, NpmCollector, TraefikCollector, caddy, domain, npm, traefik,
@@ -71,7 +70,7 @@ pub use dumbmonit_collectors::{
 };
 pub use dumbmonit_collectors::{KubernetesCollector, kubernetes};
 pub use dumbmonit_collectors::{MdaemonCollector, SecurityGatewayCollector, mdaemon};
-pub use dumbmonit_collectors::{MerakiCollector, OmadaCollector, meraki, omada};
+pub use dumbmonit_collectors::{OmadaCollector, omada};
 pub use dumbmonit_collectors::{
     MqttCollector, MysqlCollector, PostgresCollector, SmtpCollector, WebsocketCollector,
 };

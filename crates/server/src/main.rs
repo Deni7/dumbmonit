@@ -192,6 +192,9 @@ async fn run(mut config: Config, startup: Startup) -> Result<()> {
     // apportent, que le collecteur SNMP doit connaître dès sa construction. Leurs
     // collecteurs HTTP sont enregistrés plus bas, dans l'étage d'exécution.
     let packs = dumbmonit_server::packs::load_enabled(&pool).await?;
+    // Meraki, PAN-OS, SonicWall et UniFi Protect sont devenus des paquets : leurs
+    // cibles prennent le type du paquet avant que le planificateur ne les lise.
+    dumbmonit_server::packs::convert_moved_kinds(&pool).await?;
 
     // Une vérification de site interrompue par un arrêt du serveur a laissé son
     // verrou : il est levé avant que le collecteur ne reprenne.

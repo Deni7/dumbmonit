@@ -1,9 +1,22 @@
-# UniFi Protect (beta)
+# UniFi Protect (community pack)
 
-Whether the cameras and their recorder are doing their job: cameras offline, cameras connected but not recording, NVR disks in failure, storage in use and recording switched off. Not to be confused with the UniFi Network monitor (access points, switches, gateway).
+The cameras of a UniFi Protect console, through the integration API of UniFi OS:
+which ones are disconnected. Not to be confused with the UniFi Network monitor
+(access points, switches, gateway).
 
-!!! note "Beta"
-    Written from the vendor's API documentation and tested against realistic recorded-style responses, not yet against a live instance. Tell us what you see.
+!!! note "Community pack"
+    UniFi Protect is no longer built into DumbMonit: it ships as the community
+    pack [`packs/unifiprotect`](https://github.com/selfhostr/dumbmonit/tree/main/packs/unifiprotect),
+    which anyone can correct without waiting for a release. Install it under
+    **Settings → Integration packs** (paste or upload `pack.yaml`), then add a
+    monitor of type **UniFi Protect**. See [integration packs](../packs/index.md).
+
+    The pack reads the official integration API with an **API key**, where the
+    former built-in type signed in with a local account. Existing Protect
+    monitors were moved to the pack's type; once the pack is installed, edit
+    each one and replace its user name and password with an API key. The
+    integration API does not publish the recording state of the cameras nor the
+    health of the recorder's disks: those are no longer watched.
 
 ## Network ports to open
 
@@ -11,9 +24,18 @@ From the DumbMonit server (or its relay agent) to the device:
 
 | Port | Protocol | Purpose |
 |---|---|---|
-| 443 | TCP | UniFi OS (HTTPS, default) |
+| 443 | TCP | UniFi OS (HTTPS) |
 
-The failure worth watching: **a camera that dropped off and nobody noticed**. A cable, a PoE port or a firmware update, and a camera is gone from the NVR; the footage you wanted is the footage that was never recorded. A camera that is connected but not recording is the same loss, one level deeper.
+## Set it up
+
+1. In UniFi OS, **Settings → Control Plane → Integrations**: create an API key
+   named DumbMonit and copy it (it is shown once).
+2. In DumbMonit, enter the console address and paste the key as API key. Turn
+   on *Accept an unverifiable certificate* while the console keeps its factory
+   certificate.
+
+The key is sent in the `X-API-KEY` header. The integration API has no read-only
+key: keep it as secret as an administrator password.
 
 ## What it watches
 
@@ -21,34 +43,12 @@ All metrics are prefixed `dumbmonit_unifiprotect_`.
 
 | Metric | What | Labels |
 |---|---|---|
-| `version_info` | value 1 | `version` |
-| `cameras_total`, `cameras_offline`, `cameras_not_recording` | adopted cameras; those not connected; those connected, set to record, but not recording |  |
-| `camera_online`, `camera_recording` | 1 per camera while connected, while recording (at most 32) | `camera` |
-| `storage_used_percent`, `storage_size_bytes` | NVR storage in use and its capacity |  |
-| `disks_total`, `disks_unhealthy` | NVR disks, and those reported unhealthy |  |
-| `recording_disabled` | 1 when recording is switched off on the NVR |  |
+| `camera_online` | 1 while the camera is connected, 0 otherwise | `camera`, `camera_id` |
 
-The [built-in rules](../alerting/rules.md#self-hosted-applications) that apply: Protect camera offline, Protect camera not recording, Protect NVR disk unhealthy, Protect recording disabled, plus Monitor unreachable.
+## Alert rules
 
-## Create a local view-only user for Protect
+Installed with the pack, under the uid `pack:unifiprotect:<name>`:
 
-1. In UniFi OS, open Admins & Users → Create New and create a local user named as follows, with no cloud account.
-
-    ```
-    dumbmonit
-    ```
-
-2. Give it access to the Protect application only, with the View Only role, and none to Network or other applications.
-
-3. In DumbMonit, enter the console's address and that user name and password.
-
-!!! warning
-    Use a local account: UniFi OS refuses Ubiquiti cloud accounts here. The console's certificate is usually self-signed: turn on the certificate option.
-
-## Credentials
-
-| Credential | Fields |
+| Rule | Fires when |
 |---|---|
-| User name / password | A local UniFi OS user. DumbMonit logs in on `/api/auth/login`, keeps the session cookie between probes and logs in again when it expires. |
-
-Address: the console's host name (`unvr.lan`) or `host:port`. Storage in use stays high on purpose: Protect overwrites its oldest footage, so no rule fires on a full disk. Options: protocol (HTTPS by default), port (443), certificate check and request timeout (15 s).
+| `camera_offline` | a camera stays disconnected for 5 minutes |

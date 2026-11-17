@@ -15,8 +15,8 @@ chaque requête lui-même, sous des règles que le pack ne peut pas changer.
 
 | Un pack peut | Un pack ne peut pas |
 |---|---|
-| Appeler des chemins `GET` ou `POST` sur la propre adresse de la surveillance | Appeler un autre hôte, suivre une redirection vers un autre hôte, ou utiliser une URL absolue |
-| Lire du JSON (JSONPath), du texte brut (expressions régulières) ou le format texte Prometheus | Exécuter du code, des commandes shell ou des templates au-delà de `{{option.x}}` et `{{credential.x}}` |
+| Appeler des chemins `GET` ou `POST` sur la propre adresse de la surveillance, et y ouvrir puis fermer une session | Appeler un autre hôte, suivre une redirection vers un autre hôte, ou utiliser une URL absolue |
+| Lire du JSON ou du XML (JSONPath), du texte brut (expressions régulières) ou le format texte Prometheus | Exécuter du code, des commandes shell ou des templates au-delà de `{{option.x}}` et `{{credential.x}}` |
 | Envoyer l'identifiant de la surveillance dans un en-tête ou en authentification basique/bearer | Mettre un identifiant dans une URL ou un corps de requête |
 | Déclarer des options affichées dans le formulaire de la surveillance (un canal d'interrupteur, un seuil) | Écrire des métriques en dehors de son propre préfixe `dumbmonit_<pack>_` |
 | Fournir des règles d'alerte sur ses propres métriques | Changer un type de surveillance intégré ou une règle intégrée |
@@ -29,15 +29,21 @@ vérifications HTTP. Les adresses LAN privées sont toujours autorisées.
 
 ## Packs de référence
 
-Le dépôt fournit trois packs sous
+Le dépôt fournit ces packs sous
 [`packs/`](https://github.com/selfhostr/dumbmonit/tree/main/packs), chacun
-avec ses fixtures et sa sortie attendue :
+avec ses fixtures et sa sortie attendue. Les quatre derniers étaient des types
+intégrés : ils sont devenus des packs communautaires, faute d'équipement pour
+les essayer, et chacun peut maintenant les corriger sans attendre une version.
 
 | Pack | Lit | Règles |
 |---|---|---|
 | `node-exporter` | un sous-ensemble sélectionné de Prometheus node_exporter (CPU, mémoire, systèmes de fichiers, disques, réseau) | système de fichiers presque plein, mémoire presque épuisée |
 | `shelly-plug` | prises et relais Shelly Gen2+, `/rpc/Switch.GetStatus` | surchauffe |
 | `speedtest-tracker` | le dernier résultat de l'API v1 de Speedtest Tracker | internet en dessous des attentes, test de vitesse en échec |
+| `meraki` | une organisation Cisco Meraki par l'API Dashboard (clé en `Bearer`) | appareil hors ligne, liaison Internet en échec, licence hors conformité ou qui expire |
+| `paloalto` | un pare-feu PAN-OS par l'API XML (clé en `X-PAN-KEY`) | interface sans lien, pair HA perdu ou désynchronisé, table des sessions, CPU et mémoire, licences qui expirent |
+| `sonicwall` | un pare-feu SonicOS 7 par son API, en session | interface d'une zone sans lien |
+| `unifiprotect` | les caméras d'une console UniFi Protect par l'API d'intégration (clé en `X-API-KEY`) | caméra déconnectée |
 
 ## Installer un pack
 

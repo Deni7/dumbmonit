@@ -250,6 +250,10 @@ impl TargetPayload {
             )));
         }
         if state.collectors.get(&self.kind).is_none() {
+            // Le type d'un paquet communautaire absent : dire lequel installer.
+            if let Some(message) = dumbmonit_collectors::pack_to_install(&self.kind) {
+                return Err(ApiError::BadRequest(message));
+            }
             return Err(ApiError::BadRequest(format!(
                 "Unknown monitor type \"{}\" (available: {})",
                 self.kind,

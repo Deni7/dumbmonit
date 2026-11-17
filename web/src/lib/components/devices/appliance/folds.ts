@@ -2,7 +2,7 @@
  * How each appliance's stored series become a panel: a verdict sentence, a
  * few figures and the lists worth reading. One fold per kind, all pure, all
  * reading `dumbmonit_<prefix>_*` series as the collectors write them
- * (`crates/collectors/src/{pfsense,unraid,veeam,tailscale,fortigate,sophos,meraki,omada,nginx,apache}`,
+ * (`crates/collectors/src/{pfsense,unraid,veeam,tailscale,fortigate,sophos,omada,nginx,apache}`,
  * and the Hyper-V preset of the Windows agent).
  */
 import type { MetricSeries } from '#lib/api/index.js';
@@ -563,70 +563,10 @@ function sophos(series: MetricSeries[]): ApplianceView {
 	};
 }
 
-// ---------------------------------------------------------------------- Meraki
+// --------------------------------------------------------------------- Counts
 
 function plural(count: number, noun: string): string {
 	return `${count} ${noun}${count === 1 ? '' : 's'}`;
-}
-
-function meraki(series: MetricSeries[]): ApplianceView {
-	const ps = points(series, 'meraki');
-	const org = ps.find((p) => p.name === 'organization_info')?.labels.organization ?? null;
-	const status = (name: string): number | null => ps.find((p) => p.name === 'devices' && p.labels.status === name)?.value ?? null;
-	const online = status('online');
-	const alerting = status('alerting');
-	const offline = status('offline') ?? 0;
-	const dormant = status('dormant');
-	const age = byLabel(ps, 'device_last_report_age_seconds', 'serial');
-	const devices: Row[] = [];
-	for (const p of byLabel(ps, 'device_offline', 'serial').values()) {
-		const alert = (byLabel(ps, 'device_alerting', 'serial').get(p.labels.serial)?.value ?? 0) >= 1;
-		if (p.value < 1 && !alert) continue;
-		const reported = age.get(p.labels.serial)?.value ?? null;
-		devices.push({
-			key: p.labels.serial,
-			name: p.labels.device,
-			tone: p.value >= 1 ? 'warning' : 'advisory',
-			plate: p.value >= 1 ? 'Offline' : 'Alerting',
-			details: [p.labels.model, p.labels.network, reported !== null ? `last seen ${formatAge(reported)} ago` : ''].filter(Boolean)
-		});
-	}
-	devices.sort((a, b) => Number(a.tone !== 'warning') - Number(b.tone !== 'warning') || byName(a, b));
-	const failover = new Set(ps.filter((p) => p.name === 'uplink_failover' && p.value >= 1).map((p) => p.labels.serial));
-	const uplinks: Row[] = ps
-		.filter((p) => p.name === 'uplink_failed' && p.value >= 1)
-		.map((p) => ({
-			key: `${p.labels.serial}/${p.labels.interface}`,
-			name: `${p.labels.device} ${p.labels.interface}`,
-			tone: 'warning',
-			plate: 'Failed',
-			details: [p.labels.network, failover.has(p.labels.serial) ? 'running on its backup uplink' : ''].filter(Boolean)
-		}));
-	uplinks.sort(byName);
-	const licenseOk = single(ps, 'license_ok');
-	const expiry = single(ps, 'license_expiry_seconds');
-	const problems = [];
-	if (offline > 0) problems.push({ text: `${plural(offline, 'device')} offline`, severe: true });
-	if (uplinks.length > 0) problems.push({ text: `${plural(uplinks.length, 'uplink')} failed`, severe: false });
-	if (licenseOk !== null && licenseOk < 1) problems.push({ text: 'the license is not in compliance', severe: false });
-	if (expiry !== null && expiry < 30 * 86400) problems.push({ text: expiry < 0 ? 'the license has expired' : `the license expires ${days(expiry)}`, severe: false });
-	const total = (online ?? 0) + (alerting ?? 0) + offline;
-	return {
-		title: 'Cloud network',
-		description: org ? `Organization "${org}", read through the Meraki Dashboard API.` : 'Read through the Meraki Dashboard API.',
-		verdict: verdict(problems, 'Every device reaches the dashboard and every uplink works.'),
-		figures: [
-			{ label: 'Devices online', value: online !== null ? `${online + (alerting ?? 0)}/${total}` : null, tone: offline > 0 ? 'warning' : 'ink' },
-			{ label: 'Alerting', value: alerting !== null ? String(alerting) : null, tone: alerting !== null && alerting > 0 ? 'advisory' : 'ink' },
-			{ label: 'Dormant', value: dormant !== null ? String(dormant) : null, hint: 'Not seen for a long time, never counted as down' },
-			{ label: 'Clients', value: single(ps, 'clients') !== null ? String(single(ps, 'clients')) : null, hint: 'Seen in the last hour' },
-			{ label: 'License', value: expiry !== null ? (expiry < 0 ? 'Expired' : days(expiry)) : null, tone: licenseOk !== null && licenseOk < 1 ? 'advisory' : 'ink' }
-		],
-		sections: [
-			{ title: 'Devices offline or alerting', rows: devices },
-			{ title: 'Uplinks that failed', rows: uplinks }
-		]
-	};
 }
 
 // ----------------------------------------------------------------------- Omada
@@ -679,88 +619,6 @@ function omada(series: MetricSeries[]): ApplianceView {
 			{ label: 'Clients', value: single(ps, 'clients') !== null ? String(single(ps, 'clients')) : null }
 		],
 		sections: [{ title: 'Devices needing a look', rows: devices }]
-	};
-}
-
-// ------------------------------------------------------------ Palo Alto PAN-OS
-
-function paloalto(series: MetricSeries[]): ApplianceView {
-	const ps = points(series, 'paloalto');
-	const info = ps.find((p) => p.name === 'version_info')?.labels;
-	const interfaces: Row[] = [...byLabel(ps, 'interface_down', 'interface').values()]
-		.filter((p) => p.value >= 1)
-		.map((p) => ({ key: p.labels.interface, name: p.labels.interface, tone: 'warning', plate: 'No link', details: p.labels.zone ? [p.labels.zone] : undefined }));
-	interfaces.sort(byName);
-	const licenses: Row[] = [...byLabel(ps, 'license_expiry_seconds', 'license').values()]
-		.filter((p) => p.value < 60 * 86400)
-		.map((p) => ({ key: p.labels.license, name: p.labels.license, tone: p.value < 0 ? 'warning' : 'advisory', plate: p.value < 0 ? 'Expired' : `Expires ${days(p.value)}` }));
-	const haEnabled = single(ps, 'ha_enabled');
-	const peerUp = single(ps, 'ha_peer_up');
-	const inSync = single(ps, 'ha_in_sync');
-	const functional = single(ps, 'ha_local_functional');
-	const usage = single(ps, 'session_usage_percent');
-	const commit = single(ps, 'last_commit_ok');
-	const haState = ps.find((p) => p.name === 'ha_state_info')?.labels;
-	const problems = [];
-	if (functional !== null && functional < 1) problems.push({ text: 'this firewall is not functional in its HA pair', severe: true });
-	if (peerUp !== null && peerUp < 1) problems.push({ text: 'the HA peer is lost', severe: true });
-	if (inSync !== null && inSync < 1) problems.push({ text: 'the HA pair is out of sync', severe: false });
-	if (interfaces.length > 0) problems.push({ text: m.misc2_folds_interface_without_link({ count: interfaces.length }), severe: false });
-	if (usage !== null && usage > 90) problems.push({ text: 'the session table is nearly full', severe: false });
-	if (commit !== null && commit < 1) problems.push({ text: 'the last commit failed', severe: false });
-	const expired = licenses.filter((l) => l.tone === 'warning').length;
-	if (expired > 0) problems.push({ text: m.misc2_folds_licence_expired({ count: expired }), severe: false });
-	return {
-		title: 'Firewall',
-		description: info ? `${info.model || 'Palo Alto'} ${info.hostname ? `"${info.hostname}" ` : ''}running PAN-OS ${info.version}. Beta.` : 'Read through the PAN-OS XML API. Beta.',
-		verdict: verdict(problems, 'Every zoned interface has its link and the HA pair, if any, is healthy.'),
-		figures: [
-			{ label: 'CPU', value: percent(single(ps, 'cpu_usage_percent')), hint: 'Management plane' },
-			{ label: 'Memory', value: percent(single(ps, 'memory_used_percent')), hint: 'Management plane' },
-			{ label: 'Sessions', value: single(ps, 'sessions') !== null ? String(single(ps, 'sessions')) : null, tone: usage !== null && usage > 90 ? 'advisory' : 'ink', hint: usage !== null ? `${Math.round(usage)}% of the table` : undefined },
-			{
-				label: 'HA',
-				value: haEnabled === null || haEnabled < 1 ? 'Standalone' : haState ? haState.state : inSync !== null && inSync >= 1 ? 'In sync' : 'Enabled',
-				tone: (peerUp !== null && peerUp < 1) || (inSync !== null && inSync < 1) ? 'advisory' : 'ink'
-			}
-		],
-		sections: [
-			{ title: 'Interfaces without link', rows: interfaces },
-			{ title: 'Licences expiring or expired', rows: licenses }
-		]
-	};
-}
-
-// ------------------------------------------------------------ SonicWall SonicOS
-
-function sonicwall(series: MetricSeries[]): ApplianceView {
-	const ps = points(series, 'sonicwall');
-	const info = ps.find((p) => p.name === 'version_info')?.labels;
-	const links = byLabel(ps, 'interface_link_up', 'interface');
-	const interfaces: Row[] = [...byLabel(ps, 'interface_down', 'interface').values()]
-		.filter((p) => p.labels.zone && p.labels.zone.toLowerCase() !== 'unassigned')
-		.map((p) => {
-			const name = p.labels.interface;
-			const link = links.get(name)?.value ?? null;
-			return {
-				key: name,
-				name,
-				tone: p.value >= 1 ? 'warning' : link === null ? 'ghost' : 'signal',
-				plate: p.value >= 1 ? 'No link' : link === null ? 'Unknown' : 'Connected',
-				details: [p.labels.zone]
-			};
-		});
-	interfaces.sort((a, b) => Number(a.tone !== 'warning') - Number(b.tone !== 'warning') || a.name.localeCompare(b.name, 'en', { numeric: true }));
-	const down = single(ps, 'interfaces_down') ?? 0;
-	return {
-		title: 'Firewall',
-		description: info ? `${info.model ? `SonicWall ${info.model}, ` : ''}${info.version}. Beta; tunnel, HA and licence states are not read.` : 'SonicWall, read through the SonicOS API. Beta; tunnel, HA and licence states are not read.',
-		verdict: verdict(down > 0 ? [{ text: m.misc2_folds_interface_without_link({ count: down }), severe: false }] : [], 'Every interface in a zone has its link.'),
-		figures: [
-			{ label: 'Interfaces', value: single(ps, 'interfaces') !== null ? String(single(ps, 'interfaces')) : null },
-			{ label: 'Without link', value: String(down), tone: down > 0 ? 'advisory' : 'ink' }
-		],
-		sections: [{ title: 'Interfaces in a zone', rows: interfaces }]
 	};
 }
 
@@ -1211,11 +1069,8 @@ export const FOLDS: Record<string, Fold> = {
 	ceph: { prefix: 'ceph', title: 'Cluster', fold: ceph },
 	minio: { prefix: 'minio', title: 'Object store', fold: minio },
 	sophos: { prefix: 'sophos', title: 'Firewall', fold: sophos },
-	meraki: { prefix: 'meraki', title: 'Cloud network', fold: meraki },
 	omada: { prefix: 'omada', title: 'Wi-Fi and switching', fold: omada },
 	arubacentral: { prefix: 'arubacentral', title: 'Aruba Central', fold: arubacentral },
-	paloalto: { prefix: 'paloalto', title: 'Firewall', fold: paloalto },
-	sonicwall: { prefix: 'sonicwall', title: 'Firewall', fold: sonicwall },
 	nginx: { prefix: 'nginx', title: 'Web server', fold: nginx },
 	apache: { prefix: 'apache', title: 'Web server', fold: apache },
 	openvpn: { prefix: 'openvpn', title: 'VPN', fold: openvpn },

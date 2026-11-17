@@ -25,6 +25,7 @@ mod http;
 pub mod manifest;
 pub mod prom;
 pub mod template;
+mod xml;
 
 use std::collections::BTreeSet;
 
@@ -65,6 +66,9 @@ pub struct Pack {
     /// Préfixe des noms d'échantillon (`shelly_plug_`), sans `dumbmonit_`.
     prefix: String,
     sources: Vec<Source>,
+    /// Requêtes d'ouverture et de fermeture de session (`session`), s'il y en a.
+    session_login: Option<Source>,
+    session_logout: Option<Source>,
     rules: Vec<PackRule>,
     snmp_profiles: Vec<SnmpProfile>,
     /// Noms complets des séries produites (`dumbmonit_shelly_plug_power_watts`).

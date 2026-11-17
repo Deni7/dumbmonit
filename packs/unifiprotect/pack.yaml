@@ -1,0 +1,60 @@
+# UniFi Protect, through the integration API of UniFi OS (Protect 5.3 and later),
+# read with an API key sent in the X-API-KEY header. Formerly a built-in type.
+schema: 1
+id: unifiprotect
+version: 1.0.0
+requires: ">=0.17"
+label: UniFi Protect
+summary: Cameras of a UniFi Protect console through its integration API, and which ones are disconnected.
+examples: [UniFi Network Video Recorder (UNVR), Cloud Key Gen2 Plus, Dream Machine Pro, UniFi Express]
+address_hint: unvr.lan
+scheme: https
+default_port: 443
+setup:
+  title: Create an API key in UniFi OS
+  steps:
+    - In UniFi OS, open Settings → Control Plane → Integrations and create an API key named DumbMonit. Copy it now, UniFi shows it only once.
+    - In DumbMonit, enter the console address (unvr.lan) and paste the key as API key. Turn on "Accept an unverifiable certificate" while the console keeps its factory certificate.
+    - "Check that the key works from the DumbMonit host:\ncurl -k -H \"X-API-KEY: <key>\" https://unvr.lan/proxy/protect/integration/v1/cameras"
+  warning: >-
+    The integration API has no read-only key: keep this key as secret as an
+    administrator password. It does not publish the recording state of the
+    cameras nor the health of the recorder's disks, which this pack therefore
+    does not watch.
+  doc_url: https://developer.ui.com/protect/
+credentials:
+  - kind: api_token
+    label: API key
+    help: Created in UniFi OS under Settings → Control Plane → Integrations.
+
+sources:
+  - id: cameras
+    type: http
+    path: /proxy/protect/integration/v1/cameras
+    auth: none
+    headers:
+      X-API-KEY: "{{credential.token}}"
+      Accept: application/json
+
+discover:
+  - name: cameras
+    source: cameras
+    rows: $[*]
+    labels:
+      camera: $.name
+      camera_id: $.id
+    metrics:
+      - name: camera_online
+        help: 1 when the camera is connected to the console, 0 when it is not.
+        json: $.state
+        map: { CONNECTED: 1, CONNECTING: 0, DISCONNECTED: 0 }
+
+rules:
+  - name: camera_offline
+    title: Protect camera offline
+    description: A UniFi Protect camera has been disconnected from its console for five minutes.
+    expr: dumbmonit_unifiprotect_camera_online
+    op: "<"
+    threshold: 1
+    for: 5m
+    severity: warning

@@ -267,6 +267,86 @@ pub fn snmp_catalog(base: &Catalog, packs: &[Arc<Pack>]) -> Option<Catalog> {
     Some(catalog)
 }
 
+/// Règles livrées des types devenus paquets ([`dumbmonit_collectors::MOVED_TO_PACKS`]),
+/// retirées avec eux : chaque paquet installe les siennes (`pack:<id>:<nom>`).
+const MOVED_RULES: &[&str] = &[
+    "meraki_device_offline",
+    "meraki_uplink_failed",
+    "meraki_license_problem",
+    "meraki_license_expiring",
+    "paloalto_interface_down",
+    "paloalto_ha_peer_lost",
+    "paloalto_ha_out_of_sync",
+    "paloalto_ha_not_functional",
+    "paloalto_session_table_full",
+    "paloalto_cpu_high",
+    "paloalto_memory_high",
+    "paloalto_license_expiring",
+    "paloalto_commit_failed",
+    "sonicwall_interface_down",
+    "unifiprotect_camera_offline",
+    "unifiprotect_camera_not_recording",
+    "unifiprotect_disk_unhealthy",
+    "unifiprotect_recording_disabled",
+];
+
+/// `OR IGNORE` : une cible du paquet existe déjà à cette adresse (unicité type +
+/// adresse) ; l'ancienne reste telle quelle, et son erreur dit quoi faire.
+const MOVE_KIND: &str = "UPDATE OR IGNORE targets SET kind = ?, last_error = ? WHERE kind = ?";
+
+/// Fait passer les cibles des types devenus paquets communautaires au type du
+/// paquet (`meraki` → `pack.meraki`) et retire les règles livrées de ces types.
+///
+/// L'identifiant chiffré, les étiquettes (donc les réglages) et l'historique de
+/// la cible ne bougent pas : seul son type change. Tant que le paquet n'est pas
+/// installé, la cible reste visible et son erreur dit lequel installer
+/// ([`dumbmonit_collectors::pack_to_install`]). Idempotente : sert au démarrage
+/// et après la restauration d'une sauvegarde plus ancienne. Rend le nombre de
+/// cibles converties.
+pub async fn convert_moved_kinds(pool: &SqlitePool) -> Result<u64> {
+    let mut tx = pool.begin().await?;
+    let mut converted = 0;
+    for kind in dumbmonit_collectors::MOVED_TO_PACKS.iter().copied() {
+        let pack_kind = format!("{KIND_PREFIX}{kind}");
+        let result = sqlx::query(MOVE_KIND)
+            .bind(&pack_kind)
+            .bind(dumbmonit_collectors::pack_to_install(&pack_kind))
+            .bind(kind)
+            .execute(&mut *tx)
+            .await
+            .with_context(|| format!("conversion des cibles « {kind} »"))?;
+        converted += result.rows_affected();
+    }
+    // Le paquet Meraki n'a plus de filtre de réseaux : l'étiquette deviendrait
+    // une étiquette de série sans effet.
+    sqlx::query(
+        "UPDATE targets SET tags = json_remove(tags, '$.networks')
+         WHERE kind = 'pack.meraki' AND json_valid(tags)
+           AND json_extract(tags, '$.networks') IS NOT NULL",
+    )
+    .execute(&mut *tx)
+    .await
+    .context("réglages des cibles Meraki")?;
+    for uid in MOVED_RULES.iter().copied() {
+        for sql in [
+            "DELETE FROM alert_rules WHERE uid = ? AND builtin = 1",
+            "DELETE FROM rule_overrides WHERE rule_uid = ?",
+            "DELETE FROM alert_state WHERE rule_uid = ?",
+        ] {
+            sqlx::query(sql)
+                .bind(uid)
+                .execute(&mut *tx)
+                .await
+                .with_context(|| format!("retrait de la règle « {uid} »"))?;
+        }
+    }
+    tx.commit().await?;
+    if converted > 0 {
+        info!(converted, "devices moved to their community pack type");
+    }
+    Ok(converted)
+}
+
 /// Seuils réglés sur l'équipement : une règle de paquet dont le seuil vient
 /// d'une option (`threshold: "{{option.x}}"`) prend, pour chaque équipement, la
 /// valeur de cette option. Écrit comme une surcharge de seuil ; l'option de

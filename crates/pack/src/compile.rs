@@ -13,8 +13,8 @@ use serde_json_path::JsonPath;
 use sha2::{Digest, Sha256};
 
 use crate::manifest::{
-    Auth, Format, Kind, Manifest, Method, MetricSpec, RuleSpec, SCHEMA, Scalar, SourceSpec,
-    SourceType,
+    Auth, Format, Kind, Manifest, Method, MetricSpec, RuleSpec, SCHEMA, Scalar, SessionRequest,
+    SourceSpec, SourceType,
 };
 use crate::template::{CredentialField, Template};
 use crate::{
@@ -60,6 +60,10 @@ pub(crate) struct Source {
     pub headers: Vec<(String, Template)>,
     pub body: Option<Template>,
     pub auth: Auth,
+    /// Un refus ou une erreur HTTP de cette source ne fait rien échouer.
+    pub optional: bool,
+    /// `xml` : éléments toujours lus comme des listes.
+    pub lists: Vec<String>,
     /// Familles Prometheus retenues : nom lu → nom écrit (sans préfixe).
     pub keep: Vec<(String, String)>,
     pub drop: Vec<(String, Regex)>,
@@ -71,7 +75,24 @@ pub(crate) struct Source {
 pub(crate) enum BodyFormat {
     Json,
     Text,
+    /// Converti en JSON à la lecture : les mêmes chemins s'y appliquent.
+    Xml,
     Prometheus,
+}
+
+impl BodyFormat {
+    /// Vrai si la réponse se lit par JSONPath (JSON, ou XML converti).
+    pub(crate) fn is_json(self) -> bool {
+        matches!(self, Self::Json | Self::Xml)
+    }
+}
+
+/// Comment lire une date, écrite en secondes Unix.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum DateFormat {
+    Rfc3339,
+    /// Motif strftime (`%B %d, %Y`) ; sans fuseau, la date est en UTC.
+    Pattern(String),
 }
 
 #[derive(Debug)]
@@ -82,6 +103,7 @@ pub(crate) struct Metric {
     pub extractor: Extractor,
     pub scale: Option<f64>,
     pub map: BTreeMap<String, f64>,
+    pub date: Option<DateFormat>,
     pub labels: Vec<(String, LabelFrom)>,
 }
 
@@ -108,6 +130,9 @@ pub(crate) struct Discover {
     pub rows: JsonPath,
     pub max_rows: usize,
     pub labels: Vec<(String, JsonPath)>,
+    /// Liste imbriquée dans chaque ligne : les métriques se lisent sur ses éléments.
+    pub each: Option<JsonPath>,
+    pub each_labels: Vec<(String, JsonPath)>,
     pub metrics: Vec<RowMetric>,
 }
 
@@ -118,6 +143,7 @@ pub(crate) struct RowMetric {
     pub path: JsonPath,
     pub scale: Option<f64>,
     pub map: BTreeMap<String, f64>,
+    pub date: Option<DateFormat>,
 }
 
 /// Une règle d'alerte du paquet, prête à être installée.
@@ -182,6 +208,8 @@ pub(crate) fn compile(yaml: &str) -> Result<Pack, PackError> {
     // noms qu'une règle peut citer, mais pas des métriques déclarées.
     let mut variants = BTreeSet::new();
     let mut sources = sources(&manifest, &prefix, &option_defaults, &mut problems);
+    let (session_login, session_logout) =
+        session(&manifest, &prefix, &option_defaults, &mut problems);
     metrics(&manifest, &prefix, &mut sources, &mut produced, &mut variants, &mut problems);
     let snmp_profiles = snmp_profiles(&manifest, &prefix, &mut produced, &mut problems);
 
@@ -207,6 +235,8 @@ pub(crate) fn compile(yaml: &str) -> Result<Pack, PackError> {
         kind,
         prefix,
         sources,
+        session_login,
+        session_logout,
         rules,
         snmp_profiles,
         produced,
@@ -345,11 +375,14 @@ fn sources(
     options: &BTreeMap<String, String>,
     problems: &mut Problems,
 ) -> Vec<Source> {
-    if manifest.sources.len() > MAX_REQUESTS {
+    let session_requests =
+        manifest.session.as_ref().map_or(0, |session| 1 + usize::from(session.logout.is_some()));
+    if manifest.sources.len() + session_requests > MAX_REQUESTS {
         problems.error(
             "sources",
             format!(
-                "{} sources, at most {MAX_REQUESTS} requests are allowed per probe",
+                "{} sources and {session_requests} session requests, at most {MAX_REQUESTS} \
+                 requests are allowed per probe",
                 manifest.sources.len()
             ),
         );
@@ -364,11 +397,53 @@ fn sources(
         if !ids.insert(spec.id.as_str()) {
             problems.error(&at, "declared twice");
         }
+        if spec.method == Method::Delete {
+            problems.error(&at, "a source reads: DELETE is only for session.logout");
+        }
         if let Some(source) = source(manifest, spec, prefix, options, &at, problems) {
             compiled.push(source);
         }
     }
     compiled
+}
+
+/// Les requêtes d'ouverture et de fermeture de session, vérifiées comme des
+/// sources (même origine, identifiants dans les en-têtes seulement) ; leur
+/// réponse n'est pas lue, seul son statut compte.
+fn session(
+    manifest: &Manifest,
+    prefix: &str,
+    options: &BTreeMap<String, String>,
+    problems: &mut Problems,
+) -> (Option<Source>, Option<Source>) {
+    let Some(session) = &manifest.session else { return (None, None) };
+    if manifest.sources.is_empty() {
+        problems.error("session", "a session needs sources to read while it is open");
+    }
+    if session.login.method == Method::Delete {
+        problems.error("session.login", "a login is a GET or a POST");
+    }
+    let mut compile = |id: &str, request: &SessionRequest| {
+        let spec = SourceSpec {
+            id: id.to_string(),
+            kind: SourceType::Http,
+            path: request.path.clone(),
+            method: request.method,
+            headers: request.headers.clone(),
+            body: request.body.clone(),
+            auth: request.auth,
+            format: Some(Format::Text),
+            lists: Vec::new(),
+            optional: false,
+            keep: Vec::new(),
+            rename: BTreeMap::new(),
+            drop: BTreeMap::new(),
+        };
+        source(manifest, &spec, prefix, options, &format!("session.{id}"), problems)
+    };
+    let login = compile("login", &session.login);
+    let logout = session.logout.as_ref().and_then(|logout| compile("logout", logout));
+    (login, logout)
 }
 
 fn source(
@@ -382,6 +457,7 @@ fn source(
     let format = match (spec.kind, spec.format) {
         (SourceType::Http, None | Some(Format::Json)) => BodyFormat::Json,
         (SourceType::Http, Some(Format::Text)) => BodyFormat::Text,
+        (SourceType::Http, Some(Format::Xml)) => BodyFormat::Xml,
         (SourceType::Prometheus, None) => BodyFormat::Prometheus,
         (SourceType::Prometheus, Some(_)) => {
             problems
@@ -393,6 +469,14 @@ fn source(
         && (!spec.keep.is_empty() || !spec.rename.is_empty() || !spec.drop.is_empty())
     {
         problems.error(at, "keep, rename and drop only apply to prometheus sources");
+    }
+    if !spec.lists.is_empty() && format != BodyFormat::Xml {
+        problems.error(at, "lists only applies to sources in xml format");
+    }
+    for name in &spec.lists {
+        if name.is_empty() || name.contains(|c: char| c.is_whitespace() || c == '<' || c == '>') {
+            problems.error(&format!("{at}.lists"), format!("\"{name}\" is not an element name"));
+        }
     }
     if spec.kind == SourceType::Prometheus && spec.method != Method::Get {
         problems.error(at, "a prometheus source is read with GET");
@@ -482,6 +566,8 @@ fn source(
         headers,
         body,
         auth: spec.auth,
+        optional: spec.optional,
+        lists: spec.lists.clone(),
         keep,
         drop,
         metrics: Vec::new(),
@@ -636,10 +722,10 @@ fn metrics(
             problems.error(&at, format!("unknown source \"{}\"", spec.source));
             continue;
         };
-        if source.format != BodyFormat::Json {
+        if !source.format.is_json() {
             problems.error(
                 &at,
-                "discover reads JSON: its source must be an http source in json format",
+                "discover reads JSON: its source must be an http source in json or xml format",
             );
         }
         if spec.max_rows == 0 || spec.max_rows > MAX_ROWS {
@@ -657,11 +743,28 @@ fn metrics(
                 labels.push((label.clone(), path));
             }
         }
+        let each =
+            spec.each.as_ref().and_then(|raw| json_path(&format!("{at}.each"), raw, problems));
+        if spec.each.is_none() && !spec.each_labels.is_empty() {
+            problems.error(&at, "each_labels needs each");
+        }
+        let mut each_labels = Vec::new();
+        for (label, raw) in &spec.each_labels {
+            let where_ = format!("{at}.each_labels[{label}]");
+            check_label(&where_, label, problems);
+            if spec.labels.contains_key(label) {
+                problems.error(&where_, "already a label of the row");
+            }
+            if let Some(path) = json_path(&where_, raw, problems) {
+                each_labels.push((label.clone(), path));
+            }
+        }
         let mut row_metrics = Vec::new();
         for metric in &spec.metrics {
             let where_ = format!("{at}.metrics[{}]", metric.name);
             let name = claim(&where_, &metric.name, prefix, produced, problems);
             check_scale(&where_, metric.scale, problems);
+            let date = date_format(&where_, metric.date.as_deref(), &metric.map, problems);
             if let Some(path) = json_path(&where_, &metric.json, problems) {
                 row_metrics.push(RowMetric {
                     name,
@@ -669,6 +772,7 @@ fn metrics(
                     path,
                     scale: metric.scale,
                     map: map(&metric.map),
+                    date,
                 });
             }
         }
@@ -678,6 +782,8 @@ fn metrics(
                 rows,
                 max_rows: spec.max_rows.clamp(1, MAX_ROWS),
                 labels,
+                each,
+                each_labels,
                 metrics: row_metrics,
             });
         }
@@ -691,6 +797,33 @@ fn check_label(at: &str, label: &str, problems: &mut Problems) {
     if RESERVED_LABELS.contains(&label) || label.starts_with("tag_") {
         problems.error(at, format!("\"{label}\" is reserved: DumbMonit sets it itself"));
     }
+}
+
+/// `rfc3339` ou un motif strftime ; une date ne se traduit pas par `map`.
+fn date_format(
+    at: &str,
+    raw: Option<&str>,
+    map: &BTreeMap<Scalar, f64>,
+    problems: &mut Problems,
+) -> Option<DateFormat> {
+    let raw = raw?.trim();
+    if !map.is_empty() {
+        problems.error(at, "date and map exclude each other");
+    }
+    if raw.eq_ignore_ascii_case("rfc3339") {
+        return Some(DateFormat::Rfc3339);
+    }
+    let invalid = !raw.contains('%')
+        || chrono::format::StrftimeItems::new(raw)
+            .any(|item| matches!(item, chrono::format::Item::Error));
+    if invalid {
+        problems.error(
+            at,
+            format!("date \"{raw}\" is neither rfc3339 nor a strftime pattern like %B %d, %Y"),
+        );
+        return None;
+    }
+    Some(DateFormat::Pattern(raw.to_string()))
 }
 
 fn check_scale(at: &str, scale: Option<f64>, problems: &mut Problems) {
@@ -712,10 +845,14 @@ fn metric(
         problems.error(at, "set exactly one of json, regex or prom");
         return None;
     }
+    let date = date_format(at, spec.date.as_deref(), &spec.map, problems);
+    if spec.date.is_some() && spec.json.is_none() {
+        problems.error(at, "date reads a JSON value: it needs json");
+    }
     let mut labels = Vec::new();
     let extractor = if let Some(raw) = &spec.json {
-        if format != BodyFormat::Json {
-            problems.error(at, "json needs an http source in json format");
+        if !format.is_json() {
+            problems.error(at, "json needs an http source in json or xml format");
         }
         for (label, from) in &spec.labels {
             let where_ = format!("{at}.labels[{label}]");
@@ -766,6 +903,7 @@ fn metric(
         extractor,
         scale: spec.scale,
         map: map(&spec.map),
+        date,
         labels,
     })
 }

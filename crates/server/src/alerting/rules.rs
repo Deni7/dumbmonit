@@ -6563,63 +6563,6 @@ pub fn builtin_rules() -> Vec<Rule> {
                 "dumbmonit_sophos_interface_down",
             )
         },
-        Rule {
-            description: "A Cisco Meraki device has been offline (out of reach of the cloud dashboard) for ten minutes. Dormant devices, unseen for a long time, are left out.".to_string(),
-            operator: Operator::Gt,
-            threshold: 0.0,
-            for_duration: Duration::from_secs(10 * 60),
-            severity: Severity::Warning,
-            repeat_interval: Some(Duration::from_secs(6 * 3600)),
-            ..base(
-                "meraki_device_offline",
-                "Meraki device offline",
-                RuleKind::Threshold,
-                "dumbmonit_meraki_device_offline",
-            )
-        },
-        Rule {
-            description: "A Meraki router lost the Internet access of a configured uplink (the wired and cellular sockets without a cable are not counted).".to_string(),
-            operator: Operator::Gt,
-            threshold: 0.0,
-            for_duration: Duration::from_secs(5 * 60),
-            severity: Severity::Warning,
-            repeat_interval: Some(Duration::from_secs(6 * 3600)),
-            ..base(
-                "meraki_uplink_failed",
-                "Meraki uplink failed",
-                RuleKind::Threshold,
-                "dumbmonit_meraki_uplink_failed",
-            )
-        },
-        Rule {
-            description: "The Meraki license is not in compliance (expired, missing or out of compliance): the dashboard may stop managing the devices.".to_string(),
-            operator: Operator::Lt,
-            threshold: 1.0,
-            for_duration: Duration::from_secs(3600),
-            severity: Severity::Warning,
-            repeat_interval: Some(Duration::from_secs(24 * 3600)),
-            ..base(
-                "meraki_license_problem",
-                "Meraki license problem",
-                RuleKind::Threshold,
-                "dumbmonit_meraki_license_ok",
-            )
-        },
-        Rule {
-            description: "A Meraki license expires in less than 30 days.".to_string(),
-            operator: Operator::Lt,
-            threshold: 30.0 * 24.0 * 3600.0,
-            for_duration: Duration::from_secs(3600),
-            severity: Severity::Warning,
-            unit: "s".to_string(),
-            repeat_interval: Some(Duration::from_secs(24 * 3600)),
-            ..base(
-                "meraki_license_expiring",
-                "Meraki license expiring",
-                RuleKind::Threshold,
-                "dumbmonit_meraki_license_expiry_seconds",
-            )
-        },
         // --- TP-Link Omada (`collectors/omada`) ---
         Rule {
             description: "An Omada access point, switch or gateway has been disconnected from the controller for ten minutes.".to_string(),
@@ -6748,151 +6691,6 @@ pub fn builtin_rules() -> Vec<Rule> {
                 "Stormshield HA link faulty",
                 RuleKind::Threshold,
                 "dumbmonit_stormshield_ha_faulty_links",
-            )
-        },
-        Rule {
-            description: "A Palo Alto firewall interface bound to a zone has no link: cable, transceiver or the device in front.".to_string(),
-            operator: Operator::Gt,
-            threshold: 0.0,
-            for_duration: Duration::from_secs(5 * 60),
-            severity: Severity::Warning,
-            repeat_interval: Some(Duration::from_secs(6 * 3600)),
-            ..base(
-                "paloalto_interface_down",
-                "Palo Alto interface without link",
-                RuleKind::Threshold,
-                "dumbmonit_paloalto_interface_down",
-            )
-        },
-        Rule {
-            description: "The peer of a Palo Alto HA pair is no longer active or passive, or the HA link to it is down: there is no standby any more.".to_string(),
-            operator: Operator::Lt,
-            threshold: 1.0,
-            for_duration: Duration::from_secs(2 * 60),
-            severity: Severity::Critical,
-            repeat_interval: Some(Duration::from_secs(6 * 3600)),
-            ..base(
-                "paloalto_ha_peer_lost",
-                "Palo Alto HA peer lost",
-                RuleKind::Threshold,
-                "dumbmonit_paloalto_ha_peer_up",
-            )
-        },
-        Rule {
-            description: "The running configuration of a Palo Alto HA pair is not synchronized: a failover would run another configuration.".to_string(),
-            operator: Operator::Lt,
-            threshold: 1.0,
-            for_duration: Duration::from_secs(15 * 60),
-            severity: Severity::Warning,
-            repeat_interval: Some(Duration::from_secs(6 * 3600)),
-            ..base(
-                "paloalto_ha_out_of_sync",
-                "Palo Alto HA out of sync",
-                RuleKind::Threshold,
-                "dumbmonit_paloalto_ha_in_sync",
-            )
-        },
-        Rule {
-            description: "This Palo Alto firewall reports its HA state as suspended or non-functional.".to_string(),
-            operator: Operator::Lt,
-            threshold: 1.0,
-            for_duration: Duration::from_secs(5 * 60),
-            severity: Severity::Critical,
-            repeat_interval: Some(Duration::from_secs(6 * 3600)),
-            ..base(
-                "paloalto_ha_not_functional",
-                "Palo Alto HA member not functional",
-                RuleKind::Threshold,
-                "dumbmonit_paloalto_ha_local_functional",
-            )
-        },
-        Rule {
-            description: "The session table of a Palo Alto firewall has stayed above 90 % of its capacity for ten minutes: new sessions will be refused when it is full.".to_string(),
-            operator: Operator::Gt,
-            threshold: 90.0,
-            for_duration: Duration::from_secs(10 * 60),
-            severity: Severity::Warning,
-            unit: "%".to_string(),
-            repeat_interval: Some(Duration::from_secs(6 * 3600)),
-            ..base(
-                "paloalto_session_table_full",
-                "Palo Alto session table filling up",
-                RuleKind::Threshold,
-                "dumbmonit_paloalto_session_usage_percent",
-            )
-        },
-        Rule {
-            description: "The management plane CPU of a Palo Alto firewall has stayed above 90 % for fifteen minutes.".to_string(),
-            operator: Operator::Gt,
-            threshold: 90.0,
-            for_duration: Duration::from_secs(15 * 60),
-            severity: Severity::Warning,
-            unit: "%".to_string(),
-            repeat_interval: Some(Duration::from_secs(6 * 3600)),
-            ..base(
-                "paloalto_cpu_high",
-                "Palo Alto management CPU high",
-                RuleKind::Threshold,
-                "dumbmonit_paloalto_cpu_usage_percent",
-            )
-        },
-        Rule {
-            description: "The management plane memory of a Palo Alto firewall has stayed above 90 % for fifteen minutes.".to_string(),
-            operator: Operator::Gt,
-            threshold: 90.0,
-            for_duration: Duration::from_secs(15 * 60),
-            severity: Severity::Warning,
-            unit: "%".to_string(),
-            repeat_interval: Some(Duration::from_secs(6 * 3600)),
-            ..base(
-                "paloalto_memory_high",
-                "Palo Alto management memory high",
-                RuleKind::Threshold,
-                "dumbmonit_paloalto_memory_used_percent",
-            )
-        },
-        Rule {
-            description: "A licence or subscription of a Palo Alto firewall expires in less than 30 days, or has expired.".to_string(),
-            operator: Operator::Lt,
-            threshold: 30.0 * 24.0 * 3600.0,
-            for_duration: Duration::from_secs(3600),
-            severity: Severity::Warning,
-            unit: "s".to_string(),
-            repeat_interval: Some(Duration::from_secs(24 * 3600)),
-            ..base(
-                "paloalto_license_expiring",
-                "Palo Alto licence expiring",
-                RuleKind::Threshold,
-                "dumbmonit_paloalto_license_expiry_seconds",
-            )
-        },
-        Rule {
-            description: "The last configuration commit of a Palo Alto firewall failed: the running configuration is not the one that was saved.".to_string(),
-            operator: Operator::Lt,
-            threshold: 1.0,
-            for_duration: Duration::from_secs(5 * 60),
-            severity: Severity::Info,
-            repeat_interval: Some(Duration::from_secs(24 * 3600)),
-            ..base(
-                "paloalto_commit_failed",
-                "Palo Alto commit failed",
-                RuleKind::Threshold,
-                "dumbmonit_paloalto_last_commit_ok",
-            )
-        },
-        // --- SonicWall SonicOS (`collectors/sonicwall`, bêta) ---
-        Rule {
-            description: "A SonicWall interface bound to a zone has no link.".to_string(),
-            operator: Operator::Gt,
-            threshold: 0.0,
-            for_duration: Duration::from_secs(5 * 60),
-            severity: Severity::Warning,
-            repeat_interval: Some(Duration::from_secs(6 * 3600)),
-            ..base(
-                "sonicwall_interface_down",
-                "SonicWall interface without link",
-                RuleKind::Threshold,
-                "dumbmonit_sonicwall_interface_down",
             )
         },
         Rule {
@@ -7833,8 +7631,8 @@ fn app_rule(
 }
 
 /// Règles des applications de `collectors/selfhosted` : Sonarr, Radarr, Lidarr,
-/// Prowlarr, qBittorrent, UniFi Protect, Frigate, Keycloak, authentik,
-/// Vaultwarden et mailcow. Une application qui ne répond plus du tout relève de
+/// Prowlarr, qBittorrent, Frigate, Keycloak, authentik, Vaultwarden et
+/// mailcow. Une application qui ne répond plus du tout relève de
 /// la règle « injoignable » ; celles-ci surveillent ce qui continue de répondre
 /// pendant que le service est en panne.
 fn apps_rules() -> Vec<Rule> {
@@ -7960,52 +7758,6 @@ fn apps_rules() -> Vec<Rule> {
         )
     });
 
-    // UniFi Protect.
-    rules.push(app_rule(
-        "unifiprotect_camera_offline",
-        "Protect camera offline",
-        "A UniFi Protect camera has been disconnected from its NVR for five minutes.",
-        "dumbmonit_unifiprotect_camera_online == bool 0",
-        Operator::Gt,
-        0.0,
-        app_minutes(5),
-        Severity::Warning,
-        app_hours(6),
-    ));
-    rules.push(app_rule(
-        "unifiprotect_camera_not_recording",
-        "Protect camera not recording",
-        "A camera is connected but not recording although it is set to (disk trouble, \
-         recording stopped).",
-        "dumbmonit_unifiprotect_cameras_not_recording",
-        Operator::Gt,
-        0.0,
-        app_minutes(15),
-        Severity::Warning,
-        app_hours(6),
-    ));
-    rules.push(app_rule(
-        "unifiprotect_disk_unhealthy",
-        "Protect NVR disk unhealthy",
-        "The NVR reports a failing disk.",
-        "dumbmonit_unifiprotect_disks_unhealthy",
-        Operator::Gt,
-        0.0,
-        app_minutes(5),
-        Severity::Critical,
-        app_hours(1),
-    ));
-    rules.push(app_rule(
-        "unifiprotect_recording_disabled",
-        "Protect recording disabled",
-        "Recording is switched off on the NVR: no camera is recording.",
-        "dumbmonit_unifiprotect_recording_disabled",
-        Operator::Gt,
-        0.0,
-        app_minutes(10),
-        Severity::Warning,
-        app_hours(6),
-    ));
 
     // Frigate.
     rules.push(app_rule(
@@ -8676,8 +8428,8 @@ pub(crate) const PRODUITES: &[&str] = &[
     "dumbmonit_agent_eventlog_matches_critical",
     "dumbmonit_agent_eventlog_matches_warning",
     "dumbmonit_agent_eventlog_matches_info",
-    // pfSense, Unraid, Veeam, Tailscale, FortiGate, Sophos, Meraki, Omada
-    // (`collectors/{pfsense,unraid,veeam,tailscale,fortigate,sophos,meraki,omada}`),
+    // pfSense, Unraid, Veeam, Tailscale, FortiGate, Sophos, Omada
+    // (`collectors/{pfsense,unraid,veeam,tailscale,fortigate,sophos,omada}`),
     // Hyper-V par l'agent Windows (`agent/src/collect/perf_counters.rs`).
     "dumbmonit_pfsense_gateway_up",
     "dumbmonit_pfsense_gateway_loss_percent",
@@ -8715,10 +8467,6 @@ pub(crate) const PRODUITES: &[&str] = &[
     "dumbmonit_fortigate_license_expiry_seconds",
     "dumbmonit_fortigate_firmware_update_available",
     "dumbmonit_sophos_interface_down",
-    "dumbmonit_meraki_device_offline",
-    "dumbmonit_meraki_uplink_failed",
-    "dumbmonit_meraki_license_ok",
-    "dumbmonit_meraki_license_expiry_seconds",
     "dumbmonit_omada_device_offline",
     "dumbmonit_omada_device_cpu_usage_percent",
     "dumbmonit_omada_device_memory_used_percent",
@@ -8728,16 +8476,6 @@ pub(crate) const PRODUITES: &[&str] = &[
     "dumbmonit_arubacentral_devices_poor_health",
     "dumbmonit_stormshield_ha_dead_nodes",
     "dumbmonit_stormshield_ha_faulty_links",
-    "dumbmonit_paloalto_interface_down",
-    "dumbmonit_paloalto_ha_peer_up",
-    "dumbmonit_paloalto_ha_in_sync",
-    "dumbmonit_paloalto_ha_local_functional",
-    "dumbmonit_paloalto_session_usage_percent",
-    "dumbmonit_paloalto_cpu_usage_percent",
-    "dumbmonit_paloalto_memory_used_percent",
-    "dumbmonit_paloalto_license_expiry_seconds",
-    "dumbmonit_paloalto_last_commit_ok",
-    "dumbmonit_sonicwall_interface_down",
     "dumbmonit_agent_libvirt_domain_crashed",
     "dumbmonit_agent_libvirt_pool_used_percent",
     // Synology DSM par l'agent du paquet (`crates/agent/src/collect/dsm.rs`).
@@ -8808,10 +8546,6 @@ pub(crate) const PRODUITES: &[&str] = &[
     "dumbmonit_qbittorrent_torrents_errored",
     "dumbmonit_qbittorrent_connected",
     "dumbmonit_qbittorrent_free_space_bytes",
-    "dumbmonit_unifiprotect_camera_online",
-    "dumbmonit_unifiprotect_cameras_not_recording",
-    "dumbmonit_unifiprotect_disks_unhealthy",
-    "dumbmonit_unifiprotect_recording_disabled",
     "dumbmonit_frigate_camera_online",
     "dumbmonit_frigate_detector_busy_seconds",
     "dumbmonit_frigate_storage_used_percent",
@@ -9108,10 +8842,6 @@ mod tests {
             "qbittorrent_torrents_errored",
             "qbittorrent_disconnected",
             "qbittorrent_free_space_low",
-            "unifiprotect_camera_offline",
-            "unifiprotect_camera_not_recording",
-            "unifiprotect_disk_unhealthy",
-            "unifiprotect_recording_disabled",
             "frigate_camera_offline",
             "frigate_detector_stuck",
             "frigate_storage_almost_full",
@@ -9378,24 +9108,10 @@ mod tests {
             "fortigate_license_expiring",
             "fortigate_firmware_update",
             "sophos_interface_down",
-            "meraki_device_offline",
-            "meraki_uplink_failed",
-            "meraki_license_problem",
-            "meraki_license_expiring",
             "omada_device_offline",
             "omada_cpu_high",
             "omada_memory_high",
             "omada_firmware_update",
-            "paloalto_interface_down",
-            "paloalto_ha_peer_lost",
-            "paloalto_ha_out_of_sync",
-            "paloalto_ha_not_functional",
-            "paloalto_session_table_full",
-            "paloalto_cpu_high",
-            "paloalto_memory_high",
-            "paloalto_license_expiring",
-            "paloalto_commit_failed",
-            "sonicwall_interface_down",
             "qnap_volume_full",
             "qnap_disk_unhealthy",
             "qnap_disk_hot",

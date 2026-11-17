@@ -142,12 +142,10 @@ fn http_products() -> Vec<Fingerprint> {
             .status(200)
             .body("Palo Alto Networks - Login")
             .confidence(Confidence::Medium)
-            .kind("paloalto")
             .prefill(host_prefill()),
         Fingerprint::http("sonicwall.web", "SonicWall SonicOS", &[443, 8443], "/")
             .header("server", "SonicWALL")
             .confidence(Confidence::Medium)
-            .kind("sonicwall")
             .prefill(host_prefill()),
         Fingerprint::http("mikrotik.web", "MikroTik RouterOS", &[80, 443], "/")
             .status(200)

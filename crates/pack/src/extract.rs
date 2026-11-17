@@ -11,7 +11,9 @@ use serde_json::Value;
 use serde_json_path::NormalizedPath;
 
 use crate::MAX_ROWS;
-use crate::compile::{BodyFormat, Discover, Extractor, LabelFrom, Metric, RESERVED_LABELS, Source};
+use crate::compile::{
+    BodyFormat, DateFormat, Discover, Extractor, LabelFrom, Metric, RESERVED_LABELS, Source,
+};
 use crate::prom::{self, PromSample};
 
 /// Longueur maximale d'une valeur d'étiquette lue dans une réponse.
@@ -32,6 +34,9 @@ impl Source {
                 .map(Body::Json)
                 .map_err(|error| format!("source \"{}\": invalid JSON: {error}", self.id)),
             BodyFormat::Text => Ok(Body::Text(String::from_utf8_lossy(bytes).into_owned())),
+            BodyFormat::Xml => crate::xml::to_json(&String::from_utf8_lossy(bytes), &self.lists)
+                .map(Body::Json)
+                .map_err(|error| format!("source \"{}\": invalid XML: {error}", self.id)),
             BodyFormat::Prometheus => prom::parse(&String::from_utf8_lossy(bytes))
                 .map(Body::Prometheus)
                 .map_err(|error| format!("source \"{}\": {error}", self.id)),
@@ -142,8 +147,22 @@ fn truncate(mut value: String) -> String {
 }
 
 /// Valeur numérique d'un nœud JSON : nombre, booléen, ou texte traduit par `map`
-/// (ou lisible comme un nombre). `None` : rien à écrire.
-fn number(value: &Value, map: &BTreeMap<String, f64>, scale: Option<f64>) -> Option<f64> {
+/// (ou lisible comme un nombre), ou date lue selon `date`. `None` : rien à écrire.
+fn number(
+    value: &Value,
+    map: &BTreeMap<String, f64>,
+    date: Option<&DateFormat>,
+    scale: Option<f64>,
+) -> Option<f64> {
+    if let Some(format) = date {
+        // Un nombre est déjà un horodatage : gardé tel quel.
+        let seconds = match value {
+            Value::String(text) => parse_date(text, format)?,
+            Value::Number(number) => number.as_f64()?,
+            _ => return None,
+        };
+        return Some(seconds * scale.unwrap_or(1.0));
+    }
     let raw = match value {
         Value::Number(number) => map.get(&number.to_string()).copied().or_else(|| number.as_f64()),
         Value::Bool(flag) => {
@@ -155,17 +174,43 @@ fn number(value: &Value, map: &BTreeMap<String, f64>, scale: Option<f64>) -> Opt
     Some(raw * scale.unwrap_or(1.0))
 }
 
+/// Une date en secondes Unix. Un motif sans fuseau se lit en UTC, un motif
+/// sans heure à minuit.
+pub(crate) fn parse_date(text: &str, format: &DateFormat) -> Option<f64> {
+    let text = text.trim();
+    let seconds = |millis: i64| millis as f64 / 1000.0;
+    match format {
+        DateFormat::Rfc3339 => chrono::DateTime::parse_from_rfc3339(text)
+            .ok()
+            .map(|date| seconds(date.timestamp_millis())),
+        DateFormat::Pattern(pattern) => {
+            if let Ok(date) = chrono::DateTime::parse_from_str(text, pattern) {
+                return Some(seconds(date.timestamp_millis()));
+            }
+            if let Ok(date) = chrono::NaiveDateTime::parse_from_str(text, pattern) {
+                return Some(seconds(date.and_utc().timestamp_millis()));
+            }
+            let day = chrono::NaiveDate::parse_from_str(text, pattern).ok()?;
+            Some(seconds(day.and_hms_opt(0, 0, 0)?.and_utc().timestamp_millis()))
+        }
+    }
+}
+
 fn text_number(text: &str, map: &BTreeMap<String, f64>) -> Option<f64> {
     let text = text.trim();
     if let Some(value) = map.get(text) {
         return Some(*value);
     }
     if !map.is_empty() {
-        // Une énumération déclarée : une valeur hors liste n'est pas un nombre.
-        return None;
+        // Une énumération déclarée : une valeur hors liste n'est pas un nombre,
+        // sauf si l'énumération prévoit « tout le reste » (`"*"`).
+        return map.get(MAP_OTHERS).copied();
     }
     text.parse().ok()
 }
+
+/// Clé de `map` qui vaut pour toute valeur textuelle absente de la liste.
+const MAP_OTHERS: &str = "*";
 
 fn label_value(value: &Value) -> Option<String> {
     match value {
@@ -189,7 +234,10 @@ fn parent<'a>(document: &'a Value, location: &NormalizedPath<'_>) -> &'a Value {
 fn json_metric(metric: &Metric, document: &Value, ts_ms: i64, out: &mut Vec<Sample>) {
     let Extractor::Json(path) = &metric.extractor else { return };
     for node in path.query_located(document).into_iter().take(MAX_ROWS) {
-        let Some(value) = number(node.node(), &metric.map, metric.scale) else { continue };
+        let Some(value) = number(node.node(), &metric.map, metric.date.as_ref(), metric.scale)
+        else {
+            continue;
+        };
         let container = parent(document, node.location());
         let mut sample = Sample::new(metric.name.clone(), value, metric.kind, ts_ms);
         for (label, from) in &metric.labels {
@@ -213,6 +261,9 @@ fn discover_rows(discover: &Discover, document: &Value, ts_ms: i64, out: &mut Ve
             "lignes découvertes tronquées"
         );
     }
+    // Sans `each`, chaque ligne est lue elle-même ; avec, ce sont les éléments
+    // de sa liste imbriquée, `max_rows` bornant le total.
+    let mut budget = discover.max_rows;
     for row in rows.into_iter().take(discover.max_rows) {
         let mut labels = BTreeMap::new();
         for (label, path) in &discover.labels {
@@ -220,17 +271,46 @@ fn discover_rows(discover: &Discover, document: &Value, ts_ms: i64, out: &mut Ve
                 labels.insert(label.clone(), found);
             }
         }
-        for metric in &discover.metrics {
-            let Some(node) = metric.path.query(row).first() else { continue };
-            let Some(value) = number(node, &metric.map, metric.scale) else { continue };
-            out.push(Sample {
-                metric: metric.name.clone(),
-                labels: labels.clone(),
-                value,
-                kind: metric.kind,
-                ts_ms,
-            });
+        let Some(each) = &discover.each else {
+            row_metrics(discover, row, &labels, ts_ms, out);
+            continue;
+        };
+        for item in each.query(row).all() {
+            if budget == 0 {
+                tracing::debug!(discover = %discover.name, "éléments imbriqués tronqués");
+                return;
+            }
+            budget -= 1;
+            let mut item_labels = labels.clone();
+            for (label, path) in &discover.each_labels {
+                if let Some(found) = path.query(item).first().and_then(label_value) {
+                    item_labels.insert(label.clone(), found);
+                }
+            }
+            row_metrics(discover, item, &item_labels, ts_ms, out);
         }
+    }
+}
+
+fn row_metrics(
+    discover: &Discover,
+    row: &Value,
+    labels: &BTreeMap<String, String>,
+    ts_ms: i64,
+    out: &mut Vec<Sample>,
+) {
+    for metric in &discover.metrics {
+        let Some(node) = metric.path.query(row).first() else { continue };
+        let Some(value) = number(node, &metric.map, metric.date.as_ref(), metric.scale) else {
+            continue;
+        };
+        out.push(Sample {
+            metric: metric.name.clone(),
+            labels: labels.clone(),
+            value,
+            kind: metric.kind,
+            ts_ms,
+        });
     }
 }
 

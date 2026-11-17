@@ -1,0 +1,53 @@
+# TYPE dumbmonit_paloalto_cpu_idle_percent gauge
+dumbmonit_paloalto_cpu_idle_percent 90.9
+# TYPE dumbmonit_paloalto_ha_enabled gauge
+dumbmonit_paloalto_ha_enabled 1
+# TYPE dumbmonit_paloalto_ha_in_sync gauge
+dumbmonit_paloalto_ha_in_sync 0
+# TYPE dumbmonit_paloalto_ha_local_functional gauge
+dumbmonit_paloalto_ha_local_functional 1
+# TYPE dumbmonit_paloalto_ha_peer_connected gauge
+dumbmonit_paloalto_ha_peer_connected 1
+# TYPE dumbmonit_paloalto_ha_peer_up gauge
+dumbmonit_paloalto_ha_peer_up 1
+# TYPE dumbmonit_paloalto_interface_info gauge
+dumbmonit_paloalto_interface_info{interface="ethernet1/1",zone="untrust"} 1
+dumbmonit_paloalto_interface_info{interface="ethernet1/2",zone="trust"} 1
+dumbmonit_paloalto_interface_info{interface="ethernet1/2.30",zone="iot"} 1
+dumbmonit_paloalto_interface_info{interface="ethernet1/3",zone="dmz"} 1
+dumbmonit_paloalto_interface_info{interface="tunnel.1",zone="vpn"} 1
+# TYPE dumbmonit_paloalto_interface_link_up gauge
+dumbmonit_paloalto_interface_link_up{interface="ethernet1/1"} 1
+dumbmonit_paloalto_interface_link_up{interface="ethernet1/2"} 1
+dumbmonit_paloalto_interface_link_up{interface="ethernet1/3"} 0
+dumbmonit_paloalto_interface_link_up{interface="ethernet1/4"} 0
+# TYPE dumbmonit_paloalto_interface_speed_mbps gauge
+dumbmonit_paloalto_interface_speed_mbps{interface="ethernet1/1"} 1000
+dumbmonit_paloalto_interface_speed_mbps{interface="ethernet1/2"} 1000
+# TYPE dumbmonit_paloalto_license_expiration_timestamp_seconds gauge
+dumbmonit_paloalto_license_expiration_timestamp_seconds{license="PAN-DB URL Filtering"} 1790726400
+dumbmonit_paloalto_license_expiration_timestamp_seconds{license="Premium Support"} 1863129600
+dumbmonit_paloalto_license_expiration_timestamp_seconds{license="Threat Prevention"} 1794960000
+# TYPE dumbmonit_paloalto_license_expired gauge
+dumbmonit_paloalto_license_expired{license="PA-440"} 0
+dumbmonit_paloalto_license_expired{license="PAN-DB URL Filtering"} 1
+dumbmonit_paloalto_license_expired{license="Premium Support"} 0
+dumbmonit_paloalto_license_expired{license="Threat Prevention"} 0
+# TYPE dumbmonit_paloalto_memory_cache_kib gauge
+dumbmonit_paloalto_memory_cache_kib 2070000
+# TYPE dumbmonit_paloalto_memory_free_kib gauge
+dumbmonit_paloalto_memory_free_kib 600000
+# TYPE dumbmonit_paloalto_memory_total_kib gauge
+dumbmonit_paloalto_memory_total_kib 8070268
+# TYPE dumbmonit_paloalto_packets_per_second gauge
+dumbmonit_paloalto_packets_per_second 5400
+# TYPE dumbmonit_paloalto_session_setup_rate gauge
+dumbmonit_paloalto_session_setup_rate 42
+# TYPE dumbmonit_paloalto_sessions gauge
+dumbmonit_paloalto_sessions 18432
+# TYPE dumbmonit_paloalto_sessions_max gauge
+dumbmonit_paloalto_sessions_max 262144
+# TYPE dumbmonit_paloalto_throughput_kbps gauge
+dumbmonit_paloalto_throughput_kbps 35200
+# TYPE dumbmonit_paloalto_version_info gauge
+dumbmonit_paloalto_version_info{model="PA-440",system_name="pa-edge",version="11.1.4-h7"} 1

@@ -33,7 +33,7 @@ export type CategoryId = (typeof CATEGORY_IDS)[number];
  */
 export const CATEGORY_KINDS: Record<Exclude<CategoryId, 'packs' | 'other'>, string[]> = {
 	machines: ['agent', 'agent:relay', 'agent:ad', 'winrm', 'redfish', 'nut'],
-	network: ['snmp', 'netconfig', 'opnsense', 'pfsense', 'fortigate', 'sophos', 'paloalto', 'sonicwall', 'mikrotik', 'unifi', 'omada', 'meraki', 'arubacentral', 'openvpn', 'tailscale'],
+	network: ['snmp', 'netconfig', 'opnsense', 'pfsense', 'fortigate', 'sophos', 'mikrotik', 'unifi', 'omada', 'arubacentral', 'openvpn', 'tailscale'],
 	virtualization: ['proxmox', 'pdm', 'vsphere', 'xcpng', 'nutanix', 'kubernetes'],
 	storage: ['synology', 'truenas', 'unraid', 'qnap', 'ceph', 'minio', 'pbs', 'veeam', 'kopia', 'duplicati'],
 	databases: ['postgres', 'mysql', 'mssql', 'oracle', 'mongodb', 'redis', 'elasticsearch', 'influxdb', 'rabbitmq', 'kafka', 'mqtt'],
@@ -44,7 +44,7 @@ export const CATEGORY_KINDS: Record<Exclude<CategoryId, 'packs' | 'other'>, stri
 	security: ['activedirectory', 'keycloak', 'authentik', 'entra', 'vaultwarden', 'crowdsec', 'pihole', 'adguard'],
 	cloud: ['m365', 'azure', 'aws', 'cloudflare', 'hetzner', 'ovh', 'infomaniak', 'domain', 'provider'],
 	apps: ['nextcloud', 'immich', 'paperless', 'gitlab', 'forgejo'],
-	media: ['jellyfin', 'plex', 'sonarr', 'radarr', 'lidarr', 'prowlarr', 'qbittorrent', 'homeassistant', 'unifiprotect', 'frigate']
+	media: ['jellyfin', 'plex', 'sonarr', 'radarr', 'lidarr', 'prowlarr', 'qbittorrent', 'homeassistant', 'frigate']
 };
 
 const CATEGORY_OF = new Map<string, CategoryId>(
