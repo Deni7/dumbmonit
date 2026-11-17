@@ -20,7 +20,7 @@
 	import type { CollectorInfo } from '#lib/api/index.js';
 	import { Button, CopyBlock, DocLink, Panel, Plate } from '#lib/ui/index.js';
 	import { getLocale } from '#lib/paraglide/runtime.js';
-	import { kindDocPage, localizedDocsUrl } from '#lib/docs.js';
+	import { kindDocPage } from '#lib/docs.js';
 	import KindIcon from '#lib/components/KindIcon.svelte';
 
 	interface Props {
@@ -194,7 +194,7 @@
 
 		{#if setup?.doc_url}
 			<a
-				href={withBase(localizedDocsUrl(setup.doc_url))}
+				href={withBase(setup.doc_url)}
 				target="_blank"
 				rel="noreferrer noopener"
 				class="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-signal-ink hover:underline"

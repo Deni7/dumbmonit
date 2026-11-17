@@ -5,14 +5,12 @@ docs_dir: docs
 exclude_docs: |
   requirements.txt
 
-# One language per build, chosen by READTHEDOCS_LANGUAGE (English by default): see
-# hooks/rtd_language.py. site_url, theme.language, the search language, the language
-# switcher (extra.alternate) and the navigation titles are set there.
-# Published twice: on the product website under /docs/ (DUMBMONIT_DOCS_BASE, built by
-# the website build) and on Read the Docs as a mirror (the site_url below).
-# The header carries the website's navigation (overrides/partials/header.html).
+# English only (the web UI is the translated part). Published twice: on the product website
+# under /docs/ (DUMBMONIT_DOCS_BASE, built by the website build) and on Read the Docs as a
+# mirror (the site_url below). The header carries the website's navigation
+# (overrides/partials/header.html, hooks/site_nav.py).
 hooks:
-  - hooks/rtd_language.py
+  - hooks/site_nav.py
 
 validation:
   links:

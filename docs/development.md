@@ -73,7 +73,7 @@ at once: they wipe `.svelte-kit/output`.
 
 ## Translations
 
-The web UI is translated by pull request, like any other contribution. The source language is English (`web/messages/en.json`: flat keys, `{param}` placeholders); each other language is one file, `web/messages/<locale>.json`, compiled by [Paraglide JS](https://paraglidejs.com) into tree-shaken message functions under `web/src/lib/paraglide/` (generated, untracked).
+The documentation is in English only; the web UI is translated into nine languages. The web UI is translated by pull request, like any other contribution. The source language is English (`web/messages/en.json`: flat keys, `{param}` placeholders); each other language is one file, `web/messages/<locale>.json`, compiled by [Paraglide JS](https://paraglidejs.com) into tree-shaken message functions under `web/src/lib/paraglide/` (generated, untracked).
 
 1. Edit `web/messages/<locale>.json` (`fr`, `de`, `es`, `it`, `pt`, `pt-BR`, `ru`, `zh-Hans`), or copy `en.json` to add a new locale.
 2. Keep every key and every `{variable}` of `en.json`; translate only the values. Never put HTML markup in a message.
