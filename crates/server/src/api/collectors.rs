@@ -10128,12 +10128,9 @@ mod tests {
     #[test]
     fn les_blocs_compose_sont_ceux_de_la_documentation() {
         let doc = include_str!("../../../../docs/install/docker.md");
-        for (nom, bloc) in [("icmp", ICMP_SNIPPET)] {
-            assert!(doc.contains(bloc.trim_end()), "le bloc « {nom} » a divergé de docker.md");
-        }
-        for ancre in ["{#icmp-ping-without-a-capability}"] {
-            assert!(doc.contains(ancre), "ancre {ancre} absente de docker.md");
-        }
+        assert!(doc.contains(ICMP_SNIPPET.trim_end()), "le bloc « icmp » a divergé de docker.md");
+        let ancre = "{#icmp-ping-without-a-capability}";
+        assert!(doc.contains(ancre), "ancre {ancre} absente de docker.md");
     }
 
     #[test]
