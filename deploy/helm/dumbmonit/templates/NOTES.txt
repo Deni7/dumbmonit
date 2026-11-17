@@ -1,0 +1,31 @@
+DumbMonit {{ .Chart.AppVersion }} is installed as a single replica (SQLite has one writer).
+
+1. Wait for the pod:
+     kubectl -n {{ .Release.Namespace }} rollout status statefulset/{{ include "dumbmonit.fullname" . }}
+
+2. One-time code for the first admin account:
+     kubectl -n {{ .Release.Namespace }} logs statefulset/{{ include "dumbmonit.fullname" . }} | grep -i code
+
+3. Web interface (HTTPS, self-signed certificate unless tls.existingSecret is set):
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+     https://{{ .host }}
+{{- end }}
+{{- else }}
+     kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "dumbmonit.fullname" . }} 8080:{{ .Values.service.port }}
+     then open https://localhost:8080
+{{- end }}
+{{- if .Values.agentService.enabled }}
+
+4. Agent channel (port {{ .Values.agentService.port }}, mTLS): publish it with a {{ .Values.agentService.type }} Service,
+   never through a TLS-terminating Ingress:
+     kubectl -n {{ .Release.Namespace }} get svc {{ include "dumbmonit.fullname" . }}-agents
+{{- if not .Values.agentPublicUrl }}
+   Set agentPublicUrl (DUMBMONIT_AGENT_PUBLIC_URL) to the address agents will use.
+{{- end }}
+{{- end }}
+{{- if not (or .Values.secret.existingSecret .Values.secret.value) }}
+
+WARNING: no instance secret was given. DumbMonit generated /data/secret.key on the volume:
+back it up together with the data, or restoring a backup elsewhere will fail.
+{{- end }}

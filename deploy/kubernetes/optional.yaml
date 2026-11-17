@@ -1,0 +1,59 @@
+# Optional extras: Ingress (web UI only), PodDisruptionBudget, NetworkPolicy.
+# Apply with: kubectl apply -f optional.yaml
+#
+# The Ingress must never carry the agent channel (8443): its mTLS handshake
+# has to reach DumbMonit untouched.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dumbmonit
+  namespace: dumbmonit
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS" # DumbMonit serves HTTPS on 8080
+spec:
+  # ingressClassName: nginx
+  # tls:
+  #   - secretName: monit-tls
+  #     hosts: [monit.example.com]
+  rules:
+    - host: monit.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: dumbmonit
+                port:
+                  name: https
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: dumbmonit
+  namespace: dumbmonit
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dumbmonit
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dumbmonit
+  namespace: dumbmonit
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: dumbmonit
+  policyTypes: [Ingress]
+  ingress:
+    # Web UI: restrict with a `from:` list (for example your ingress controller namespace).
+    - ports:
+        - port: https
+          protocol: TCP
+    # Agent channel: agents are outside the cluster, so any source.
+    - ports:
+        - port: agents
+          protocol: TCP

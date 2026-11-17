@@ -49,6 +49,13 @@ All notable changes to this project are documented here. The format follows
 - **Misleading authentication messages.** A refused request (HTTP 403) no longer claims the
   "credentials were accepted": it says the token or key is wrong or expired, or lacks permission.
   qBittorrent now asks for the WebUI user name and password instead of "the token".
+- **Kubernetes installation.** A Helm chart (`deploy/helm/dumbmonit`, published as
+  `oci://ghcr.io/selfhostr/charts/dumbmonit` with each release) and equivalent plain manifests
+  (`deploy/kubernetes`). One replica (SQLite has a single writer), a volume for `/data`, a web
+  Service with an optional Ingress, and a separate Service for the mTLS agent channel that never
+  goes through a TLS-terminating proxy. Non-root, read-only root filesystem, HTTPS health probes,
+  optional NetworkPolicy and PodDisruptionBudget, external VictoriaMetrics. CI lints, renders and
+  validates it with kubeconform. See the new Kubernetes page in the installation guide.
 
 ### Changed
 
