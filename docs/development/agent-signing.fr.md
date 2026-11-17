@@ -25,8 +25,8 @@ scripts/agent-signing-key.sh            # écrit ~/.dumbmonit-agent-signing/
 
 Le script crée la clé Ed25519 avec OpenSSL (clé privée en `0600` dans un dossier
 `0700`), vérifie la paire par une signature d'essai faite exactement comme
-`release.yml` la fait, affiche le bloc PEM public et la commande
-`gh secret set`, et ne touche à rien d'autre : ni au dépôt, ni à aucun secret
+`release.yml` la fait, ajoute la clé publique à `crates/agent/signing/release-keys.pem` (la liste des clés acceptées, gardée pour la rotation), affiche le bloc PEM et la commande
+`gh secret set`, et ne touche à rien d'autre : ni commit, ni secret
 GitHub. Il refuse d'écraser une clé existante. À la main, la même clé :
 
 ```sh
@@ -34,14 +34,14 @@ openssl genpkey -algorithm ed25519 -out agent-signing.pem
 openssl pkey -in agent-signing.pem -pubout
 ```
 
-1. Ajoutez le bloc PEM **public** affiché par la seconde commande à
+1. Committez le bloc PEM **public** (ajouté par le script, ou à la main depuis la seconde commande) dans
    `crates/agent/signing/release-keys.pem` et committez-le. Plusieurs clés
    peuvent y figurer.
 2. Stockez la clé **privée** comme secret de dépôt (pas un secret
    d'environnement) :
 
     ```sh
-    gh secret set AGENT_SIGNING_KEY < agent-signing.pem
+    gh secret set AGENT_SIGNING_KEY -R selfhostr/dumbmonit < agent-signing.pem
     ```
 
 3. Gardez une sauvegarde hors ligne de `agent-signing.pem`, puis supprimez la
