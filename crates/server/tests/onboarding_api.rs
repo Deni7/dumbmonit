@@ -131,3 +131,72 @@ async fn seul_un_administrateur_ecrit_le_guide() {
     let reply = app.put("/api/onboarding", json!({ "skipped": true }), Some(&viewer)).await;
     assert_eq!(reply.status, StatusCode::FORBIDDEN, "{}", reply.body);
 }
+
+#[tokio::test]
+async fn le_premier_lancement_est_chronometre_sur_l_instance() {
+    let app = TestApp::configured().await;
+    let cookie = app.admin_cookie().await;
+
+    // La création du compte ouvre la mesure ; le reste n'est pas encore franchi.
+    let reply = app.get("/api/onboarding", Some(&cookie)).await;
+    let timings = &reply.body["first_run"];
+    assert!(timings["setup_at"].is_string(), "{}", reply.body);
+    assert!(timings["first_target_at"].is_null());
+    assert!(timings["first_channel_at"].is_null());
+    assert!(timings["first_notification_at"].is_null());
+    assert!(timings["first_alert_at"].is_null());
+
+    let reply = app
+        .post(
+            "/api/targets",
+            json!({ "name": "nas", "address": "nas.lan", "kind": "dummy" }),
+            Some(&cookie),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::CREATED, "{}", reply.body);
+    let reply = app
+        .post(
+            "/api/notify/channels",
+            json!({
+                "name": "Ops", "kind": "discord",
+                "secrets": { "webhook_url": "https://127.0.0.1:1/hook/x" }
+            }),
+            Some(&cookie),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::CREATED, "{}", reply.body);
+    let channel = reply.body["id"].as_i64().expect("identifiant du canal");
+
+    let reply = app.get("/api/onboarding", Some(&cookie)).await;
+    let first_target = reply.body["first_run"]["first_target_at"].clone();
+    assert!(first_target.is_string(), "{}", reply.body);
+    assert!(reply.body["first_run"]["first_channel_at"].is_string());
+    // Un canal créé n'est pas un message parti.
+    assert!(reply.body["first_run"]["first_notification_at"].is_null());
+
+    // Un envoi réussi, consigné directement : le test n'a pas de réseau.
+    let config = common::base_config(app._dir.path());
+    let pool = dumbmonit_server::db::open(&config.database_path()).await.expect("base");
+    let report = dumbmonit_server::notify::DeliveryReport {
+        channel_id: channel,
+        channel_name: "Ops".into(),
+        error: None,
+        transient: false,
+    };
+    dumbmonit_server::db::alerts::record_delivery(&pool, &report, chrono::Utc::now())
+        .await
+        .expect("envoi consigné");
+
+    // Un second moniteur ne déplace pas le premier repère.
+    app.post(
+        "/api/targets",
+        json!({ "name": "nas2", "address": "nas2.lan", "kind": "dummy" }),
+        Some(&cookie),
+    )
+    .await;
+    let reply = app.get("/api/onboarding", Some(&cookie)).await;
+    assert!(reply.body["first_run"]["first_notification_at"].is_string(), "{}", reply.body);
+    assert_eq!(reply.body["first_run"]["first_target_at"], first_target);
+    // Seule une alerte du moteur compte comme première alerte.
+    assert!(reply.body["first_run"]["first_alert_at"].is_null());
+}

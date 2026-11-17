@@ -3965,6 +3965,21 @@ export interface OnboardingState {
 	has_channel: boolean;
 	/** A message really left on some channel — a test counts. */
 	notification_confirmed: boolean;
+	/** When the instance first passed each step. Older servers omit it. */
+	first_run?: FirstRunTimings;
+}
+
+/**
+ * First-run stopwatch, kept on the instance only. UTC without suffix (read with
+ * `parseServerDate`), `null` until the step happens. Mirrors `first_run::Timings`.
+ */
+export interface FirstRunTimings {
+	first_boot_at: string | null;
+	setup_at: string | null;
+	first_target_at: string | null;
+	first_channel_at: string | null;
+	first_notification_at: string | null;
+	first_alert_at: string | null;
 }
 
 export type OnboardingStep = 'device' | 'channel' | 'test';

@@ -1145,6 +1145,8 @@ pub async fn record_delivery(
         .bind(report.channel_id)
         .execute(pool)
         .await?;
+        // Premier message réellement parti, test compris (Réglages → À propos).
+        crate::first_run::record(pool, crate::first_run::Milestone::FirstNotification).await;
     } else {
         sqlx::query("UPDATE notification_channels SET last_error = ? WHERE id = ?")
             .bind(report.error.as_deref())

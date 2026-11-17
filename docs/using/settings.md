@@ -302,5 +302,11 @@ Version of the server and the health of its two stores, the database (monitor
 setup and alert history) and VictoriaMetrics (every measurement in the
 charts), as reported by `GET /api/health` and refreshed every 15 seconds. A
 store that stops answering shows a warning with the error and what to check.
-The section also links to this documentation and names the licence, Apache
-2.0.
+The section also links to this documentation and names the licence, MIT.
+
+**First run**, folded at the bottom, times the road to the first alert on this
+instance: started without an account, administrator created, first monitor,
+first channel, first message delivered (a test counts) and first real alert
+delivered, each with its delay from the start. The times are recorded once,
+stay on the instance and are never sent anywhere (`GET /api/onboarding`,
+`first_run`). See [First alert in five minutes](../install/quickstart.md).

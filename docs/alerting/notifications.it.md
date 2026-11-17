@@ -29,7 +29,7 @@ evaluate (hysteresis, per-device overrides)
 | Ore silenziose | Canale → Delivery options | disattivate |
 | Filtro di instradamento (tag, tipo, regola) | Canale → Delivery options → *Only some alerts* | disattivato (il canale sente tutto) |
 | Escalation se nessuno conferma | Settings → Notifications & reports → Notification policy | disattivata |
-| Finestra di batch | Settings → Notifications & reports → Notification policy | 60 s |
+| Finestra di batch | Settings → Notifications & reports → Notification policy | 30 s |
 | Messaggi per canale all'ora | Settings → Notifications & reports → Notification policy | 20 |
 | URL pubblico (deep link) | Settings → Notifications & reports → Notification policy, oppure `DUMBMONIT_PUBLIC_URL` | vuoto |
 

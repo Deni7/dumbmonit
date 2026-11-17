@@ -13,6 +13,7 @@ l'échelle météorologique (info → avis → alerte), les prédictions sont de
 de maintenance sont planifiées.
 
 <div class="dm-links" markdown>
+<a href="install/quickstart/">Première alerte en cinq minutes<small>De docker compose up à un message sur votre téléphone</small></a>
 <a href="install/docker/">Installer<small>Docker Compose, premier démarrage, sauvegardes</small></a>
 <a href="install/first-device/">Ajouter votre première surveillance<small>SNMP, scan réseau, la suite</small></a>
 <a href="alerting/">Alertes<small>Règles intégrées, silencieuses par construction</small></a>

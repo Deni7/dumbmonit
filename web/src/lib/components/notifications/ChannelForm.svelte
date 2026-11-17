@@ -32,11 +32,15 @@
 		kinds: KindInfo[];
 		/** Present when editing, absent when adding. */
 		channel?: Channel;
+		/** Adding: opens straight on this kind's fields (the setup wizard's one-click kinds). */
+		initialKind?: string;
+		/** Adding: values typed in advance, by setting key (an ntfy topic, for one). */
+		initialSettings?: Record<string, string>;
 		onsaved: (channel: Channel) => void;
 		oncancel: () => void;
 	}
 
-	let { kinds, channel, onsaved, oncancel }: Props = $props();
+	let { kinds, channel, initialKind, initialSettings, onsaved, oncancel }: Props = $props();
 	const editing = $derived(channel !== undefined);
 
 	type Value = string | boolean;
@@ -50,8 +54,8 @@
 		return typeof raw === 'string' ? raw : String(raw);
 	}
 
-	function initialSettings(): Record<string, Value> {
-		if (!channel) return {};
+	function startingSettings(): Record<string, Value> {
+		if (!channel) return { ...(initialSettings ?? {}) };
 		const fields = kinds.find((k) => k.kind === channel.kind)?.settings ?? [];
 		const initial: Record<string, Value> = {};
 		for (const field of fields) initial[field.key] = toField(field, channel.settings?.[field.key]);
@@ -60,10 +64,12 @@
 
 	// The initial state is frozen when the form opens: it must not follow list
 	// refreshes while the user types. `untrack` says this one-time read is meant.
-	let kind = $state(untrack(() => channel?.kind ?? ''));
+	/** A preset kind counts only when the catalogue has it: otherwise the picker shows. */
+	const presetKind = untrack(() => (!channel && initialKind && kinds.some((k) => k.kind === initialKind) ? initialKind : ''));
+	let kind = $state(untrack(() => channel?.kind ?? presetKind));
 	let name = $state(untrack(() => channel?.name ?? ''));
 	let enabled = $state(untrack(() => channel?.enabled ?? true));
-	let settings = $state<Record<string, Value>>(untrack(() => initialSettings()));
+	let settings = $state<Record<string, Value>>(untrack(() => (presetKind || channel ? startingSettings() : {})));
 	let secrets = $state<Record<string, string>>({});
 	let clearSecrets = $state(false);
 
@@ -105,7 +111,7 @@
 			: [...INTERVALS, { value: minInterval, label: m.notifications_form_interval_current({ seconds: minInterval }) }].sort((a, b) => a.value - b.value)
 	);
 
-	let step = $state<'kind' | 'fields'>(untrack(() => (channel ? 'fields' : 'kind')));
+	let step = $state<'kind' | 'fields'>(untrack(() => (channel || presetKind ? 'fields' : 'kind')));
 	let search = $state('');
 	let searchBox = $state<HTMLInputElement | null>(null);
 	// The picker opens with the cursor in the search box, every time it shows.
@@ -199,6 +205,9 @@
 
 	function validate(): boolean {
 		const errors: Record<string, string> = {};
+		// A new channel left unnamed takes its kind's name ("ntfy"): one field less
+		// on the way to the first alert. A saved channel keeps asking for one.
+		if (!editing && !name.trim()) name = info?.label ?? kind;
 		nameError = name.trim() ? null : m.notifications_form_error_name();
 
 		for (const field of settingFields) {
@@ -379,7 +388,7 @@
 			</div>
 
 			<div class="grid gap-5 px-5 py-5">
-				<Field label={m.alerts_form_name()} for="channel-name" required error={nameError} help={m.notifications_form_name_help()}>
+				<Field label={m.alerts_form_name()} for="channel-name" required={editing} error={nameError} help={m.notifications_form_name_help()}>
 					<input
 						id="channel-name"
 						type="text"

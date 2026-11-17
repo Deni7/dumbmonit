@@ -21,7 +21,7 @@ docker compose up -d
 docker compose logs dumbmonit   # one-time code for the first admin account
 ```
 
-Open https://localhost:8080 (self-signed certificate, accept the browser warning once). Back up *Settings → Backup* **and** `/data/secret.key`. Updating, ports and lost password: see the [installation guide](https://dumbmonit.selfhostr.io/docs/install/docker/).
+Open https://localhost:8080 (self-signed certificate, accept the browser warning once). The setup wizard starts with your first monitor, where alerts go and a test alert: [first alert in five minutes](https://dumbmonit.selfhostr.io/docs/install/quickstart/). Back up *Settings → Backup* **and** `/data/secret.key`. Updating, ports and lost password: see the [installation guide](https://dumbmonit.selfhostr.io/docs/install/docker/).
 
 On Kubernetes: a Helm chart (`oci://ghcr.io/selfhostr/charts/dumbmonit`) and plain manifests live in [`deploy/`](deploy/); see the [Kubernetes guide](https://dumbmonit.selfhostr.io/docs/install/kubernetes/).
 

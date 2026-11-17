@@ -176,7 +176,7 @@ ordem:
    passam; o resto espera por um resumo quando as horas de silêncio
    terminam (um alerta que se resolve entretanto só é mencionado como
    «resolved during quiet hours»).
-9. **Agrupamento em lote** — alertas dentro da janela de lote (60 s por
+9. **Agrupamento em lote** — alertas dentro da janela de lote (30 s por
    predefinição) saem como uma mensagem por canal: «3 alerts on 2
    devices, 1 resolved».
 10. **Limite horário** — passado `max_per_hour` mensagens num canal, os

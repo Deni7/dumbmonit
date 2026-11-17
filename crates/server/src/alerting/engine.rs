@@ -47,7 +47,7 @@ impl Default for AlertingConfig {
     fn default() -> Self {
         Self {
             // Trente secondes : assez réactif pour une alerte « injoignable » avec un
-            // `for` d'une minute, assez espacé pour ne pas marteler VictoriaMetrics.
+            // `for` d'un cycle, assez espacé pour ne pas marteler VictoriaMetrics.
             interval: Duration::from_secs(30),
             history_retention: Duration::from_secs(90 * 24 * 3600),
             baseline_retention: Duration::from_secs(60 * 24 * 3600),
@@ -587,6 +587,7 @@ async fn send_outgoing(
             stats().notification(&config.kind, !delivery.is_success());
             if delivery.is_success() {
                 report.notifications_sent += 1;
+                crate::first_run::record(pool, crate::first_run::Milestone::FirstAlert).await;
                 if let Err(error) =
                     policy_store::record_sent(pool, out.channel_id, &out.queue_ids, &out.sent, now)
                         .await
@@ -626,6 +627,7 @@ async fn send_outgoing(
         stats().notification(&config.kind, !delivery.is_success());
         if delivery.is_success() {
             report.notifications_sent += 1;
+            crate::first_run::record(pool, crate::first_run::Milestone::FirstAlert).await;
             policy_store::reset_failures(config.id);
             if let Err(error) =
                 policy_store::record_sent(pool, out.channel_id, &out.queue_ids, &out.sent, now)

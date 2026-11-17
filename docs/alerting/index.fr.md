@@ -182,7 +182,7 @@ personne ne soit spammé. Le chemin complet d'une alerte, dans l'ordre :
    Avertissement passent ; le reste attend un résumé à la fin des heures
    calmes (une alerte qui se résout pendant ce temps n'est mentionnée que
    comme « résolue pendant les heures calmes »).
-9. **Regroupement** — les alertes dans la fenêtre de regroupement (60 s
+9. **Regroupement** — les alertes dans la fenêtre de regroupement (30 s
    par défaut) partent comme un message par canal : « 3 alertes sur 2
    surveillances, 1 résolue ».
 10. **Plafond horaire** — au-delà de `max_per_hour` messages sur un canal,

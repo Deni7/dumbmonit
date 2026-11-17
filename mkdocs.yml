@@ -75,6 +75,7 @@ plugins:
 nav:
   - Home: index.md
   - Install:
+      - First alert in five minutes: install/quickstart.md
       - Docker: install/docker.md
       - Kubernetes: install/kubernetes.md
       - HTTPS and encryption: install/https.md

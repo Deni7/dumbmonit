@@ -14,7 +14,7 @@ untenstehende Regel auf jeder Instanz aktiviert ausgeliefert.
 
 | Regel | Was | Standardschwelle | Haltezeit | Schweregrad | Erinnerung |
 |---|---|---|---|---|---|
-| Monitor nicht erreichbar | Seit mehr als drei Minuten keine Messung empfangen. `bottomk by (target) (1, time() - tlast_over_time(dumbmonit_up[7d]))` | > 180 s | 1 Min. | Warnung (`critical`) | 6 h |
+| Monitor nicht erreichbar | Seit mehr als drei Minuten keine Messung empfangen. `bottomk by (target) (1, time() - tlast_over_time(dumbmonit_up[7d]))` | > 180 s | 30 s | Warnung (`critical`) | 6 h |
 | CPU hoch | CPU-Last dauerhaft über 90 %, pro Monitor über SNMP-, Proxmox- und Agent-Quellen gemittelt; löst sich unter 85 %. | > 90 % | 10 Min. | Hinweis (`warning`), eskaliert nach 1 h | 6 h |
 | Ungewöhnliche CPU | CPU-Last spürbar anders als üblich zu dieser Uhrzeit und diesem Wochentag (saisonale Baseline). | Score > 3,5 | 15 Min. | Info (`info`) | 6 h |
 | Platte fast voll | Dateisystem zu 90 % oder mehr voll, pro Mountpunkt (SNMP, Proxmox-Storages und Root-Dateisysteme); löst sich unter 88 %. | ≥ 90 % | 15 Min. | Hinweis (`warning`), eskaliert nach 24 h | 6 h |
@@ -51,7 +51,7 @@ Zustandsserien sind 0 (OK), 1 (Warnung) oder 2 (Kritisch). Ein leerer Steckplatz
 
 | Regel | Was | Standardschwelle | Haltezeit | Schweregrad | Erinnerung |
 |---|---|---|---|---|---|
-| Dienst ausgefallen | Der Dienst hat drei Minuten lang nicht korrekt geantwortet (`dumbmonit_probe_success{probe!="push"} == bool 0`). | > 0 | 3 Min. | Warnung (`critical`) | 30 Min. |
+| Dienst ausgefallen | Der Dienst hat zwei Minuten lang nicht korrekt geantwortet (`dumbmonit_probe_success{probe!="push"} == bool 0`). | > 0 | 2 Min. | Warnung (`critical`) | 30 Min. |
 | Heartbeat verpasst | Der Job hat sich nicht innerhalb seines erwarteten Intervalls plus Karenzzeit gemeldet oder selbst einen Fehler gemeldet (`dumbmonit_probe_success{probe="push"} == bool 0`; die Verzögerung wird pro Monitor festgelegt, siehe [Heartbeat](../devices/push.md)). | > 0 | 2 Min. | Hinweis (`warning`) | 6 h |
 | Dienst flattert | Der Dienst hat in dreißig Minuten mehr als sechsmal den Zustand gewechselt (`changes(dumbmonit_probe_success{probe!="push"}[30m])`). | > 6 | 5 Min. | Hinweis (`warning`) | 1 h |
 | Langsamer Dienst | Der Dienst braucht mehr als drei Sekunden zum Antworten; fehlgeschlagene Prüfungen bleiben außen vor (`dumbmonit_probe_duration_seconds and dumbmonit_probe_success == 1`). | > 3 s | 10 Min. | Hinweis (`warning`) | 6 h |

@@ -12416,6 +12416,21 @@ components:
         has_target: { type: boolean }
         has_channel: { type: boolean }
         notification_confirmed: { type: boolean }
+        first_run: { $ref: "#/components/schemas/FirstRunTimings" }
+    FirstRunTimings:
+      type: object
+      description: >-
+        When this instance first passed each step, UTC without suffix; `null` until it
+        has. Recorded locally, never sent anywhere. Steps after the account are only
+        recorded when the account creation was (instances set up by an older version
+        stay empty).
+      properties:
+        first_boot_at: { type: [string, "null"], description: First start without an account. }
+        setup_at: { type: [string, "null"], description: First administrator created. }
+        first_target_at: { type: [string, "null"] }
+        first_channel_at: { type: [string, "null"] }
+        first_notification_at: { type: [string, "null"], description: First message that really left a channel, a test included. }
+        first_alert_at: { type: [string, "null"], description: First real alert delivered by the engine. }
     OnboardingPatch:
       type: object
       properties:

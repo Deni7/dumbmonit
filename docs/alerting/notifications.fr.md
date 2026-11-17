@@ -29,7 +29,7 @@ s'appliquent dès la sortie de boîte.
 | Heures calmes | Canal → Options de livraison | désactivé |
 | Filtre de routage (étiquettes, type, règle) | Canal → Options de livraison → *Seulement certaines alertes* | désactivé (le canal entend tout) |
 | Escalade si personne n'acquitte | Réglages → Notifications → Politique de notification | désactivé |
-| Fenêtre de regroupement | Réglages → Notifications → Politique de notification | 60 s |
+| Fenêtre de regroupement | Réglages → Notifications → Politique de notification | 30 s |
 | Messages par canal par heure | Réglages → Notifications → Politique de notification | 20 |
 | URL publique (liens profonds) | Réglages → Notifications → Politique de notification, ou `DUMBMONIT_PUBLIC_URL` | vide |
 | Retours à la normale pendant un silence ou une maintenance | Réglages → Notifications → Politique de notification | non envoyés |

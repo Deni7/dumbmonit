@@ -1,12 +1,14 @@
 <script lang="ts">
 	/**
 	 * Setup wizard, after the first administrator signs in (and again from
-	 * Settings → General): name and language, a notification channel with a
-	 * test, first monitors, an agent, then three optional steps (single
-	 * sign-on and teams, on-call, retention).
+	 * Settings → General). It opens on "Your first alert": one thing to watch,
+	 * where the alert goes and a test that proves it, the whole road from a
+	 * fresh instance to a message on the phone. Then name and language, more
+	 * monitors, an agent, and three optional steps (single sign-on and teams,
+	 * on-call, retention).
 	 *
 	 * Every step can be skipped; "Skip setup" ends it at once. The step lives
-	 * in the URL (`?step=channel`), so Back works and a language change, which
+	 * in the URL (`?step=monitors`), so Back works and a language change, which
 	 * reloads the page, lands on the next step. Finishing marks the wizard done
 	 * on the server, for every browser.
 	 */
@@ -24,7 +26,7 @@
 	import Logo from '#lib/components/Logo.svelte';
 	import InstanceFields from '#lib/components/modes/InstanceFields.svelte';
 	import { browserTimeZone } from '#lib/components/modes/timezones.js';
-	import WizardChannel from '#lib/components/wizard/WizardChannel.svelte';
+	import WizardQuickStart from '#lib/components/wizard/WizardQuickStart.svelte';
 	import WizardMonitors from '#lib/components/wizard/WizardMonitors.svelte';
 	import WizardOnCall from '#lib/components/wizard/WizardOnCall.svelte';
 	import WizardPigeon from '#lib/components/wizard/WizardPigeon.svelte';
@@ -33,7 +35,7 @@
 	import UsersSection from '#lib/components/settings/UsersSection.svelte';
 	import StorageSection from '#lib/components/settings/StorageSection.svelte';
 
-	type StepId = 'instance' | 'channel' | 'monitors' | 'agent' | 'sso' | 'oncall' | 'retention';
+	type StepId = 'start' | 'instance' | 'monitors' | 'agent' | 'sso' | 'oncall' | 'retention';
 	interface Step {
 		id: StepId;
 		title: () => string;
@@ -44,8 +46,8 @@
 	}
 
 	const STEPS: Step[] = [
+		{ id: 'start', title: () => m.wizard_start_title(), text: () => m.wizard_start_text(), say: () => m.wizard_pigeon_start() },
 		{ id: 'instance', title: () => m.wizard_instance_title(), text: () => m.wizard_instance_text(), say: () => m.wizard_pigeon_instance() },
-		{ id: 'channel', title: () => m.wizard_channel_title(), text: () => m.wizard_channel_text(), say: () => m.wizard_pigeon_channel() },
 		{ id: 'monitors', title: () => m.wizard_monitors_title(), text: () => m.wizard_monitors_text(), say: () => m.wizard_pigeon_monitors() },
 		{ id: 'agent', title: () => m.wizard_agent_title(), text: () => m.wizard_agent_text(), say: () => m.wizard_pigeon_agent() },
 		{ id: 'sso', title: () => m.wizard_sso_title(), text: () => m.wizard_sso_text(), say: () => m.wizard_pigeon_sso(), optional: true },
@@ -54,7 +56,8 @@
 	];
 
 	const steps = STEPS;
-	const asked = $derived(page.url.searchParams.get('step'));
+	// `channel` was the notification step before it joined "Your first alert".
+	const asked = $derived(page.url.searchParams.get('step') === 'channel' ? 'start' : page.url.searchParams.get('step'));
 	const index = $derived(Math.max(0, steps.findIndex((s) => s.id === asked)));
 	const step = $derived(steps[index]);
 	const last = $derived(index === steps.length - 1);
@@ -200,10 +203,10 @@
 					<p class="mt-2 max-w-[65ch] text-ink-2">{step.text()}</p>
 
 					<div class="mt-6 min-w-0">
-						{#if step.id === 'instance'}
+						{#if step.id === 'start'}
+							<WizardQuickStart />
+						{:else if step.id === 'instance'}
 							<InstanceFields bind:name bind:language bind:timezone idPrefix="wizard-instance" />
-						{:else if step.id === 'channel'}
-							<WizardChannel />
 						{:else if step.id === 'monitors'}
 							<WizardMonitors />
 						{:else if step.id === 'agent'}

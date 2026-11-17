@@ -13,6 +13,7 @@ ladder (info → advisory → warning), predictions are forecasts, and maintenan
 windows are scheduled.
 
 <div class="dm-links" markdown>
+<a href="install/quickstart/">First alert in five minutes<small>From docker compose up to a message on your phone</small></a>
 <a href="install/docker/">Install<small>Docker Compose, first start, backups</small></a>
 <a href="install/first-device/">Add your first monitor<small>SNMP, network scan, what happens next</small></a>
 <a href="alerting/">Alerting<small>Built-in rules, quiet by construction</small></a>

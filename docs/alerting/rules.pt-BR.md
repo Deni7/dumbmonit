@@ -15,7 +15,7 @@ instância.
 
 | Regra | O que é | Limite padrão | Retenção | Severidade | Lembrete |
 |---|---|---|---|---|---|
-| Monitor unreachable | Nenhuma medição recebida por mais de três minutos. `time() - tlast_over_time(dumbmonit_up[7d])` | > 180 s | 1 min | Alerta (`critical`) | 6 h |
+| Monitor unreachable | Nenhuma medição recebida por mais de três minutos. `time() - tlast_over_time(dumbmonit_up[7d])` | > 180 s | 30 s | Alerta (`critical`) | 6 h |
 | High CPU | Carga de CPU sustentada acima de 90%, média por monitor entre fontes SNMP, Proxmox e agente; limpa abaixo de 85%. | > 90 % | 10 min | Aviso (`warning`), escala depois de 1 h | 6 h |
 | Unusual CPU | Carga de CPU perceptivelmente diferente do usual nesse horário e dia da semana (linha de base sazonal). | score > 3.5 | 15 min | Info (`info`) | 6 h |
 | Disk almost full | Sistema de arquivos 90% cheio ou mais, por ponto de montagem (SNMP, storages Proxmox e sistemas de arquivos raiz); limpa abaixo de 88%. | ≥ 90 % | 15 min | Aviso (`warning`), escala depois de 24 h | 6 h |
@@ -54,7 +54,7 @@ fonte de alimentação de duas nunca dispara.
 
 | Regra | O que é | Limite padrão | Retenção | Severidade | Lembrete |
 |---|---|---|---|---|---|
-| Service down | O serviço não respondeu corretamente por três minutos (`dumbmonit_probe_success{probe!="push"} == bool 0`). | > 0 | 3 min | Alerta (`critical`) | 30 min |
+| Service down | O serviço não respondeu corretamente por dois minutos (`dumbmonit_probe_success{probe!="push"} == bool 0`). | > 0 | 2 min | Alerta (`critical`) | 30 min |
 | Heartbeat missed | O job não chamou dentro de seu intervalo esperado mais o período de tolerância, ou reportou uma falha ele mesmo (`dumbmonit_probe_success{probe="push"} == bool 0`; o prazo é definido por monitor, veja [Heartbeat](../devices/push.md)). | > 0 | 2 min | Aviso (`warning`) | 6 h |
 | Service flapping | O serviço mudou de estado mais de seis vezes em trinta minutos (`changes(dumbmonit_probe_success{probe!="push"}[30m])`). | > 6 | 5 min | Aviso (`warning`) | 1 h |
 | Slow service | O serviço leva mais de três segundos para responder; verificações com falha ficam de fora (`dumbmonit_probe_duration_seconds and dumbmonit_probe_success == 1`). | > 3 s | 10 min | Aviso (`warning`) | 6 h |

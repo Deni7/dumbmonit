@@ -53,7 +53,7 @@
 
 | Правило | Что | Порог по умолчанию | Выдержка | Важность | Напоминание |
 |---|---|---|---|---|---|
-| Service down | Служба не отвечала корректно три минуты (`dumbmonit_probe_success{probe!="push"} == bool 0`). | > 0 | 3 мин | Warning (`critical`) | 30 мин |
+| Service down | Служба не отвечала корректно две минуты (`dumbmonit_probe_success{probe!="push"} == bool 0`). | > 0 | 2 мин | Warning (`critical`) | 30 мин |
 | Heartbeat missed | Задание не вышло на связь в течение ожидаемого интервала плюс льготного периода или само сообщило о сбое (`dumbmonit_probe_success{probe="push"} == bool 0`; задержка задаётся для каждого монитора, см. [Heartbeat](../devices/push.md)). | > 0 | 2 мин | Advisory (`warning`) | 6 ч |
 | Service flapping | Служба сменила состояние более шести раз за тридцать минут (`changes(dumbmonit_probe_success{probe!="push"}[30m])`). | > 6 | 5 мин | Advisory (`warning`) | 1 ч |
 | Slow service | Служба отвечает дольше трёх секунд; неудачные проверки не учитываются (`dumbmonit_probe_duration_seconds and dumbmonit_probe_success == 1`). | > 3 с | 10 мин | Advisory (`warning`) | 6 ч |

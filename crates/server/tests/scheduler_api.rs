@@ -106,3 +106,30 @@ async fn les_cibles_echues_sont_sondees_et_leur_resultat_enregistre() {
     // La cible désactivée n'a jamais été interrogée.
     assert_eq!(last_probe(&lab.pool, off).await, (None, None));
 }
+
+#[tokio::test]
+async fn un_moniteur_ajoute_en_marche_est_sonde_tout_de_suite() {
+    let lab = lab().await;
+    scheduler::spawn(lab.state.clone());
+    // Le premier tour charge une base vide ; la cible arrive ensuite, comme un
+    // moniteur ajouté depuis l'interface.
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+    let id = add_target(&lab.pool, "nas", "dummy", "nas.lan", true).await;
+    sqlx::query("UPDATE targets SET interval_secs = 300 WHERE id = ?")
+        .bind(id)
+        .execute(&lab.pool)
+        .await
+        .expect("période");
+    scheduler::wake();
+
+    // Avant : jusqu'à quinze secondes de rechargement, puis un décalage pouvant
+    // aller jusqu'à la période entière (ici cinq minutes).
+    let started = Instant::now();
+    loop {
+        if last_probe(&lab.pool, id).await.0.is_some() {
+            break;
+        }
+        assert!(started.elapsed() < Duration::from_secs(6), "première sonde trop tardive");
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}

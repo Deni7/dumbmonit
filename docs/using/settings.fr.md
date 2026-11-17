@@ -336,3 +336,11 @@ Version du serveur et santé de ses deux magasins, la base de données
 et rafraîchi toutes les 15 secondes. Un magasin qui arrête de répondre
 montre un avertissement avec l'erreur et quoi vérifier. La section pointe
 aussi vers cette documentation et nomme la licence, MIT.
+
+**Premier lancement**, replié en bas, chronomètre le chemin jusqu'à la première
+alerte sur cette instance : démarrée sans compte, administrateur créé, premier
+moniteur, premier canal, premier message remis (un test compte) et première
+vraie alerte remise, chacune avec son délai depuis le départ. Les heures sont
+notées une fois, restent sur l'instance et ne sont jamais envoyées ailleurs
+(`GET /api/onboarding`, `first_run`). Voir [Première alerte en cinq
+minutes](../install/quickstart.md).

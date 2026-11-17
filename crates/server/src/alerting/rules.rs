@@ -144,11 +144,16 @@ pub fn builtin_rules() -> Vec<Rule> {
         // et elles sonnaient une semaine durant, la cible bien vivante. `bottomk`
         // ne garde que la plus fraîche de chaque cible, avec ses étiquettes : les
         // silences par tag et le nom affiché continuent de fonctionner.
+        //
+        // Le seuil de trois minutes est déjà l'anti-faux-positif (deux sondes
+        // manquées à la période par défaut) ; le `for` ne fait que confirmer au
+        // cycle suivant, trente secondes suffisent. Une minute de plus retardait
+        // chaque première alerte sans écarter de fausse panne.
         Rule {
             description: "No measurement received for more than three minutes.".to_string(),
             operator: Operator::Gt,
             threshold: 180.0,
-            for_duration: Duration::from_secs(60),
+            for_duration: Duration::from_secs(30),
             severity: Severity::Critical,
             unit: "s".to_string(),
             ..base(
@@ -596,7 +601,9 @@ pub fn builtin_rules() -> Vec<Rule> {
         },
         // Moniteurs de disponibilité. Contrairement au matériel, un service en
         // panne écrit bien un point (`probe_success = 0`) : la règle est un simple
-        // seuil, et le `for` absorbe un raté isolé. `== bool 0` rend 1 pour un
+        // seuil, et le `for` absorbe un raté isolé. Deux minutes, soit trois
+        // sondes en échec d'affilée à la période par défaut : un raté isolé, et
+        // même deux, ne sonnent jamais. `== bool 0` rend 1 pour un
         // service en panne ; sans `bool`, la comparaison renverrait 0 (la valeur
         // de gauche) et le seuil « > 0 » ne se déclencherait jamais.
         //
@@ -604,10 +611,10 @@ pub fn builtin_rules() -> Vec<Rule> {
         // propre règle, `push_missed`, en avertissement : un cron en retard n'est
         // pas une panne critique, et il ne doit pas alerter deux fois.
         Rule {
-            description: "The service has not responded correctly for three minutes.".to_string(),
+            description: "The service has not responded correctly for two minutes.".to_string(),
             operator: Operator::Gt,
             threshold: 0.0,
-            for_duration: Duration::from_secs(3 * 60),
+            for_duration: Duration::from_secs(2 * 60),
             severity: Severity::Critical,
             repeat_interval: Some(Duration::from_secs(1800)),
             ..base(

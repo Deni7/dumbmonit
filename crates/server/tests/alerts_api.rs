@@ -1216,7 +1216,7 @@ async fn the_notification_policy_has_defaults_and_accepts_partial_updates() {
 
     let (status, policy) = app.request("GET", "/api/notify/policy", None).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(policy["batch_window_secs"], json!(60));
+    assert_eq!(policy["batch_window_secs"], json!(30));
     assert_eq!(policy["max_per_hour"], json!(20));
     assert_eq!(policy["flap_events"], json!(4));
     assert_eq!(policy["public_url"], json!(""));

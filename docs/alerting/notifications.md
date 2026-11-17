@@ -28,7 +28,7 @@ evaluate (hysteresis, per-monitor overrides)
 | Quiet hours | Channel → Delivery options | off |
 | Routing filter (tags, kind, rule) | Channel → Delivery options → *Only some alerts* | off (the channel hears everything) |
 | Escalation if nobody acknowledges | Settings → Notifications → Notification policy | off |
-| Batch window | Settings → Notifications → Notification policy | 60 s |
+| Batch window | Settings → Notifications → Notification policy | 30 s |
 | Messages per channel per hour | Settings → Notifications → Notification policy | 20 |
 | Public URL (deep links) | Settings → Notifications → Notification policy, or `DUMBMONIT_PUBLIC_URL` | empty |
 | Recoveries during a silence or maintenance window | Settings → Notifications → Notification policy | not sent |

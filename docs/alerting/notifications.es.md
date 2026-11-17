@@ -29,7 +29,7 @@ evaluar (histéresis, anulaciones por monitor)
 | Horas de silencio | Canal → Delivery options | desactivado |
 | Filtro de enrutado (etiquetas, tipo, regla) | Canal → Delivery options → *Only some alerts* | desactivado (el canal escucha todo) |
 | Escalada si nadie confirma | Settings → Notifications & reports → Notification policy | desactivado |
-| Ventana de lote | Settings → Notifications & reports → Notification policy | 60 s |
+| Ventana de lote | Settings → Notifications & reports → Notification policy | 30 s |
 | Mensajes por canal por hora | Settings → Notifications & reports → Notification policy | 20 |
 | URL pública (enlaces profundos) | Settings → Notifications & reports → Notification policy, o `DUMBMONIT_PUBLIC_URL` | vacía |
 
