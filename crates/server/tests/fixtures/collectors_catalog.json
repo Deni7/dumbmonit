@@ -2075,11 +2075,12 @@
           "arubacentral_devices_poor_health"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "authentik",
-    "label": "authentik (beta)",
+    "label": "authentik",
     "summary": "Readiness, workers, failed system tasks, outpost connections, version updates, users.",
     "examples": [
       "authentik 2025.x"
@@ -2284,7 +2285,8 @@
           "authentik_version_info"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "aws",
@@ -3384,7 +3386,8 @@
           "ceph_pgs_unclean"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "cloudflare",
@@ -4617,7 +4620,8 @@
           "duplicati_backup_target_bytes"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "elasticsearch",
@@ -5679,7 +5683,7 @@
   },
   {
     "kind": "frigate",
-    "label": "Frigate NVR (beta)",
+    "label": "Frigate NVR",
     "summary": "Cameras that stopped delivering frames, detector speed and hangs, frame rates, recording storage, updates.",
     "examples": [
       "Frigate 0.14 and later"
@@ -5903,7 +5907,8 @@
           "frigate_storage_used_percent"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "gitlab",
@@ -7937,9 +7942,11 @@
         "queue.read\nJob queues (job.read on older Immich)",
         "session.read\nDevices and their last connection",
         "asset.read\nLast backup",
-        "user.read\nThe account that owns the key"
+        "user.read\nThe account that owns the key",
+        "adminUser.read\nNeeds a key from an account with access to Administration: the list of accounts",
+        "adminSession.read\nNeeds a key from an account with access to Administration: every account's phones and tablets"
       ],
-      "warning": "Create the key from an account that can open Administration, or photo counts and job queues are skipped; \"last backup\" is the whole library's latest upload, the same for every device.",
+      "warning": "Create the key from an account with access to Administration: it then covers the phones and tablets of every user, and photo counts and job queues are read. With an ordinary account only its own devices are read. \"Last backup\" is the whole library's latest upload, the same for every device.",
       "doc_url": "https://dumbmonit.selfhostr.io/docs/devices/immich/"
     },
     "options": [
@@ -9510,7 +9517,7 @@
   },
   {
     "kind": "keycloak",
-    "label": "Keycloak (beta)",
+    "label": "Keycloak",
     "summary": "Readiness and database health, version, realms (disabled ones), active sessions and users per realm.",
     "examples": [
       "Keycloak 25 and later",
@@ -9803,7 +9810,8 @@
           "keycloak_realm_offline_sessions"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "kopia",
@@ -10056,7 +10064,8 @@
           "kopia_source_last_snapshot_bytes"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "kubernetes",
@@ -10376,7 +10385,7 @@
   },
   {
     "kind": "lidarr",
-    "label": "Lidarr (beta)",
+    "label": "Lidarr",
     "summary": "Health warnings, failing download clients and indexers, download queue errors, library disk space, updates.",
     "examples": [
       "Lidarr"
@@ -10581,7 +10590,8 @@
           "lidarr_queue_total"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "loki",
@@ -11484,7 +11494,7 @@
   },
   {
     "kind": "mailcow",
-    "label": "mailcow (beta)",
+    "label": "mailcow",
     "summary": "Stopped containers, Postfix queue size and age, mail volume, mailboxes near their quota.",
     "examples": [
       "mailcow: dockerized"
@@ -11700,7 +11710,8 @@
           "limit": "10"
         }
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "mdaemon",
@@ -11966,7 +11977,7 @@
   },
   {
     "kind": "meraki",
-    "label": "Cisco Meraki (beta)",
+    "label": "Cisco Meraki",
     "summary": "Beta. A Cisco Meraki organization through the Dashboard API: devices offline, Internet uplinks that failed, license out of compliance or expiring, clients per network.",
     "examples": [
       "Meraki MX / MS / MR",
@@ -12163,7 +12174,8 @@
           "meraki_clients"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "mikrotik",
@@ -12786,7 +12798,8 @@
           "minio_capacity_usable_used_percent"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "mongodb",
@@ -15752,7 +15765,7 @@
   },
   {
     "kind": "omada",
-    "label": "TP-Link Omada (beta)",
+    "label": "TP-Link Omada",
     "summary": "Beta. A TP-Link Omada controller through its OpenAPI: devices disconnected, CPU and memory saturated, firmware updates offered, clients per site.",
     "examples": [
       "Omada software controller",
@@ -16064,7 +16077,8 @@
           "omada_device_memory_used_percent"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "openvpn",
@@ -17683,7 +17697,8 @@
           "paloalto_session_usage_percent"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "paperless",
@@ -19411,6 +19426,8 @@
         "/api/v2/status/services GET\nStopped services",
         "/api/v2/system/version GET\npfSense version",
         "/api/v2/system/restapi/version GET\nOptional: updates of the REST API package",
+        "/api/v2/firewall/states/size GET\nOptional: state table usage",
+        "/api/v2/status/carp GET\nOptional: CARP maintenance mode",
         "/api/v2/auth/key POST\nOnly while creating the key, then remove it"
       ],
       "warning": "The REST API package is a community project, not part of pfSense: reinstall it after each pfSense upgrade. pfSense ships a self-signed certificate: tick \"Accept an unverifiable certificate\" unless you replaced it.",
@@ -22306,7 +22323,7 @@
   },
   {
     "kind": "prowlarr",
-    "label": "Prowlarr (beta)",
+    "label": "Prowlarr",
     "summary": "Health warnings, indexers disabled after failures, disk space, updates.",
     "examples": [
       "Prowlarr"
@@ -22511,7 +22528,8 @@
           "prowlarr_queue_total"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "proxmox",
@@ -24123,7 +24141,7 @@
   },
   {
     "kind": "qbittorrent",
-    "label": "qBittorrent (beta)",
+    "label": "qBittorrent",
     "summary": "Torrents in error or stalled, lost connectivity, download and upload speed, free space, torrents by state.",
     "examples": [
       "qBittorrent 4.x and 5.x"
@@ -24322,7 +24340,8 @@
           "qbittorrent_upload_speed_bytes"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "qnap",
@@ -24603,7 +24622,8 @@
           "qnap_disk_temperature_celsius"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "rabbitmq",
@@ -24946,7 +24966,7 @@
   },
   {
     "kind": "radarr",
-    "label": "Radarr (beta)",
+    "label": "Radarr",
     "summary": "Health warnings, failing download clients and indexers, download queue errors, library disk space, updates.",
     "examples": [
       "Radarr v5"
@@ -25151,7 +25171,8 @@
           "radarr_queue_total"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "radius",
@@ -27817,7 +27838,7 @@
   },
   {
     "kind": "sonarr",
-    "label": "Sonarr (beta)",
+    "label": "Sonarr",
     "summary": "Health warnings, failing download clients and indexers, download queue errors, library disk space, updates.",
     "examples": [
       "Sonarr v4"
@@ -28022,7 +28043,8 @@
           "sonarr_queue_total"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "sonicwall",
@@ -28166,7 +28188,8 @@
           "sonicwall_version_info"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "sophos",
@@ -31057,7 +31080,7 @@
   },
   {
     "kind": "unifiprotect",
-    "label": "UniFi Protect (beta)",
+    "label": "UniFi Protect",
     "summary": "Cameras offline or not recording, NVR disks and storage, recording switched off.",
     "examples": [
       "UNVR",
@@ -31255,7 +31278,8 @@
           "unifiprotect_storage_used_percent"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "unraid",
@@ -31628,7 +31652,7 @@
   },
   {
     "kind": "vaultwarden",
-    "label": "Vaultwarden (beta)",
+    "label": "Vaultwarden",
     "summary": "Liveness, version, open sign-ups, and with the admin token disabled-account and two-step login counts.",
     "examples": [
       "Vaultwarden"
@@ -31802,7 +31826,8 @@
           "vaultwarden_version_info"
         ]
       }
-    ]
+    ],
+    "beta": true
   },
   {
     "kind": "veeam",
