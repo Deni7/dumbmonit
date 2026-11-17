@@ -486,7 +486,7 @@ pub async fn prune(pool: &SqlitePool, target: TargetId) -> Result<()> {
     .await
     .context("purge des changements anciens")?;
 
-    let orphans: Vec<i64> = sqlx::query_as(
+    let orphans: Vec<i64> = sqlx::query_scalar(
         "SELECT s.id FROM webchange_snapshots s
          WHERE s.target_id = ?
            AND NOT EXISTS (SELECT 1 FROM webchange_pages p
