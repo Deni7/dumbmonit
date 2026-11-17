@@ -10,6 +10,9 @@
 	 * Unbound means refused: a host enrolled before binding existed, and never
 	 * bound since, no longer gets its measurements, container commands or relayed
 	 * probes accepted. The summary says so and points to the settings.
+	 *
+	 * An agent whose configuration lists backup servers (`server_urls`) says which
+	 * one it reports to: the primary, or a backup since a given time.
 	 */
 	import { ShieldCheck, ShieldAlert } from 'lucide-svelte';
 	import { getAgentHost, type AgentHost, type Target } from '#lib/api/index.js';
@@ -41,6 +44,10 @@
 	/** An unknown state from a newer server reads as "not bound", never as safe. */
 	const unbound = $derived(!!host && host.binding !== 'bound');
 	const system = $derived(host ? `${host.os_version ?? host.os}${host.arch ? ` · ${host.arch}` : ''}` : '');
+	/** Server the agent reports to, when its configuration lists several. */
+	const link = $derived(host?.server_link ?? null);
+	const onBackup = $derived(!!link && link.active > 0);
+	const switchedAt = $derived(link?.since_ms ? new Date(link.since_ms) : null);
 </script>
 
 <!-- Shown only on a Synology NAS running the agent package: volumes, RAID, disks, packages. -->
@@ -58,6 +65,16 @@
 				{m.devices_agent_last_batch()}
 				<time class="tnum text-ink" title={formatDateTime(host.last_seen_at)}>{formatRelative(host.last_seen_at)}</time>
 			</span>
+			{#if link}
+				<span class="inline-flex min-w-0 items-center gap-1.5 text-ink-2" title={link.url}>
+					{m.devices_agent_server()}
+					{#if onBackup}
+						<Plate tone="warning" label={m.devices_agent_server_backup()} />
+					{:else}
+						<span class="text-ink">{m.devices_agent_server_primary()}</span>
+					{/if}
+				</span>
+			{/if}
 			<span class="inline-flex items-center gap-1.5 sm:ml-auto">
 				{#if unbound}
 					<ShieldAlert class="size-4 text-warning-ink" aria-hidden="true" />
@@ -68,6 +85,14 @@
 				{/if}
 			</span>
 		</div>
+		{#if link && onBackup}
+			<p class="mt-2 break-words text-sm text-ink-2">
+				{m.devices_agent_server_backup_detail({ url: link.url, since: formatRelative(switchedAt) })}
+				{#if link.primary_error}
+					<span class="block">{m.devices_agent_server_primary_error({ error: link.primary_error })}</span>
+				{/if}
+			</p>
+		{/if}
 		{#if unbound}
 			<p class="mt-2 text-sm text-ink-2">
 				{m.devices_agent_unbound_detail()}

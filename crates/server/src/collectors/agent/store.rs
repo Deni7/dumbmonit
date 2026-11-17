@@ -1,7 +1,10 @@
 //! Persistance de l'agent : jetons d'enregistrement et machines enregistrées.
 
 use anyhow::{Context, Result};
-use dumbmonit_proto::{AgentIdentity, Credential, GatewayCheck, RelaySetting, TargetId};
+use dumbmonit_proto::{
+    AgentIdentity, Credential, GatewayCheck, MAX_SERVER_LINK_TEXT, RelaySetting, ServerLink,
+    TargetId,
+};
 use sqlx::{Row, SqlitePool};
 
 use crate::crypto::Cipher;
@@ -1044,7 +1047,7 @@ async fn update_host(
          SET hostname = ?, os = ?, os_version = ?, kernel_version = ?, arch = ?,
              agent_version = ?, commands_enabled = ?, relay = ?, site = ?,
              relay_control = ?, relay_local = ?, binding_supported = ?, relay_gateway_port = ?,
-             relay_gateway_check = ?
+             relay_gateway_check = ?, server_link = ?
          WHERE target_id = ?",
     )
     .bind(&identity.hostname)
@@ -1061,6 +1064,7 @@ async fn update_host(
     .bind(i64::from(identity.binding_supported))
     .bind(identity.relay_gateway.filter(|_| identity.relay).map(i64::from))
     .bind(gateway_check_json(identity))
+    .bind(server_link_json(identity))
     .bind(target_id)
     .execute(pool)
     .await
@@ -1088,6 +1092,23 @@ async fn store_remediation(
         .await
         .context("recording the remediation declaration")?;
     Ok(())
+}
+
+/// Serveur en service que l'agent rapporte (`server_urls`), borné, en JSON.
+/// Rien pour un agent qui ne connaît qu'une adresse : la colonne s'efface
+/// quand on retire ses secours.
+fn server_link_json(identity: &AgentIdentity) -> Option<String> {
+    let link = identity.server_link.as_ref()?;
+    let servers = link.servers.clamp(1, 64);
+    let clip = |text: &str| text.chars().take(MAX_SERVER_LINK_TEXT).collect::<String>();
+    let bounded = ServerLink {
+        active: link.active.min(servers - 1),
+        servers,
+        url: clip(&link.url),
+        since_ms: link.since_ms,
+        primary_error: link.primary_error.as_deref().map(clip),
+    };
+    serde_json::to_string(&bounded).ok()
 }
 
 /// Essai de passerelle que le relais rapporte, borné, en JSON. Rien pour un
@@ -1169,6 +1190,8 @@ pub struct HostInfo {
     pub relay_gateway_host: Option<String>,
     /// Dernier essai de sa passerelle par le relais.
     pub relay_gateway_check: Option<GatewayCheck>,
+    /// Serveur en service, quand l'agent en connaît plusieurs (`server_urls`).
+    pub server_link: Option<ServerLink>,
     pub last_seen_at: Option<String>,
     /// Vrai si la machine est liée à un secret connu d'elle seule.
     pub bound: bool,
@@ -1202,7 +1225,8 @@ pub async fn host(pool: &SqlitePool, target_id: TargetId) -> Result<Option<HostI
     let row = sqlx::query(
         "SELECT hostname, os, os_version, arch, agent_version, commands_enabled, relay, site,
                 relay_wanted, relay_wanted_site, relay_control, relay_local, last_seen_at, secret_hash, bound_at, binding_supported, rebind_until,
-                relay_gateway_wanted, relay_gateway_port, relay_gateway_host, relay_gateway_check
+                relay_gateway_wanted, relay_gateway_port, relay_gateway_host, relay_gateway_check,
+                server_link
          FROM agent_hosts WHERE target_id = ?",
     )
     .bind(target_id)
@@ -1220,7 +1244,7 @@ pub async fn list_hosts(pool: &SqlitePool) -> Result<Vec<(TargetId, String, Host
                 h.commands_enabled, h.relay, h.site, h.relay_wanted, h.relay_wanted_site,
                 h.relay_control, h.relay_local, h.last_seen_at, h.secret_hash, h.bound_at,
                 h.binding_supported, h.rebind_until, h.relay_gateway_wanted, h.relay_gateway_port,
-                h.relay_gateway_host, h.relay_gateway_check
+                h.relay_gateway_host, h.relay_gateway_check, h.server_link
          FROM agent_hosts h JOIN targets t ON t.id = h.target_id
          ORDER BY t.name",
     )
@@ -1238,6 +1262,9 @@ fn row_to_host(row: &sqlx::sqlite::SqliteRow) -> Result<HostInfo> {
     let gateway_check = row
         .try_get::<Option<String>, _>("relay_gateway_check")?
         .and_then(|raw| serde_json::from_str::<GatewayCheck>(&raw).ok());
+    let server_link = row
+        .try_get::<Option<String>, _>("server_link")?
+        .and_then(|raw| serde_json::from_str::<ServerLink>(&raw).ok());
     Ok(HostInfo {
         hostname: row.try_get("hostname")?,
         os: row.try_get("os")?,
@@ -1258,6 +1285,7 @@ fn row_to_host(row: &sqlx::sqlite::SqliteRow) -> Result<HostInfo> {
         relay_gateway_port: port_of(row.try_get("relay_gateway_port")?),
         relay_gateway_host: row.try_get("relay_gateway_host")?,
         relay_gateway_check: gateway_check,
+        server_link,
         last_seen_at: row.try_get("last_seen_at")?,
         bound: row.try_get::<Option<String>, _>("secret_hash")?.is_some(),
         bound_at: row.try_get("bound_at")?,
@@ -1507,6 +1535,37 @@ mod tests {
         assert_eq!(setting.gateway_host.as_deref(), Some("192.168.10.5"));
         assert!(set_relay_gateway(&db.pool, target, Some(9443), None).await.unwrap());
         assert_eq!(gateway(relay_setting(&db.pool, target).await.unwrap()), Some(9443));
+    }
+
+    #[tokio::test]
+    async fn the_server_an_agent_reports_using_is_kept_bounded_then_cleared() {
+        let db = setup().await;
+        let token_id = token(&db, "parc").await;
+        let mut agent = identity("nas", Some("id-nas"));
+        let first = enrol(&db, &agent, token_id).await;
+        let secret = first.issued_secret.clone().expect("secret");
+        let target = first.target_id;
+        assert!(host(&db.pool, target).await.unwrap().unwrap().server_link.is_none());
+
+        // Sur le secours : rangé, borné (un rang hors liste est ramené).
+        agent.server_link = Some(ServerLink {
+            active: 7,
+            servers: 2,
+            url: "https://b.example:8443".into(),
+            since_ms: Some(1_700_000_000_000),
+            primary_error: Some("x".repeat(5000)),
+        });
+        register(&db.pool, &db.cipher, &agent, token_id, Some(&secret)).await.expect("lot");
+        let link = host(&db.pool, target).await.unwrap().unwrap().server_link.expect("lien");
+        assert_eq!((link.active, link.servers), (1, 2));
+        assert_eq!(link.url, "https://b.example:8443");
+        assert_eq!(link.since_ms, Some(1_700_000_000_000));
+        assert_eq!(link.primary_error.unwrap().chars().count(), MAX_SERVER_LINK_TEXT);
+
+        // Plus de secours dans sa configuration : plus rien d'affiché.
+        agent.server_link = None;
+        register(&db.pool, &db.cipher, &agent, token_id, Some(&secret)).await.expect("lot");
+        assert!(host(&db.pool, target).await.unwrap().unwrap().server_link.is_none());
     }
 
     #[test]
