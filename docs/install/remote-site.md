@@ -255,9 +255,13 @@ A monitor does not have to choose between the server and one relay: it can be pr
 - Agent monitors are never probed through a relay (they push their own
   metrics); an agent can instead *connect* through a relay's gateway (see
   above). A relay always connects directly: there is no relay behind a relay.
-- A relay's gateway accepts 64 connections at a time and 4 MiB/s per tunnel
+- A relay's gateway accepts 256 connections at a time and 4 MiB/s per tunnel
   and direction by default (`gateway_max_connections`, `gateway_rate_kib`);
-  the server accepts 256 tunnels per relay.
+  the server accepts 1024 tunnels per relay (`DUMBMONIT_RELAY_MAX_TUNNELS`, up
+  to 4096). Up to date, the relay carries them all in **one** multiplexed
+  connection to the server (one yamux stream per agent connection, each still
+  encrypted end to end by the agent), and each agent keeps a single connection
+  (HTTP/2). An older server gets one tunnel per connection, as before.
 - The relay runs at most 8 probes at a time; a probe is bounded by the
   server's probe timeout (`DUMBMONIT_PROBE_TIMEOUT_SECS`), capped at 120 s on the
   agent.

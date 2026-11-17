@@ -24,6 +24,12 @@
 //! auquel le relais est lui-même enrôlé, rien dans la connexion entrante ne
 //! peut la choisir. Le nombre de connexions simultanées et le débit de chaque
 //! tunnel sont bornés ; une connexion muette est coupée.
+//!
+//! Vers un serveur à jour, les tunnels ne sont plus des connexions : ce sont
+//! les flux d'une seule connexion multiplexée ([`crate::mux`]), ouverte au
+//! premier besoin et rouverte si elle tombe. Un serveur antérieur la refuse
+//! (`426`) : la passerelle ouvre alors un tunnel par connexion, comme avant,
+//! et retente la connexion multiplexée toutes les heures.
 
 use std::future::Future;
 use std::net::SocketAddr;
@@ -37,11 +43,23 @@ use tokio::task::JoinSet;
 use tokio::time::Instant;
 use tracing::{debug, info, warn};
 
-use crate::client::PushClient;
+use crate::client::{PushClient, PushError};
+use crate::mux::MuxHandle;
 use crate::shutdown::Shutdown;
 
-/// Connexions simultanées par défaut (tunnels et téléchargements confondus).
-pub const DEFAULT_MAX_CONNECTIONS: usize = 64;
+/// Connexions simultanées par défaut (tunnels et téléchargements confondus) :
+/// un agent à jour n'en garde qu'une (HTTP/2), et toutes passent par la même
+/// connexion multiplexée vers le serveur.
+pub const DEFAULT_MAX_CONNECTIONS: usize = 256;
+
+/// Plafond de `gateway_max_connections` : la moitié des flux qu'une connexion
+/// multiplexée accepte ([`crate::mux::MAX_STREAMS`]), pour que des flux en
+/// cours de fermeture ne la fassent jamais déborder.
+pub const MAX_CONNECTIONS: usize = 2048;
+
+/// Délai avant de retenter la connexion multiplexée auprès d'un serveur qui
+/// l'a refusée (antérieur à elle) : il a pu être mis à jour entre-temps.
+const MUX_RETRY: Duration = Duration::from_secs(3600);
 
 /// Débit par défaut de chaque tunnel, dans chaque sens, en Kio/s.
 pub const DEFAULT_RATE_KIB: u32 = 4096;
@@ -90,16 +108,65 @@ pub trait Upstream: Send + Sync + 'static {
 /// Le serveur, joint par le canal chiffré du relais.
 pub struct ServerUpstream {
     client: PushClient,
+    /// Connexion multiplexée vers le serveur, ou ce qu'on en sait.
+    mux: tokio::sync::Mutex<Multiplexed>,
+}
+
+/// Où en est la connexion multiplexée.
+enum Multiplexed {
+    /// Pas encore ouverte, ou tombée : ouverte au prochain besoin.
+    Closed,
+    Open(MuxHandle),
+    /// Refusée par le serveur : un tunnel par connexion jusqu'à cet instant.
+    Unsupported { retry: Instant },
 }
 
 impl ServerUpstream {
     pub fn new(client: PushClient) -> Self {
-        Self { client }
+        Self { client, mux: tokio::sync::Mutex::new(Multiplexed::Closed) }
+    }
+
+    /// Un flux de la connexion multiplexée, ouverte au besoin. `Ok(None)` : le
+    /// serveur ne la connaît pas, il faut un tunnel à part.
+    async fn open_stream(&self) -> Result<Option<crate::mux::MuxStream>, String> {
+        let mut state = self.mux.lock().await;
+        let handle = match &*state {
+            Multiplexed::Open(handle) if handle.is_open() => Some(handle.clone()),
+            Multiplexed::Unsupported { retry } if Instant::now() < *retry => return Ok(None),
+            _ => None,
+        };
+        if let Some(handle) = handle {
+            if let Some(stream) = handle.open().await {
+                return Ok(Some(stream));
+            }
+            debug!("relay gateway: multiplexed connection lost, opening another one");
+        }
+        *state = Multiplexed::Closed;
+        match self.client.open_mux().await {
+            Ok(upgraded) => {
+                let handle = crate::mux::spawn(upgraded);
+                let stream = handle.open().await;
+                *state = Multiplexed::Open(handle);
+                debug!("relay gateway: multiplexed connection to the server open");
+                stream.map(Some).ok_or_else(|| "the multiplexed connection closed at once".into())
+            }
+            // Serveur antérieur à la connexion multiplexée : `426` (protocole de
+            // mise à niveau inconnu), ou pas de route du tout.
+            Err(PushError::Rejected { status: 404 | 405 | 426, .. }) => {
+                info!("relay gateway: the server predates multiplexing, one tunnel per connection");
+                *state = Multiplexed::Unsupported { retry: Instant::now() + MUX_RETRY };
+                Ok(None)
+            }
+            Err(error) => Err(error.to_string()),
+        }
     }
 }
 
 impl Upstream for ServerUpstream {
     async fn open(&self) -> Result<Box<dyn Io>, String> {
+        if let Some(stream) = self.open_stream().await? {
+            return Ok(Box::new(stream));
+        }
         let tunnel = self.client.open_tunnel().await.map_err(|error| error.to_string())?;
         Ok(Box::new(tunnel))
     }
@@ -121,7 +188,7 @@ pub async fn serve<U: Upstream>(
     let local = listener.local_addr().ok();
     info!(listen = ?local, max = config.max_connections, rate_kib = config.rate_kib,
         "relay gateway open for the agents of this site");
-    let slots = Arc::new(Semaphore::new(config.max_connections.max(1)));
+    let slots = Arc::new(Semaphore::new(config.max_connections.clamp(1, MAX_CONNECTIONS)));
     let rate = u64::from(config.rate_kib.max(1)) * 1024;
     let mut connections = JoinSet::new();
     loop {

@@ -27,6 +27,18 @@ pub const DEFAULT_AGENT_TLS_PORT: u16 = 8443;
 /// sécurité, pas le nom.
 pub const AGENT_TLS_SERVER_NAME: &str = "agents.dumbmonit.internal";
 
+/// Protocole ALPN par lequel un agent se désigne dans son ClientHello.
+///
+/// Un agent à jour le propose à chaque poignée de main, à côté de `h2` et de
+/// `http/1.1` : sur le port unique du serveur (`DUMBMONIT_SINGLE_PORT`), c'est
+/// ce qui aiguille la connexion vers le canal des agents (certificat client,
+/// autorité épinglée) plutôt que vers l'interface. Le protocole effectivement
+/// parlé reste HTTP (`h2` ou `http/1.1`, choisi par le serveur) : la marque ne
+/// sert qu'à l'aiguillage. Un serveur antérieur l'ignore et choisit
+/// `http/1.1` ; un agent antérieur ne la propose pas et passe par le port des
+/// agents (8443).
+pub const AGENT_ALPN: &[u8] = b"dumbmonit-agent/1";
+
 /// Enrôlement : clé publique de l'agent contre un certificat client.
 pub const TLS_ENROL_PATH: &str = "/api/agent/tls/enroll";
 
@@ -70,6 +82,23 @@ pub const RELAY_TUNNEL_PATH: &str = "/api/agent/relay/tunnel";
 
 /// Protocole de la mise à niveau HTTP d'un tunnel de relais.
 pub const RELAY_TUNNEL_PROTOCOL: &str = "dumbmonit-tunnel/1";
+
+/// Protocole de la mise à niveau HTTP qui ouvre la connexion multiplexée d'un
+/// relais.
+///
+/// Même route que [`RELAY_TUNNEL_PATH`], autre `Upgrade:` : au lieu d'un
+/// tunnel par connexion d'agent du site, le relais garde une seule connexion
+/// vers le serveur et y ouvre un flux [yamux] par connexion. Chaque flux est
+/// ensuite traité exactement comme un tunnel : poignée de main TLS de l'agent
+/// du site, de bout en bout, et le relais ne voit que du chiffré.
+///
+/// Négociation : un serveur antérieur répond `426` à ce protocole ; le relais
+/// revient alors aux tunnels [`RELAY_TUNNEL_PROTOCOL`] et réessaie plus tard.
+/// Un relais antérieur ne demande que des tunnels, que le serveur sert
+/// toujours.
+///
+/// [yamux]: https://github.com/hashicorp/yamux/blob/master/spec.md
+pub const RELAY_MUX_PROTOCOL: &str = "dumbmonit-mux/1";
 
 /// Port d'écoute par défaut de la passerelle d'un relais (côté site).
 pub const DEFAULT_RELAY_GATEWAY_PORT: u16 = 8443;

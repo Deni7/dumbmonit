@@ -407,7 +407,7 @@ log_level: info
 | `DUMBMONIT_AGENT_RELAY` | `true` 运行，对于服务器，分配给这个代理的监控项的探测（参见 [在 Docker / 另一网络中运行代理](#run-the-agent-in-docker--on-another-network)） |
 | `DUMBMONIT_AGENT_SITE` | 当它被提供为中继时显示在代理旁的网站标签 |
 | `DUMBMONIT_AGENT_GATEWAY_LISTEN` | 中继为其站点的代理提供的网关，例如 `0.0.0.0:8443`（`gateway_listen:`）；优先于界面中设置的端口（参见[在中继后安装代理](../install/remote-site.md#5-install-agents-behind-the-relay)） |
-| `DUMBMONIT_AGENT_GATEWAY_MAX_CONNECTIONS` | 网关同时保持的连接数，默认 64（`gateway_max_connections:`） |
+| `DUMBMONIT_AGENT_GATEWAY_MAX_CONNECTIONS` | 网关同时保持的连接数，默认 256（`gateway_max_connections:`） |
 | `DUMBMONIT_AGENT_GATEWAY_RATE_KIB` | 经网关的每条隧道每个方向的速率，单位 KiB/s，默认 4096（`gateway_rate_kib:`） |
 
 ## Windows 性能计数器 {#windows-performance-counters}

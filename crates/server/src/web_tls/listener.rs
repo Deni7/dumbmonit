@@ -16,6 +16,10 @@
 //! Comme pour le canal des agents, la lecture du premier octet et la poignée
 //! de main se font hors de la boucle d'acceptation, bornées en durée et en
 //! nombre : un client lent ne retient personne.
+//!
+//! Le port unique ([`crate::single_port`]) dépose ici aussi les connexions
+//! qui ne viennent pas d'un agent ([`WebListener::feed`]) : elles sont servies
+//! par la même application, exactement comme celles de ce port.
 
 use std::io;
 use std::net::SocketAddr;
@@ -31,15 +35,16 @@ use tokio_rustls::TlsAcceptor;
 use tokio_rustls::server::TlsStream;
 
 use super::WebTls;
+use crate::agent_tls::Transport;
 
 /// Premier octet d'un enregistrement TLS `handshake` (RFC 8446 §5.1).
-const TLS_HANDSHAKE_RECORD: u8 = 0x16;
+pub(crate) const TLS_HANDSHAKE_RECORD: u8 = 0x16;
 
 /// Délai laissé au client pour envoyer son premier octet.
-const FIRST_BYTE_TIMEOUT: Duration = Duration::from_secs(10);
+pub(crate) const FIRST_BYTE_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Durée maximale d'une poignée de main TLS.
-const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
+pub(crate) const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Connexions en cours de tri (premier octet, poignée de main, redirection)
 /// au plus.
@@ -60,8 +65,12 @@ const PLAIN_DRAIN: usize = 64 * 1024;
 /// Longueur maximale d'un nom d'hôte (RFC 1035).
 const MAX_HOST_LEN: usize = 253;
 
-/// Connexion servie : toujours chiffrée.
-pub type WebIo = TlsStream<TcpStream>;
+/// Connexion servie : toujours chiffrée. Le transport est une connexion TCP,
+/// de ce port ou du port unique.
+pub type WebIo = TlsStream<Box<dyn Transport>>;
+
+/// File des connexions établies, prêtes pour l'application.
+pub(crate) type WebFeed = mpsc::Sender<(WebIo, WebPeer)>;
 
 /// Ce que la connexion dit de son client.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,7 +87,15 @@ impl Connected<IncomingStream<'_, WebListener>> for WebPeer {
 /// Connexions triées, prêtes pour axum.
 pub struct WebListener {
     ready: mpsc::Receiver<(WebIo, WebPeer)>,
+    feed: WebFeed,
     local: SocketAddr,
+}
+
+impl WebListener {
+    /// File où déposer d'autres connexions établies (port unique).
+    pub(crate) fn feed(&self) -> WebFeed {
+        self.feed.clone()
+    }
 }
 
 impl Listener for WebListener {
@@ -107,8 +124,8 @@ pub fn listen(web: Arc<WebTls>, tcp: TcpListener) -> io::Result<WebListener> {
     }
     let local = tcp.local_addr()?;
     let (sender, ready) = mpsc::channel(128);
-    tokio::spawn(accept_loop(web, tcp, sender));
-    Ok(WebListener { ready, local })
+    tokio::spawn(accept_loop(web, tcp, sender.clone()));
+    Ok(WebListener { ready, feed: sender, local })
 }
 
 async fn accept_loop(web: Arc<WebTls>, tcp: TcpListener, ready: mpsc::Sender<(WebIo, WebPeer)>) {
@@ -157,7 +174,8 @@ async fn classify(web: &WebTls, stream: TcpStream, addr: SocketAddr) -> Option<(
         return None;
     }
     let acceptor = TlsAcceptor::from(config);
-    match tokio::time::timeout(HANDSHAKE_TIMEOUT, acceptor.accept(stream)).await {
+    let transport: Box<dyn Transport> = Box::new(stream);
+    match tokio::time::timeout(HANDSHAKE_TIMEOUT, acceptor.accept(transport)).await {
         Ok(Ok(tls)) => Some((tls, WebPeer { addr })),
         Ok(Err(error)) => {
             tracing::debug!(%addr, %error, "web port: TLS handshake refused");
@@ -168,7 +186,7 @@ async fn classify(web: &WebTls, stream: TcpStream, addr: SocketAddr) -> Option<(
 }
 
 /// Répond à une requête en clair, sans rien de l'application, puis ferme.
-async fn redirect_plain(mut stream: TcpStream, addr: SocketAddr) {
+pub(crate) async fn redirect_plain(mut stream: TcpStream, addr: SocketAddr) {
     let head = tokio::time::timeout(PLAIN_TIMEOUT, read_head(&mut stream)).await.ok().flatten();
     let response = plain_response(head.as_deref());
     let redirected = response.starts_with(REDIRECT_STATUS);

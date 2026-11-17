@@ -87,6 +87,26 @@ All notable changes to this project are documented here. The format follows
   accepted. The installers take `--proxy` / `--no-proxy` (`-Proxy`, `-NoProxy`) for their own
   downloads and write them to `agent.yaml`; `docker-compose.agent.yml` passes
   `DUMBMONIT_AGENT_PROXY`.
+- **Optional single port: `DUMBMONIT_SINGLE_PORT=443`.** One more port serves the web interface,
+  the API and the agent channel. Each connection is sorted on its TLS ClientHello: agents announce
+  the ALPN protocol `dumbmonit-agent/1` and get the agent channel (client certificate, pinned
+  authority, same routes and checks as 8443); everything else (browsers, `curl`, PowerShell over
+  TLS 1.2 included) gets the interface and its certificate; plain HTTP gets the usual redirect.
+  Install commands copied from the interface opened on that port use it for everything. 8080 and
+  8443 stay open and remain the default: agents older than this release do not announce the
+  protocol and keep using 8443, and new agents talking to an older server fall back to HTTP/1.1.
+  The configuration reference and the network ports page have the Compose lines.
+- **Multiplexed relays and HTTP/2 agents.** A relay now carries all the tunnels of its site in one
+  outbound connection to the server (`Upgrade: dumbmonit-mux/1`, one yamux stream per agent
+  connection) instead of one TCP + TLS connection each; every stream still holds the site agent's
+  own TLS session, end to end. On the encrypted channel, agents negotiate HTTP/2, so batches, the
+  command long poll and the relay long poll share a single connection (about a third of the
+  sockets per agent). Limits are now settings: `DUMBMONIT_RELAY_MAX_TUNNELS` on the server (1024 by
+  default, was a fixed 256, up to 4096) and `gateway_max_connections` on the relay (256 by default,
+  was 64, up to 2048). Mixed versions keep working: an older server answers `426` and the relay
+  falls back to one tunnel per connection (retried hourly); an older relay keeps opening tunnels,
+  which the server still serves; the server offers HTTP/2 only to clients that announce the agent
+  protocol, so installers and older agents still get HTTP/1.1.
 
 ### Changed
 

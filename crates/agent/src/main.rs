@@ -18,6 +18,7 @@ mod identity;
 #[cfg(any(windows, test))]
 mod logfile;
 mod logs;
+mod mux;
 mod proxy;
 mod relay;
 mod remediation;

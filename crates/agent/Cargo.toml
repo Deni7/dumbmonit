@@ -39,9 +39,15 @@ tokio = { version = "1", default-features = false, features = [
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"] }
 
 # Mêmes réglages TLS que le serveur, pour ne pas entretenir deux configurations.
+# `http2` : sur le canal chiffré, lots, commandes et relais partagent une
+# seule connexion (ALPN `h2`, que le serveur n'offre qu'aux agents).
 reqwest = { version = "0.13", default-features = false, features = [
-    "json", "rustls", "gzip",
+    "json", "rustls", "gzip", "http2",
 ] }
+# Connexion multiplexée du relais vers le serveur (un flux yamux par connexion
+# d'agent du site), et le pont entre ses flux et ceux de tokio.
+yamux = "0.14"
+tokio-util = { version = "0.7", default-features = false, features = ["compat"] }
 
 # Canal chiffré vers le serveur : TLS 1.3, échange de clés hybride
 # post-quantique, certificat client et autorité du serveur épinglée. Le même

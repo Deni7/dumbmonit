@@ -889,7 +889,7 @@ a container without mounting a file:
 | `DUMBMONIT_AGENT_RELAY` | `true` to run, for the server, the probes of the monitors assigned to this agent (see [Run the agent in Docker / on another network](#run-the-agent-in-docker--on-another-network)) |
 | `DUMBMONIT_AGENT_SITE` | Site label shown next to the agent when it is offered as a relay |
 | `DUMBMONIT_AGENT_GATEWAY_LISTEN` | A relay's gateway for the agents of its site, for example `0.0.0.0:8443` (`gateway_listen:`); wins over the port set in the UI (see [Install agents behind the relay](../install/remote-site.md#5-install-agents-behind-the-relay)) |
-| `DUMBMONIT_AGENT_GATEWAY_MAX_CONNECTIONS` | Connections the gateway holds at once, 64 by default (`gateway_max_connections:`) |
+| `DUMBMONIT_AGENT_GATEWAY_MAX_CONNECTIONS` | Connections the gateway holds at once, 256 by default, 2048 at most (`gateway_max_connections:`) |
 | `DUMBMONIT_AGENT_GATEWAY_RATE_KIB` | Rate of each tunnel through the gateway, per direction, in KiB/s, 4096 by default (`gateway_rate_kib:`) |
 
 ## Windows performance counters

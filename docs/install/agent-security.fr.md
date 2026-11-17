@@ -132,11 +132,17 @@ La conception garde la sécurité du canal direct :
   par le canal du relais ; la commande d'installation porte le SHA-256 de
   chaque binaire et le script refuse tout autre fichier. Le reste (`CONNECT`,
   SOCKS, autres chemins) est fermé ou reçoit un `404`.
-- **Borné.** La passerelle tient au plus 64 connexions
+- **Borné.** La passerelle tient au plus 256 connexions
   (`gateway_max_connections`), 4 Mio/s par tunnel et par sens
   (`gateway_rate_kib`), ferme une connexion muette au bout de 10 secondes et un
-  tunnel inactif au bout de 15 minutes. Le serveur accepte 256 tunnels par
-  relais et applique ses limites habituelles de poignées de main.
+  tunnel inactif au bout de 15 minutes. Le serveur accepte 1024 tunnels par
+  relais (`DUMBMONIT_RELAY_MAX_TUNNELS`) et applique ses limites habituelles de
+  poignées de main.
+- **Multiplexé.** Un relais à jour ouvre une seule connexion mise à niveau
+  vers le serveur et y porte chaque tunnel comme un flux yamux. Chaque flux
+  contient la session TLS de l'agent du site, exactement comme un tunnel : le
+  relais ne voit toujours que du chiffré. Face à un serveur antérieur, il
+  revient à un tunnel par connexion.
 - **Tracé.** Le serveur retient, pour chaque agent, le relais par lequel il se
   connecte : le relais devient son parent sur la carte de topologie et pour la
   suppression des alertes.

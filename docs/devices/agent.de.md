@@ -576,7 +576,7 @@ Container ohne Einbinden einer Datei nutzbar ist:
 | `DUMBMONIT_AGENT_RELAY` | `true`, um für den Server die Prüfungen der diesem Agenten zugewiesenen Monitore auszuführen (siehe [Den Agenten in Docker / in einem anderen Netzwerk betreiben](#run-the-agent-in-docker--on-another-network)) |
 | `DUMBMONIT_AGENT_SITE` | Standortlabel, das neben dem Agenten angezeigt wird, wenn er als Relay angeboten wird |
 | `DUMBMONIT_AGENT_GATEWAY_LISTEN` | Gateway eines Relays für die Agenten seines Standorts, zum Beispiel `0.0.0.0:8443` (`gateway_listen:`); hat Vorrang vor dem in der Oberfläche gesetzten Port (siehe [Agenten hinter dem Relay installieren](../install/remote-site.md#5-install-agents-behind-the-relay)) |
-| `DUMBMONIT_AGENT_GATEWAY_MAX_CONNECTIONS` | Gleichzeitig vom Gateway gehaltene Verbindungen, standardmäßig 64 (`gateway_max_connections:`) |
+| `DUMBMONIT_AGENT_GATEWAY_MAX_CONNECTIONS` | Gleichzeitig vom Gateway gehaltene Verbindungen, standardmäßig 256 (`gateway_max_connections:`) |
 | `DUMBMONIT_AGENT_GATEWAY_RATE_KIB` | Rate jedes Tunnels durch das Gateway, pro Richtung, in KiB/s, standardmäßig 4096 (`gateway_rate_kib:`) |
 
 ## Windows-Leistungsindikatoren {#windows-performance-counters}

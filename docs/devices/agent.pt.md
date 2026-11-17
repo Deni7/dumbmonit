@@ -543,7 +543,7 @@ num contentor sem montar um ficheiro:
 | `DUMBMONIT_AGENT_RELAY` | `true` para executar, para o servidor, as sondas dos monitores atribuídos a este agente (veja [Executar o agente no Docker / noutra rede](#run-the-agent-in-docker--on-another-network)) |
 | `DUMBMONIT_AGENT_SITE` | Etiqueta do site mostrada ao lado do agente quando é oferecido como relay |
 | `DUMBMONIT_AGENT_GATEWAY_LISTEN` | Gateway de um relay para os agentes do seu site, por exemplo `0.0.0.0:8443` (`gateway_listen:`); prevalece sobre a porta definida na interface (consulte [Instalar agentes atrás do relay](../install/remote-site.md#5-install-agents-behind-the-relay)) |
-| `DUMBMONIT_AGENT_GATEWAY_MAX_CONNECTIONS` | Ligações mantidas em simultâneo pelo gateway, 64 por predefinição (`gateway_max_connections:`) |
+| `DUMBMONIT_AGENT_GATEWAY_MAX_CONNECTIONS` | Ligações mantidas em simultâneo pelo gateway, 256 por predefinição (`gateway_max_connections:`) |
 | `DUMBMONIT_AGENT_GATEWAY_RATE_KIB` | Débito de cada túnel através do gateway, por sentido, em KiB/s, 4096 por predefinição (`gateway_rate_kib:`) |
 
 ## Contadores de desempenho do Windows {#windows-performance-counters}

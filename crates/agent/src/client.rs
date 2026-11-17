@@ -8,8 +8,9 @@ use anyhow::{Context, Result};
 use dumbmonit_proto::{
     AGENT_KEY_HEADER, AGENT_SECRET_HEADER, AGENT_TLS_HEADER, AgentCommand, CERT_REFUSED,
     COMMANDS_PATH, CommandReport, INGEST_PATH, LOGS_PATH, LogBatch, ProbeOutcome, PushAck,
-    PushBatch, RELAY_PATH, RELAY_RESYNC_HEADER, RELAY_TUNNEL_PATH, RELAY_TUNNEL_PROTOCOL,
-    TLS_ENROL_PATH, TLS_RENEW_PATH, TlsCertificate, TlsEnrolRequest, TlsOffer, TlsRenewRequest,
+    PushBatch, RELAY_MUX_PROTOCOL, RELAY_PATH, RELAY_RESYNC_HEADER, RELAY_TUNNEL_PATH,
+    RELAY_TUNNEL_PROTOCOL, TLS_ENROL_PATH, TLS_RENEW_PATH, TlsCertificate, TlsEnrolRequest,
+    TlsOffer, TlsRenewRequest,
 };
 use tokio::sync::Notify;
 
@@ -69,7 +70,12 @@ impl std::fmt::Display for PushError {
 
 /// Le chemin vers le serveur : client HTTP et racine des URL.
 struct Channel {
+    /// Toutes les requêtes : en HTTP/2 sur le canal chiffré quand le serveur le
+    /// propose, une seule connexion pour les lots, les commandes et le relais.
     http: reqwest::Client,
+    /// Mises à niveau du relais (tunnels, connexion multiplexée) : HTTP/1.1,
+    /// une connexion à part. Seulement sur le canal chiffré.
+    upgrade: Option<reqwest::Client>,
     /// Racine du serveur, sans barre oblique finale.
     base_url: String,
     /// Vrai sur le canal chiffré (TLS 1.3, autorité épinglée).
@@ -123,6 +129,7 @@ impl PushClient {
         let proxy = Arc::new(ProxyConfig::default());
         let channel = Channel {
             http: http_client(timeout, None, &proxy)?,
+            upgrade: None,
             base_url: server_url.trim_end_matches('/').to_string(),
             encrypted: false,
         };
@@ -147,6 +154,7 @@ impl PushClient {
         self.proxy = Arc::new(proxy);
         let channel = Channel {
             http: http_client(self.timeout, None, &self.proxy)?,
+            upgrade: None,
             base_url: self.channel().base_url.clone(),
             encrypted: false,
         };
@@ -204,9 +212,11 @@ impl PushClient {
     /// Passe au canal chiffré : `url` du port des agents, certificat client
     /// s'il y en a un. Plus aucune requête ne part en clair ensuite.
     pub fn use_tls(&self, url: &str, identity: Option<(Vec<u8>, Vec<u8>)>) -> Result<()> {
-        let config = tls::client_config(self.pins.clone(), identity)?;
+        let config = tls::client_config(self.pins.clone(), identity.clone())?;
+        let upgrade = tls::upgrade_config(self.pins.clone(), identity)?;
         let channel = Channel {
             http: http_client(self.timeout, Some(config), &self.proxy)?,
+            upgrade: Some(upgrade_client(self.timeout, upgrade, &self.proxy)?),
             base_url: url.trim_end_matches('/').to_string(),
             encrypted: true,
         };
@@ -223,6 +233,7 @@ impl PushClient {
         let config = tls::pinned_key_config(pin)?;
         let channel = Channel {
             http: http_client(self.timeout, Some(config), &self.proxy)?,
+            upgrade: None,
             base_url: self.channel().base_url.clone(),
             encrypted: false,
         };
@@ -571,17 +582,28 @@ impl PushClient {
     /// Jamais par l'ancien canal en clair : seul un relais authentifié par son
     /// certificat peut ouvrir un tunnel.
     pub async fn open_tunnel(&self) -> Result<reqwest::Upgraded, PushError> {
+        self.upgrade_to(RELAY_TUNNEL_PROTOCOL).await
+    }
+
+    /// Ouvre la connexion multiplexée du relais (voir `mux.rs`) : la même mise à
+    /// niveau, pour une connexion qui portera un flux par connexion d'agent du
+    /// site. Un serveur antérieur répond `426` (`PushError::Rejected`).
+    pub async fn open_mux(&self) -> Result<reqwest::Upgraded, PushError> {
+        self.upgrade_to(RELAY_MUX_PROTOCOL).await
+    }
+
+    async fn upgrade_to(&self, protocol: &'static str) -> Result<reqwest::Upgraded, PushError> {
         let channel = self.channel();
-        if !channel.encrypted {
+        let Some(http) = channel.upgrade.as_ref().filter(|_| channel.encrypted) else {
             return Err(PushError::Transport(
                 "the relay is not on the encrypted agent channel yet".to_string(),
             ));
-        }
+        };
         let target = format!("{}{RELAY_TUNNEL_PATH}", channel.base_url);
         let response = self
-            .identified(channel.http.get(target).bearer_auth(&self.token))
+            .identified(http.get(target).bearer_auth(&self.token))
             .header(reqwest::header::CONNECTION, "upgrade")
-            .header(reqwest::header::UPGRADE, RELAY_TUNNEL_PROTOCOL)
+            .header(reqwest::header::UPGRADE, protocol)
             .send()
             .await
             .map_err(|error| self.transport(&error))?;
@@ -660,8 +682,39 @@ fn http_client(
         builder = builder
             .tls_backend_preconfigured(config)
             .https_only(true)
-            .redirect(reqwest::redirect::Policy::none());
+            .redirect(reqwest::redirect::Policy::none())
+            // En HTTP/2, toutes les requêtes passent par une seule connexion :
+            // une connexion morte (NAT, coupure) est détectée par un ping
+            // sans réponse plutôt qu'au délai de chaque requête.
+            .http2_keep_alive_interval(HTTP2_PING_INTERVAL)
+            .http2_keep_alive_timeout(HTTP2_PING_TIMEOUT);
     }
+    proxy.apply(builder)?.build().context("building the HTTP client")
+}
+
+/// Intervalle des pings HTTP/2 sur le canal chiffré.
+const HTTP2_PING_INTERVAL: Duration = Duration::from_secs(30);
+
+/// Délai de réponse à un ping HTTP/2 : au-delà, la connexion est abandonnée.
+const HTTP2_PING_TIMEOUT: Duration = Duration::from_secs(20);
+
+/// Client des mises à niveau du relais : HTTP/1.1 seul (une mise à niveau
+/// n'existe pas en HTTP/2), sans connexion gardée en réserve, et des sondes
+/// TCP pour qu'une connexion multiplexée muette (NAT) finisse par tomber.
+fn upgrade_client(
+    timeout: Duration,
+    tls: rustls::ClientConfig,
+    proxy: &ProxyConfig,
+) -> Result<reqwest::Client> {
+    let builder = reqwest::Client::builder()
+        .timeout(timeout)
+        .http1_only()
+        .pool_max_idle_per_host(0)
+        .tcp_keepalive(Duration::from_secs(60))
+        .user_agent(concat!("dumbmonit-agent/", env!("CARGO_PKG_VERSION")))
+        .tls_backend_preconfigured(tls)
+        .https_only(true)
+        .redirect(reqwest::redirect::Policy::none());
     proxy.apply(builder)?.build().context("building the HTTP client")
 }
 

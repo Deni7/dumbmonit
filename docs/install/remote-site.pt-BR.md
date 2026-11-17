@@ -198,8 +198,8 @@ papel e vence quando ambos estão desativados.
 - Monitoramentos de agente nunca são sondados por meio de um relay (eles enviam as próprias
   métricas); em vez disso, um agente pode se *conectar* pelo gateway de um relay (veja acima). Um
   relay sempre se conecta diretamente: não existe relay atrás de relay.
-- O gateway de um relay aceita por padrão 64 conexões ao mesmo tempo e 4 MiB/s por túnel e
-  sentido (`gateway_max_connections`, `gateway_rate_kib`); o servidor aceita 256 túneis por
+- O gateway de um relay aceita por padrão 256 conexões ao mesmo tempo e 4 MiB/s por túnel e
+  sentido (`gateway_max_connections`, `gateway_rate_kib`); o servidor aceita 1024 túneis por
   relay.
 - O agente de retransmissão executa no máximo 8 sondas por vez; uma sonda é limitada pelo
   tempo limite de sonda do servidor (`DUMBMONIT_PROBE_TIMEOUT_SECS`), limitado a 120 s no

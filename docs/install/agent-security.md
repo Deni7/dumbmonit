@@ -123,10 +123,16 @@ The design keeps the security of the direct channel:
   any other. Anything else (`CONNECT`, SOCKS, other paths) is closed or answered
   `404`, and a plain `http://` request is refused: nothing is served in clear
   on the site's network.
-- **Bounded.** The gateway holds at most 64 connections (`gateway_max_connections`),
+- **Bounded.** The gateway holds at most 256 connections (`gateway_max_connections`),
   4 MiB/s per tunnel and direction (`gateway_rate_kib`), closes a connection
   that says nothing within 10 seconds and a tunnel idle for 15 minutes. The
-  server allows 256 tunnels per relay and applies its usual handshake limits.
+  server allows 1024 tunnels per relay (`DUMBMONIT_RELAY_MAX_TUNNELS`) and
+  applies its usual handshake limits.
+- **Multiplexed.** An up-to-date relay opens a single upgraded connection to
+  the server and carries every tunnel as a yamux stream inside it. Each stream
+  holds the site agent's own TLS session, exactly like a tunnel: the relay
+  still sees only ciphertext. Against an older server it falls back to one
+  tunnel per connection.
 - **Recorded.** The server stores, for each agent, the relay it connects
   through: the relay becomes its parent on the topology map and in alert
   suppression.

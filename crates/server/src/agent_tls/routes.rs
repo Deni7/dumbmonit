@@ -34,8 +34,8 @@ use axum::{Extension, Json, Router};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use dumbmonit_proto::{
-    AGENT_SECRET_HEADER, AGENT_TLS_HEADER, CERT_REFUSED, RELAY_TUNNEL_PATH, RELAY_TUNNEL_PROTOCOL,
-    TargetId, TlsCertificate, TlsEnrolRequest, TlsRenewRequest,
+    AGENT_SECRET_HEADER, AGENT_TLS_HEADER, CERT_REFUSED, RELAY_MUX_PROTOCOL, RELAY_TUNNEL_PATH,
+    RELAY_TUNNEL_PROTOCOL, TargetId, TlsCertificate, TlsEnrolRequest, TlsRenewRequest,
 };
 use serde_json::json;
 
@@ -166,9 +166,31 @@ async fn is_relay(state: &AppState, target_id: TargetId) -> anyhow::Result<bool>
         .is_some_and(|host| host.relay || host.relay_wanted))
 }
 
+/// Ce qu'un relais demande par `Upgrade:`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TunnelKind {
+    /// Un tunnel pour une seule connexion ([`RELAY_TUNNEL_PROTOCOL`]).
+    Single,
+    /// La connexion multiplexée ([`RELAY_MUX_PROTOCOL`]).
+    Multiplexed,
+}
+
+/// Lit `Upgrade:` : le protocole demandé, s'il est l'un des nôtres.
+fn tunnel_kind(upgrade: Option<&str>) -> Option<TunnelKind> {
+    let upgrade = upgrade?.trim();
+    if upgrade.eq_ignore_ascii_case(RELAY_TUNNEL_PROTOCOL) {
+        Some(TunnelKind::Single)
+    } else if upgrade.eq_ignore_ascii_case(RELAY_MUX_PROTOCOL) {
+        Some(TunnelKind::Multiplexed)
+    } else {
+        None
+    }
+}
+
 /// `GET /api/agent/relay/tunnel` (mise à niveau HTTP) : tunnel d'un agent du
-/// site de ce relais vers ce port. Réservé à un relais authentifié par son
-/// certificat, et jamais depuis un tunnel.
+/// site de ce relais vers ce port, ou connexion multiplexée qui portera ceux de
+/// tout le site. Réservé à un relais authentifié par son certificat, et jamais
+/// depuis un tunnel.
 async fn open_tunnel(
     State(state): State<AppState>,
     Extension(cert): Extension<AgentCert>,
@@ -178,17 +200,22 @@ async fn open_tunnel(
     if cert.via_relay.is_some() {
         return error(StatusCode::FORBIDDEN, "A tunnel cannot be opened through another tunnel.");
     }
-    let wanted = request
-        .headers()
-        .get(header::UPGRADE)
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|value| value.eq_ignore_ascii_case(RELAY_TUNNEL_PROTOCOL));
-    if !wanted {
+    // Une mise à niveau n'existe qu'en HTTP/1.1 : un relais la demande par une
+    // connexion à part, jamais par celle, en HTTP/2, de ses requêtes.
+    if request.version() != axum::http::Version::HTTP_11 {
         return error(
-            StatusCode::UPGRADE_REQUIRED,
-            "This route only opens a relay tunnel (Upgrade: dumbmonit-tunnel/1).",
+            StatusCode::HTTP_VERSION_NOT_SUPPORTED,
+            "Relay tunnels are opened over HTTP/1.1.",
         );
     }
+    let kind = tunnel_kind(request.headers().get(header::UPGRADE).and_then(|v| v.to_str().ok()));
+    let Some(kind) = kind else {
+        return error(
+            StatusCode::UPGRADE_REQUIRED,
+            "This route only opens a relay tunnel \
+             (Upgrade: dumbmonit-tunnel/1 or dumbmonit-mux/1).",
+        );
+    };
     match is_relay(&state, cert.target_id).await {
         Ok(true) => {}
         Ok(false) => return error(StatusCode::FORBIDDEN, NOT_A_RELAY),
@@ -212,16 +239,24 @@ async fn open_tunnel(
     tokio::spawn(async move {
         match upgrade.await {
             Ok(upgraded) => {
-                grant.attach(hyper_util::rt::TokioIo::new(upgraded), relay, addr).await;
+                let upgraded = hyper_util::rt::TokioIo::new(upgraded);
+                match kind {
+                    TunnelKind::Single => grant.attach(upgraded, relay, addr).await,
+                    TunnelKind::Multiplexed => grant.multiplex(state, upgraded, relay, addr).await,
+                }
             }
             Err(cause) => tracing::debug!(relay, %cause, "agent relay: tunnel upgrade failed"),
         }
     });
+    let protocol = match kind {
+        TunnelKind::Single => RELAY_TUNNEL_PROTOCOL,
+        TunnelKind::Multiplexed => RELAY_MUX_PROTOCOL,
+    };
     let mut response = Response::new(Body::empty());
     *response.status_mut() = StatusCode::SWITCHING_PROTOCOLS;
     let headers = response.headers_mut();
     headers.insert(header::CONNECTION, HeaderValue::from_static("upgrade"));
-    headers.insert(header::UPGRADE, HeaderValue::from_static(RELAY_TUNNEL_PROTOCOL));
+    headers.insert(header::UPGRADE, HeaderValue::from_static(protocol));
     response
 }
 
@@ -425,4 +460,20 @@ async fn not_found() -> Response {
 
 fn error(status: StatusCode, message: &str) -> Response {
     (status, Json(json!({ "error": message }))).into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_relay_asks_for_a_tunnel_or_for_the_multiplexed_connection_and_nothing_else() {
+        assert_eq!(tunnel_kind(Some("dumbmonit-tunnel/1")), Some(TunnelKind::Single));
+        assert_eq!(tunnel_kind(Some(" DumbMonit-Mux/1 ")), Some(TunnelKind::Multiplexed));
+        assert_eq!(tunnel_kind(Some("websocket")), None);
+        // Une liste n'est pas lue : le relais demande un protocole à la fois,
+        // comme le serveur antérieur l'attendait.
+        assert_eq!(tunnel_kind(Some("dumbmonit-mux/1, dumbmonit-tunnel/1")), None);
+        assert_eq!(tunnel_kind(None), None);
+    }
 }
