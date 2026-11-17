@@ -1,0 +1,47 @@
+# Extrait de GET /minio/v2/metrics/cluster, MinIO RELEASE.2026-11-09T00-10-40Z
+# (un nœud, un disque, deux buckets, un objet de six octets). Valeurs relevées
+# sur une instance réelle ; l'étiquette server est fictive.
+# HELP minio_cluster_bucket_total Total number of buckets in the cluster
+# TYPE minio_cluster_bucket_total gauge
+minio_cluster_bucket_total 2
+# HELP minio_cluster_capacity_raw_free_bytes Total free capacity online in the cluster
+# TYPE minio_cluster_capacity_raw_free_bytes gauge
+minio_cluster_capacity_raw_free_bytes 341262344192
+# HELP minio_cluster_capacity_raw_total_bytes Total capacity online in the cluster
+# TYPE minio_cluster_capacity_raw_total_bytes gauge
+minio_cluster_capacity_raw_total_bytes 512470736896
+# HELP minio_cluster_drive_offline_total Total drives offline in this cluster
+# TYPE minio_cluster_drive_offline_total gauge
+minio_cluster_drive_offline_total 0
+# HELP minio_cluster_drive_online_total Total drives online in this cluster
+# TYPE minio_cluster_drive_online_total gauge
+minio_cluster_drive_online_total 1
+# HELP minio_cluster_drive_total Total drives in this cluster
+# TYPE minio_cluster_drive_total gauge
+minio_cluster_drive_total 1
+# HELP minio_cluster_nodes_offline_total Total number of MinIO nodes offline
+# TYPE minio_cluster_nodes_offline_total gauge
+minio_cluster_nodes_offline_total 0
+# HELP minio_cluster_nodes_online_total Total number of MinIO nodes online
+# TYPE minio_cluster_nodes_online_total gauge
+minio_cluster_nodes_online_total 1
+# HELP minio_cluster_usage_object_total Total number of objects in a cluster
+# TYPE minio_cluster_usage_object_total gauge
+minio_cluster_usage_object_total 1
+# HELP minio_cluster_usage_total_bytes Total cluster usage in bytes
+# TYPE minio_cluster_usage_total_bytes gauge
+minio_cluster_usage_total_bytes 6
+# HELP minio_node_process_uptime_seconds Total uptime of MinIO server process in seconds
+# TYPE minio_node_process_uptime_seconds gauge
+minio_node_process_uptime_seconds{server="minio:9000"} 295.7
+# HELP minio_s3_requests_4xx_errors_total Total number of S3 requests with (4xx) errors
+# TYPE minio_s3_requests_4xx_errors_total counter
+minio_s3_requests_4xx_errors_total{api="getobject"} 3
+minio_s3_requests_4xx_errors_total{api="headbucket"} 1
+minio_s3_requests_4xx_errors_total{api="putobject"} 1
+# HELP minio_s3_requests_total Total number of S3 requests
+# TYPE minio_s3_requests_total counter
+minio_s3_requests_total{api="getobject"} 11
+# HELP minio_software_version_info MinIO Release tag for the server
+# TYPE minio_software_version_info gauge
+minio_software_version_info{version="2026-11-09T00-10-40Z"} 1

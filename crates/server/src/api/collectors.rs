@@ -6299,7 +6299,7 @@ fn compiled(kind: &str) -> Option<CollectorView> {
         "prowlarr" => CollectorView {
             kind: "prowlarr",
             label: "Prowlarr",
-            summary: "Health warnings, indexers disabled after failures, disk space, updates.",
+            summary: "Health warnings, indexers disabled after failures, updates.",
             examples: &["Prowlarr"],
             credential_types: &["api_token"],
             credentials: &[ARR_KEY],

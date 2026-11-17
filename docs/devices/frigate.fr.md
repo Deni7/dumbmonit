@@ -30,7 +30,7 @@ Toutes les métriques sont préfixées `dumbmonit_frigate_`.
 | `camera_process_fps`, `camera_skipped_fps`, `camera_detection_fps` | images traitées, jetées faute de temps, et envoyées à la détection | `camera` |
 | `detector_inference_ms` | durée d'inférence de chaque détecteur | `detector` |
 | `detector_busy_seconds` | depuis combien de temps un détecteur est sur la même inférence (0 au repos) | `detector` |
-| `storage_used_percent`, `storage_free_bytes` | disques d'enregistrement (les montages en mémoire sont ignorés) | `path` |
+| `storage_used_percent`, `storage_free_bytes` | disques d'enregistrement (les montages en mémoire sont ignorés) ; l'espace libre est en octets (Frigate le donne en mégaoctets, converti) | `path` |
 
 Les [règles intégrées](../alerting/rules.md#self-hosted-applications) qui s'appliquent : Frigate camera offline, Frigate detector stuck, Frigate storage almost full, Frigate update available, plus Appareil inaccessible.
 
@@ -54,6 +54,6 @@ Les [règles intégrées](../alerting/rules.md#self-hosted-applications) qui s'a
 | Identifiant | Champs |
 |---|---|
 | Aucune authentification | Le port 5000, l'API interne. |
-| Jeton porteur | Envoyé en `Authorization: Bearer …`, pour un proxy qui l'attend. |
+| Jeton porteur | Envoyé en `Authorization: Bearer …`, pour un proxy qui l'attend, ou jeton de session du port authentifié (8971), obtenu avec `POST /api/login`. Les jetons de session de Frigate expirent au bout de 24 heures et ne se renouvellent pas : le moniteur signale alors une erreur d'authentification (401), et il faut coller un nouveau jeton. Préférez le port 5000 sur un réseau de confiance. |
 
 Adresse : un nom d'hôte (`frigate.lan`), `host:port`, ou une URL complète avec préfixe de chemin. Options : protocole (HTTP par défaut), port (5000), vérification du certificat et délai de requête (15 s).

@@ -17,7 +17,7 @@ l'URL. Le jeton n'ouvre que les pages de métriques : pas d'accès S3, pas de
 console, aucun autre droit. Si MinIO tourne avec
 `MINIO_PROMETHEUS_AUTH_TYPE=public`, les pages n'ont pas besoin de jeton. La
 page de la grappe est obligatoire ; `/minio/v2/metrics/node` (durée de
-fonctionnement du nœud interrogé) est facultative. Les noms de métriques ont
+fonctionnement du nœud interrogé, sur les versions anciennes) est facultative. Les noms de métriques ont
 changé d'une version de MinIO à l'autre (`disk` est devenu `drive`) : les deux
 sont lus, et une famille que le serveur ne publie pas ne produit simplement
 aucun chiffre. Le port de la console (9001) n'est pas utilisé.
@@ -36,7 +36,7 @@ Toutes les métriques sont préfixées `dumbmonit_minio_`.
 
 | Métrique | Labels | Signification |
 |---|---|---|
-| `version_info` | `version`, `commit` | Valeur 1. |
+| `version_info` | `version`, `commit` | Valeur 1. `commit` est omis sur les versions qui ne le publient plus. |
 | `nodes_online`, `nodes_offline` | | Nœuds de la grappe. |
 | `drives_online`, `drives_offline`, `drives` | | Disques de la grappe. |
 | `capacity_raw_bytes`, `capacity_raw_free_bytes`, `capacity_raw_used_percent` | | Capacité brute. |
@@ -47,7 +47,7 @@ Toutes les métriques sont préfixées `dumbmonit_minio_`.
 | `heal_active` | | 1 quand la réparation a été active dans les cinq dernières minutes. |
 | `replication_failed_objects` | | Objets dont la réplication a échoué (publié quand le serveur l'expose). |
 | `s3_requests_total`, `s3_requests_4xx_total`, `s3_requests_5xx_total` | | Compteurs de requêtes S3. Les 5xx sont des erreurs serveur ; les 4xx des erreurs du client. |
-| `uptime_seconds` | | Durée de fonctionnement du nœud qui répond. |
+| `uptime_seconds` | | Durée de fonctionnement du processus MinIO. Lue sur la page du nœud sur les versions anciennes, sur la page de la grappe sur les récentes (la plus courte quand plusieurs serveurs la publient). |
 
 Les [règles intégrées](../alerting/rules.md#minio) qui s'appliquent :
 
@@ -110,8 +110,8 @@ URL. Options :
 
 ## Dépannage
 
-« MinIO accepted the credentials but refused … (403) » : le jeton est
-incorrect. Générez-en un nouveau.
+« MinIO refused … (403) » : le jeton est incorrect, expiré ou fabriqué pour
+la clé d'un autre serveur. Générez-en un nouveau.
 
 « does not look like MinIO cluster metrics » : l'adresse ou le port n'est pas
 l'API S3 d'un serveur MinIO (9000, pas la console).

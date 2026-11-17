@@ -1,8 +1,9 @@
 //! Sonarr, Radarr, Lidarr et Prowlarr.
 //!
 //! Les quatre applications de la famille *arr parlent la même API (Servarr) :
-//! un en-tête `X-Api-Key`, `/system/status`, `/health`, `/diskspace`,
-//! `/update`, et, pour les trois gestionnaires de médias, `/queue/status`.
+//! un en-tête `X-Api-Key`, `/system/status`, `/health`, `/update`, et, pour les
+//! trois gestionnaires de médias, `/diskspace` et `/queue/status` (Prowlarr
+//! n'a ni l'un ni l'autre).
 //! Seuls le port, la version de l'API (`v3` pour Sonarr et Radarr, `v1` pour
 //! Lidarr et Prowlarr) et quelques routes propres changent : un seul module,
 //! quatre [`Flavor`].
@@ -38,6 +39,8 @@ pub struct Flavor {
     pub queue: bool,
     /// Possède des indexeurs (`/indexerstatus`) : Prowlarr.
     pub indexers: bool,
+    /// Possède `/diskspace` : pas Prowlarr, qui ne gère aucun média.
+    pub disk: bool,
 }
 
 pub const SONARR: Flavor = Flavor {
@@ -47,6 +50,7 @@ pub const SONARR: Flavor = Flavor {
     api: "v3",
     queue: true,
     indexers: false,
+    disk: true,
 };
 pub const RADARR: Flavor = Flavor {
     kind: "radarr",
@@ -55,6 +59,7 @@ pub const RADARR: Flavor = Flavor {
     api: "v3",
     queue: true,
     indexers: false,
+    disk: true,
 };
 pub const LIDARR: Flavor = Flavor {
     kind: "lidarr",
@@ -63,6 +68,7 @@ pub const LIDARR: Flavor = Flavor {
     api: "v1",
     queue: true,
     indexers: false,
+    disk: true,
 };
 pub const PROWLARR: Flavor = Flavor {
     kind: "prowlarr",
@@ -71,6 +77,7 @@ pub const PROWLARR: Flavor = Flavor {
     api: "v1",
     queue: false,
     indexers: true,
+    disk: false,
 };
 
 // ------------------------------------------------------------ traduction
@@ -202,7 +209,15 @@ pub async fn probe(
         (format!("/api/{api}/queue/status"), format!("/api/{api}/indexerstatus"));
     let (health, disks, updates, queue, indexers) = futures::join!(
         client.get_json::<Value>(&health_path),
-        client.get_json::<Value>(&disks_path),
+        async {
+            // Prowlarr n'a pas de `/diskspace` : ne pas l'appeler, sous peine d'un
+            // avertissement et d'une erreur de collecte à chaque sonde.
+            if flavor.disk {
+                client.get_json::<Value>(&disks_path).await.map(Some)
+            } else {
+                Ok(None)
+            }
+        },
         optional_json(client, &update_path),
         async { if flavor.queue { optional_json(client, &queue_path).await } else { Ok(None) } },
         async {
@@ -219,7 +234,7 @@ pub async fn probe(
     if let Some(body) = settle(health, &mut errors, target.id, "health") {
         out.extend(health_samples(flavor, &body, ts_ms));
     }
-    if let Some(body) = settle(disks, &mut errors, target.id, "diskspace") {
+    if let Some(Some(body)) = settle(disks, &mut errors, target.id, "diskspace") {
         out.extend(disk_samples(flavor, &body, ts_ms));
     }
     if let Some(Some(body)) = settle(updates, &mut errors, target.id, "update") {
@@ -299,6 +314,8 @@ impl Collector for ArrCollector {
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Duration;
 
     use axum::Router;
@@ -327,7 +344,14 @@ mod tests {
     const PROWLARR_HEALTH: &str = include_str!("testdata/prowlarr_1.31.2/health.json");
     const PROWLARR_INDEXERS: &str = include_str!("testdata/prowlarr_1.31.2/indexerstatus.json");
     const PROWLARR_UPDATE: &str = include_str!("testdata/prowlarr_1.31.2/update.json");
-    const PROWLARR_DISKS: &str = include_str!("testdata/prowlarr_1.31.2/diskspace.json");
+    // Réponses d'un Prowlarr 2.7.0.5723 réel, sans indexeur : `/health` rend
+    // « No indexers enabled », `/indexerstatus` une liste vide, et
+    // `/api/v1/diskspace` n'existe pas (404).
+    const PROWLARR_NEW_STATUS: &str =
+        include_str!("testdata/prowlarr_2.7.0.5723/system_status.json");
+    const PROWLARR_NEW_HEALTH: &str = include_str!("testdata/prowlarr_2.7.0.5723/health.json");
+    const PROWLARR_NEW_INDEXERS: &str =
+        include_str!("testdata/prowlarr_2.7.0.5723/indexerstatus.json");
 
     fn json(text: &str) -> Value {
         serde_json::from_str(text).unwrap()
@@ -492,7 +516,6 @@ mod tests {
         let app = Router::new()
             .route("/api/v1/system/status", get(|| async { PROWLARR_STATUS }))
             .route("/api/v1/health", get(|| async { PROWLARR_HEALTH }))
-            .route("/api/v1/diskspace", get(|| async { PROWLARR_DISKS }))
             .route("/api/v1/update", get(|| async { PROWLARR_UPDATE }))
             .route("/api/v1/indexerstatus", get(|| async { PROWLARR_INDEXERS }));
         let base = serve(app).await;
@@ -502,6 +525,44 @@ mod tests {
         assert_eq!(value(&samples, "prowlarr_health_warnings"), Some(1.0));
         assert!(value(&samples, "prowlarr_queue_total").is_none());
         assert_eq!(value(&samples, "prowlarr_update_available"), Some(0.0));
+        assert_eq!(value(&samples, "prowlarr_scrape_errors"), Some(0.0));
+    }
+
+    #[tokio::test]
+    async fn prowlarr_n_appelle_pas_diskspace_et_garde_zero_erreur_de_collecte() {
+        let disk_calls = Arc::new(AtomicUsize::new(0));
+        let counter = disk_calls.clone();
+        // Comme le vrai Prowlarr 2.7 : pas de `/diskspace` (404), et on compte les appels.
+        let app = Router::new()
+            .route("/api/v1/system/status", get(|| async { PROWLARR_NEW_STATUS }))
+            .route("/api/v1/health", get(|| async { PROWLARR_NEW_HEALTH }))
+            .route("/api/v1/update", get(|| async { "[]" }))
+            .route("/api/v1/indexerstatus", get(|| async { PROWLARR_NEW_INDEXERS }))
+            .route(
+                "/api/v1/diskspace",
+                get(move || {
+                    counter.fetch_add(1, Ordering::SeqCst);
+                    std::future::ready((StatusCode::NOT_FOUND, ""))
+                }),
+            );
+        let base = serve(app).await;
+        let samples =
+            ArrCollector::prowlarr().probe(&target("prowlarr", base, "cle")).await.unwrap();
+        assert_eq!(disk_calls.load(Ordering::SeqCst), 0, "diskspace ne doit pas être appelé");
+        assert_eq!(value(&samples, "prowlarr_scrape_errors"), Some(0.0));
+        assert_eq!(value(&samples, "prowlarr_health_errors"), Some(1.0));
+        assert_eq!(
+            labelled(&samples, "prowlarr_health_issue", "source", "IndexerCheck"),
+            Some(1.0)
+        );
+        assert_eq!(value(&samples, "prowlarr_indexers_disabled"), Some(0.0));
+        assert!(value(&samples, "prowlarr_disk_used_percent").is_none());
+        let info = samples.iter().find(|s| s.metric == "prowlarr_version_info").unwrap();
+        assert_eq!(info.labels["version"], "2.7.0.5723");
+        // Les trois autres gardent leur lecture de `/diskspace`.
+        let with_disk: Vec<&str> =
+            [SONARR, RADARR, LIDARR, PROWLARR].iter().filter(|f| f.disk).map(|f| f.kind).collect();
+        assert_eq!(with_disk, ["sonarr", "radarr", "lidarr"]);
     }
 
     #[tokio::test]

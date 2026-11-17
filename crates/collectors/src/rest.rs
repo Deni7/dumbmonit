@@ -212,8 +212,8 @@ impl RestClient {
                  account."
             )),
             StatusCode::FORBIDDEN => ProbeError::Auth(format!(
-                "{product} accepted the credentials but refused {path} (403): the account or \
-                 key lacks the permission to read it, or this address is not allowed to use the \
+                "{product} refused {path} (403): the token or key is wrong or expired, the account \
+                 lacks the permission to read it, or this address is not allowed to use the \
                  API."
             )),
             StatusCode::NOT_FOUND => ProbeError::Protocol(format!(

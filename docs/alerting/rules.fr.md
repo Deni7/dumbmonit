@@ -455,7 +455,6 @@ Sonarr, Radarr, Lidarr, Prowlarr, qBittorrent, UniFi Protect, Frigate, Keycloak,
 | Lidarr disk almost full | Un disque que Lidarr signale est plein à plus de 90 % (`dumbmonit_lidarr_disk_used_percent`) ; se rétablit sous 88 %. | > 90 % | 30 min | Avis (`warning`) | 24 h |
 | Lidarr update available | Une version plus récente de Lidarr existe (`dumbmonit_lidarr_update_available`). | > 0 | 1 h | Info (`info`) | 7 d |
 | Prowlarr health error | Prowlarr signale une erreur sur sa page System → Status : client de téléchargement ou indexeur en échec, dossier racine manquant (`dumbmonit_prowlarr_health_errors`). | > 0 | 15 min | Avis (`warning`) | 6 h |
-| Prowlarr disk almost full | Un disque que Prowlarr signale est plein à plus de 90 % (`dumbmonit_prowlarr_disk_used_percent`) ; se rétablit sous 88 %. | > 90 % | 30 min | Avis (`warning`) | 24 h |
 | Prowlarr update available | Une version plus récente de Prowlarr existe (`dumbmonit_prowlarr_update_available`). | > 0 | 1 h | Info (`info`) | 7 d |
 | Prowlarr indexers disabled | Prowlarr a désactivé des indexeurs après des échecs répétés (`dumbmonit_prowlarr_indexers_disabled`) : Sonarr, Radarr et Lidarr ne trouvent plus de versions par eux. | > 0 | 1 h | Avis (`warning`) | 24 h |
 | qBittorrent torrents in error | Des torrents sont en erreur ou ont perdu leurs fichiers (`dumbmonit_qbittorrent_torrents_errored`). | > 0 | 15 min | Avis (`warning`) | 24 h |

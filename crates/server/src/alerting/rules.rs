@@ -7840,11 +7840,12 @@ fn app_rule(
 fn apps_rules() -> Vec<Rule> {
     let mut rules = Vec::new();
     // La famille *arr : mêmes métriques, préfixées par le produit.
-    for (kind, product, has_queue) in [
-        ("sonarr", "Sonarr", true),
-        ("radarr", "Radarr", true),
-        ("lidarr", "Lidarr", true),
-        ("prowlarr", "Prowlarr", false),
+    // Prowlarr n'a ni file de téléchargements ni `/diskspace` : pas de règle.
+    for (kind, product, has_queue, has_disk) in [
+        ("sonarr", "Sonarr", true, true),
+        ("radarr", "Radarr", true, true),
+        ("lidarr", "Lidarr", true, true),
+        ("prowlarr", "Prowlarr", false, false),
     ] {
         rules.push(app_rule(
             &format!("{kind}_health_error"),
@@ -7876,21 +7877,23 @@ fn apps_rules() -> Vec<Rule> {
                 app_hours(6),
             ));
         }
-        rules.push(Rule {
-            clear_threshold: Some(88.0),
-            unit: "%".to_string(),
-            ..app_rule(
-                &format!("{kind}_disk_almost_full"),
-                &format!("{product} disk almost full"),
-                &format!("A disk {product} reports is more than 90% full."),
-                &format!("dumbmonit_{kind}_disk_used_percent"),
-                Operator::Gt,
-                90.0,
-                app_minutes(30),
-                Severity::Warning,
-                app_hours(24),
-            )
-        });
+        if has_disk {
+            rules.push(Rule {
+                clear_threshold: Some(88.0),
+                unit: "%".to_string(),
+                ..app_rule(
+                    &format!("{kind}_disk_almost_full"),
+                    &format!("{product} disk almost full"),
+                    &format!("A disk {product} reports is more than 90% full."),
+                    &format!("dumbmonit_{kind}_disk_used_percent"),
+                    Operator::Gt,
+                    90.0,
+                    app_minutes(30),
+                    Severity::Warning,
+                    app_hours(24),
+                )
+            });
+        }
         rules.push(app_rule(
             &format!("{kind}_update_available"),
             &format!("{product} update available"),
@@ -8800,7 +8803,6 @@ pub(crate) const PRODUITES: &[&str] = &[
     "dumbmonit_lidarr_update_available",
     "dumbmonit_lidarr_queue_has_errors",
     "dumbmonit_prowlarr_health_errors",
-    "dumbmonit_prowlarr_disk_used_percent",
     "dumbmonit_prowlarr_update_available",
     "dumbmonit_prowlarr_indexers_disabled",
     "dumbmonit_qbittorrent_torrents_errored",
@@ -9101,7 +9103,6 @@ mod tests {
             "lidarr_disk_almost_full",
             "lidarr_update_available",
             "prowlarr_health_error",
-            "prowlarr_disk_almost_full",
             "prowlarr_update_available",
             "prowlarr_indexers_disabled",
             "qbittorrent_torrents_errored",

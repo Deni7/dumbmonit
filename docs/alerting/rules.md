@@ -448,7 +448,6 @@ Sonarr, Radarr, Lidarr, Prowlarr, qBittorrent, UniFi Protect, Frigate, Keycloak,
 | Lidarr disk almost full | A disk Lidarr reports is more than 90 % full (`dumbmonit_lidarr_disk_used_percent`); clears below 88 %. | > 90 % | 30 min | Advisory (`warning`) | 24 h |
 | Lidarr update available | A newer Lidarr release exists (`dumbmonit_lidarr_update_available`). | > 0 | 1 h | Info (`info`) | 7 d |
 | Prowlarr health error | Prowlarr reports an error on its System → Status page: a failing download client or indexer, a missing root folder (`dumbmonit_prowlarr_health_errors`). | > 0 | 15 min | Advisory (`warning`) | 6 h |
-| Prowlarr disk almost full | A disk Prowlarr reports is more than 90 % full (`dumbmonit_prowlarr_disk_used_percent`); clears below 88 %. | > 90 % | 30 min | Advisory (`warning`) | 24 h |
 | Prowlarr update available | A newer Prowlarr release exists (`dumbmonit_prowlarr_update_available`). | > 0 | 1 h | Info (`info`) | 7 d |
 | Prowlarr indexers disabled | Prowlarr disabled indexers after repeated failures (`dumbmonit_prowlarr_indexers_disabled`): Sonarr, Radarr and Lidarr stop finding releases through them. | > 0 | 1 h | Advisory (`warning`) | 24 h |
 | qBittorrent torrents in error | Torrents are in error or have lost their files (`dumbmonit_qbittorrent_torrents_errored`). | > 0 | 15 min | Advisory (`warning`) | 24 h |
