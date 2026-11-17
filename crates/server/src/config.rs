@@ -158,10 +158,6 @@ pub struct Config {
     /// Les mots de passe des utilisateurs passeraient en clair sur le réseau ;
     /// ce n'est acceptable que pour un annuaire de test.
     pub ldap_allow_plain: bool,
-    /// Chromium sans interface qui fait les captures d'écran de la
-    /// surveillance des sites (`DUMBMONIT_BROWSER_URL`, `http://browser:9222`).
-    /// `None` : pas de capture, la comparaison de texte fonctionne seule.
-    pub browser_url: Option<String>,
     /// Bornes des sondes de santé des sites (`website`), pour qu'une liste de
     /// centaines de sites ne parte jamais d'un bloc. Voir
     /// [`crate::website::throttle`].
@@ -176,11 +172,32 @@ pub struct Config {
     /// mandataire TCP le publie sous un autre numéro. Par défaut, celui de
     /// l'écoute.
     pub agent_public_port: Option<u16>,
+    /// Adresse dédiée aux agents (`DUMBMONIT_AGENT_PUBLIC_URL`, par exemple
+    /// `https://agents.example.com:443`), normalisée en `https://hôte:port` :
+    /// un nom à part, souvent derrière un mandataire TCP qui aiguille sur le
+    /// SNI sans terminer TLS. Prime sur l'hôte vu par le navigateur et sur
+    /// `DUMBMONIT_AGENT_PUBLIC_PORT`, dans les commandes d'installation comme
+    /// dans l'annonce du canal faite aux agents.
+    pub agent_public_url: Option<String>,
     /// Nombre de jours pendant lesquels l'ancien canal en clair reste accepté
     /// après la mise à jour d'une instance existante
     /// (`DUMBMONIT_AGENT_LEGACY_DAYS`). `None` : jusqu'à ce qu'un administrateur
     /// exige mTLS dans l'interface.
     pub agent_legacy_days: Option<u32>,
+    /// Port unique (`DUMBMONIT_SINGLE_PORT`, `443` ou `0.0.0.0:443`) : une
+    /// écoute de plus, qui sert l'interface, l'API **et** le canal des agents.
+    /// Elle aiguille chaque connexion sur le ClientHello TLS : un agent à jour
+    /// y annonce le protocole ALPN [`dumbmonit_proto::AGENT_ALPN`] et passe au
+    /// canal des agents (mTLS, autorité épinglée) ; tout le reste (navigateur,
+    /// `curl`, PowerShell) voit l'interface. `None` (défaut) : rien de plus,
+    /// 8080 et 8443 comme avant — et ils restent ouverts, un agent antérieur
+    /// continuant par le port des agents.
+    pub single_listen: Option<SocketAddr>,
+    /// Tunnels simultanés au plus par agent relais
+    /// (`DUMBMONIT_RELAY_MAX_TUNNELS`, 1024 par défaut, de 1 à 4096) : une
+    /// connexion d'agent du site, qu'elle passe par son propre tunnel ou par un
+    /// flux de la connexion multiplexée du relais.
+    pub relay_max_tunnels: usize,
     /// Certificat fourni (`DUMBMONIT_TLS_CERT`, chaîne PEM) et sa clé
     /// (`DUMBMONIT_TLS_KEY`). Absents : un certificat autosigné est créé au
     /// premier démarrage et gardé, clé chiffrée, dans la base.
@@ -190,6 +207,9 @@ pub struct Config {
     /// séparés par des virgules), en plus de `localhost`, de la boucle locale,
     /// du nom d'hôte et de l'hôte de `DUMBMONIT_PUBLIC_URL`.
     pub tls_names: Vec<String>,
+    /// Serveur de secours (`DUMBMONIT_HA_*`, voir [`crate::ha`]). `None` : un
+    /// serveur seul, comme toujours.
+    pub ha: Option<crate::ha::HaConfig>,
 }
 
 /// Réglages d'instance du collecteur `website`.
@@ -240,6 +260,16 @@ impl WebsiteLimits {
 impl Config {
     pub fn from_env() -> Result<Self> {
         check_https_only()?;
+        let agent_listen = parse_agent_listen(env_var("DUMBMONIT_AGENT_LISTEN").as_deref())?;
+        let agent_public_url = parse_agent_public_url(
+            env_var("DUMBMONIT_AGENT_PUBLIC_URL").as_deref(),
+            agent_listen.is_some(),
+        )?;
+        let single_listen = parse_single_listen(env_var("DUMBMONIT_SINGLE_PORT").as_deref())?;
+        if let Some(single) = single_listen {
+            let bind = env_parsed("DUMBMONIT_BIND", "0.0.0.0:8080")?;
+            check_single_listen(single, agent_listen, bind)?;
+        }
         Ok(Self {
             bind: env_parsed("DUMBMONIT_BIND", "0.0.0.0:8080")?,
             data_dir: PathBuf::from(env_or("DUMBMONIT_DATA_DIR", "/data")),
@@ -301,11 +331,9 @@ impl Config {
             ldap: LdapEnv::from_env(),
             saml_hooks: Default::default(),
             ldap_allow_plain: env_flag("DUMBMONIT_LDAP_ALLOW_PLAIN"),
-            browser_url: env_var("DUMBMONIT_BROWSER_URL")
-                .map(|url| url.trim().trim_end_matches('/').to_string())
-                .filter(|url| !url.is_empty()),
             website: WebsiteLimits::from_env()?,
-            agent_listen: parse_agent_listen(env_var("DUMBMONIT_AGENT_LISTEN").as_deref())?,
+            agent_listen,
+            agent_public_url,
             agent_public_port: env_var("DUMBMONIT_AGENT_PUBLIC_PORT")
                 .map(|raw| {
                     raw.trim().parse::<u16>().ok().filter(|port| *port != 0).with_context(|| {
@@ -313,6 +341,9 @@ impl Config {
                     })
                 })
                 .transpose()?,
+            single_listen,
+            relay_max_tunnels: env_parsed::<usize>("DUMBMONIT_RELAY_MAX_TUNNELS", "1024")?
+                .clamp(1, MAX_RELAY_TUNNELS),
             agent_legacy_days: env_var("DUMBMONIT_AGENT_LEGACY_DAYS")
                 .map(|raw| {
                     raw.trim().parse::<u32>().with_context(|| {
@@ -323,6 +354,7 @@ impl Config {
             tls_cert: env_path("DUMBMONIT_TLS_CERT"),
             tls_key: env_path("DUMBMONIT_TLS_KEY"),
             tls_names: parse_tls_names(&env_or("DUMBMONIT_TLS_NAMES", "")),
+            ha: crate::ha::HaConfig::from_env()?,
         })
     }
 
@@ -330,6 +362,22 @@ impl Config {
     pub fn agent_port(&self) -> Option<u16> {
         let listen = self.agent_listen?;
         Some(self.agent_public_port.unwrap_or(listen.port()))
+    }
+
+    /// Port que les agents composent réellement : celui de
+    /// `DUMBMONIT_AGENT_PUBLIC_URL` s'il y en a une, sinon [`Config::agent_port`].
+    pub fn agent_dial_port(&self) -> Option<u16> {
+        self.agent_listen?;
+        self.agent_public_url
+            .as_deref()
+            .and_then(|url| url.rsplit_once(':'))
+            .and_then(|(_, port)| port.parse::<u16>().ok())
+            .or_else(|| self.agent_port())
+    }
+
+    /// Port de l'écoute unique, si elle est ouverte.
+    pub fn single_port(&self) -> Option<u16> {
+        self.single_listen.map(|listen| listen.port())
     }
 
     pub fn database_path(&self) -> PathBuf {
@@ -412,6 +460,53 @@ fn parse_agent_listen(raw: Option<&str>) -> Result<Option<SocketAddr>> {
     })
 }
 
+/// Plafond de `DUMBMONIT_RELAY_MAX_TUNNELS` : au-delà, la connexion
+/// multiplexée d'un relais (yamux) réserverait plus d'un gibioctet de fenêtres
+/// de réception.
+pub const MAX_RELAY_TUNNELS: usize = 4096;
+
+/// Lit `DUMBMONIT_SINGLE_PORT` : absente, `off` (ou `none`, `0`, vide) : pas
+/// d'écoute unique ; un port seul (`443`) écoute sur toutes les adresses IPv4 ;
+/// sinon une adresse complète (`0.0.0.0:443`, `[::]:443`).
+fn parse_single_listen(raw: Option<&str>) -> Result<Option<SocketAddr>> {
+    let Some(raw) = raw.map(str::trim) else { return Ok(None) };
+    if matches!(raw.to_ascii_lowercase().as_str(), "" | "off" | "none" | "0" | "false" | "no") {
+        return Ok(None);
+    }
+    if let Ok(port) = raw.parse::<u16>() {
+        return Ok(Some(SocketAddr::from(([0, 0, 0, 0], port))));
+    }
+    raw.parse::<SocketAddr>().map(Some).with_context(|| {
+        format!("DUMBMONIT_SINGLE_PORT: invalid port or address '{raw}' (e.g. 443 or 0.0.0.0:443)")
+    })
+}
+
+/// L'écoute unique s'ajoute aux deux autres : elle a besoin du canal des agents
+/// (son autorité, ses routes) et d'un port qui ne soit ni celui de
+/// l'interface, ni celui des agents.
+fn check_single_listen(
+    single: SocketAddr,
+    agent_listen: Option<SocketAddr>,
+    bind: SocketAddr,
+) -> Result<()> {
+    let Some(agent) = agent_listen else {
+        anyhow::bail!(
+            "DUMBMONIT_SINGLE_PORT needs the agent channel: it is closed \
+             (DUMBMONIT_AGENT_LISTEN=off). Remove one of them."
+        );
+    };
+    for (name, taken) in [("DUMBMONIT_BIND", bind), ("DUMBMONIT_AGENT_LISTEN", agent)] {
+        if taken.port() == single.port() {
+            anyhow::bail!(
+                "DUMBMONIT_SINGLE_PORT uses port {}, already taken by {name}: choose another \
+                 port (443 is the usual one)",
+                single.port()
+            );
+        }
+    }
+    Ok(())
+}
+
 /// Adresse par laquelle joindre un processus local qui écoute sur `listen` :
 /// `0.0.0.0:8428` ou `:8428` s'interrogent sur `127.0.0.1:8428`.
 fn loopback_address(listen: &str) -> String {
@@ -457,6 +552,47 @@ fn check_https_only() -> Result<()> {
         );
     }
     Ok(())
+}
+
+/// Lit `DUMBMONIT_AGENT_PUBLIC_URL` : `https://hôte[:port]`, rien d'autre (ni
+/// chemin, ni identifiants, ni paramètres), rendue sous la forme
+/// `https://hôte:port` (443 par défaut). Elle finit dans des commandes que
+/// l'on colle dans un terminal : l'hôte normalisé par l'analyseur d'URL ne
+/// porte que des caractères sûrs. Refusée si le canal des agents est fermé
+/// (`DUMBMONIT_AGENT_LISTEN=off`) : elle ne mènerait nulle part.
+fn parse_agent_public_url(raw: Option<&str>, channel_open: bool) -> Result<Option<String>> {
+    let Some(raw) = raw.map(str::trim).filter(|raw| !raw.is_empty()) else {
+        return Ok(None);
+    };
+    let invalid = |why: &str| {
+        anyhow::anyhow!(
+            "DUMBMONIT_AGENT_PUBLIC_URL must be https://host[:port], for example \
+             https://agents.example.com:443 ({why}; got '{raw}')"
+        )
+    };
+    if !is_https_url(raw) {
+        return Err(invalid("https:// only: the agent channel is TLS"));
+    }
+    let url = reqwest::Url::parse(raw).map_err(|error| invalid(error.to_string().as_str()))?;
+    if !url.username().is_empty() || url.password().is_some() {
+        return Err(invalid("no user name or password"));
+    }
+    if !matches!(url.path(), "" | "/") || url.query().is_some() || url.fragment().is_some() {
+        return Err(invalid("no path, query or fragment: agents use fixed routes"));
+    }
+    let host = url.host_str().filter(|host| !host.is_empty()).ok_or_else(|| invalid("no host"))?;
+    let safe = |b: u8| b.is_ascii_alphanumeric() || b"-._:[]".contains(&b);
+    if !host.bytes().all(safe) {
+        return Err(invalid("unexpected characters in the host"));
+    }
+    let port = url.port_or_known_default().ok_or_else(|| invalid("no port"))?;
+    if !channel_open {
+        anyhow::bail!(
+            "DUMBMONIT_AGENT_PUBLIC_URL is set but the agent channel is closed \
+             (DUMBMONIT_AGENT_LISTEN=off): remove one of them"
+        );
+    }
+    Ok(Some(format!("https://{host}:{port}")))
 }
 
 /// Vrai pour une URL absolue `https://hôte…`.
@@ -570,6 +706,67 @@ mod tests {
         assert_eq!(parse_agent_listen(Some("off")).unwrap(), None);
         assert_eq!(parse_agent_listen(Some("")).unwrap(), None);
         assert!(parse_agent_listen(Some("8443")).is_err(), "une adresse complète est attendue");
+    }
+
+    #[test]
+    fn the_single_port_is_off_unless_asked_and_takes_a_port_or_an_address() {
+        assert_eq!(parse_single_listen(None).unwrap(), None);
+        assert_eq!(parse_single_listen(Some("off")).unwrap(), None);
+        assert_eq!(parse_single_listen(Some(" ")).unwrap(), None);
+        assert_eq!(parse_single_listen(Some("443")).unwrap(), Some("0.0.0.0:443".parse().unwrap()));
+        assert_eq!(
+            parse_single_listen(Some("[::]:8444")).unwrap(),
+            Some("[::]:8444".parse().unwrap())
+        );
+        assert!(parse_single_listen(Some("https://x")).is_err());
+    }
+
+    #[test]
+    fn the_single_port_needs_the_agent_channel_and_a_port_of_its_own() {
+        let single: SocketAddr = "0.0.0.0:443".parse().unwrap();
+        let bind: SocketAddr = "0.0.0.0:8080".parse().unwrap();
+        let agent: SocketAddr = "0.0.0.0:8443".parse().unwrap();
+        assert!(check_single_listen(single, Some(agent), bind).is_ok());
+        assert!(check_single_listen(single, None, bind).is_err(), "canal des agents fermé");
+        assert!(check_single_listen("0.0.0.0:8080".parse().unwrap(), Some(agent), bind).is_err());
+        assert!(check_single_listen("[::]:8443".parse().unwrap(), Some(agent), bind).is_err());
+    }
+
+    #[test]
+    fn the_dedicated_agent_address_is_https_host_and_port_only() {
+        let parse = |raw: &str| parse_agent_public_url(Some(raw), true);
+        assert_eq!(parse("").unwrap(), None);
+        assert_eq!(parse_agent_public_url(None, true).unwrap(), None);
+        assert_eq!(
+            parse("https://agents.example.com:443").unwrap().as_deref(),
+            Some("https://agents.example.com:443")
+        );
+        // Port par défaut écrit en toutes lettres, barre finale et casse effacées.
+        assert_eq!(
+            parse(" HTTPS://Agents.Example.com/ ").unwrap().as_deref(),
+            Some("https://agents.example.com:443")
+        );
+        assert_eq!(
+            parse("https://[fd00::5]:9443").unwrap().as_deref(),
+            Some("https://[fd00::5]:9443")
+        );
+        assert_eq!(
+            parse("https://203.0.113.10:18443").unwrap().as_deref(),
+            Some("https://203.0.113.10:18443")
+        );
+        for refused in [
+            "http://agents.example.com",
+            "agents.example.com:443",
+            "https://agents.example.com/dumbmonit",
+            "https://user:pass@agents.example.com",
+            "https://agents.example.com?x=1",
+            "https://agents.example.com:99999",
+            "https://",
+        ] {
+            assert!(parse(refused).is_err(), "{refused}");
+        }
+        // Une adresse vers un canal fermé ne mènerait nulle part.
+        assert!(parse_agent_public_url(Some("https://agents.example.com"), false).is_err());
     }
 
     #[test]

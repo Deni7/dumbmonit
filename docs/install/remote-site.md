@@ -19,14 +19,24 @@ instance to look at.
     The relay, like every agent, talks to the server over TLS 1.3 with its own
     agent certificate (mutual TLS). Open **TCP 8443** (the agent port) from the
     remote site to the server: the relay always connects out, nothing has to
-    reach it. This is the only port needed to monitor from another site. See
+    reach the server from there on any other port. This is the only port needed
+    to monitor from another site, installation included. See
     [Agent channel security](agent-security.md).
 
 ## 1. Publish the server over HTTPS
 
-The relay fetches its jobs from the server: the server must be reachable from
-the remote site, typically `https://monitor.example.org` behind a reverse
-proxy. Two things travel on that link:
+!!! tip "One port for a remote site"
+    The install command shown for a relay uses the **agent port only**: the
+    install script, the agent binary and the encrypted channel all come from
+    `https://<server>:8443` (or `DUMBMONIT_AGENT_PUBLIC_URL`). The command pins the key of the certificate of that
+    port and the SHA-256 of each binary, so the download is verified end to end
+    without opening the web port (8080) to the site. Deployment tools get the
+    same command from `GET /api/agent/install?agent_port_only=true`.
+
+The relay fetches its jobs from the server: the server's agent port must be
+reachable from the remote site (TCP 8443). The paragraphs below about the web
+port only apply to agents that still use the former channel through it. Two
+things travel on that link:
 
 - the **enrollment token** (`dmon_…`), in the `Authorization` header of every
   request — as for any agent;
@@ -74,9 +84,12 @@ On Linux, macOS or FreeBSD, the one-line installer with `--relay` and the site
 (not needed with a relay token from the add page):
 
 ```sh
-curl -sSL https://monitor.example.org/install.sh | sudo sh -s -- \
-  --token=dmon_… --url=https://monitor.example.org --relay --site='Lyon office'
+curl -sSL -k --pinnedpubkey sha256//… https://monitor.example.org:8443/install.sh | sudo sh -s -- \
+  --token=dmon_… --url=https://monitor.example.org:8443 --pinned-key=sha256//… \
+  --tls-url=https://monitor.example.org:8443 --ca-pin=… --relay --site='Lyon office'
 ```
+
+Copy the real command from DumbMonit: it carries the pins and the checksums.
 
 On Windows, add `-Relay -Site 'Lyon office'` to the PowerShell install command.
 
@@ -84,7 +97,9 @@ Or any machine at the remote site with Docker, using `docker-compose.agent.yml`
 from the repository:
 
 ```sh
-DUMBMONIT_AGENT_URL=https://monitor.example.org \
+DUMBMONIT_AGENT_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_TLS_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_CA_PIN=… \
 DUMBMONIT_AGENT_TOKEN=dmon_… \
 DUMBMONIT_AGENT_HOSTNAME=relay-lyon \
 DUMBMONIT_AGENT_RELAY=true \
@@ -164,14 +179,24 @@ file it in a folder and place it at a site, without leaving the page. From a
 site in *Add by site*, **Server with the agent** preselects that site's relay;
 the relay's own page has **Install an agent through it**.
 
-Choosing a relay for an install asks it to open its gateway (on port 8443 by
-default) at its next report. The *Relay* panel of the relay's page shows the
-gateway — *Listening on port 8443 — 3 agents connected* — and lets you change
-the port and the address, or close it. Open that port on the relay's own
-firewall, **to the site's network only**. On a Docker relay, publish the port
-(`-p 8443:8443`, or the commented `ports:` of `docker-compose.agent.yml`).
-`gateway_listen: 0.0.0.0:9443` in the relay's `agent.yaml`
-(`DUMBMONIT_AGENT_GATEWAY_LISTEN`) wins over the setting in the UI.
+A relay opens its gateway (port 8443 by default) as soon as it connects, and
+at once when you choose it for an install or change the gateway: the server
+ends the relay's long poll, so there is no report to wait for. The relay then
+tests its gateway itself, at the address the site uses, as a machine of the site
+would, and reports the outcome: the add screen shows the command once that test
+passes, or says what failed. The test cannot see a firewall between the site's
+machines and the relay (the relay does not cross it to reach itself). The
+*Relay* panel of the relay's page shows the gateway — *Listening on port 8443 —
+3 agents connected* — and lets you change the port and the address, or close it.
+The install command of a relay opens that port on the relay's own firewall,
+**to the site's network only** (firewalld or ufw on Linux, the Windows firewall
+with `LocalSubnet`), says so on screen, and `--uninstall` (`-Uninstall`) removes
+the rule; `--no-firewall` (`-NoFirewall`) leaves the firewall alone. On a Docker
+relay, `docker-compose.agent.yml` publishes 8443
+(`DUMBMONIT_AGENT_GATEWAY_PUBLISH=192.168.10.5:8443` keeps it on the LAN
+address). `gateway_listen: 0.0.0.0:9443` in the relay's `agent.yaml`
+(`DUMBMONIT_AGENT_GATEWAY_LISTEN`) wins over the setting in the UI. Relays
+installed before this behaviour keep a gateway they never opened closed.
 
 What travels through the relay:
 
@@ -208,6 +233,60 @@ shown as `suppressed` with `suppressed_by` = the relay, and only one
 notification goes out — for the relay. The parent you set explicitly keeps its
 role and wins when both are down.
 
+The relay's own alert says so: its monitor reads *relay unreachable: no
+measurement for …*, and the room monitor shows **Relay unreachable for …** —
+one line for the whole site, not one per device.
+
+## When the link to the server drops
+
+A relay does not stop at the first WAN outage: it keeps probing its site and
+loses nothing.
+
+1. **It keeps its schedule.** While the server answers, the relay fetches the
+   list of monitors it probes, with their intervals and the credentials they
+   need, every few minutes. It stores it encrypted next to its binding secret
+   (`relay-plan.enc`, AES-256-GCM, with a random key of its own in
+   `relay-plan.key`, readable by the agent account only).
+2. **It probes on its own.** When the server has not answered for about 35
+   seconds, the relay schedules every monitor itself, at its usual interval,
+   with the same collectors and the same concurrency cap.
+3. **It keeps the results on disk.** Each result goes into a disk buffer
+   (`spool/relay/`), written as it comes, checksummed and flushed: a power cut
+   at the site loses nothing already probed. The buffer shares the agent's
+   `buffer_max_mb` (default 256 MB, compressed; three quarters for the relay's
+   results, one quarter for the machine's own readings). When full, the oldest
+   results go first; `agent_relay_dropped_results` counts them, and the server
+   logs the loss when the relay comes back.
+4. **It catches up.** As soon as the server answers, it takes the scheduling
+   back, and the relay sends what it kept, oldest first, in batches of at most
+   200 results with a pause between them. Every result carries its original
+   timestamps: the graphs of the site fill in by themselves. Each result has a
+   sequence number; a batch sent twice (its acknowledgement lost with the link)
+   is recognised and not written again. A result for a device that no longer
+   goes through this relay is ignored.
+
+During the outage, the site shows as one alert, the relay's (see above), and
+the devices behind it as `suppressed`. Their current state is not rewritten
+from the past: once the server probes them again, their status is the
+present one, and their history is complete.
+
+A result that the relay obtained while the link was up but could not report
+(the link dropped in between) is kept the same way rather than lost. A device
+that did not answer during the outage leaves a gap, exactly as it would have
+with the server probing it.
+
+**What the encryption protects.** The stored schedule holds the credentials
+of the site's devices. Encrypting it protects against the file leaking on its
+own: a copy of the data directory without the key file, a partial backup, a
+disk recovered from an old relay. It does not protect against someone who can
+read the agent's whole directory with its rights or an administrator's: they
+would find the key, but also the agent certificate and binding secret, which
+let them fetch the same schedule from the server anyway. Against that, the
+machine's permissions protect, not cryptography. Switching relay mode off
+erases the schedule, its key and the results waiting; a revoked relay (token
+or certificate refused) erases its schedule at once. `buffer_max_mb: 0` turns
+all this off: the relay then probes only when the server asks.
+
 ## Probing from the server and several relays
 
 A monitor does not have to choose between the server and one relay: it can be probed from both, or from several relays, with a quorum and a confirmation round before any alert. See [Probing from several locations](../devices/services.md#probing-from-several-locations).
@@ -216,12 +295,12 @@ A monitor does not have to choose between the server and one relay: it can be pr
 
 | What you see | Cause and fix |
 |---|---|
-| The relay machine never appears | The command did not reach the server. From the remote site, open the server address in a browser and check TCP 8443. See [Network ports](ports.md). |
+| The relay machine never appears | The command did not reach the server. From the remote site, check that TCP 8443 of the server answers (`curl -k https://<server>:8443/install.sh`). See [Network ports](ports.md). |
 | The add page shows a red channel message | Port 8443 is not published or is blocked. Publish it (`"8443:8443"` under `ports:`) and open it in the firewall. |
 | The agent page does not say *Relay* | The relay switch is off. Open the monitor, use the **gear**, switch on *Relay for a remote site*, give the site, save. It applies at the next report. |
 | A monitor shows *Timed out: relay agent … did not pick up the probe* | The relay is stopped or not in relay mode. Check the service on the relay machine and that `relay: true` is set. |
 | A monitor shows a red message under its address | The relay cannot reach the device. The address must be the one **seen from the remote site**, and the relay needs the same access the server would. |
-| Agents installed behind the relay do not appear | Run the command copied from the relay's *Install an agent behind this relay* page, not the direct one. The relay opens its gateway at its next report, within a minute. |
+| Agents installed behind the relay do not appear | Run the command copied from the relay's *Install an agent behind this relay* page, not the direct one. The relay opens its gateway within seconds; the add screen says whether the relay could reach it at the site's address. |
 
 ## Limits
 
@@ -230,14 +309,21 @@ A monitor does not have to choose between the server and one relay: it can be pr
 - Agent monitors are never probed through a relay (they push their own
   metrics); an agent can instead *connect* through a relay's gateway (see
   above). A relay always connects directly: there is no relay behind a relay.
-- A relay's gateway accepts 64 connections at a time and 4 MiB/s per tunnel
+- A relay's gateway accepts 256 connections at a time and 4 MiB/s per tunnel
   and direction by default (`gateway_max_connections`, `gateway_rate_kib`);
-  the server accepts 256 tunnels per relay.
+  the server accepts 1024 tunnels per relay (`DUMBMONIT_RELAY_MAX_TUNNELS`, up
+  to 4096). Up to date, the relay carries them all in **one** multiplexed
+  connection to the server (one yamux stream per agent connection, each still
+  encrypted end to end by the agent), and each agent keeps a single connection
+  (HTTP/2). An older server gets one tunnel per connection, as before.
 - The relay runs at most 8 probes at a time; a probe is bounded by the
   server's probe timeout (`DUMBMONIT_PROBE_TIMEOUT_SECS`), capped at 120 s on the
   agent.
 - A relay agent needs the collectors compiled in: agents older than this
   feature ignore `relay: true`, and the server reports their probes as timed
   out. Reinstall with the current binary or image.
+- During an outage, the relay probes only what its last schedule listed:
+  monitors added meanwhile wait for the server. Probes from several locations
+  and configuration backups are left to the server.
 
 Which ports to open, and which never to expose: see [Network ports](ports.md).

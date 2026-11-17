@@ -11,12 +11,13 @@
 //! clair sur disque ; ici, il n'existe que le temps d'un aller-retour, et une
 //! sonde que personne n'est venu chercher s'évapore avec son échéance.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use dumbmonit_proto::{
-    AgentCommand, ProbeJob, ProbeOutcome, Sample, Target, TargetId, apply_identity,
+    AgentCommand, BacklogAck, PlannedProbe, ProbeJob, ProbeOutcome, RelayBacklog, RelayPlan,
+    Sample, Target, TargetId, apply_identity,
 };
 use tokio::sync::{Notify, oneshot};
 use tokio::time::Instant;
@@ -104,6 +105,9 @@ struct Inner {
     wakers: HashMap<TargetId, Arc<Notify>>,
     /// Dernière demande de chaque agent relais, pour journaliser ses retours.
     last_poll: HashMap<TargetId, Instant>,
+    /// Relais dont le réglage vient de changer : leur attente longue est
+    /// rendue aussitôt, avec l'en-tête qui leur fait envoyer un lot.
+    resync: HashSet<TargetId>,
 }
 
 /// Absence au-delà de laquelle un relais qui revient demander ses sondes est
@@ -215,6 +219,9 @@ impl RelayHub {
                     }
                     return commands;
                 }
+                if inner.resync.contains(&agent_id) {
+                    return Vec::new();
+                }
                 inner.waker(agent_id)
             };
             let remaining = until.saturating_duration_since(Instant::now());
@@ -225,6 +232,21 @@ impl RelayHub {
                 return Vec::new();
             }
         }
+    }
+
+    /// Le réglage de ce relais vient de changer (passerelle, adresse du site) :
+    /// son attente longue en cours, ou la prochaine, est rendue aussitôt, et
+    /// [`RelayHub::take_resync`] le dit à la route, qui le signale au relais.
+    pub fn nudge(&self, agent_id: TargetId) {
+        let mut inner = self.lock();
+        inner.resync.insert(agent_id);
+        inner.waker(agent_id).notify_one();
+    }
+
+    /// Vrai, une seule fois, si le réglage de ce relais a changé depuis sa
+    /// dernière demande.
+    pub fn take_resync(&self, agent_id: TargetId) -> bool {
+        self.lock().resync.remove(&agent_id)
     }
 
     /// Note qu'un relais vient chercher ses sondes, et dit s'il revient de loin.
@@ -398,6 +420,127 @@ pub async fn settle(state: &AppState, mut job: Job, result: JobResult) {
     job.reply(result);
 }
 
+/// Planning des sondes de ce relais, remis pour qu'il le garde (chiffré) et
+/// continue de sonder pendant une coupure du lien.
+///
+/// Exactement ce que le planificateur lui confierait : les cibles actives qui
+/// passent par lui, sauf la sauvegarde de configuration (qui a sa propre
+/// tâche) et les sondes multi-emplacements (dont la décision se prend ici).
+pub async fn plan_for(state: &AppState, agent_id: TargetId) -> anyhow::Result<RelayPlan> {
+    let relays = db::targets::relay_map(&state.pool).await?;
+    let multisite = db::multisite::all(&state.pool).await?;
+    let probes = db::targets::list_enabled(&state.pool, &state.cipher)
+        .await?
+        .into_iter()
+        .filter(|target| relays.get(&target.id) == Some(&agent_id))
+        .filter(|target| target.kind != crate::netconfig::KIND)
+        .filter(|target| {
+            !(multisite.contains_key(&target.id) && crate::multisite::supports(&target.kind))
+        })
+        .map(|target| {
+            let timeout =
+                dumbmonit_collectors::Registry::deadline_for(&target, state.config.probe_timeout);
+            PlannedProbe { target, timeout_secs: timeout.as_secs().max(1) }
+        })
+        .collect();
+    Ok(RelayPlan { probes, issued_at_ms: chrono::Utc::now().timestamp_millis() })
+}
+
+/// Range un lot de résultats obtenus par le relais pendant une coupure.
+///
+/// - **Dédoublonnage** : chaque résultat porte le numéro de séquence du tampon
+///   du relais ; ce qui ne dépasse pas le dernier numéro reçu (accusé perdu,
+///   lot renvoyé) est écarté sans rien écrire.
+/// - **Horodatages d'origine** : les échantillons passent par [`prepare`],
+///   comme une sonde relayée ordinaire — identité de la cible imposée, fenêtre
+///   de rattrapage de [`MAX_BACKFILL_MS`] (30 jours).
+/// - **Garde-fou** : un résultat pour un équipement qui ne passe pas (ou plus)
+///   par ce relais est ignoré ; un relais n'écrit jamais dans les séries d'un
+///   autre.
+///
+/// Le verdict courant des équipements (`last_error`) n'est pas touché : il
+/// appartient aux sondes du présent, que le serveur a reprises.
+pub async fn ingest_backlog(
+    state: &AppState,
+    agent_id: TargetId,
+    backlog: RelayBacklog,
+) -> anyhow::Result<BacklogAck> {
+    let previous = db::relay_backlog::cursor(&state.pool, agent_id).await?;
+    let same_spool = previous.as_ref().filter(|c| c.spool_id == backlog.spool_id);
+    if previous.is_some() && same_spool.is_none() {
+        info!(agent = agent_id, "relay buffer replaced (reinstalled relay?): numbering restarts");
+    }
+    let known = same_spool.map_or(0, |c| c.last_seq);
+    let dropped_before = same_spool.map_or(0, |c| c.dropped);
+
+    let relays = db::targets::relay_map(&state.pool).await?;
+    let mut results = backlog.results;
+    results.sort_by_key(|result| result.seq);
+    // Chaque équipement n'est lu qu'une fois par lot.
+    let wanted: HashSet<TargetId> = results
+        .iter()
+        .filter(|result| relays.get(&result.target_id) == Some(&agent_id))
+        .map(|result| result.target_id)
+        .collect();
+    let mut targets: HashMap<TargetId, Target> = HashMap::with_capacity(wanted.len());
+    for id in wanted {
+        if let Some(target) = db::targets::get(&state.pool, &state.cipher, id).await? {
+            targets.insert(id, target);
+        }
+    }
+
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    let mut ack = BacklogAck { acked_seq: known, ..BacklogAck::default() };
+    let mut samples = Vec::new();
+    for result in results {
+        if result.seq <= ack.acked_seq {
+            ack.duplicates += 1;
+            continue;
+        }
+        ack.acked_seq = result.seq;
+        if relays.get(&result.target_id) != Some(&agent_id) {
+            ack.ignored += 1;
+            continue;
+        }
+        let target = targets
+            .get(&result.target_id)
+            .filter(|target| target.enabled && target.kind != crate::netconfig::KIND);
+        let Some(target) = target else {
+            ack.ignored += 1;
+            continue;
+        };
+        samples.extend(prepare(&state.collectors, target, result.outcome.samples, now_ms));
+        ack.accepted += 1;
+    }
+
+    let written = samples.len();
+    state.sink.send(samples).await;
+    let cursor = db::relay_backlog::BacklogCursor {
+        spool_id: backlog.spool_id,
+        last_seq: ack.acked_seq,
+        dropped: backlog.dropped,
+    };
+    if previous.as_ref() != Some(&cursor) {
+        db::relay_backlog::save(&state.pool, agent_id, &cursor).await?;
+    }
+    if backlog.dropped > dropped_before {
+        warn!(
+            agent = agent_id,
+            lost = backlog.dropped - dropped_before,
+            "the relay buffer filled up during the outage: the oldest results were lost"
+        );
+    }
+    debug!(
+        agent = agent_id,
+        accepted = ack.accepted,
+        duplicates = ack.duplicates,
+        ignored = ack.ignored,
+        samples = written,
+        "relay backlog received"
+    );
+    Ok(ack)
+}
+
 /// Prépare les mesures rapportées par le relais : les étiquettes d'identité de
 /// la cible priment sur ce que l'agent a envoyé — même garde-fou qu'à
 /// l'ingestion, un relais ne peut pas écrire dans les séries d'une autre cible —
@@ -508,6 +651,27 @@ mod tests {
         let commands = waiter.await.expect("tâche");
         assert_eq!(commands.len(), 1);
         assert!(started.elapsed() < Duration::from_secs(2), "réveil immédiat attendu");
+    }
+
+    #[tokio::test]
+    async fn a_changed_setting_ends_the_long_poll_once_and_says_so() {
+        let hub = Arc::new(RelayHub::new());
+        let waiter = {
+            let hub = hub.clone();
+            tokio::spawn(async move { hub.take(9, Duration::from_secs(5)).await })
+        };
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        let started = Instant::now();
+        hub.nudge(9);
+        assert!(waiter.await.expect("tâche").is_empty());
+        assert!(started.elapsed() < Duration::from_secs(2), "réveil immédiat attendu");
+        assert!(!hub.take_resync(8), "un autre relais n'est pas concerné");
+        assert!(hub.take_resync(9));
+        assert!(!hub.take_resync(9), "une seule fois");
+        // L'attente suivante dure de nouveau.
+        let started = Instant::now();
+        assert!(hub.take(9, Duration::from_millis(200)).await.is_empty());
+        assert!(started.elapsed() >= Duration::from_millis(150));
     }
 
     #[tokio::test]

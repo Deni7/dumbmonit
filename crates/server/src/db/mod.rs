@@ -7,6 +7,7 @@ pub mod opnsense;
 pub mod pbs;
 pub mod pdm;
 pub mod pmg;
+pub mod relay_backlog;
 pub mod status_pages;
 pub mod targets;
 pub mod truenas;

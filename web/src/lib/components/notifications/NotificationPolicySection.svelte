@@ -74,7 +74,7 @@
 		{ value: 3600, label: m.alerts_span_h({ hours: 1 }) }
 	]);
 
-	let batchWindow = $state(60);
+	let batchWindow = $state(30);
 	let maxPerHour = $state('20');
 	let flapOn = $state(true);
 	let flapEvents = $state('4');

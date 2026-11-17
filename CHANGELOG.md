@@ -5,12 +5,301 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## 0.18.0 — 2026-11-17
+
+### Added
+
+- **Outside weather on the wall.** An administrator can pick a city (searched by name) and a unit
+  (°C or °F) in Settings → Wall display → Wall weather; the wall then shows a small icon and the
+  outside temperature to the right of the date. The DumbMonit server asks Open-Meteo (free, no key)
+  and caches the answer for ten minutes; browsers never contact it. Off until a city is chosen, and
+  silent when the service does not answer. The setting is part of backups.
+
+- **CVE check per monitor, in bulk.** On Monitors › List, select several monitors and use
+  "CVE check" to turn the known-vulnerability check on or off for all of them at once (turning it
+  off asks for a second click; a toast reports the result with an Undo). The same switch is on each
+  monitor's form. A monitor with the check off is no longer inventoried and its results leave the
+  CVE list, summary and alerts; they come back when it is turned on again. It is on by default,
+  included in backups, and exposed as `cve_scan` on the monitor API and through
+  `POST /api/security/cves/targets`.
+- **Agent updates by waves.** Beyond "canary agents first", an administrator can order the fleet in
+  successive waves (a number of agents, a share of the fleet, a site, a folder or a tag), set the
+  delay between waves, and let the rollout stop by itself when too many agents of a wave fail or
+  roll back. A rollout can be paused and resumed, and an agent whose updates are off keeps its
+  version. Nothing changes until waves are configured. The settings are part of the backup
+  (`PUT /api/agent/updates/rollout`, `POST .../pause`, `POST .../resume`).
+
+- **Integration packs read more APIs.** `format: xml` (converted to JSON, with `lists` for elements
+  that are always lists), `date:` for metrics that are dates (written in Unix seconds, compared with
+  `time()` by rules), `optional: true` for sources a role or a licence may refuse, `each` to read a
+  list nested in each discovered row, `"*"` in a `map` for every other text value, and a `session`
+  opened before the sources and always closed after them.
+
 ### Changed
+
+- **Documentation is now English only.** The translated pages are gone; the interface stays translated in nine languages.
+- **Public status pages: leaner, in the console's own look.** The page uses the console's tokens,
+  surfaces and type, tighter header, banner and service rows, in the light or dark of the visitor's
+  system (the page's Theme setting still forces one). The history bar's colour legend is gone: hover,
+  focus or tap a segment for a tooltip with the date, the state in words, the downtime and the
+  incidents of that day. The pigeon animation, the summary line, the per-period uptime figures under
+  each service, the "Simple mode" setting and every mention of the product (footer, version tag)
+  are removed from the page; each service keeps its uptime on its row. The API still accepts
+  `simple`.
+- **A clearer "Add a monitor" screen.** The "Most common" block is gone: every integration now sits
+  under a category (servers, network, virtualization, storage, databases, web, checks, mail, metrics
+  and logs, security, cloud, apps, media and home, community packs). The search box has filter chips
+  that combine with the text: by category, no login needed, beta and community packs. A beta
+  integration shows a **Beta** badge instead of "(beta)" in its name, a line at the top explains it,
+  and community packs get their own badge and a short explanation with a link to the docs. The
+  catalogue (`GET /api/collectors`) gains a `beta` field.
+- **A leaner wall.** The health river, the mean time to resolve, the response time and the on-call
+  rota are gone from the wall (the home page keeps the river). The strip along the foot keeps three
+  figures: monitors up, availability and open alerts. The wall is always Night: the Day theme and
+  its button are removed, and a saved or linked `light`/`day` choice reads as Night.
+- **Immich: stale-device check limited to phones and tablets, for every user.** Browsers and
+  computers no longer count in the device metrics, the "Client device stale" rule or the monitor's
+  table; only iOS and Android app sessions do. With an administrator API key (plus the
+  `adminUser.read` and `adminSession.read` permissions), the phones of all users are read, each
+  labelled with its owner; without them the key owner's own devices are read as before. Existing
+  monitors keep working unchanged.
+- **Overview, "Needs attention".** Ages read "3d ago", "2h ago" (number glued to the unit, spaced
+  with a non-breaking space where the language does so) and are larger and darker. An alert row has
+  a labelled "Acknowledge" button: it stops the reminders until the alert resolves and takes the row
+  out of the list; the alert stays on the Alerts page, where it can be un-acknowledged.
+- **"Acknowledge" on a monitor row of "Needs attention".** The small cross menu now ends with
+  "Acknowledge": seen, I am on it. The row leaves the list and nothing is sent for that monitor
+  until it answers again; the server then lifts the acknowledgement by itself, so the next outage
+  notifies as usual. While it lasts it shows on the monitor's page ("Snoozed until it is back to
+  normal", with Lift) and in the maintenance windows. New schedule kind `recovery` on
+  `POST /api/alerts/silences`; it is not counted as planned maintenance on public status pages,
+  agent updates or automatic remediation.
+- **The health river fills its card:** strips take the available height, and more of them show when
+  there is room, at any width.
+- The monitor-count lines ("reporting, unreachable, suppressed by parent" and the severity
+  breakdown) are gone from the wall header, next to the problem total; the "suppressed by parent"
+  counter no longer appears anywhere.
+- The "Scan my network" descriptions no longer say it only finds SNMP devices: the scan finds live
+  devices, checks their open ports and recognises products.
+
+- **Unraid goes deeper.** New readings: licence state and type, trial and OS-update expiry dates,
+  uptime, CPU, memory and swap use. New built-in rules: a crashed VM, unread Unraid alerts, an array
+  almost full (95 %), memory above 95 %, a licence problem, a trial ending within 3 days and OS
+  updates ending within 30 days.
+- **pfSense goes deeper.** New readings: firewall state table (entries, limit, percent used) and
+  CARP status with its maintenance mode. New built-in rules: state table above 80 %, mbuf clusters
+  above 90 %, temperature above 85 °C, CPU above 90 %, swap above 50 %, interface errors and CARP
+  left in maintenance mode. The two new readings need two optional privileges on the API user
+  (`/api/v2/firewall/states/size` and `/api/v2/status/carp`); without them everything else keeps
+  working.
+- **Veeam goes deeper.** New readings: whether each repository is online (API revision `1.2-rev0`
+  and later) and the state of the configuration backup (enabled, encrypted, age of the last
+  success). New built-in rules: repository offline, invalid licence, configuration backup disabled
+  and configuration backup older than 7 days.
+- **vSphere goes deeper.** New readings per VM: number of snapshots, age of the oldest one and
+  whether disks need consolidation. New built-in rules: a snapshot older than 3 days and a VM
+  waiting for consolidation.
+- **Docs: every built-in rule of ten integrations is now listed, in nine languages.** The pages for
+  Proxmox VE, Proxmox Backup Server, TrueNAS, Synology, Unraid, UniFi Network, pfSense, OPNsense,
+  Veeam and vSphere each carry the full table of their rules (threshold, delay, severity, reminder)
+  and a "Known limits" section; the rules reference gains 68 rows that were missing, and a few
+  broken or incomplete tables in the translations are repaired.
+- **Agent signing key setup is one step shorter.** `scripts/agent-signing-key.sh` now appends the
+  new public key to the list of accepted keys (rotation keeps the old ones) and prints the exact
+  `gh secret set AGENT_SIGNING_KEY -R selfhostr/dumbmonit` command; a release built without the
+  secret now says so in the job summary as well as in an annotation.
+- **Your first alert, in the setup wizard.** The wizard now opens on one screen with the whole
+  road to a first alert: type one address (an URL becomes a website check, a host a ping,
+  `host:port` a TCP port), pick where alerts go in one click (ntfy with a private topic already
+  filled in, Discord, Telegram, email, webhook, or any other channel), then **Send a test alert**.
+  It replaces the separate "Get notified" step. New docs page:
+  [First alert in five minutes](https://dumbmonit.selfhostr.io/docs/install/quickstart/).
+- **First-run stopwatch.** The instance records, once, when it started without an account, when
+  the administrator was created, the first monitor, the first channel, the first message delivered
+  (a test counts) and the first real alert delivered. Shown in Settings → System → About → First
+  run and in `GET /api/onboarding` (`first_run`). Kept on the instance only, never sent anywhere,
+  not part of backups; instances set up by an older version stay empty.
+
+
+- **A new monitor is probed at once.** Creating, editing or resuming a monitor wakes the scheduler,
+  and a monitor added while the server runs gets its first probe right away instead of after up
+  to 15 s of reload plus up to a whole interval. Large imports keep the usual spreading after the
+  first twenty.
+- **Shorter waits before the first message, same protection against false alarms.** On new
+  instances, *Service down* fires after two minutes of failed checks instead of three (still at
+  least three failures in a row at the default interval) and *Monitor unreachable* confirms its
+  three-minute threshold on the next 30 s cycle instead of waiting one more minute. Rules already
+  in place keep their delays. The default grouping window drops from 60 s to 30 s (one evaluation
+  cycle) for instances that never changed it. A website that goes down is now reported in under
+  4 minutes, a silent device in under 4.5 minutes (5.5 minutes before).
+- **Notification channels:** a new channel left unnamed takes the name of its kind.
 
 - **One typeface family everywhere: Inter and JetBrains Mono.** The console, the status pages, the
   topology exports and the documentation now use Inter (headings in semibold) and JetBrains Mono
   for code and figures, replacing Geist and Bricolage Grotesque. Both are open source (SIL OFL 1.1)
   and served from DumbMonit itself; the documentation no longer loads anything from Google Fonts.
+
+### Removed
+
+- **Screenshots of website changes.** The website-change monitor no longer takes screenshots, and
+  the optional headless Chromium (`DUMBMONIT_BROWSER_URL`, the `browser` service of the Compose
+  examples) is no longer used: you can remove both from your `docker-compose.yml`. Text and HTML
+  comparison, the before/after line diff and alerts are unchanged. Screenshots already stored are
+  deleted at startup, and their database column is dropped.
+
+### Fixed
+
+- **Vaultwarden 1.37.** Disabled accounts and accounts without two-step login are counted again
+  (the admin user list now uses `userEnabled` and `twoFactorEnabled`; both spellings are read).
+  The item count, which Vaultwarden no longer lists, is left out instead of showing a false 0. The
+  version shown is Vaultwarden's own (`/api/version`), not the Bitwarden compatibility version. A
+  saved admin session is dropped as soon as the admin token changes or Vaultwarden refuses it,
+  instead of staying in use for up to 15 minutes.
+- **Frigate.** Free storage was published in megabytes under a name ending in `_bytes`; it is now in
+  bytes. An expired session token (they last 24 hours) now gets a message that says so and points
+  to port 5000, which needs none.
+- **Prowlarr.** The monitor no longer calls `/api/v1/diskspace`, which Prowlarr does not have: no
+  more warning in the log and a permanent `scrape_errors` of 1 on a healthy Prowlarr. The disk
+  figures and the "Prowlarr disk almost full" rule, which could never have data, are gone
+  (Sonarr, Radarr and Lidarr keep theirs). An already installed instance keeps the unused rule
+  until you delete it.
+- **MinIO.** The uptime comes back on recent releases (they publish it on the cluster page instead
+  of the node page), and the `commit` label of `version_info` is left out when empty.
+- **Omada.** The controller's error message in a refused-client error no longer ends with a doubled
+  full stop.
+- **Misleading authentication messages.** A refused request (HTTP 403) no longer claims the
+  "credentials were accepted": it says the token or key is wrong or expired, or lacks permission.
+  qBittorrent now asks for the WebUI user name and password instead of "the token".
+- **Kubernetes installation.** A Helm chart (`deploy/helm/dumbmonit`, published as
+  `oci://ghcr.io/selfhostr/charts/dumbmonit` with each release) and equivalent plain manifests
+  (`deploy/kubernetes`). One replica (SQLite has a single writer), a volume for `/data`, a web
+  Service with an optional Ingress, and a separate Service for the mTLS agent channel that never
+  goes through a TLS-terminating proxy. Non-root, read-only root filesystem, HTTPS health probes,
+  optional NetworkPolicy and PodDisruptionBudget, external VictoriaMetrics. CI lints, renders and
+  validates it with kubeconform. See the new Kubernetes page in the installation guide.
+- **A relay keeps probing through a WAN outage, and loses nothing.** The relay keeps a copy of its
+  schedule (monitors, intervals, credentials), refreshed every few minutes from
+  `GET /api/agent/relay/plan` and stored encrypted next to its binding secret (AES-256-GCM, random
+  key of its own, readable by the agent account only). When the server has not answered for about
+  35 s, the relay schedules its site's monitors itself; each result goes to a disk buffer, written
+  as it comes. Once the server is back, it takes the scheduling back and the relay sends the
+  results in batches (`POST /api/agent/relay/backlog`, at most 200, with a pause between them),
+  with their original timestamps: the site's graphs fill in. Each result has a sequence number, so
+  a batch sent twice is not written twice. A result probed online but not reported (link dropped
+  in between) is kept the same way. Switching relay mode off erases schedule, key and backlog; a
+  relay whose token or certificate is refused erases its schedule at once.
+- **Agents buffer on disk during an outage.** As soon as a send fails, what was waiting in memory
+  goes to a disk buffer (`spool/` next to the binding secret), and every following cycle is written
+  there as it is collected — checksummed records, flushed to disk, torn records dropped at the
+  next start: a power cut during the outage loses nothing already collected. Bounded by
+  `buffer_max_mb` (`DUMBMONIT_AGENT_BUFFER_MAX_MB`, default 256 MB, compressed; shared three
+  quarters / one quarter with the relay's results); the oldest go first and
+  `agent_dropped_samples` / `agent_relay_dropped_results` count the loss; `0` keeps memory only.
+  Nothing is written while the server answers. New metrics `agent_buffer_disk_bytes`,
+  `agent_relay_buffered_results`, `agent_relay_dropped_results`.
+- **One alert for a site whose relay is unreachable.** The relay's own message reads *relay
+  unreachable: no measurement for …*, shown on the room monitor as *Relay unreachable for …*; its
+  devices stay `suppressed` behind it as before.
+- **Standby server (active/passive), off by default.** With `DUMBMONIT_HA_DIR` (a directory both
+  servers write, NFS or SMB), `DUMBMONIT_HA_NODE` and `DUMBMONIT_HA_ROLE` (`primary`/`standby`), a
+  second server waits on another machine. A lease file says which one is active: the active server
+  renews it every 10 s and stops at once (exit 75, restarted as the standby) if another holds it.
+  Every `DUMBMONIT_HA_SNAPSHOT_SECS` (30) it publishes a consistent copy of its database; the
+  standby copies it, checks its SHA-256, its integrity and that its own instance secret decrypts
+  it, and meanwhile opens neither its database nor a port and probes nothing. It becomes active on
+  `dumbmonit ha promote` (refused while the active one renews its lease, unless `--force`), on its
+  own after `DUMBMONIT_HA_TAKEOVER_MINUTES` without a heartbeat (the active server fences itself
+  after half of it), or at once for the primary when the lease was released by a clean stop. The
+  agent authority, the HTTPS certificate and every credential are in the database: agents reach
+  the new active server without re-enrolment. `dumbmonit ha status` shows both sides. Requires a
+  VictoriaMetrics shared by both (`DUMBMONIT_VM_URL`) and the same instance secret. See
+  [High availability](docs/install/high-availability.md), with a two-node Compose example and why
+  Litestream and LiteFS were not chosen.
+- **Agents: backup servers.** `server_urls` in `agent.yaml` (or `DUMBMONIT_AGENT_URLS`) lists the
+  servers after `server_url`/`tls_url`, which keep their meaning. After three failed attempts in a
+  row the agent moves to the next address with the same certificate, tries the primary every two
+  minutes and goes back as soon as it answers as an active server. The machine page shows which
+  server it reports to and since when (migration 0242).
+- **Plan for PostgreSQL as an option** (not implemented): what it would take and cost, in
+  [docs/development/postgres-plan.md](docs/development/postgres-plan.md).
+- **One port for a remote site.** The agent port (8443) now also serves `install.sh`, `install.ps1`
+  and the agent binaries, without a client certificate (like enrolment). The install command shown
+  for a relay uses that port only: script, binary and encrypted channel come from
+  `https://<server>:8443`, pinned by the key of its certificate and the SHA-256 of each binary, so
+  the web port can stay private. Deployment tools get the same command with
+  `GET /api/agent/install?agent_port_only=true` (or `agent_port_only` when creating a token).
+- **Reliable relay gateway.** A relay opens its gateway (8443) as soon as it connects, and at once
+  when it is chosen for an install or its gateway is changed: the server ends its long poll and the
+  relay reports right away, instead of at its next batch. The relay then tests its own gateway at
+  the address the site dials, through its tunnel to the server, and reports the result: the add
+  screen shows the command for the site's machines once that test passes, or explains what failed
+  (retried every minute). The relay install command opens the gateway port on the local firewall,
+  to the local subnet only (firewalld or ufw, Windows firewall with `LocalSubnet`), says so, and
+  `--uninstall` (or a remote uninstall) removes the rule; `--no-firewall` opts out.
+  `docker-compose.agent.yml` now publishes 8443 for relays (`DUMBMONIT_AGENT_GATEWAY_PUBLISH` to
+  bind it to one address). Relays installed earlier keep a gateway they never opened closed.
+- **Dedicated address for agents: `DUMBMONIT_AGENT_PUBLIC_URL`.** For example
+  `https://agents.example.com:443` behind an SNI passthrough sharing port 443 with websites. It
+  wins over the browser's host and `DUMBMONIT_AGENT_PUBLIC_PORT` (still supported) in the install
+  commands, and the channel announcement carries it, so agents installed without `--tls-url` use it
+  too. Checked at startup (`https://host[:port]` only). The configuration reference has HAProxy and
+  Traefik examples (TLS passed through, never terminated).
+- **Agent behind an outbound proxy.** `proxy:` in `agent.yaml` (or `DUMBMONIT_AGENT_PROXY`):
+  `http://[user:password@]host:port`, `none`, or `system` on Windows (the machine's WinHTTP proxy,
+  then the Internet Explorer one of the service account); `no_proxy:` lists the hosts reached
+  directly, `proxy_user` / `proxy_password` keep credentials out of the URL. Without the key,
+  `HTTPS_PROXY` / `NO_PROXY` apply as before. The agent's TLS session crosses the proxy by
+  `CONNECT`, end to end (client certificate and pinning unchanged); only `http://` proxies are
+  accepted. The installers take `--proxy` / `--no-proxy` (`-Proxy`, `-NoProxy`) for their own
+  downloads and write them to `agent.yaml`; `docker-compose.agent.yml` passes
+  `DUMBMONIT_AGENT_PROXY`.
+- **Optional single port: `DUMBMONIT_SINGLE_PORT=443`.** One more port serves the web interface,
+  the API and the agent channel. Each connection is sorted on its TLS ClientHello: agents announce
+  the ALPN protocol `dumbmonit-agent/1` and get the agent channel (client certificate, pinned
+  authority, same routes and checks as 8443); everything else (browsers, `curl`, PowerShell over
+  TLS 1.2 included) gets the interface and its certificate; plain HTTP gets the usual redirect.
+  Install commands copied from the interface opened on that port use it for everything. 8080 and
+  8443 stay open and remain the default: agents older than this release do not announce the
+  protocol and keep using 8443, and new agents talking to an older server fall back to HTTP/1.1.
+  The configuration reference and the network ports page have the Compose lines.
+- **Multiplexed relays and HTTP/2 agents.** A relay now carries all the tunnels of its site in one
+  outbound connection to the server (`Upgrade: dumbmonit-mux/1`, one yamux stream per agent
+  connection) instead of one TCP + TLS connection each; every stream still holds the site agent's
+  own TLS session, end to end. On the encrypted channel, agents negotiate HTTP/2, so batches, the
+  command long poll and the relay long poll share a single connection (about a third of the
+  sockets per agent). Limits are now settings: `DUMBMONIT_RELAY_MAX_TUNNELS` on the server (1024 by
+  default, was a fixed 256, up to 4096) and `gateway_max_connections` on the relay (256 by default,
+  was 64, up to 2048). Mixed versions keep working: an older server answers `426` and the relay
+  falls back to one tunnel per connection (retried hourly); an older relay keeps opening tunnels,
+  which the server still serves; the server offers HTTP/2 only to clients that announce the agent
+  protocol, so installers and older agents still get HTTP/1.1.
+
+
+- **authentik 2025.10 and later: workers and tasks are measured again.** authentik moved them to
+  `/api/v3/tasks/workers/` and `/api/v3/tasks/schedules/`; DumbMonit reads those first and falls
+  back to the old `/api/v3/admin/` routes on older versions, so the "no worker" and "task failed"
+  rules work again. A route missing on both sides, or a web page instead of JSON, now counts as a
+  scrape error instead of passing in silence.
+- **Kopia: a normally started server is read.** DumbMonit now fetches the CSRF token the Kopia
+  server requires (session cookie and `X-Kopia-Csrf-Token`), instead of reporting refused
+  credentials. A wrong password and a missing CSRF token now give two different messages.
+- **Keycloak 26.8.2 and later: the service account is accepted by the admin API.** The setup notice
+  adds the `kc-admin-api` client scope Keycloak now requires, and the error names it when it is
+  missing. `keycloak_admin_readable` is 0 when the admin API refuses the token, a realm whose
+  clients the account cannot see (no `view-clients`) gets no session count and an error instead of
+  a false zero, and the notice lists the per-realm roles and the optional `manage-realm` that the
+  version, uptime and memory need.
+- **Cisco Meraki, Palo Alto PAN-OS, SonicWall and UniFi Protect become community packs.** Written
+  without a device to try them on, they leave the binary for `packs/meraki`, `packs/paloalto`,
+  `packs/sonicwall` and `packs/unifiprotect`, which anyone can fix without waiting for a release.
+  Existing monitors move to the pack's type (`pack.meraki`…) with their credential, settings and
+  history; until the pack is installed (Settings → Integration packs) they say which one to install.
+  The built-in rules of these types are removed: each pack installs its own. Meraki's
+  *Organization* now takes the organization ID and its network filter is gone; PAN-OS needs an API
+  key (no more user name and password) and no longer watches the last commit; UniFi Protect reads
+  the official integration API with an API key, which reports cameras connected or not, but neither
+  recording nor recorder disks. Aruba Central and QNAP stay built in (token from another host,
+  session cookie in the URL).
 
 ## 0.17.1 — 2026-11-04
 

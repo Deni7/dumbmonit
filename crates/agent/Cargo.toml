@@ -39,9 +39,15 @@ tokio = { version = "1", default-features = false, features = [
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"] }
 
 # Mêmes réglages TLS que le serveur, pour ne pas entretenir deux configurations.
+# `http2` : sur le canal chiffré, lots, commandes et relais partagent une
+# seule connexion (ALPN `h2`, que le serveur n'offre qu'aux agents).
 reqwest = { version = "0.13", default-features = false, features = [
-    "json", "rustls", "gzip",
+    "json", "rustls", "gzip", "http2",
 ] }
+# Connexion multiplexée du relais vers le serveur (un flux yamux par connexion
+# d'agent du site), et le pont entre ses flux et ceux de tokio.
+yamux = "0.14"
+tokio-util = { version = "0.7", default-features = false, features = ["compat"] }
 
 # Canal chiffré vers le serveur : TLS 1.3, échange de clés hybride
 # post-quantique, certificat client et autorité du serveur épinglée. Le même
@@ -52,6 +58,14 @@ rcgen = { version = "0.14", default-features = false, features = ["aws_lc_rs"] }
 sha2 = "0.11"
 hex = "0.4"
 base64 = "0.23"
+# Planning du relais chiffré sur disque (AES-256-GCM, `relay_offline.rs`) :
+# le même moteur que rustls, déjà compilé, rien de plus dans le binaire.
+aws-lc-rs = { version = "1", default-features = false, features = ["aws-lc-sys"] }
+
+# Tampon disque (`spool.rs`) : charges compressées (zlib) et somme de contrôle
+# par enregistrement. Déjà dans l'arbre de dépendances (collecteurs, serveur).
+flate2 = "1.1"
+crc32fast = "1.5"
 
 # Couche multiplateforme d'accès aux compteurs système.
 sysinfo = { version = "0.39", default-features = false, features = [
@@ -91,7 +105,8 @@ windows-service = "0.8"
 # listés dans `perf_counters` ; journal d'événements (`wevtapi`) pour les
 # règles d'événements (`collect/eventlog`). Même version que celle qu'apporte
 # déjà `windows-service`, pour ne pas faire entrer une seconde copie des
-# liaisons.
+# liaisons. WinHTTP : le mandataire système de la machine (`proxy: system`).
 windows-sys = { version = "0.61", features = [
-    "Win32_Foundation", "Win32_System_EventLog", "Win32_System_Performance",
+    "Win32_Foundation", "Win32_Networking_WinHttp", "Win32_System_EventLog",
+    "Win32_System_Performance",
 ] }

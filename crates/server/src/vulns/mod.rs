@@ -187,11 +187,14 @@ fn group_series(series: Vec<InstantSeries>) -> BTreeMap<TargetId, Vec<Series>> {
     grouped
 }
 
-/// L'inventaire de tous les équipements actifs.
+/// L'inventaire de tous les équipements actifs dont le contrôle CVE n'est pas
+/// coupé (réglage par équipement, voir `db::targets::set_cve_scan`).
 pub async fn build_inventory(state: &AppState) -> anyhow::Result<Vec<Component>> {
     let catalog = catalog::catalog();
     let targets = crate::db::targets::list(&state.pool, &state.cipher).await?;
-    let active: HashSet<TargetId> = targets.iter().filter(|t| t.enabled).map(|t| t.id).collect();
+    let skipped = crate::db::targets::cve_scan_off(&state.pool).await?;
+    let active: HashSet<TargetId> =
+        targets.iter().filter(|t| t.enabled && !skipped.contains(&t.id)).map(|t| t.id).collect();
     let mut builder = Builder::new(catalog);
     // VictoriaMetrics indisponible : on garde au moins l'inventaire des agents.
     match state.victoria.query(&inventory_query(&catalog.metric_names())).await {

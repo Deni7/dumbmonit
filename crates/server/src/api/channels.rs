@@ -215,6 +215,7 @@ pub async fn create(
         .map_err(duplicate_name_to_conflict)?;
     policy_store::save_channel_policy(&state.pool, id, &policy).await?;
     clients::adopt(&state.pool, &access, clients::Kind::Channel, id).await?;
+    crate::first_run::record(&state.pool, crate::first_run::Milestone::FirstChannel).await;
     Ok((StatusCode::CREATED, Json(summary(&state.pool, id).await?)))
 }
 

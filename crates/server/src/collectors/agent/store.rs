@@ -1,7 +1,10 @@
 //! Persistance de l'agent : jetons d'enregistrement et machines enregistrées.
 
 use anyhow::{Context, Result};
-use dumbmonit_proto::{AgentIdentity, Credential, RelaySetting, TargetId};
+use dumbmonit_proto::{
+    AgentIdentity, Credential, GatewayCheck, MAX_SERVER_LINK_TEXT, RelaySetting, ServerLink,
+    TargetId,
+};
 use sqlx::{Row, SqlitePool};
 
 use crate::crypto::Cipher;
@@ -399,9 +402,13 @@ pub async fn set_relay_wanted(
 }
 
 /// Mode relais à transmettre à l'agent dans son accusé de réception.
+///
+/// La passerelle d'un relais est ouverte d'office (port par défaut) tant que
+/// personne ne l'a fermée : un relais tout juste installé accepte les agents
+/// de son site dès son premier accusé de réception.
 pub async fn relay_setting(pool: &SqlitePool, target_id: TargetId) -> Result<Option<RelaySetting>> {
     let row = sqlx::query(
-        "SELECT relay_wanted, relay_wanted_site, relay_gateway_wanted
+        "SELECT relay_local, relay_wanted, relay_wanted_site, relay_gateway_wanted, relay_gateway_host
          FROM agent_hosts WHERE target_id = ?",
     )
     .bind(target_id)
@@ -409,10 +416,14 @@ pub async fn relay_setting(pool: &SqlitePool, target_id: TargetId) -> Result<Opt
     .await
     .context("reading the relay mode")?;
     row.map(|row| {
+        let enabled = row.try_get::<i64, _>("relay_wanted")? != 0;
+        // Relais demandé depuis l'interface, ou posé dans l'agent.yaml.
+        let relay = enabled || row.try_get::<i64, _>("relay_local")? != 0;
         Ok(RelaySetting {
-            enabled: row.try_get::<i64, _>("relay_wanted")? != 0,
+            enabled,
             site: row.try_get("relay_wanted_site")?,
-            gateway_port: port_of(row.try_get("relay_gateway_wanted")?),
+            gateway_port: gateway_wanted_of(row.try_get("relay_gateway_wanted")?, relay),
+            gateway_host: row.try_get("relay_gateway_host")?,
         })
     })
     .transpose()
@@ -421,6 +432,17 @@ pub async fn relay_setting(pool: &SqlitePool, target_id: TargetId) -> Result<Opt
 /// Port lu en base, écarté s'il n'en est pas un.
 fn port_of(raw: Option<i64>) -> Option<u16> {
     raw.and_then(|port| u16::try_from(port).ok()).filter(|port| *port > 0)
+}
+
+/// Port de passerelle demandé, tel que rangé : `NULL`, jamais réglé (un relais
+/// l'ouvre sur le port par défaut) ; `0`, fermée depuis l'interface ; sinon le
+/// port. `None` : pas de passerelle.
+pub fn gateway_wanted_of(raw: Option<i64>, relay: bool) -> Option<u16> {
+    match raw {
+        None if relay => Some(dumbmonit_proto::DEFAULT_RELAY_GATEWAY_PORT),
+        None => None,
+        Some(port) => port_of(Some(port)),
+    }
 }
 
 /// Longueur maximale de l'adresse de passerelle d'un relais.
@@ -446,8 +468,9 @@ pub fn clean_gateway_host(raw: Option<&str>) -> Result<Option<String>, &'static 
 }
 
 /// Règle depuis l'interface la passerelle d'un relais : port d'écoute (`None` :
-/// fermée) et adresse par laquelle les machines du site le joignent. Faux si
-/// aucune machine à agent ne porte cette cible.
+/// fermée, rangée `0` pour la distinguer d'une passerelle jamais réglée, qui
+/// s'ouvre d'office) et adresse par laquelle les machines du site le joignent.
+/// Faux si aucune machine à agent ne porte cette cible.
 pub async fn set_relay_gateway(
     pool: &SqlitePool,
     target_id: TargetId,
@@ -458,7 +481,7 @@ pub async fn set_relay_gateway(
         "UPDATE agent_hosts SET relay_gateway_wanted = ?, relay_gateway_host = ?
          WHERE target_id = ?",
     )
-    .bind(port.map(i64::from))
+    .bind(port.map_or(0, i64::from))
     .bind(host)
     .bind(target_id)
     .execute(pool)
@@ -1023,7 +1046,8 @@ async fn update_host(
         "UPDATE agent_hosts
          SET hostname = ?, os = ?, os_version = ?, kernel_version = ?, arch = ?,
              agent_version = ?, commands_enabled = ?, relay = ?, site = ?,
-             relay_control = ?, relay_local = ?, binding_supported = ?, relay_gateway_port = ?
+             relay_control = ?, relay_local = ?, binding_supported = ?, relay_gateway_port = ?,
+             relay_gateway_check = ?, server_link = ?
          WHERE target_id = ?",
     )
     .bind(&identity.hostname)
@@ -1039,6 +1063,8 @@ async fn update_host(
     .bind(i64::from(identity.relay_local))
     .bind(i64::from(identity.binding_supported))
     .bind(identity.relay_gateway.filter(|_| identity.relay).map(i64::from))
+    .bind(gateway_check_json(identity))
+    .bind(server_link_json(identity))
     .bind(target_id)
     .execute(pool)
     .await
@@ -1066,6 +1092,41 @@ async fn store_remediation(
         .await
         .context("recording the remediation declaration")?;
     Ok(())
+}
+
+/// Serveur en service que l'agent rapporte (`server_urls`), borné, en JSON.
+/// Rien pour un agent qui ne connaît qu'une adresse : la colonne s'efface
+/// quand on retire ses secours.
+fn server_link_json(identity: &AgentIdentity) -> Option<String> {
+    let link = identity.server_link.as_ref()?;
+    let servers = link.servers.clamp(1, 64);
+    let clip = |text: &str| text.chars().take(MAX_SERVER_LINK_TEXT).collect::<String>();
+    let bounded = ServerLink {
+        active: link.active.min(servers - 1),
+        servers,
+        url: clip(&link.url),
+        since_ms: link.since_ms,
+        primary_error: link.primary_error.as_deref().map(clip),
+    };
+    serde_json::to_string(&bounded).ok()
+}
+
+/// Essai de passerelle que le relais rapporte, borné, en JSON. Rien pour un
+/// agent qui n'est pas relais, ou sans passerelle.
+fn gateway_check_json(identity: &AgentIdentity) -> Option<String> {
+    let check = identity.relay_gateway_check.as_ref().filter(|_| identity.relay)?;
+    identity.relay_gateway.filter(|port| *port > 0)?;
+    let clip = |text: &str, max: usize| text.chars().take(max).collect::<String>();
+    let bounded = GatewayCheck {
+        address: clip(check.address.as_str(), MAX_GATEWAY_HOST_LEN + 8),
+        ok: check.ok,
+        error: check
+            .error
+            .as_deref()
+            .map(|error| clip(error, dumbmonit_proto::MAX_GATEWAY_CHECK_ERROR)),
+        checked_at_ms: check.checked_at_ms,
+    };
+    serde_json::to_string(&bounded).ok()
 }
 
 /// Site déclaré par l'agent, vidé de ses blancs ; `None` s'il n'en dit rien.
@@ -1127,6 +1188,10 @@ pub struct HostInfo {
     pub relay_gateway_port: Option<u16>,
     /// Adresse par laquelle les machines du site joignent le relais.
     pub relay_gateway_host: Option<String>,
+    /// Dernier essai de sa passerelle par le relais.
+    pub relay_gateway_check: Option<GatewayCheck>,
+    /// Serveur en service, quand l'agent en connaît plusieurs (`server_urls`).
+    pub server_link: Option<ServerLink>,
     pub last_seen_at: Option<String>,
     /// Vrai si la machine est liée à un secret connu d'elle seule.
     pub bound: bool,
@@ -1160,7 +1225,8 @@ pub async fn host(pool: &SqlitePool, target_id: TargetId) -> Result<Option<HostI
     let row = sqlx::query(
         "SELECT hostname, os, os_version, arch, agent_version, commands_enabled, relay, site,
                 relay_wanted, relay_wanted_site, relay_control, relay_local, last_seen_at, secret_hash, bound_at, binding_supported, rebind_until,
-                relay_gateway_wanted, relay_gateway_port, relay_gateway_host
+                relay_gateway_wanted, relay_gateway_port, relay_gateway_host, relay_gateway_check,
+                server_link
          FROM agent_hosts WHERE target_id = ?",
     )
     .bind(target_id)
@@ -1178,7 +1244,7 @@ pub async fn list_hosts(pool: &SqlitePool) -> Result<Vec<(TargetId, String, Host
                 h.commands_enabled, h.relay, h.site, h.relay_wanted, h.relay_wanted_site,
                 h.relay_control, h.relay_local, h.last_seen_at, h.secret_hash, h.bound_at,
                 h.binding_supported, h.rebind_until, h.relay_gateway_wanted, h.relay_gateway_port,
-                h.relay_gateway_host
+                h.relay_gateway_host, h.relay_gateway_check, h.server_link
          FROM agent_hosts h JOIN targets t ON t.id = h.target_id
          ORDER BY t.name",
     )
@@ -1191,6 +1257,14 @@ pub async fn list_hosts(pool: &SqlitePool) -> Result<Vec<(TargetId, String, Host
 }
 
 fn row_to_host(row: &sqlx::sqlite::SqliteRow) -> Result<HostInfo> {
+    let relay_wanted = row.try_get::<i64, _>("relay_wanted")? != 0;
+    let relay_local = row.try_get::<i64, _>("relay_local")? != 0;
+    let gateway_check = row
+        .try_get::<Option<String>, _>("relay_gateway_check")?
+        .and_then(|raw| serde_json::from_str::<GatewayCheck>(&raw).ok());
+    let server_link = row
+        .try_get::<Option<String>, _>("server_link")?
+        .and_then(|raw| serde_json::from_str::<ServerLink>(&raw).ok());
     Ok(HostInfo {
         hostname: row.try_get("hostname")?,
         os: row.try_get("os")?,
@@ -1200,13 +1274,18 @@ fn row_to_host(row: &sqlx::sqlite::SqliteRow) -> Result<HostInfo> {
         commands_enabled: row.try_get::<Option<i64>, _>("commands_enabled")?.map(|v| v != 0),
         relay: row.try_get::<i64, _>("relay")? != 0,
         site: row.try_get("site")?,
-        relay_wanted: row.try_get::<i64, _>("relay_wanted")? != 0,
+        relay_wanted,
         relay_wanted_site: row.try_get("relay_wanted_site")?,
         relay_control: row.try_get::<i64, _>("relay_control")? != 0,
-        relay_local: row.try_get::<i64, _>("relay_local")? != 0,
-        relay_gateway_wanted: port_of(row.try_get("relay_gateway_wanted")?),
+        relay_local,
+        relay_gateway_wanted: gateway_wanted_of(
+            row.try_get("relay_gateway_wanted")?,
+            relay_wanted || relay_local,
+        ),
         relay_gateway_port: port_of(row.try_get("relay_gateway_port")?),
         relay_gateway_host: row.try_get("relay_gateway_host")?,
+        relay_gateway_check: gateway_check,
+        server_link,
         last_seen_at: row.try_get("last_seen_at")?,
         bound: row.try_get::<Option<String>, _>("secret_hash")?.is_some(),
         bound_at: row.try_get("bound_at")?,
@@ -1303,6 +1382,8 @@ mod tests {
             binding_supported: true,
             self_update: None,
             relay_gateway: None,
+            relay_gateway_check: None,
+            server_link: None,
             remediation: None,
         }
     }
@@ -1410,6 +1491,90 @@ mod tests {
         assert!(!second.created);
         assert!(second.issued_secret.is_none(), "le secret n'est remis qu'une fois");
         assert_eq!(db::targets::list(&db.pool, &db.cipher).await.unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_relay_gateway_opens_by_default_closes_on_demand_and_keeps_its_check() {
+        let db = setup().await;
+        let token_id = token(&db, "relais").await;
+        let mut relay = identity("relais", Some("id-relais"));
+        let first = enrol(&db, &relay, token_id).await;
+        let secret = first.issued_secret.clone().expect("secret");
+        let target = first.target_id;
+        let gateway = |setting: Option<RelaySetting>| setting.expect("machine").gateway_port;
+
+        // Pas un relais : pas de passerelle.
+        assert_eq!(gateway(relay_setting(&db.pool, target).await.unwrap()), None);
+        // Relais : passerelle ouverte d'office, sans attendre qu'on la demande.
+        assert!(set_relay_wanted(&db.pool, target, true, Some("Lyon")).await.unwrap());
+        let open = Some(dumbmonit_proto::DEFAULT_RELAY_GATEWAY_PORT);
+        assert_eq!(gateway(relay_setting(&db.pool, target).await.unwrap()), open);
+        let info = host(&db.pool, target).await.unwrap().expect("machine");
+        assert_eq!(info.relay_gateway_wanted, open);
+
+        // Le relais rapporte l'essai de sa passerelle : rangé, borné.
+        relay.relay = true;
+        relay.relay_gateway = Some(8443);
+        relay.relay_gateway_check = Some(GatewayCheck {
+            address: "192.168.10.5:8443".into(),
+            ok: false,
+            error: Some("x".repeat(5000)),
+            checked_at_ms: 1_700_000_000_000,
+        });
+        register(&db.pool, &db.cipher, &relay, token_id, Some(&secret)).await.expect("lot");
+        let check = host(&db.pool, target).await.unwrap().unwrap().relay_gateway_check.unwrap();
+        assert_eq!(check.address, "192.168.10.5:8443");
+        assert!(!check.ok);
+        let error = check.error.unwrap();
+        assert_eq!(error.chars().count(), dumbmonit_proto::MAX_GATEWAY_CHECK_ERROR);
+
+        // Fermée depuis l'interface : elle le reste, avec l'adresse gardée.
+        assert!(set_relay_gateway(&db.pool, target, None, Some("192.168.10.5")).await.unwrap());
+        let setting = relay_setting(&db.pool, target).await.unwrap().unwrap();
+        assert_eq!(setting.gateway_port, None);
+        assert_eq!(setting.gateway_host.as_deref(), Some("192.168.10.5"));
+        assert!(set_relay_gateway(&db.pool, target, Some(9443), None).await.unwrap());
+        assert_eq!(gateway(relay_setting(&db.pool, target).await.unwrap()), Some(9443));
+    }
+
+    #[tokio::test]
+    async fn the_server_an_agent_reports_using_is_kept_bounded_then_cleared() {
+        let db = setup().await;
+        let token_id = token(&db, "parc").await;
+        let mut agent = identity("nas", Some("id-nas"));
+        let first = enrol(&db, &agent, token_id).await;
+        let secret = first.issued_secret.clone().expect("secret");
+        let target = first.target_id;
+        assert!(host(&db.pool, target).await.unwrap().unwrap().server_link.is_none());
+
+        // Sur le secours : rangé, borné (un rang hors liste est ramené).
+        agent.server_link = Some(ServerLink {
+            active: 7,
+            servers: 2,
+            url: "https://b.example:8443".into(),
+            since_ms: Some(1_700_000_000_000),
+            primary_error: Some("x".repeat(5000)),
+        });
+        register(&db.pool, &db.cipher, &agent, token_id, Some(&secret)).await.expect("lot");
+        let link = host(&db.pool, target).await.unwrap().unwrap().server_link.expect("lien");
+        assert_eq!((link.active, link.servers), (1, 2));
+        assert_eq!(link.url, "https://b.example:8443");
+        assert_eq!(link.since_ms, Some(1_700_000_000_000));
+        assert_eq!(link.primary_error.unwrap().chars().count(), MAX_SERVER_LINK_TEXT);
+
+        // Plus de secours dans sa configuration : plus rien d'affiché.
+        agent.server_link = None;
+        register(&db.pool, &db.cipher, &agent, token_id, Some(&secret)).await.expect("lot");
+        assert!(host(&db.pool, target).await.unwrap().unwrap().server_link.is_none());
+    }
+
+    #[test]
+    fn a_gateway_never_set_is_open_for_a_relay_only() {
+        assert_eq!(gateway_wanted_of(None, true), Some(8443));
+        assert_eq!(gateway_wanted_of(None, false), None);
+        assert_eq!(gateway_wanted_of(Some(0), true), None, "fermée depuis l'interface");
+        assert_eq!(gateway_wanted_of(Some(9443), false), Some(9443));
+        assert_eq!(gateway_wanted_of(Some(70_000), true), None);
     }
 
     #[tokio::test]

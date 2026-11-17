@@ -136,6 +136,8 @@ pub async fn restore(
     report.push(restore_overrides(&mut tx, bundle, &refs).await?);
     report.push(restore_notify_policy(&mut tx, bundle).await?);
     report.push(restore_agent_enrolment(&mut tx, bundle).await?);
+    report.push(restore_wall_weather(&mut tx, bundle).await?);
+    report.push(restore_agent_update_rollout(&mut tx, bundle).await?);
     report.push(restore_instance(&mut tx, bundle).await?);
     report.push(restore_silences(&mut tx, bundle, &refs).await?);
     report.push(restore_status_pages(&mut tx, bundle, &refs).await?);
@@ -492,8 +494,8 @@ async fn upsert_target(
     let tags = serde_json::to_string(&target.tags)?;
 
     let existing = sqlx::query(
-        "SELECT id, name, profile_id, interval_secs, enabled, tags, credential_enc, group_name,
-                position
+        "SELECT id, name, profile_id, interval_secs, enabled, cve_scan, tags, credential_enc,
+                group_name, position
          FROM targets WHERE kind = ? AND address = ?",
     )
     .bind(&target.kind)
@@ -504,9 +506,9 @@ async fn upsert_target(
 
     let Some(row) = existing else {
         sqlx::query(
-            "INSERT INTO targets (name, address, kind, profile_id, interval_secs, enabled, tags,
-                                  credential_enc, group_name, position)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO targets (name, address, kind, profile_id, interval_secs, enabled, cve_scan,
+                                  tags, credential_enc, group_name, position)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&target.name)
         .bind(&target.address)
@@ -514,6 +516,7 @@ async fn upsert_target(
         .bind(&target.profile_id)
         .bind(target.interval_secs.max(10))
         .bind(i64::from(target.enabled))
+        .bind(i64::from(target.cve_scan))
         .bind(&tags)
         .bind(credential.map(|plain| cipher.encrypt(&plain)).transpose()?)
         .bind(&target.group_name)
@@ -531,6 +534,7 @@ async fn upsert_target(
         && row.try_get::<Option<String>, _>("profile_id")? == target.profile_id
         && row.try_get::<i64, _>("interval_secs")? == target.interval_secs
         && (row.try_get::<i64, _>("enabled")? != 0) == target.enabled
+        && (row.try_get::<i64, _>("cve_scan")? != 0) == target.cve_scan
         && serde_json::from_str::<Value>(&stored_tags).ok()
             == serde_json::from_str::<Value>(&tags).ok()
         && same_secret(cipher, stored_credential.as_deref(), target.credential.as_ref())
@@ -542,8 +546,8 @@ async fn upsert_target(
     }
 
     sqlx::query(
-        "UPDATE targets SET name = ?, profile_id = ?, interval_secs = ?, enabled = ?, tags = ?,
-             credential_enc = ?, group_name = ?, position = ?,
+        "UPDATE targets SET name = ?, profile_id = ?, interval_secs = ?, enabled = ?,
+             cve_scan = ?, tags = ?, credential_enc = ?, group_name = ?, position = ?,
              updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
          WHERE id = ?",
     )
@@ -551,6 +555,7 @@ async fn upsert_target(
     .bind(&target.profile_id)
     .bind(target.interval_secs.max(10))
     .bind(i64::from(target.enabled))
+    .bind(i64::from(target.cve_scan))
     .bind(&tags)
     .bind(credential.map(|plain| cipher.encrypt(&plain)).transpose()?)
     .bind(&target.group_name)
@@ -914,6 +919,53 @@ async fn restore_notify_policy(
     Ok(report)
 }
 
+/// Météo du mur (lieu et unité) : remplacée par celle du lot, après contrôle.
+/// Un lot sans section ne touche pas au réglage de l'instance.
+async fn restore_wall_weather(
+    tx: &mut Transaction<'_, Sqlite>,
+    bundle: &Bundle,
+) -> Result<SectionReport> {
+    use crate::weather::{SETTINGS_KEY, Settings};
+    let mut report = SectionReport::new("wall_weather");
+    let Some(raw) = &bundle.wall_weather else { return Ok(report) };
+    let settings = match serde_json::from_value::<Settings>(raw.clone()) {
+        Ok(settings) if settings.place.as_ref().is_none_or(|p| p.validate().is_ok()) => settings,
+        _ => {
+            report.skipped += 1;
+            report.notes.push("The wall weather settings of the backup are unreadable".into());
+            return Ok(report);
+        }
+    };
+    let value = serde_json::to_vec(&settings)?;
+    let existing = sqlx::query("SELECT value FROM settings WHERE key = ?")
+        .bind(SETTINGS_KEY)
+        .fetch_optional(&mut **tx)
+        .await
+        .context("lecture de la météo du mur")?;
+    if let Some(row) = &existing
+        && row.try_get::<Vec<u8>, _>("value")? == value
+    {
+        report.skipped += 1;
+        return Ok(report);
+    }
+    sqlx::query(
+        "INSERT INTO settings (key, value) VALUES (?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value,
+             updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')",
+    )
+    .bind(SETTINGS_KEY)
+    .bind(&value)
+    .execute(&mut **tx)
+    .await
+    .context("écriture de la météo du mur")?;
+    report.count(if existing.is_some() {
+        RestoreOutcome::Updated
+    } else {
+        RestoreOutcome::Created
+    });
+    Ok(report)
+}
+
 /// Garde de l'enrôlement des agents (validation, débit, mise en veille) :
 /// remplacée par celle du lot, après contrôle. Un réglage illisible est
 /// signalé et laissé de côté, l'instance garde le sien.
@@ -965,6 +1017,61 @@ async fn restore_agent_enrolment(
     .execute(&mut **tx)
     .await
     .context("écriture de la garde de l'enrôlement")?;
+    report.count(if existing.is_some() {
+        RestoreOutcome::Updated
+    } else {
+        RestoreOutcome::Created
+    });
+    Ok(report)
+}
+
+/// Déploiement par vagues des mises à jour des agents : remplacé par celui du
+/// lot, après contrôle. Un réglage illisible ou invalide est signalé et laissé
+/// de côté, l'instance garde le sien ; un lot d'avant cette section n'y touche pas.
+async fn restore_agent_update_rollout(
+    tx: &mut Transaction<'_, Sqlite>,
+    bundle: &Bundle,
+) -> Result<SectionReport> {
+    use crate::collectors::agent::rollout::{Rollout, SETTINGS_KEY};
+    let mut report = SectionReport::new("agent_update_rollout");
+    let Some(raw) = &bundle.agent_update_rollout else { return Ok(report) };
+    let rollout = match serde_json::from_value::<Rollout>(raw.clone()) {
+        Ok(rollout) if rollout.validate().is_ok() => rollout,
+        _ => {
+            report.skipped += 1;
+            let note = "The agent update rollout settings of the backup are unreadable";
+            report.notes.push(note.into());
+            return Ok(report);
+        }
+    };
+    let existing = sqlx::query("SELECT value FROM settings WHERE key = ?")
+        .bind(SETTINGS_KEY)
+        .fetch_optional(&mut **tx)
+        .await
+        .context("lecture du déploiement par vagues des agents")?;
+    let value = serde_json::to_vec(&rollout)?;
+    match &existing {
+        Some(row) if row.try_get::<Vec<u8>, _>("value")? == value => {
+            report.skipped += 1;
+            return Ok(report);
+        }
+        // Rien de rangé et la politique par défaut : rien à restaurer.
+        None if rollout == Rollout::default() => {
+            report.skipped += 1;
+            return Ok(report);
+        }
+        _ => {}
+    }
+    sqlx::query(
+        "INSERT INTO settings (key, value) VALUES (?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value,
+             updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')",
+    )
+    .bind(SETTINGS_KEY)
+    .bind(&value)
+    .execute(&mut **tx)
+    .await
+    .context("écriture du déploiement par vagues des agents")?;
     report.count(if existing.is_some() {
         RestoreOutcome::Updated
     } else {

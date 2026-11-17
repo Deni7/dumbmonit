@@ -562,3 +562,93 @@ async fn an_uptime_monitor_is_probed_from_several_locations() {
     assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
     assert!(reply.body["multisite"].is_null());
 }
+
+/// Un résultat mis de côté par le relais pendant une coupure.
+fn offline_result(seq: u64, target_id: i64, ts_ms: i64) -> Value {
+    json!({
+        "seq": seq,
+        "target_id": target_id,
+        "started_at_ms": ts_ms,
+        "outcome": {
+            "duration_ms": 3,
+            "samples": [
+                { "metric": "up", "labels": {}, "value": 1.0, "kind": "gauge", "ts_ms": ts_ms }
+            ]
+        }
+    })
+}
+
+#[tokio::test]
+async fn a_relay_gets_its_plan_and_its_offline_results_are_taken_once() {
+    let app = setup().await;
+    let admin = app.admin_cookie().await;
+    let token = enrollment_token(&app, &admin).await;
+    let agent_id = register_relay(&app, &token, "machine-lyon", true).await;
+    let other_relay = register_relay(&app, &token, "machine-paris", true).await;
+    let mine = create_http_target(&app, &admin, "http://10.0.0.5/", Some(agent_id)).await;
+    let theirs = create_http_target(&app, &admin, "http://10.1.0.5/", Some(other_relay)).await;
+
+    // Le planning : les équipements de ce relais, et eux seuls.
+    let (status, plan) =
+        as_agent(&app, "GET", "/api/agent/relay/plan?key=machine-lyon", &token, Value::Null).await;
+    assert_eq!(status, StatusCode::OK, "{plan}");
+    let planned: Vec<i64> = plan["probes"]
+        .as_array()
+        .expect("sondes")
+        .iter()
+        .map(|p| p["target"]["id"].as_i64().unwrap())
+        .collect();
+    assert_eq!(planned, vec![mine]);
+    assert!(plan["probes"][0]["timeout_secs"].as_u64().unwrap() >= 1);
+    assert_eq!(plan["probes"][0]["target"]["kind"], json!("http"));
+
+    // Le rattrapage : horodatages d'origine, il y a une heure.
+    let then = chrono::Utc::now().timestamp_millis() - 3_600_000;
+    let first = json!({
+        "spool_id": "a1b2",
+        "results": [
+            offline_result(1, mine, then),
+            offline_result(2, mine, then + 60_000),
+            // Un équipement d'un autre relais : jamais écrit au nom de celui-ci.
+            offline_result(3, theirs, then),
+        ],
+        "dropped": 0,
+    });
+    let uri = "/api/agent/relay/backlog?key=machine-lyon";
+    let (status, ack) = as_agent(&app, "POST", uri, &token, first.clone()).await;
+    assert_eq!(status, StatusCode::OK, "{ack}");
+    assert_eq!(ack, json!({ "acked_seq": 3, "accepted": 2, "duplicates": 0, "ignored": 1 }));
+
+    // Accusé perdu, lot renvoyé avec la suite : seul le nouveau est rangé.
+    let mut again = first.clone();
+    again["results"].as_array_mut().unwrap().push(offline_result(4, mine, then + 120_000));
+    let (status, ack) = as_agent(&app, "POST", uri, &token, again).await;
+    assert_eq!(status, StatusCode::OK, "{ack}");
+    assert_eq!(ack, json!({ "acked_seq": 4, "accepted": 1, "duplicates": 3, "ignored": 0 }));
+
+    // Relais réinstallé : nouveau tampon, la numérotation repart.
+    let fresh = json!({ "spool_id": "c3d4", "results": [offline_result(1, mine, then)] });
+    let (status, ack) = as_agent(&app, "POST", uri, &token, fresh).await;
+    assert_eq!(status, StatusCode::OK, "{ack}");
+    assert_eq!(ack["accepted"], json!(1));
+    assert_eq!(ack["acked_seq"], json!(1));
+
+    // L'autre relais ne range rien pour un équipement qui n'est pas le sien.
+    let foreign = json!({ "spool_id": "e5f6", "results": [offline_result(1, mine, then)] });
+    let (status, ack) =
+        as_agent(&app, "POST", "/api/agent/relay/backlog?key=machine-paris", &token, foreign).await;
+    assert_eq!(status, StatusCode::OK, "{ack}");
+    assert_eq!(ack["ignored"], json!(1));
+    assert_eq!(ack["accepted"], json!(0));
+
+    // Un lot démesuré est refusé franchement.
+    let too_many = dumbmonit_proto::MAX_BACKLOG_RESULTS as u64 + 1;
+    let results: Vec<Value> = (1..=too_many).map(|seq| offline_result(seq, mine, then)).collect();
+    let huge = json!({ "spool_id": "a1b2", "results": results });
+    let (status, _) = as_agent(&app, "POST", uri, &token, huge).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+
+    // Le verdict courant de l'équipement n'est pas réécrit par le passé.
+    let view = app.get(&format!("/api/targets/{mine}"), Some(&admin)).await;
+    assert!(view.body["last_error"].is_null(), "{}", view.body);
+}

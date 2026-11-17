@@ -15,13 +15,23 @@
 //!   certificat en cours). Supprimer la machine révoque le certificat ;
 //! - **épinglage** : l'agent ne reconnaît le serveur qu'à l'empreinte SHA-256
 //!   de l'autorité, que porte la commande d'installation ;
-//! - **installation à travers un relais** : les machines d'un site lisent les
-//!   fichiers d'installation sur ce port, par le tunnel du relais. `curl` et
+//! - **installation par ce seul port** : une machine d'un site distant (en
+//!   direct, ou par le tunnel d'un relais) y lit les fichiers d'installation,
+//!   sans certificat client. `curl` et
 //!   PowerShell y reconnaissent le serveur à la clé publique de son
 //!   certificat, gardée d'un renouvellement à l'autre ([`AgentTls::server_pin`]),
 //!   et peuvent n'y parler que TLS 1.2 (Windows 10, Windows Server 2019) :
 //!   le port l'accepte, suites ECDHE + AEAD seules — un agent, lui, ne
 //!   propose que TLS 1.3.
+//!
+//! **Aiguillage par ALPN** : un agent à jour propose
+//! [`dumbmonit_proto::AGENT_ALPN`] dans son ClientHello. Il reçoit alors une
+//! configuration qui offre `h2` (le long-poll des commandes, celui du relais
+//! et les lots partagent une seule connexion), sinon `http/1.1`. Tout autre
+//! client (`curl`, PowerShell, agent antérieur) voit ce port exactement comme
+//! avant : `http/1.1` seul. Le port unique (`DUMBMONIT_SINGLE_PORT`,
+//! [`crate::single_port`]) s'appuie sur la même marque pour séparer les agents
+//! de l'interface.
 //!
 //! L'ancien canal (les mêmes routes sur le port de l'interface, en clair ou
 //! derrière un mandataire) reste accepté tant que le réglage « exiger mTLS »
@@ -36,16 +46,18 @@ mod routes;
 mod tunnel;
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
 use anyhow::{Context, Result};
-use dumbmonit_proto::{TargetId, TlsOffer};
+use dumbmonit_proto::{AGENT_ALPN, TargetId, TlsOffer};
 use rustls::ServerConfig;
 use rustls::crypto::CryptoProvider;
 use rustls::server::WebPkiClientVerifier;
 use sqlx::SqlitePool;
 
 pub use listener::{AgentIo, AgentListener, AgentPeer, Transport, listen};
+pub(crate) use listener::{Ready, peer_of};
 pub use routes::{AgentCert, router};
 
 use crate::auth::rate_limit::Buckets;
@@ -66,11 +78,40 @@ pub const SETTING_LEGACY_SINCE: &str = "agent_legacy_since";
 /// Groupe d'échange de clés que l'agent propose, seul.
 pub const POST_QUANTUM_GROUP: &str = "X25519MLKEM768";
 
+/// Protocoles ALPN servis à un agent qui s'est désigné : `h2` d'abord, pour
+/// qu'une seule connexion porte toutes ses requêtes, `http/1.1` pour un
+/// client qui ne parle pas HTTP/2 (le tunnel d'un relais, mis à niveau), et
+/// la marque elle-même en dernier recours.
+pub const AGENT_PROTOCOLS: [&[u8]; 3] = [b"h2", b"http/1.1", AGENT_ALPN];
+
+/// Les deux configurations TLS du canal, sous le même certificat.
+#[derive(Clone)]
+pub struct Configs {
+    /// Pour tout client qui ne se désigne pas comme agent (installateurs,
+    /// agents antérieurs) : `http/1.1` seul, comme toujours.
+    pub legacy: Arc<ServerConfig>,
+    /// Pour un agent qui propose [`dumbmonit_proto::AGENT_ALPN`] :
+    /// [`AGENT_PROTOCOLS`].
+    pub agent: Arc<ServerConfig>,
+}
+
+impl Configs {
+    /// Configuration à servir pour ce ClientHello.
+    pub fn for_hello(&self, hello: &rustls::server::ClientHello<'_>) -> Arc<ServerConfig> {
+        if offers_agent_protocol(hello) { self.agent.clone() } else { self.legacy.clone() }
+    }
+}
+
+/// Vrai si le ClientHello porte la marque des agents.
+pub fn offers_agent_protocol(hello: &rustls::server::ClientHello<'_>) -> bool {
+    hello.alpn().is_some_and(|mut protocols| protocols.any(|protocol| protocol == AGENT_ALPN))
+}
+
 /// État du canal en mémoire, partagé par l'écoute et l'API.
 pub struct AgentTls {
-    /// Configuration TLS courante ; remplacée à chaque nouveau certificat de
-    /// serveur, sans couper les connexions établies.
-    server_config: RwLock<Option<Arc<ServerConfig>>>,
+    /// Configurations TLS courantes ; remplacées à chaque nouveau certificat
+    /// de serveur, sans couper les connexions établies.
+    configs: RwLock<Option<Configs>>,
     /// Empreintes épinglables (autorité active, puis suivante en rotation).
     pins: RwLock<Vec<String>>,
     /// Épingle (`sha256//…`) de la clé du certificat du serveur.
@@ -82,6 +123,8 @@ pub struct AgentTls {
     ready: Mutex<Option<listener::Ready>>,
     /// Tunnels ouverts, par agent relais.
     tunnels: Arc<Mutex<HashMap<TargetId, usize>>>,
+    /// Plafond de tunnels par relais (`DUMBMONIT_RELAY_MAX_TUNNELS`).
+    max_tunnels: AtomicUsize,
 }
 
 impl Default for AgentTls {
@@ -93,18 +136,35 @@ impl Default for AgentTls {
 impl AgentTls {
     pub fn new() -> Self {
         Self {
-            server_config: RwLock::new(None),
+            configs: RwLock::new(None),
             pins: RwLock::new(Vec::new()),
             server_pin: RwLock::new(None),
             limits: Mutex::new(Buckets::new()),
             ready: Mutex::new(None),
             tunnels: Arc::new(Mutex::new(HashMap::new())),
+            max_tunnels: AtomicUsize::new(tunnel::DEFAULT_MAX_TUNNELS_PER_RELAY),
         }
     }
 
-    /// Configuration TLS à servir, une fois l'autorité chargée.
+    /// Configuration TLS des clients qui ne se désignent pas comme agents
+    /// (`http/1.1` seul), une fois l'autorité chargée.
     pub fn server_config(&self) -> Option<Arc<ServerConfig>> {
-        self.server_config.read().ok().and_then(|config| config.clone())
+        self.configs().map(|configs| configs.legacy)
+    }
+
+    /// Les deux configurations TLS du canal, une fois l'autorité chargée.
+    pub fn configs(&self) -> Option<Configs> {
+        self.configs.read().ok().and_then(|configs| configs.clone())
+    }
+
+    /// Plafond de tunnels par relais en vigueur.
+    pub fn max_tunnels(&self) -> usize {
+        self.max_tunnels.load(Ordering::Relaxed)
+    }
+
+    /// Pose le plafond de tunnels par relais (au moins un).
+    pub fn set_max_tunnels(&self, max: usize) {
+        self.max_tunnels.store(max.max(1), Ordering::Relaxed);
     }
 
     /// Empreintes à épingler.
@@ -128,14 +188,16 @@ impl AgentTls {
         }
     }
 
-    fn ready(&self) -> Option<listener::Ready> {
+    /// File des connexions établies du port des agents, que le port unique
+    /// alimente aussi. `None` tant que le port des agents n'écoute pas.
+    pub(crate) fn ready(&self) -> Option<listener::Ready> {
         self.ready.lock().ok().and_then(|slot| slot.clone())
     }
 
     /// Réserve une place de tunnel pour ce relais, ou `None` s'il a atteint
     /// son plafond. La place se libère quand la connexion se ferme.
     fn reserve_tunnel(&self, relay: TargetId) -> Option<tunnel::Slot> {
-        tunnel::Slot::reserve(&self.tunnels, relay, tunnel::MAX_TUNNELS_PER_RELAY)
+        tunnel::Slot::reserve(&self.tunnels, relay, self.max_tunnels())
     }
 
     /// Tunnels ouverts par un relais en ce moment.
@@ -143,9 +205,9 @@ impl AgentTls {
         self.tunnels.lock().map(|open| open.get(&relay).copied().unwrap_or(0)).unwrap_or(0)
     }
 
-    fn install(&self, config: Arc<ServerConfig>, pins: Vec<String>, server_pin: Option<String>) {
-        if let Ok(mut slot) = self.server_config.write() {
-            *slot = Some(config);
+    fn install(&self, configs: Configs, pins: Vec<String>, server_pin: Option<String>) {
+        if let Ok(mut slot) = self.configs.write() {
+            *slot = Some(configs);
         }
         if let Ok(mut slot) = self.pins.write() {
             *slot = pins;
@@ -157,11 +219,14 @@ impl AgentTls {
 }
 
 /// Annonce du canal à joindre aux réponses faites aux agents, si le canal est
-/// ouvert et l'autorité chargée.
+/// ouvert et l'autorité chargée. Avec une adresse dédiée aux agents
+/// (`DUMBMONIT_AGENT_PUBLIC_URL`), l'annonce la porte : un agent qui migre ou
+/// s'enrôle sans `tls_url` la compose plutôt que l'hôte de son `server_url`.
 pub fn offer(state: &AppState) -> Option<TlsOffer> {
     let port = state.config.agent_port()?;
     let pins = state.agent_tls().pins();
-    (!pins.is_empty()).then_some(TlsOffer { port, pins })
+    let url = state.config.agent_public_url.clone();
+    (!pins.is_empty()).then_some(TlsOffer { port, pins, url })
 }
 
 /// Fournisseur cryptographique du canal : aws-lc-rs, suites AEAD seules (TLS
@@ -186,6 +251,7 @@ pub fn provider() -> Arc<CryptoProvider> {
 /// Prépare le canal au démarrage : autorité (créée au premier lancement),
 /// réglage d'exigence par défaut, certificat du serveur.
 pub async fn init(state: &AppState) -> Result<()> {
+    state.agent_tls().set_max_tunnels(state.config.relay_max_tunnels);
     let created = pki::ensure_active(&state.pool, &state.cipher).await?;
     if created {
         tracing::info!("agent channel: internal certificate authority created");
@@ -252,6 +318,9 @@ pub async fn reload(state: &AppState) -> Result<()> {
         .with_single_cert(identity.chain, identity.key)
         .context("agent channel certificate")?;
     config.alpn_protocols = vec![b"http/1.1".to_vec()];
+    let mut agent = config.clone();
+    agent.alpn_protocols = AGENT_PROTOCOLS.iter().map(|protocol| protocol.to_vec()).collect();
+    let configs = Configs { legacy: Arc::new(config), agent: Arc::new(agent) };
 
     let mut pins: Vec<String> = authorities
         .iter()
@@ -261,7 +330,7 @@ pub async fn reload(state: &AppState) -> Result<()> {
     pins.extend(
         authorities.iter().filter(|ca| ca.state == "next").map(|ca| ca.fingerprint.clone()),
     );
-    state.agent_tls().install(Arc::new(config), pins, server_pin);
+    state.agent_tls().install(configs, pins, server_pin);
     Ok(())
 }
 

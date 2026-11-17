@@ -264,7 +264,11 @@ jobs:
           set -eu
           mkdir -p signatures
           if [ -z "$AGENT_SIGNING_KEY" ]; then
-            echo "::warning::AGENT_SIGNING_KEY is not set: the agent binaries are not signed"
+            echo "::warning title=Agent binaries NOT signed::AGENT_SIGNING_KEY is not set: agents will refuse every update of this build (docs/development/agent-signing.md)"
+            {
+              echo "### Agent binaries are NOT signed"
+              echo "The secret AGENT_SIGNING_KEY is not set: agents refuse updates to this build. See docs/development/agent-signing.md."
+            } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           umask 077

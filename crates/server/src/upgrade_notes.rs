@@ -336,12 +336,16 @@ pub async fn probe(host: &str, port: u16, fresh: bool) -> bool {
 async fn run_check(state: &AppState, check: Check, host: Option<&str>, fresh: bool) -> Detection {
     match check {
         Check::AgentChannelPort => {
-            let port = state.config.agent_port();
-            // L'adresse publique réglée l'emporte sur celle du navigateur.
+            let port = state.config.agent_dial_port();
+            // L'adresse dédiée aux agents d'abord, puis l'adresse publique
+            // réglée, qui l'emporte sur celle du navigateur.
             let global = crate::notify::policy_store::load_global(&state.pool).await.ok();
             let env_url = crate::config::env_var("DUMBMONIT_PUBLIC_URL");
-            let public = global
-                .and_then(|global| global.public_url(env_url.as_deref()))
+            let public = state
+                .config
+                .agent_public_url
+                .clone()
+                .or_else(|| global.and_then(|global| global.public_url(env_url.as_deref())))
                 .and_then(|url| crate::status_host::host_of_url(&url));
             let host = public.as_deref().or(host).and_then(probe_host);
             let reachable = match (port, &host) {

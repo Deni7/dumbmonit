@@ -30,10 +30,12 @@ use crate::alerting::matcher::{ChannelMatcher, MatchContext};
 use crate::alerting::model::{Severity, TargetId};
 use crate::alerting::silence::Schedule;
 
-/// Fenêtre de regroupement par défaut. Une minute : le temps qu'un incident
-/// montre toutes ses facettes (le disque, puis le service, puis la latence) et
-/// qu'elles partent ensemble.
-pub const DEFAULT_BATCH_WINDOW_SECS: u32 = 60;
+/// Fenêtre de regroupement par défaut. Trente secondes, un cycle d'évaluation :
+/// les facettes d'un incident qui sonnent au même cycle partent déjà ensemble
+/// (un message par hôte et par cycle), et celles du cycle suivant les
+/// rejoignent. Une minute faisait attendre la première alerte d'autant, pour un
+/// regroupement à peine meilleur.
+pub const DEFAULT_BATCH_WINDOW_SECS: u32 = 30;
 /// Plafond de messages par canal et par heure. Vingt suffit à une panne sérieuse
 /// sans qu'un téléphone vibre toute la nuit.
 pub const DEFAULT_MAX_PER_HOUR: u32 = 20;

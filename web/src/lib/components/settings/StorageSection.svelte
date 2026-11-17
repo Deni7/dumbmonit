@@ -12,7 +12,6 @@
 	import { getStorage, updateStorage } from '#lib/api/storage.js';
 	import type { SettingSource, StorageUsageKey, StorageView } from '#lib/api/types.js';
 	import { formatDateTime } from '#lib/format.js';
-	import { localizedDocsUrl } from '#lib/docs.js';
 	import { Button, Disclosure, ErrorNotice, Field, Panel, Plate, Skeleton, Toggle } from '#lib/ui/index.js';
 	import RetentionInput from './RetentionInput.svelte';
 	import { diffUpdate, diskShare, formatBytes, formFrom, lowersRawRetention, needsRestart, parseDays, type StorageForm } from './storage';
@@ -195,7 +194,7 @@
 						<p class="text-[0.8125rem] text-ink-3">{m.storage_source({ source: sourceLabel(view.metrics.retention_source) })}</p>
 					{:else}
 						<p class="max-w-prose text-sm text-ink-2">{m.storage_metrics_external({ days: view.metrics.retention_days })}</p>
-						<a href={withBase(localizedDocsUrl(EXTERNAL_VM_DOCS))} target="_blank" rel="noopener" class="inline-flex min-h-10 items-center gap-1 text-[0.8125rem] font-semibold text-ink-2 hover:text-ink hover:underline">
+						<a href={withBase(EXTERNAL_VM_DOCS)} target="_blank" rel="noopener" class="inline-flex min-h-10 items-center gap-1 text-[0.8125rem] font-semibold text-ink-2 hover:text-ink hover:underline">
 							{m.storage_docs_external()}
 							<ExternalLink class="size-3.5" aria-hidden="true" />
 						</a>

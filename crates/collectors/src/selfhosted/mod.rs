@@ -25,12 +25,12 @@
 //!   exécuteurs Actions de l'administration (jeton `Authorization: token …`),
 //!   partagé avec Gitea.
 //!
-//! Les intégrations d'applications *arr, qBittorrent, UniFi Protect, Frigate,
-//! Keycloak, authentik, Vaultwarden et mailcow suivent le même schéma :
+//! Les intégrations d'applications *arr, qBittorrent, Frigate, Keycloak,
+//! authentik, Vaultwarden et mailcow suivent le même schéma (UniFi Protect est
+//! devenu un paquet communautaire, `packs/unifiprotect`) :
 //!
 //! * [`arr`] — Sonarr, Radarr, Lidarr, Prowlarr (clé d'API `X-Api-Key`) ;
 //! * [`qbittorrent`] — WebUI API v2 (session par cookie) ;
-//! * [`protect`] — UniFi Protect, caméras et stockage du NVR (compte local) ;
 //! * [`frigate`] — `/api/stats` et `/api/version` ;
 //! * [`keycloak`] — sondes de santé, puis API d'administration (client de service) ;
 //! * [`authentik`] — santé, version, travailleurs, tâches (jeton d'API) ;
@@ -72,7 +72,6 @@ pub mod nextcloud;
 pub(crate) mod options;
 pub mod paperless;
 pub mod plex;
-pub mod protect;
 pub mod qbittorrent;
 pub mod vaultwarden;
 
@@ -98,7 +97,6 @@ pub use nextcloud::NextcloudCollector;
 pub use options::DEFAULT_REQUEST_TIMEOUT;
 pub use paperless::PaperlessCollector;
 pub use plex::PlexCollector;
-pub use protect::ProtectCollector;
 pub use qbittorrent::QbittorrentCollector;
 pub use vaultwarden::VaultwardenCollector;
 

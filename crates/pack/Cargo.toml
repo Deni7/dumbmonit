@@ -27,6 +27,9 @@ reqwest = { version = "0.13", default-features = false, features = [
 # Chemins JSONPath (RFC 9535) des métriques et des lignes découvertes. MIT.
 serde_json_path = "0.7"
 regex = "1"
+# Réponses XML (`format: xml`), converties en JSON ; déjà utilisé par les
+# collecteurs (même version, aucune nouvelle dépendance). MIT/Apache-2.0.
+roxmltree = "0.20"
 # Version du paquet et version de DumbMonit qu'il exige.
 semver = "1"
 # Empreinte du YAML installé, affichée et comparée à la mise à jour.

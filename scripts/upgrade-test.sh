@@ -1,109 +1,255 @@
 #!/usr/bin/env bash
-# Test de mise à jour : l'image publiée (OLD) crée des données sur un volume, puis
-# l'image candidate (NEW) reprend le MÊME volume. Vérifie que rien n'est perdu.
+# Test de mise à jour : une image publiée (OLD) crée de VRAIES données sur un
+# volume, puis l'image candidate (NEW) reprend le MÊME volume. Vérifie que rien
+# n'est perdu ni abîmé, secrets chiffrés compris.
 #
 #   scripts/upgrade-test.sh [NEW_IMAGE]
 #
 # Variables :
-#   OLD_IMAGE   image de départ (défaut : dernière release publiée, voir plus bas)
-#   NEW_IMAGE   image candidate (défaut : ghcr.io/selfhostr/dumbmonit:edge)
-#   KEEP=1      garde le volume et les conteneurs après coup (débogage)
+#   OLD_IMAGE         image de départ : `latest` (défaut, dernière release publiée),
+#                     `previous-minor` (dernier correctif de la version mineure
+#                     d'avant, pour une montée qui saute une version), ou une
+#                     référence d'image complète
+#   NEW_IMAGE         image candidate (défaut : ghcr.io/selfhostr/dumbmonit:edge)
+#   UPGRADE_LOG_DIR   dossier des journaux (défaut : /tmp/dumbmonit-upgrade-logs-<pid>,
+#                     gardé seulement en cas d'échec)
+#   UPGRADE_SUMMARY_FILE  fichier Markdown où ajouter le résultat (en CI :
+#                     $GITHUB_STEP_SUMMARY)
+#   KEEP=1            garde volumes, conteneurs et réseau après coup (débogage)
 #
-# Prérequis : docker, curl, python3. Les images sont lancées comme en production
-# (uid 65532, système de fichiers en lecture seule, capacités retirées) : c'est le
-# docker-compose.yml d'alpha.8 tel quel, qui doit continuer de démarrer sans retouche.
+# Déroulement (détails dans scripts/upgrade-test/data.py) :
+#   1. OLD démarre sur un volume neuf ; compte admin, comptes, équipes, moniteurs
+#      de types variés (http, tcp, ping, snmp, proxmox, Home Assistant à secret
+#      chiffré, battement de cœur, agent simulé), règles, silences, canal ntfy à
+#      secret, page de statut, incident, réglages. Un faux service HTTP (mock.py)
+#      joue Home Assistant et ntfy et note les jetons qu'on lui présente.
+#   2. Attente de l'historique VictoriaMetrics, photographie de la configuration,
+#      export d'une sauvegarde par OLD, arrêt propre d'OLD.
+#   3. NEW démarre sur le même volume : santé, migrations, journal ; chaque objet
+#      est relu et comparé ; les secrets sont rejoués contre le faux service ;
+#      l'agent, le jeton d'API, la page publique, l'historique, la reprise de la
+#      supervision ; sauvegarde exportée et restauration simulée.
+#   4. La sauvegarde d'OLD est restaurée sur une instance NEUVE de NEW, qui doit
+#      retrouver la configuration et ses secrets.
+#
+# Prérequis : docker (Linux : le faux service est joint par l'adresse de la
+# passerelle du réseau Docker), curl, git, python3. Les images sont lancées comme
+# en production (uid 65532, système de fichiers en lecture seule, capacités
+# retirées) : le docker-compose.yml publié doit continuer de démarrer sans retouche.
 set -euo pipefail
 
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO=selfhostr/dumbmonit
+# Avant le passage à l'organisation selfhostr, les images étaient publiées ici.
+LEGACY_REPO=laupernoe/dumbmonit
 NEW_IMAGE=${1:-${NEW_IMAGE:-ghcr.io/$REPO:edge}}
-PASSWORD='correct horse battery 42'
-USER_NAME=upgrader
+OLD_SPEC=${OLD_IMAGE:-latest}
 SETUP_CODE=UPGRD-TEST2
-RUN_ID=$$
-VOLUME=dumbmonit-upgrade-$RUN_ID
-NAME=dumbmonit-upgrade-$RUN_ID
-WORK=$(mktemp -d)
-JAR=$WORK/cookies
-PORT=
-CODE_SEEN=
+# Doit rester celui de scripts/upgrade-test/data.py (HA_TOKEN).
+HA_TOKEN='ha-llat-upgrade-test-0123456789'
 
+RUN_ID=$$
+PREFIX=dmup-$RUN_ID
+NET=$PREFIX
+VOLUME=$PREFIX-data
+VOLUME_FRESH=$PREFIX-fresh
+C_OLD=$PREFIX-old
+C_NEW=$PREFIX-new
+C_FRESH=$PREFIX-fresh
+WORK=$(mktemp -d)
+LOGDIR=${UPGRADE_LOG_DIR:-${TMPDIR:-/tmp}/dumbmonit-upgrade-logs-$RUN_ID}
+CHECKS=$LOGDIR/checks.log
+MOCK_LOG=$WORK/mock.log
+MOCK_PID=
+SKIP=0
+PORT=
+SCHEME=
+OLD_IMAGE=
+OLD_VERSION=?
+NEW_VERSION=?
+mkdir -p "$LOGDIR"
+: >"$CHECKS"
+
+in_actions() { [ "${GITHUB_ACTIONS:-}" = true ]; }
 step() { printf '\n==> %s\n' "$*"; }
+group() { if in_actions; then printf '::group::%s\n' "$*"; else printf '\n--- %s ---\n' "$*"; fi; }
+endgroup() { if in_actions; then printf '::endgroup::\n'; fi; }
+strip_colors() { sed 's/\x1b\[[0-9;]*m//g'; }
+
+# Journaux des conteneurs et du faux service, écrits dans $LOGDIR.
+collect_logs() {
+  local entry name role
+  for entry in "$C_OLD:old" "$C_NEW:new" "$C_FRESH:fresh"; do
+    name=${entry%%:*}
+    role=${entry##*:}
+    if docker inspect "$name" >/dev/null 2>&1; then
+      docker logs "$name" 2>&1 | strip_colors >"$LOGDIR/$role.log" || true
+    fi
+  done
+  if [ -s "$MOCK_LOG" ]; then cp "$MOCK_LOG" "$LOGDIR/mock.jsonl" || true; fi
+}
+
+show_logs() {
+  local role
+  for role in old new fresh; do
+    [ -s "$LOGDIR/$role.log" ] || continue
+    group "journal du conteneur « $role » (80 dernières lignes ; complet : $LOGDIR/$role.log)"
+    tail -n 80 "$LOGDIR/$role.log"
+    endgroup
+  done
+  if [ -s "$LOGDIR/mock.jsonl" ]; then
+    group "requêtes reçues par le faux service (30 dernières)"
+    tail -n 30 "$LOGDIR/mock.jsonl"
+    endgroup
+  fi
+}
+
 fail() {
   printf '\nECHEC : %s\n' "$*" >&2
-  if docker inspect "$NAME" >/dev/null 2>&1; then
-    printf '\n--- 60 dernières lignes du journal de %s ---\n' "$NAME" >&2
-    docker logs --tail 60 "$NAME" 2>&1 | sed 's/\x1b\[[0-9;]*m//g' >&2 || true
-  fi
+  collect_logs
+  show_logs >&2
   exit 1
 }
+
+write_summary() { # write_summary EXIT_CODE
+  [ -n "${UPGRADE_SUMMARY_FILE:-}" ] && [ "$SKIP" = 0 ] || return 0
+  {
+    if [ "$1" = 0 ]; then
+      printf '### Upgrade test: %s -> %s, passed\n\n' "${OLD_VERSION}" "${NEW_VERSION}"
+    else
+      printf '### Upgrade test: %s -> %s, FAILED\n\n' "${OLD_VERSION}" "${NEW_VERSION}"
+    fi
+    printf 'From `%s` to `%s`.\n\n```\n' "${OLD_IMAGE:-$OLD_SPEC}" "$NEW_IMAGE"
+    tail -n 120 "$CHECKS" 2>/dev/null || true
+    printf '```\n'
+  } >>"$UPGRADE_SUMMARY_FILE" 2>/dev/null || true
+}
+
 cleanup() {
+  local rc=$?
+  trap - EXIT
+  write_summary "$rc"
   if [ "${KEEP:-0}" = 1 ]; then
-    echo "KEEP=1 : volume $VOLUME et dossier $WORK conservés."
-    return
+    echo "KEEP=1 : conteneurs $PREFIX-*, volumes $VOLUME et $VOLUME_FRESH, réseau $NET," \
+      "dossier $WORK et journaux $LOGDIR conservés."
+    exit "$rc"
   fi
-  docker rm -f "$NAME" >/dev/null 2>&1 || true
-  docker volume rm "$VOLUME" >/dev/null 2>&1 || true
+  [ -z "$MOCK_PID" ] || kill "$MOCK_PID" >/dev/null 2>&1 || true
+  docker rm -f "$C_OLD" "$C_NEW" "$C_FRESH" >/dev/null 2>&1 || true
+  docker volume rm "$VOLUME" "$VOLUME_FRESH" >/dev/null 2>&1 || true
+  docker network rm "$NET" >/dev/null 2>&1 || true
   rm -rf "$WORK"
+  # Les journaux ne sont gardés qu'en cas d'échec, ou si l'appelant les a demandés.
+  if [ "$rc" = 0 ] && [ -z "${UPGRADE_LOG_DIR:-}" ]; then rm -rf "$LOGDIR"; fi
+  exit "$rc"
 }
 trap cleanup EXIT
 
-for tool in docker curl python3; do
+for tool in docker curl git python3; do
   command -v "$tool" >/dev/null || { echo "$tool est requis." >&2; exit 2; }
 done
 
-# Dernière release publiée : le tag `latest` n'est posé que par un tag v*, donc
-# il désigne exactement la dernière release. À défaut (image absente), on prend
-# le dernier tag via gh.
-resolve_old_image() {
-  if [ -n "${OLD_IMAGE:-}" ]; then echo "$OLD_IMAGE"; return; fi
-  if docker manifest inspect "ghcr.io/$REPO:latest" >/dev/null 2>&1; then
-    echo "ghcr.io/$REPO:latest"; return
-  fi
+# --- Choix de l'image de départ ---------------------------------------------
+
+image_exists() { docker manifest inspect "$1" >/dev/null 2>&1; }
+
+# Tag (vX.Y.Z) de la dernière release publiée.
+latest_tag() {
+  local tag='' auth=()
   if command -v gh >/dev/null; then
-    local tag
     tag=$(gh api "repos/$REPO/releases/latest" --jq .tag_name 2>/dev/null || true)
-    [ -n "$tag" ] && docker manifest inspect "ghcr.io/$REPO:${tag#v}" >/dev/null 2>&1 \
-      && { echo "ghcr.io/$REPO:${tag#v}"; return; }
   fi
-  # Avant le passage à l'organisation selfhostr, les images étaient publiées ici :
-  # la première release de l'organisation part de la dernière de l'ancien nom.
-  if docker manifest inspect ghcr.io/laupernoe/dumbmonit:latest >/dev/null 2>&1; then
-    echo ghcr.io/laupernoe/dumbmonit:latest; return
+  if [ -z "$tag" ]; then
+    [ -z "${GITHUB_TOKEN:-}" ] || auth=(-H "Authorization: Bearer $GITHUB_TOKEN")
+    tag=$(curl -fsS ${auth[@]+"${auth[@]}"} "https://api.github.com/repos/$REPO/releases/latest" \
+      2>/dev/null | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["tag_name"])' \
+      2>/dev/null || true)
   fi
+  printf '%s' "$tag"
+}
+
+resolve_latest() {
+  # Le tag `latest` n'est posé que par un tag v* sur main : il désigne exactement
+  # la dernière release. À défaut (image absente), on prend le dernier tag via gh.
+  if image_exists "ghcr.io/$REPO:latest"; then echo "ghcr.io/$REPO:latest"; return; fi
+  local tag
+  tag=$(latest_tag)
+  if [ -n "$tag" ] && image_exists "ghcr.io/$REPO:${tag#v}"; then
+    echo "ghcr.io/$REPO:${tag#v}"; return
+  fi
+  if image_exists "ghcr.io/$LEGACY_REPO:latest"; then echo "ghcr.io/$LEGACY_REPO:latest"; return; fi
   echo "Impossible de trouver la dernière release (fixez OLD_IMAGE)." >&2
   exit 2
 }
-OLD_IMAGE=$(resolve_old_image)
+
+# Dernier correctif de la version mineure publiée juste avant celle de `latest`.
+# Imprime rien (code 0) s'il n'y en a pas.
+resolve_previous_minor() {
+  local latest tag repo
+  latest=$(latest_tag)
+  [ -n "$latest" ] || { echo "Dernière release introuvable (gh ou api.github.com)." >&2; exit 2; }
+  for tag in $(git ls-remote --tags --refs "https://github.com/$REPO.git" 'v*' 2>/dev/null \
+    | python3 -I -c '
+import re, sys
+def parse(tag):
+    m = re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)", tag)
+    return tuple(int(x) for x in m.groups()) if m else None
+current = parse(sys.argv[1])
+found = []
+for line in sys.stdin:
+    if "refs/tags/" not in line:
+        continue
+    tag = line.split("refs/tags/", 1)[1].strip()
+    version = parse(tag)
+    if version and current and version[:2] < current[:2]:
+        found.append((version, tag))
+for _, tag in sorted(found, reverse=True):
+    print(tag)
+' "$latest"); do
+    for repo in "$REPO" "$LEGACY_REPO"; do
+      if image_exists "ghcr.io/$repo:${tag#v}"; then echo "ghcr.io/$repo:${tag#v}"; return; fi
+    done
+  done
+}
+
+case "$OLD_SPEC" in
+  latest) OLD_IMAGE=$(resolve_latest) ;;
+  previous-minor)
+    OLD_IMAGE=$(resolve_previous_minor)
+    if [ -z "$OLD_IMAGE" ]; then
+      echo "Aucune version mineure publiée avant la dernière release : rien à tester."
+      SKIP=1
+      exit 0
+    fi
+    ;;
+  *) OLD_IMAGE=$OLD_SPEC ;;
+esac
 
 # --- Aides -------------------------------------------------------------------
 
 # Extrait un champ JSON : `jfield '<expr python sur d>'`, JSON sur stdin.
 jfield() { python3 -I -c 'import sys,json; d=json.load(sys.stdin); print(eval(sys.argv[1]))' "$1"; }
 
-# api METHODE CHEMIN [JSON] : imprime le corps, échoue sur un code >= 400.
-api() {
-  local method=$1 path=$2 body=${3:-} out code
-  local args=(-sk -o "$WORK/body" -w '%{http_code}' -X "$method" -b "$JAR" -c "$JAR"
-    -H 'X-Requested-With: dumbmonit' "$SCHEME://127.0.0.1:$PORT$path")
-  [ -n "$body" ] && args+=(-H 'content-type: application/json' -d "$body")
-  code=$(curl "${args[@]}") || fail "curl $method $path n'a pas abouti"
-  out=$(cat "$WORK/body")
-  if [ "$code" -ge 400 ]; then fail "$method $path -> HTTP $code : $out"; fi
-  printf '%s' "$out"
+# Exécute une phase de data.py, affiche et garde sa sortie ; rend son code.
+run_py() {
+  local rc
+  set +e
+  python3 -I -u "$HERE/upgrade-test/data.py" "$@" 2>&1 | tee -a "$CHECKS"
+  rc=${PIPESTATUS[0]}
+  set -e
+  return "$rc"
 }
 
-start() { # start IMAGE : lance le conteneur sur le volume, attend /api/health
-  local image=$1
-  docker rm -f "$NAME" >/dev/null 2>&1 || true
-  docker run -d --name "$NAME" -p 127.0.0.1::8080 -v "$VOLUME:/data" \
+start() { # start NOM VOLUME IMAGE : lance le conteneur, attend /api/health (PORT, SCHEME)
+  local name=$1 volume=$2 image=$3 i
+  docker run -d --name "$name" --network "$NET" -p 127.0.0.1::8080 -v "$volume:/data" \
     -e DUMBMONIT_SETUP_CODE="$SETUP_CODE" \
     --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true \
     --sysctl net.ipv4.ping_group_range="0 2147483647" "$image" >/dev/null \
     || fail "docker run $image"
-  PORT=$(docker port "$NAME" 8080/tcp | head -1 | sed 's/.*://')
-  local i
+  PORT=$(docker port "$name" 8080/tcp | head -1 | sed 's/.*://')
   for i in $(seq 1 90); do
-    if [ "$(docker inspect -f '{{.State.Running}}' "$NAME")" != true ]; then
+    if [ "$(docker inspect -f '{{.State.Running}}' "$name")" != true ]; then
       fail "$image s'est arrêtée au démarrage"
     fi
     # Depuis la 0.16 le port web ne sert que du HTTPS (certificat auto-signé) : une requête en
@@ -119,55 +265,9 @@ start() { # start IMAGE : lance le conteneur sur le volume, attend /api/health
   fail "$image ne répond pas sur /api/health après 90 s"
 }
 
-stop() { docker stop -t 30 "$NAME" >/dev/null || fail "arrêt de $NAME"; }
+stop() { docker stop -t 30 "$1" >/dev/null || fail "arrêt de $1"; }
 
-login() {
-  : >"$JAR"
-  api POST /api/auth/login "{\"username\":\"$USER_NAME\",\"password\":\"$PASSWORD\"}" >/dev/null
-}
-
-# Photographie normalisée de la configuration : seuls les champs stables et
-# significatifs sont gardés, pour qu'une nouvelle version puisse en ajouter.
-snapshot() {
-  python3 -I - "$PORT" "$JAR" "$SCHEME" >"$1" <<'PY'
-import json, subprocess, sys
-port, jar, scheme = sys.argv[1], sys.argv[2], sys.argv[3]
-def get(path):
-    out = subprocess.run(["curl", "-fsk", "-b", jar, "-H", "X-Requested-With: dumbmonit",
-                          f"{scheme}://127.0.0.1:{port}{path}"], capture_output=True, text=True)
-    if out.returncode != 0:
-        print(f"GET {path} a échoué", file=sys.stderr); sys.exit(1)
-    return json.loads(out.stdout)
-def pick(items, keys):
-    return {str(i["id"]): {k: i.get(k) for k in keys} for i in items}
-snap = {
-    "users": pick(get("/api/users"), ["username", "role", "disabled"]),
-    "targets": pick(get("/api/targets"), ["name", "address", "kind", "tags", "interval_secs",
-                                          "enabled", "credential_kind", "group_name"]),
-    "rules": pick(get("/api/alerts/rules"), ["name", "query", "threshold", "severity"]),
-    "silences": pick(get("/api/alerts/silences"), ["name", "matchers", "schedule", "comment"]),
-    "channels": pick(get("/api/notify/channels"), ["name", "kind", "settings", "has_secret"]),
-}
-pages = get("/api/status-pages")
-snap["pages"] = pick(pages, ["slug", "title", "published"])
-snap["page_items"] = {str(p["id"]): [[i.get("target_id"), i.get("label")] for i in p.get("items", [])]
-                      for p in pages}
-json.dump(snap, sys.stdout, indent=1, sort_keys=True)
-PY
-}
-
-# Échantillons `dumbmonit_up` sur une fenêtre FIXE (millisecondes, bornes passées
-# en argument) : la même avant et après, donc comparable. Imprime « nombre plus_ancien ».
-history() {
-  api GET "/api/metrics/query_range?query=dumbmonit_up&start=$1&end=$2&step=15" \
-    | python3 -I -c '
-import sys, json
-res = json.load(sys.stdin)
-pts = [v for r in res for v in r["values"]]
-print(len(pts), min((float(v[0]) for v in pts), default=0))'
-}
-
-# --- Départ : image publiée --------------------------------------------------
+# --- Mise en place -------------------------------------------------------------
 
 step "Image de départ : $OLD_IMAGE"
 step "Image candidate : $NEW_IMAGE"
@@ -176,64 +276,52 @@ if ! docker image inspect "$NEW_IMAGE" >/dev/null 2>&1; then
   docker pull -q "$NEW_IMAGE" >/dev/null || fail "pull $NEW_IMAGE"
 fi
 docker volume create "$VOLUME" >/dev/null
+docker network create "$NET" >/dev/null
+# Le faux service écoute sur l'hôte ; les conteneurs le joignent par la passerelle
+# de leur réseau (adresse privée : jamais refusée par les gardes d'adresses).
+MOCK_IP=$(docker network inspect -f '{{(index .IPAM.Config 0).Gateway}}' "$NET")
+python3 -I "$HERE/upgrade-test/mock.py" --portfile "$WORK/mock.port" --log "$MOCK_LOG" \
+  --ha-token "$HA_TOKEN" >"$LOGDIR/mock-stderr.log" 2>&1 &
+MOCK_PID=$!
+for _ in $(seq 1 50); do [ -s "$WORK/mock.port" ] && break; sleep 0.1; done
+[ -s "$WORK/mock.port" ] || fail "le faux service n'a pas démarré (voir $LOGDIR/mock-stderr.log)"
+MOCK_PORT=$(cat "$WORK/mock.port")
+echo "faux service : $MOCK_IP:$MOCK_PORT"
+
+# --- Départ : image publiée --------------------------------------------------
 
 step "Démarrage de l'ancienne version"
-start "$OLD_IMAGE"
+start "$C_OLD" "$VOLUME" "$OLD_IMAGE"
 OLD_VERSION=$(jfield 'd["version"]' <"$WORK/health")
 echo "version de départ : $OLD_VERSION"
+URL="$SCHEME://127.0.0.1:$PORT"
 
-step "Création du compte et des données"
-api POST /api/auth/setup \
-  "{\"setup_code\":\"$SETUP_CODE\",\"username\":\"$USER_NAME\",\"password\":\"$PASSWORD\"}" >/dev/null
-login
+step "Création des données (version $OLD_VERSION)"
+run_py seed --url "$URL" --work "$WORK" --setup-code "$SETUP_CODE" \
+  --mock-ip "$MOCK_IP" --mock-port "$MOCK_PORT" --old-version "$OLD_VERSION" \
+  || fail "création des données impossible sur $OLD_IMAGE"
 
-# Appareils de types variés. Ils n'ont pas à être joignables : la configuration,
-# les secrets chiffrés et l'historique de `dumbmonit_up` suffisent au test.
-T_HTTP=$(api POST /api/targets '{"name":"web self","address":"127.0.0.1:8080","kind":"http","tags":{"scheme":"http","allow_private_targets":"true"},"group_name":"Lab","interval_secs":15}' | jfield 'd["id"]')
-T_TCP=$(api POST /api/targets '{"name":"tcp self","address":"127.0.0.1:8080","kind":"tcp","tags":{"allow_private_targets":"true"},"interval_secs":15}' | jfield 'd["id"]')
-T_PING=$(api POST /api/targets '{"name":"ping loopback","address":"127.0.0.1","kind":"ping","tags":{"allow_private_targets":"true"},"interval_secs":15}' | jfield 'd["id"]')
-T_SNMP=$(api POST /api/targets '{"name":"switch","address":"192.0.2.10","kind":"snmp","interval_secs":60,"credential":{"type":"snmp_community","community":"s3cret-community"}}' | jfield 'd["id"]')
-T_PVE=$(api POST /api/targets '{"name":"pve","address":"192.0.2.20","kind":"proxmox","interval_secs":60,"credential":{"type":"api_token","token":"root@pam!dm=00000000-0000-0000-0000-000000000000"}}' | jfield 'd["id"]')
-echo "appareils : $T_HTTP $T_TCP $T_PING $T_SNMP $T_PVE"
-
-api POST /api/alerts/rules '{"name":"Upgrade test: target down","query":"dumbmonit_up == 0","operator":">","threshold":0,"for_secs":60,"severity":"warning"}' >/dev/null
-api POST /api/alerts/silences '{"name":"Upgrade test silence","comment":"kept","matchers":{"host":"switch"},"schedule":{"kind":"weekly","days":[6],"start_minute":120,"end_minute":240,"utc_offset_minutes":60}}' >/dev/null
-CHANNEL_OUT=$(api POST /api/notify/channels '{"name":"Upgrade test ntfy","kind":"ntfy","settings":{"topic":"upgrade-test-topic"}}')
-PAGE_ID=$(api POST /api/status-pages '{"title":"Upgrade test","slug":"upgrade-test","published":true}' | jfield 'd["id"]')
-api PUT "/api/status-pages/$PAGE_ID/items" "[{\"target_id\":$T_HTTP,\"label\":\"Web\"},{\"target_id\":$T_TCP}]" >/dev/null
-echo "règle, silence, canal ($(printf '%s' "$CHANNEL_OUT" | jfield 'd["id"]')) et page $PAGE_ID créés"
-
-step "Attente des premières métriques (jusqu'à 120 s)"
-BEFORE_COUNT=0
-W_START=$(( ($(date +%s) - 3600) * 1000 ))
-for _ in $(seq 1 60); do
-  W_END=$(( $(date +%s) * 1000 ))
-  read -r BEFORE_COUNT BEFORE_OLDEST < <(history "$W_START" "$W_END" || echo "0 0")
-  [ "${BEFORE_COUNT:-0}" -ge 4 ] && break
-  sleep 2
-done
-[ "${BEFORE_COUNT:-0}" -ge 4 ] || fail "moins de 4 échantillons dumbmonit_up après 120 s (obtenus : ${BEFORE_COUNT:-0})"
-echo "échantillons avant : $BEFORE_COUNT (plus ancien : $BEFORE_OLDEST)"
-api GET /api/status-pages >/dev/null
-snapshot "$WORK/before.json"
-curl -fsk "$SCHEME://127.0.0.1:$PORT/api/public/status/upgrade-test" >/dev/null \
-  || fail "la page publique upgrade-test ne répond pas avant la mise à jour"
+step "Attente de l'historique, photographie, sauvegarde"
+run_py before --url "$URL" --work "$WORK" --mock-log "$MOCK_LOG" \
+  || fail "préparation de la comparaison impossible sur $OLD_IMAGE"
 
 step "Arrêt propre de l'ancienne version"
-stop
+stop "$C_OLD"
+collect_logs
 
 # --- Arrivée : image candidate sur le même volume -----------------------------
 
 step "Démarrage de la version candidate sur le même volume"
-start "$NEW_IMAGE"
+NEW_START=$(date +%s)
+start "$C_NEW" "$VOLUME" "$NEW_IMAGE"
 NEW_VERSION=$(jfield 'd["version"]' <"$WORK/health")
 echo "version candidate : $NEW_VERSION ($(jfield 'd.get("build","?")' <"$WORK/health"))"
+URL="$SCHEME://127.0.0.1:$PORT"
 
-step "Vérifications"
 OK=1
-check() { printf '  [%s] %s\n' "$1" "$2"; [ "$1" = ok ] || OK=0; }
+check() { printf '  [%s] %s\n' "$1" "$2" | tee -a "$CHECKS"; [ "$1" = ok ] || OK=0; }
 
-LOGS=$(docker logs "$NAME" 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
+step "Vérifications de démarrage"
 [ "$(jfield 'd["status"]' <"$WORK/health")" = ok ] && check ok "/api/health : status ok" \
   || check KO "/api/health : $(cat "$WORK/health")"
 [ "$(jfield 'd["database"]["ok"]' <"$WORK/health")" = True ] && check ok "base de données saine" \
@@ -241,86 +329,45 @@ LOGS=$(docker logs "$NAME" 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
 [ "$(jfield 'd["victoria"]["ok"]' <"$WORK/health")" = True ] && check ok "VictoriaMetrics saine" \
   || check KO "VictoriaMetrics : $(cat "$WORK/health")"
 # Les migrations s'appliquent avant « database ready » ; un échec arrête le serveur.
-grep -q 'database ready' <<<"$LOGS" && check ok "migrations appliquées (database ready)" \
+# grep sans -q : avec pipefail, -q ferme le tube tôt et docker logs meurt de SIGPIPE.
+docker logs "$C_NEW" 2>&1 | strip_colors | grep 'database ready' >/dev/null \
+  && check ok "migrations appliquées (database ready)" \
   || check KO "« database ready » absent du journal"
+
+step "Relecture des données et des secrets"
+run_py after --url "$URL" --work "$WORK" --mock-log "$MOCK_LOG" \
+  --old-version "$OLD_VERSION" --new-start "$NEW_START" || OK=0
+
+LOGS=$(docker logs "$C_NEW" 2>&1 | strip_colors)
 if grep -Eq ' (ERROR|PANIC) |panicked at' <<<"$LOGS"; then
-  check KO "erreurs dans le journal de démarrage :"; grep -E ' (ERROR|PANIC) |panicked at' <<<"$LOGS" | head -5
+  check KO "erreurs dans le journal de la version candidate :"
+  grep -E ' (ERROR|PANIC) |panicked at' <<<"$LOGS" | head -8
 else
   check ok "aucune ERROR ni panic dans le journal"
 fi
-
-if login 2>/dev/null; then check ok "connexion avec le même mot de passe"
-else check KO "connexion refusée avec le mot de passe d'avant la mise à jour"; fi
-
-if [ "$OK" = 1 ]; then
-  snapshot "$WORK/after.json" || check KO "lecture de la configuration impossible"
-  python3 -I - "$WORK/before.json" "$WORK/after.json" <<'PY' || OK=0
-import json, sys
-before, after = (json.load(open(p)) for p in sys.argv[1:3])
-# Renommages voulus des règles livrées : la mise à jour doit les appliquer,
-# ce ne sont pas des données abîmées.
-EXPECTED = {
-    ("rules", "name"): {"Device unreachable": "Monitor unreachable"},
-    # 0.14.2 : le remplissage d'un volume Synology se lit hors réservation des LUN iSCSI.
-    ("rules", "query"): {
-        "dumbmonit_synology_volume_used_percent":
-            "dumbmonit_synology_volume_effective_used_percent or dumbmonit_synology_volume_used_percent",
-    },
-}
-total = 0
-for section, objs in before.items():
-    bad = 0
-    if section == "page_items":
-        for pid, items in objs.items():
-            ok = after[section].get(pid) == items
-            print(f"  [{'ok' if ok else 'KO'}] services de la page {pid}")
-            if not ok: bad += 1; print(f"       avant {items}\n       après {after[section].get(pid)}")
-        total += bad
-        continue
-    for oid, fields in objs.items():
-        now = after[section].get(oid)
-        if now is None:
-            print(f"  [KO] {section} #{oid} ({fields.get('name') or fields.get('username') or fields.get('slug')}) a disparu"); bad += 1
-        else:
-            diff = {k: (fields[k], now.get(k)) for k in fields
-                    if fields[k] != now.get(k)
-                    and EXPECTED.get((section, k), {}).get(fields[k]) != now.get(k)}
-            if diff:
-                print(f"  [KO] {section} #{oid} modifié (avant, après) : {diff}"); bad += 1
-    print(f"  [{'ok' if not bad else 'KO'}] {section} : {len(objs)} objet(s) inchangé(s)" if not bad else f"  [KO] {section}")
-    total += bad
-sys.exit(1 if total else 0)
-PY
-fi
-
-# Les secrets chiffrés doivent rester lisibles par la nouvelle version : une sonde
-# immédiate chiffre/déchiffre côté serveur avec la clé de /data/secret.key.
-PROBE=$(curl -sk -b "$JAR" -X POST -H 'X-Requested-With: dumbmonit' \
-  "$SCHEME://127.0.0.1:$PORT/api/targets/$T_SNMP/probe" || true)
-if grep -qi 'decrypt\|cipher' <<<"$PROBE"; then
-  check KO "déchiffrement du secret de l'appareil : $PROBE"
+if grep -Eiq 'decrypt|cipher|déchiffr' <<<"$LOGS"; then
+  check KO "le journal parle d'un secret illisible :"
+  grep -Ei 'decrypt|cipher|déchiffr' <<<"$LOGS" | head -5
 else
-  check ok "secrets des appareils toujours déchiffrables"
+  check ok "aucun secret illisible signalé dans le journal"
 fi
 
-curl -fsk "$SCHEME://127.0.0.1:$PORT/api/public/status/upgrade-test" >/dev/null \
-  && check ok "page de statut publique toujours servie" \
-  || check KO "page de statut publique /api/public/status/upgrade-test indisponible"
+# --- Sauvegarde de l'ancienne version restaurée sur une instance neuve --------
 
-# L'historique : sur la même fenêtre, les points d'avant sont tous là (le
-# serveur d'avant peut encore en écrire un entre la mesure et son arrêt :
-# un point de plus n'est pas une perte), et le plus ancien n'a pas bougé.
-read -r AFTER_COUNT AFTER_OLDEST < <(history "$W_START" "$W_END" || echo "0 0")
-if [ "${AFTER_COUNT:-0}" -ge "$BEFORE_COUNT" ] \
-   && python3 -I -c 'import sys; sys.exit(0 if float(sys.argv[1]) == float(sys.argv[2]) else 1)' "$AFTER_OLDEST" "$BEFORE_OLDEST"; then
-  check ok "historique VictoriaMetrics conservé ($BEFORE_COUNT -> $AFTER_COUNT échantillons, plus ancien $BEFORE_OLDEST -> $AFTER_OLDEST)"
+if [ -s "$WORK/old-backup.json" ]; then
+  step "Restauration de la sauvegarde de $OLD_VERSION sur une instance neuve de $NEW_VERSION"
+  docker volume create "$VOLUME_FRESH" >/dev/null
+  start "$C_FRESH" "$VOLUME_FRESH" "$NEW_IMAGE"
+  run_py restore --url "$SCHEME://127.0.0.1:$PORT" --work "$WORK" --mock-log "$MOCK_LOG" \
+    --setup-code "$SETUP_CODE" || OK=0
 else
-  check KO "historique perdu : $BEFORE_COUNT -> ${AFTER_COUNT:-0} échantillons, plus ancien $BEFORE_OLDEST -> ${AFTER_OLDEST:-?}"
+  check ok "restauration de la sauvegarde ancienne ignorée (aucune exportée par $OLD_VERSION)"
 fi
 
+collect_logs
 printf '\n'
 if [ "$OK" = 1 ]; then
-  echo "SUCCES : $OLD_VERSION ($OLD_IMAGE) -> $NEW_VERSION ($NEW_IMAGE), données intactes."
+  echo "SUCCES : $OLD_VERSION ($OLD_IMAGE) -> $NEW_VERSION ($NEW_IMAGE), données intactes ($SECONDS s)."
 else
   fail "la mise à jour $OLD_VERSION -> $NEW_VERSION a abîmé des données (voir [KO] ci-dessus)."
 fi

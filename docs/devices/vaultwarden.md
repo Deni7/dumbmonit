@@ -23,11 +23,11 @@ All metrics are prefixed `dumbmonit_vaultwarden_`.
 | Metric | What | Labels |
 |---|---|---|
 | `up` | value 1 while `/alive` answers |  |
-| `version_info` | value 1 | `version` |
+| `version_info` | value 1; the Vaultwarden version (from `/api/version`), not the Bitwarden compatibility version of `/api/config` | `version` |
 | `signups_open` | 1 when anyone can create an account |  |
 | `admin_readable` | 1 when the admin page was read (absent without the admin token) |  |
 | `users`, `users_disabled`, `users_without_2fa` | accounts; disabled ones; active ones with no two-step login |  |
-| `items` | vault items, all accounts together |  |
+| `items` | vault items, all accounts together (absent on Vaultwarden 1.37 and later, which no longer lists them) |  |
 | `scrape_errors` | calls that failed on the last probe |  |
 
 The [built-in rules](../alerting/rules.md#self-hosted-applications) that apply: Vaultwarden sign-ups open, plus Monitor unreachable.
@@ -51,7 +51,7 @@ The [built-in rules](../alerting/rules.md#self-hosted-applications) that apply: 
 
 | Credential | Fields |
 |---|---|
-| No admin token | Public checks only: `/alive` and `/api/config`. |
-| Admin token | The plain ADMIN_TOKEN. Vaultwarden has no admin API key: the token opens a session on `/admin` (cookie valid 20 minutes), which DumbMonit keeps for 15 minutes between probes, because the login is rate-limited. |
+| No admin token | Public checks only: `/alive`, `/api/version` and `/api/config`. |
+| Admin token | The plain ADMIN_TOKEN. Vaultwarden has no admin API key: the token opens a session on `/admin` (cookie valid 20 minutes), which DumbMonit keeps for 15 minutes between probes, because the login is rate-limited. The saved session is dropped as soon as the token is changed or Vaultwarden refuses it (401, 403). |
 
 Address: a host name (`vault.example.com`), `host:port`, or a full URL with a path prefix. Options: protocol (HTTPS by default), port (443), certificate check and request timeout (15 s).

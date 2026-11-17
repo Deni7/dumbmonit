@@ -3,8 +3,11 @@
 #   DUMBMONIT_AGENT_URL=https://monitor.example.org DUMBMONIT_AGENT_TOKEN=dmon_… \
 #   docker compose -f docker-compose.agent.yml up -d
 #
-# Outbound only: nothing to open on this side. Options and trade-offs
-# (host network, relay mode, private CA): docs/devices/agent.md.
+# An ordinary agent is outbound only: nothing to open on this side. A relay
+# (DUMBMONIT_AGENT_RELAY=true, or a relay token) also opens a gateway on port
+# 8443 for the agents of its site: see ports: below. Options and trade-offs
+# (host network, relay mode, private CA): docs/devices/agent.md and
+# docs/install/remote-site.md.
 name: dumbmonit-agent
 
 services:
@@ -23,11 +26,24 @@ services:
       DUMBMONIT_AGENT_RELAY: ${DUMBMONIT_AGENT_RELAY:-false}
       DUMBMONIT_AGENT_SITE: ${DUMBMONIT_AGENT_SITE:-}
       DUMBMONIT_AGENT_SECRET_FILE: /var/lib/dumbmonit-agent/agent-secret
-      # A relay with its gateway on: where the agents of the site connect.
-      # Publish the port below too.
+      # A relay's gateway listens on 8443 by default (the port set in DumbMonit
+      # wins); this forces another address, for example 0.0.0.0:9443. Publish
+      # the same port below.
       DUMBMONIT_AGENT_GATEWAY_LISTEN: ${DUMBMONIT_AGENT_GATEWAY_LISTEN:-}
-    # ports:
-    #   - "8443:8443"
+      # Outbound HTTP proxy to reach the server (http://[user:password@]host:port,
+      # or none) and the hosts reached directly. HTTPS_PROXY / NO_PROXY work too.
+      DUMBMONIT_AGENT_PROXY: ${DUMBMONIT_AGENT_PROXY:-}
+      DUMBMONIT_AGENT_NO_PROXY: ${DUMBMONIT_AGENT_NO_PROXY:-}
+    ports:
+      # Relay gateway: the agents of the site connect here, and the relay
+      # carries their encrypted channel to the server. A relay opens it as soon
+      # as it connects; an ordinary agent never listens, so the published port
+      # just refuses connections. Restrict it to the site's network, either
+      # with the host firewall or by publishing on the LAN address only
+      # (DUMBMONIT_AGENT_GATEWAY_PUBLISH=192.168.10.5:8443). On a host where 8443
+      # is already taken (the DumbMonit server itself), keep it off the network:
+      # DUMBMONIT_AGENT_GATEWAY_PUBLISH=127.0.0.1:18443.
+      - "${DUMBMONIT_AGENT_GATEWAY_PUBLISH:-8443}:8443"
     volumes:
       # Keeps the agent bound to its device when the container is recreated.
       - agent-state:/var/lib/dumbmonit-agent

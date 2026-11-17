@@ -163,7 +163,7 @@ gets spammed. The full path of one alert, in order:
 8. **Quiet hours** (per channel) — only Warning-level alerts come through;
    the rest waits for a digest when quiet hours end (an alert that clears
    meanwhile is only mentioned as "resolved during quiet hours").
-9. **Batching** — alerts within the batch window (60 s by default) leave as
+9. **Batching** — alerts within the batch window (30 s by default) leave as
    one message per channel: "3 alerts on 2 monitors, 1 resolved".
 10. **Hourly cap** — past `max_per_hour` messages on a channel, alerts wait
     and arrive as one digest ("…and 7 more alerts").

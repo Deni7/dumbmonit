@@ -98,6 +98,7 @@ pub(crate) async fn fetch(
     let mut method = match source.method {
         Method::Get => reqwest::Method::GET,
         Method::Post => reqwest::Method::POST,
+        Method::Delete => reqwest::Method::DELETE,
     };
     let mut with_body = true;
 

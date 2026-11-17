@@ -40,6 +40,8 @@ const MAX_MAX_DAYS: f64 = 3650.0;
 enum Unit {
     Days,
     Seconds,
+    /// La date elle-même, en secondes Unix (paquets : `date:` d'une métrique).
+    Timestamp,
 }
 
 struct Family {
@@ -134,15 +136,16 @@ const FAMILIES: &[Family] = &[
         kind: "license",
         what: &["license"],
     },
+    // Paquets communautaires `meraki` et `paloalto`, qui écrivent la date.
     Family {
-        metric: "meraki_license_expiry_seconds",
-        unit: Unit::Seconds,
+        metric: "meraki_license_expiration_timestamp_seconds",
+        unit: Unit::Timestamp,
         kind: "license",
         what: &[],
     },
     Family {
-        metric: "paloalto_license_expiry_seconds",
-        unit: Unit::Seconds,
+        metric: "paloalto_license_expiration_timestamp_seconds",
+        unit: Unit::Timestamp,
         kind: "license",
         what: &["license"],
     },
@@ -290,6 +293,7 @@ pub fn build(
         let left = match row.family.unit {
             Unit::Days => row.value * DAY,
             Unit::Seconds => row.value,
+            Unit::Timestamp => row.value - row.sampled,
         };
         let expires = row.sampled + left;
         let days_left = (expires - now) / DAY;
@@ -406,6 +410,25 @@ mod tests {
         assert_eq!(out[0].kind, "product");
         assert_eq!(out[0].what, "vps-aaa111.vps.ovh.net");
         assert!((out[0].days_left - 5.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn une_date_d_expiration_ecrite_telle_quelle_est_une_echeance() {
+        let expires = NOW + 12.0 * DAY;
+        let last = vec![series(
+            "paloalto_license_expiration_timestamp_seconds",
+            2,
+            &[("license", "Threat Prevention")],
+            expires,
+        )];
+        let metric = last[0].metric.clone();
+        // Le dernier point date d'hier : la date reste celle qu'il portait.
+        let at = vec![InstantSeries { metric, value: (NOW, (NOW - DAY).to_string()) }];
+        let out = build(&last, &at, &targets(), NOW, 366.0);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].kind, "license");
+        assert_eq!(out[0].what, "Threat Prevention");
+        assert!((out[0].days_left - 12.0).abs() < 0.01, "{}", out[0].days_left);
     }
 
     #[test]

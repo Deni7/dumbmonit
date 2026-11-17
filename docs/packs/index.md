@@ -14,8 +14,8 @@ itself, under rules the pack cannot change.
 
 | A pack can | A pack cannot |
 |---|---|
-| Call `GET` or `POST` paths on the device's own address | Call any other host, follow a redirect to another host, or use an absolute URL |
-| Read JSON (JSONPath), plain text (regular expressions) or the Prometheus text format | Run code, shell commands or templates beyond `{{option.x}}` and `{{credential.x}}` |
+| Call `GET` or `POST` paths on the device's own address, and open then close a session there | Call any other host, follow a redirect to another host, or use an absolute URL |
+| Read JSON or XML (JSONPath), plain text (regular expressions) or the Prometheus text format | Run code, shell commands or templates beyond `{{option.x}}` and `{{credential.x}}` |
 | Send the monitor's credential in a header or as basic/bearer authentication | Put a credential in a URL or a request body |
 | Declare options shown in the monitor form (a switch channel, a threshold) | Write metrics outside its own `dumbmonit_<pack>_` prefix |
 | Ship alert rules on its own metrics | Change a built-in monitor type or built-in rule |
@@ -27,15 +27,21 @@ exactly like the HTTP checks. Private LAN addresses are always allowed.
 
 ## Reference packs
 
-The repository ships three packs under
+The repository ships these packs under
 [`packs/`](https://github.com/selfhostr/dumbmonit/tree/main/packs), each with its
-fixtures and expected output:
+fixtures and expected output. The last four used to be built-in types: with no
+device to try them on, they became community packs, which anyone can now fix
+without waiting for a release.
 
 | Pack | Reads | Rules |
 |---|---|---|
 | `node-exporter` | a curated subset of Prometheus node_exporter (CPU, memory, filesystems, disks, network) | filesystem almost full, memory almost exhausted |
 | `shelly-plug` | Shelly Gen2+ plugs and relays, `/rpc/Switch.GetStatus` | overheating |
 | `speedtest-tracker` | the latest result of Speedtest Tracker's v1 API | internet below expectations, speed test failing |
+| `meraki` | a Cisco Meraki organization through the Dashboard API (key as `Bearer`) | device offline, Internet uplink failed, license out of compliance or expiring |
+| `paloalto` | a PAN-OS firewall through the XML API (key in `X-PAN-KEY`) | interface without link, HA peer lost or out of sync, session table, CPU and memory, licenses expiring |
+| `sonicwall` | a SonicOS 7 firewall through its API, in a session | interface of a zone without link |
+| `unifiprotect` | the cameras of a UniFi Protect console through the integration API (key in `X-API-KEY`) | camera disconnected |
 
 ## Install a pack
 

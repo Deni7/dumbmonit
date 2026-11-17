@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { m } from '#lib/paraglide/messages.js';
 	/**
-	 * One detected website change: the before/after screenshot comparison (when
-	 * the server took any) above its visible-text diff. Deep-linkable on its
+	 * One detected website change: its visible-text diff. Deep-linkable on its
 	 * own — someone can land here straight from a notification — so everything
 	 * it needs comes from a single `GET .../webchange/changes/{id}`; nothing is
 	 * assumed from the device panel that usually links here.
@@ -12,7 +11,6 @@
 	import { formatRelative } from '#lib/format.js';
 	import { ErrorNotice, PageHeader, Panel, Skeleton } from '#lib/ui/index.js';
 	import { FileDiff, FileMinus, FilePlus } from 'lucide-svelte';
-	import ChangeScreenshots from '#lib/components/devices/webchange/ChangeScreenshots.svelte';
 	import DiffView from '#lib/components/devices/webchange/DiffView.svelte';
 	import { pagePath } from '#lib/components/devices/webchange/format.js';
 
@@ -45,14 +43,6 @@
 			loading = false;
 		}
 	}
-
-	// Landing from a row's camera button (`#screenshots`): the content arrives
-	// after the navigation, so the browser's own jump to the anchor misses it.
-	$effect(() => {
-		if (detail && page.url.hash === '#screenshots') {
-			requestAnimationFrame(() => document.getElementById('screenshots')?.scrollIntoView({ block: 'start' }));
-		}
-	});
 
 	$effect(() => {
 		void targetId;
@@ -93,11 +83,7 @@
 		{/snippet}
 	</PageHeader>
 
-	<Panel id="screenshots" title={m.app_change_screenshots()} class="rise-in scroll-mt-20">
-		<ChangeScreenshots {targetId} {detail} />
-	</Panel>
-
-	<Panel title={m.app_change_text_changes()} description={m.app_change_text_desc()} padded={false} class="mt-6 rise-in">
+	<Panel title={m.app_change_text_changes()} description={m.app_change_text_desc()} padded={false} class="rise-in">
 		<div class="p-3">
 			<DiffView diff={detail.diff} />
 		</div>

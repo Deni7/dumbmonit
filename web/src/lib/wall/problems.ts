@@ -96,6 +96,7 @@ export function quietCounts(lines: ProblemLine[]): { suppressed: number; snoozed
 export type ShortCause =
 	| { code: 'no_data'; seconds: number }
 	| { code: 'agent_silent'; seconds: number }
+	| { code: 'relay_silent'; seconds: number }
 	| { code: 'text'; text: string };
 
 const UNIT_SECONDS: Record<string, number> = { d: 86_400, h: 3600, min: 60, s: 1 };
@@ -118,12 +119,17 @@ export function parseServerDuration(text: string): number | null {
 
 /**
  * The probe's error, said short: the plate already says "Unreachable", so the
- * "Monitor unreachable:" prefix goes, and the two long agent messages become
- * a duration; the "(limit …)" tail goes too. Anything else stays as written,
+ * "Monitor unreachable:" prefix goes, and the long agent and relay messages
+ * become a duration; the "(limit …)" tail goes too. Anything else stays as written,
  * its first letter up.
  */
 export function shortCause(text: string): ShortCause {
 	let rest = text.trim().replace(/^monitor unreachable\s*:\s*/i, '');
+	const relay = rest.match(/^relay unreachable\s*:\s*no measurement for (.+?)\s*\(limit [^)]*\)\s*$/i);
+	if (relay) {
+		const seconds = parseServerDuration(relay[1]);
+		if (seconds !== null) return { code: 'relay_silent', seconds };
+	}
 	const noData = rest.match(/^no measurement for (.+?)\s*\(limit [^)]*\)\s*$/i);
 	if (noData) {
 		const seconds = parseServerDuration(noData[1]);

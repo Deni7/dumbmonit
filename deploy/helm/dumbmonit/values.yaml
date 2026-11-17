@@ -1,0 +1,157 @@
+# DumbMonit runs as ONE replica: SQLite has a single writer. Do not scale the
+# StatefulSet; resilience comes from the PVC and a fast restart.
+
+image:
+  repository: ghcr.io/selfhostr/dumbmonit
+  # Defaults to the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Instance secret (encrypts monitor credentials and tokens), 16 characters minimum.
+# Three ways, in order of precedence:
+#   existingSecret: name of a Secret you manage (key below)
+#   value: the chart creates a Secret (it ends up in the Helm release: prefer existingSecret)
+#   neither: DumbMonit generates /data/secret.key on the volume (back it up with the data)
+secret:
+  existingSecret: ""
+  existingSecretKey: DUMBMONIT_SECRET
+  value: ""
+
+# Public URL of the web interface (DUMBMONIT_PUBLIC_URL), e.g. https://monit.example.com
+publicUrl: ""
+
+# Address agents use to reach the encrypted agent channel (DUMBMONIT_AGENT_PUBLIC_URL),
+# e.g. https://agents.example.com:8443. Used in install commands and enrolment
+# answers. Only read by DumbMonit versions that know this variable.
+agentPublicUrl: ""
+
+# Extra names/addresses of the self-signed certificate (DUMBMONIT_TLS_NAMES).
+tlsNames: ""
+
+# Your own certificate for the web port (kubernetes.io/tls Secret). Empty: self-signed.
+tls:
+  existingSecret: ""
+
+# Reverse proxies whose forwarded headers are trusted (DUMBMONIT_TRUSTED_PROXIES).
+trustedProxies: ""
+
+# VictoriaMetrics: the bundled one (stored in /data/vm) unless a URL is given.
+victoriametrics:
+  externalUrl: ""     # DUMBMONIT_VM_URL
+  retention: ""       # DUMBMONIT_VM_RETENTION, e.g. 12 (months), 30d, 2y
+  memory: ""          # DUMBMONIT_VM_MEMORY, e.g. 256MB
+
+# Free-form extra environment (list of Kubernetes EnvVar).
+extraEnv: []
+
+persistence:
+  size: 10Gi
+  storageClassName: ""
+  accessModes: [ReadWriteOnce]
+  annotations: {}
+  # Use an existing PVC instead of the StatefulSet volumeClaimTemplate.
+  existingClaim: ""
+
+# Web interface, port 8080. DumbMonit serves HTTPS there (self-signed by default).
+service:
+  type: ClusterIP
+  port: 8080
+  annotations: {}
+
+# Agent channel, port 8443: TLS 1.3 with client certificates (mTLS) end to end.
+# It must NOT go through an Ingress or any proxy that terminates TLS.
+agentService:
+  enabled: true
+  type: LoadBalancer      # LoadBalancer, NodePort or ClusterIP
+  port: 8443
+  nodePort: null          # for type NodePort
+  loadBalancerIP: ""
+  loadBalancerSourceRanges: []
+  externalTrafficPolicy: ""   # Local keeps agent source addresses
+  annotations: {}
+
+# Optional Ingress for the web interface only. DumbMonit speaks HTTPS: the
+# controller must reach the backend in HTTPS (annotation below is for ingress-nginx).
+ingress:
+  enabled: false
+  className: ""
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+  hosts:
+    - host: monit.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: monit-tls
+  #    hosts: [monit.example.com]
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 1Gi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true   # /tmp is an emptyDir
+  capabilities:
+    drop: [ALL]
+
+# Lets the unprivileged server send ICMP echo (ping monitors). A "safe" sysctl since Kubernetes 1.18.
+pingSysctl: true
+
+terminationGracePeriodSeconds: 30
+
+probes:
+  startup:
+    failureThreshold: 30
+    periodSeconds: 5
+  liveness:
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+priorityClassName: ""
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+networkPolicy:
+  enabled: false
+  # Sources allowed to reach the web port (NetworkPolicyPeer list). Empty: any source.
+  uiFrom: []
+  # Sources allowed to reach the agent port. Empty: any source (agents are outside the cluster).
+  agentFrom: []
+  # Egress stays open (probes reach arbitrary targets). false: no egress at all, so
+  # only use it with your own additional policy.
+  allowAllEgress: true
+
+podDisruptionBudget:
+  enabled: false
+  maxUnavailable: 1

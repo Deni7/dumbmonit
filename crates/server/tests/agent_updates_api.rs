@@ -61,12 +61,22 @@ async fn send(app: &TestApp, request: Request<Body>) -> (StatusCode, Vec<u8>) {
 
 /// Un lot vide ; `self_update` : ce que l'agent dit de son binaire.
 async fn push(fleet: &Fleet, secret: Option<&str>, self_update: Value) -> Reply {
+    push_machine(fleet, "nas", secret, self_update).await
+}
+
+/// Le même lot, pour la machine `machine` (nom d'hôte ; identifiant `id-<nom>`).
+async fn push_machine(
+    fleet: &Fleet,
+    machine: &str,
+    secret: Option<&str>,
+    self_update: Value,
+) -> Reply {
     let mut identity = json!({
-        "hostname": "nas",
+        "hostname": machine,
         "os": "linux",
         "arch": "x86_64",
         "agent_version": "0.0.1",
-        "machine_id": "id-nas",
+        "machine_id": format!("id-{machine}"),
         "binding_supported": true,
     });
     if !self_update.is_null() {
@@ -97,7 +107,11 @@ fn running(sha: &str) -> Value {
 
 /// Enrôle la machine et rend (secret de liaison, cible).
 async fn enrolled(fleet: &Fleet) -> (String, i64) {
-    let reply = push(fleet, None, Value::Null).await;
+    enrolled_machine(fleet, "nas").await
+}
+
+async fn enrolled_machine(fleet: &Fleet, machine: &str) -> (String, i64) {
+    let reply = push_machine(fleet, machine, None, Value::Null).await;
     assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
     (
         reply.body["agent_secret"].as_str().unwrap().to_string(),
@@ -301,4 +315,156 @@ async fn an_unsigned_build_blocks_the_updates_and_the_view_says_so() {
         .await;
     assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
     assert_eq!(reply.body["blocked_unsigned"], false);
+}
+
+#[tokio::test]
+async fn by_default_there_is_no_wave_and_pause_and_resume_hold_the_offers() {
+    let fleet = fleet().await;
+    let (secret, target) = enrolled(&fleet).await;
+    let old = "0".repeat(64);
+
+    let view = fleet.app.get("/api/agent/updates", Some(&fleet.admin)).await;
+    assert_eq!(view.body["rollout"]["waves"], json!([]), "{}", view.body);
+    assert_eq!(view.body["rollout"]["policy"]["waves"], json!([]));
+    assert_eq!(view.body["rollout"]["paused"], false);
+
+    let pause = "/api/agent/updates/rollout/pause";
+    let paused = fleet.app.post(pause, json!({}), Some(&fleet.admin)).await;
+    assert_eq!(paused.status, StatusCode::OK, "{}", paused.body);
+    assert_eq!(paused.body["rollout"]["paused"], true);
+    let reply = push(&fleet, Some(&secret), running(&old)).await;
+    assert!(reply.body.get("agent_update").is_none(), "en pause : rien {}", reply.body);
+    let view = fleet.app.get("/api/agent/updates", Some(&fleet.admin)).await;
+    assert_eq!(agent_status(&view, target)["status"], "paused");
+
+    // « Update now » passe outre la pause.
+    let now = format!("/api/agent/updates/{target}/now");
+    fleet.app.post(&now, json!({}), Some(&fleet.admin)).await;
+    let reply = push(&fleet, Some(&secret), running(&old)).await;
+    assert_eq!(reply.body["agent_update"]["force"], true, "{}", reply.body);
+    // Mise à jour faite : la demande est close, la pause vaut de nouveau.
+    push(&fleet, Some(&secret), running(&fleet.sha256)).await;
+    let reply = push(&fleet, Some(&secret), running(&old)).await;
+    assert!(reply.body.get("agent_update").is_none(), "{}", reply.body);
+
+    let resume = "/api/agent/updates/rollout/resume";
+    let resumed = fleet.app.post(resume, json!({}), Some(&fleet.admin)).await;
+    assert_eq!(resumed.body["rollout"]["paused"], false);
+    let reply = push(&fleet, Some(&secret), running(&old)).await;
+    assert!(reply.body.get("agent_update").is_some(), "{}", reply.body);
+}
+
+#[tokio::test]
+async fn the_wave_policy_is_validated_and_kept() {
+    let fleet = fleet().await;
+    for bad in [
+        json!({ "waves": [{ "by": "percent", "value": 0 }] }),
+        json!({ "waves": [{ "by": "site", "value": " " }] }),
+        json!({ "waves": [{ "by": "moon", "value": 1 }] }),
+        json!({ "max_failure_percent": 101 }),
+        json!({ "delay_minutes": 10081 }),
+    ] {
+        let reply = fleet.app.put("/api/agent/updates/rollout", bad, Some(&fleet.admin)).await;
+        assert!(reply.status.is_client_error(), "{}", reply.body);
+    }
+    let good = json!({
+        "waves": [
+            { "by": "count", "value": 1 },
+            { "by": "percent", "value": 50 },
+            { "by": "tag", "key": "env", "value": "prod" }
+        ],
+        "delay_minutes": 15,
+        "max_failure_percent": 10
+    });
+    let reply = fleet.app.put("/api/agent/updates/rollout", good, Some(&fleet.admin)).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    let policy = &reply.body["rollout"]["policy"];
+    assert_eq!(policy["waves"].as_array().unwrap().len(), 3);
+    assert_eq!(policy["delay_minutes"], 15);
+    assert_eq!(policy["max_failure_percent"], 10);
+    // Les champs absents sont inchangés ; une liste vide revient au déploiement historique.
+    let reply = fleet
+        .app
+        .put("/api/agent/updates/rollout", json!({ "waves": [] }), Some(&fleet.admin))
+        .await;
+    assert_eq!(reply.body["rollout"]["policy"]["waves"], json!([]));
+    assert_eq!(reply.body["rollout"]["policy"]["delay_minutes"], 15);
+
+    let viewer = fleet.app.viewer_cookie(&fleet.admin).await;
+    let denied = fleet.app.post("/api/agent/updates/rollout/pause", json!({}), Some(&viewer)).await;
+    assert_eq!(denied.status, StatusCode::FORBIDDEN, "{}", denied.body);
+}
+
+#[tokio::test]
+async fn a_later_wave_waits_and_a_failure_halts_the_rest_until_resumed() {
+    let fleet = fleet().await;
+    let old = "0".repeat(64);
+    let mut machines = Vec::new();
+    for name in ["alpha", "beta"] {
+        let (secret, id) = enrolled_machine(&fleet, name).await;
+        // Chacune dit son binaire : elle devient candidate au déploiement.
+        push_machine(&fleet, name, Some(&secret), running(&old)).await;
+        machines.push((name, secret, id));
+    }
+    let waves = json!({ "waves": [{ "by": "count", "value": 1 }], "delay_minutes": 60 });
+    let reply = fleet.app.put("/api/agent/updates/rollout", waves, Some(&fleet.admin)).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+
+    let find = |view: &Reply, wave: i64| {
+        machines
+            .iter()
+            .find(|(_, _, id)| agent_status(view, *id)["wave"] == wave)
+            .cloned()
+            .expect("une machine dans cette vague")
+    };
+    let (lead, lead_secret, lead_id) = find(&reply, 1);
+    let (follow, follow_secret, follow_id) = find(&reply, 2);
+    assert_eq!(reply.body["rollout"]["current_wave"], 1);
+
+    // La vague suivante attend : rien pour elle, tout pour la première.
+    let held = push_machine(&fleet, follow, Some(&follow_secret), running(&old)).await;
+    assert!(held.body.get("agent_update").is_none(), "{}", held.body);
+    let first = push_machine(&fleet, lead, Some(&lead_secret), running(&old)).await;
+    assert!(first.body.get("agent_update").is_some(), "{}", first.body);
+    let view = fleet.app.get("/api/agent/updates", Some(&fleet.admin)).await;
+    assert_eq!(agent_status(&view, follow_id)["status"], "waiting_wave");
+
+    // La première vague a fini : la suivante n'attend plus que le délai.
+    push_machine(&fleet, lead, Some(&lead_secret), running(&fleet.sha256)).await;
+    let view = fleet.app.get("/api/agent/updates", Some(&fleet.admin)).await;
+    assert!(view.body["rollout"]["next_wave_at"].is_string(), "{}", view.body);
+    assert_eq!(view.body["rollout"]["waves"][0]["state"], "done");
+    let held = push_machine(&fleet, follow, Some(&follow_secret), running(&old)).await;
+    assert!(held.body.get("agent_update").is_none(), "{}", held.body);
+    let instant = json!({ "delay_minutes": 0 });
+    fleet.app.put("/api/agent/updates/rollout", instant, Some(&fleet.admin)).await;
+    let open = push_machine(&fleet, follow, Some(&follow_secret), running(&old)).await;
+    assert!(open.body.get("agent_update").is_some(), "{}", open.body);
+
+    // Nouvelle version : le canari échoue, la propagation s'arrête.
+    let mut failed = running(&old);
+    failed["last"] = json!({
+        "outcome": "rolled_back",
+        "from_version": "0.0.1",
+        "to_version": env!("CARGO_PKG_VERSION"),
+        "to_sha256": fleet.sha256,
+        "reason": "boom",
+        "at_ms": chrono::Utc::now().timestamp_millis(),
+    });
+    push_machine(&fleet, lead, Some(&lead_secret), failed).await;
+    let view = fleet.app.get("/api/agent/updates", Some(&fleet.admin)).await;
+    assert_eq!(view.body["rollout"]["halted"]["wave"], 1, "{}", view.body);
+    assert_eq!(agent_status(&view, lead_id)["status"], "failed");
+    assert_eq!(agent_status(&view, follow_id)["status"], "halted");
+    let other = running(&"2".repeat(64));
+    let stopped = push_machine(&fleet, follow, Some(&follow_secret), other.clone()).await;
+    assert!(stopped.body.get("agent_update").is_none(), "{}", stopped.body);
+
+    // Reprise : l'échec est pardonné, la suite repart.
+    let path = "/api/agent/updates/rollout/resume";
+    let reply = fleet.app.post(path, json!({}), Some(&fleet.admin)).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert!(reply.body["rollout"]["halted"].is_null(), "{}", reply.body);
+    let go = push_machine(&fleet, follow, Some(&follow_secret), other).await;
+    assert!(go.body.get("agent_update").is_some(), "{}", go.body);
 }

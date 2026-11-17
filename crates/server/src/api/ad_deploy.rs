@@ -395,7 +395,7 @@ pub async fn create_kit(
             .await?
             .port
             .to_string(),
-        None => state.config.agent_port().map(|port| port.to_string()).unwrap_or_default(),
+        None => state.config.agent_dial_port().map(|port| port.to_string()).unwrap_or_default(),
     };
     let script = render_deploy_script(&KitParams {
         domain: &domain,

@@ -208,6 +208,8 @@ pub async fn push_agent_batch(
         binding_supported: true,
         self_update: None,
         relay_gateway: host.gateway,
+        relay_gateway_check: None,
+        server_link: None,
         remediation: None,
     };
     let batch = PushBatch {

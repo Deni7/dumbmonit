@@ -34,7 +34,9 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "time", "sync", "signal", "fs", "process", "io-util"] }
 tracing.workspace = true
 
-axum = "0.8"
+# `http2` : sur le canal des agents, un agent à jour négocie `h2` et y fait
+# passer toutes ses requêtes (long-poll compris) sur une seule connexion.
+axum = { version = "0.8", features = ["http2"] }
 tower-http = { version = "0.7", features = ["trace", "compression-gzip", "compression-br"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
@@ -72,7 +74,9 @@ lettre = { version = "0.11", default-features = false, features = [
     "smtp-transport", "tokio1-rustls", "ring", "rustls-native-certs", "builder", "hostname",
 ] }
 
-tokio-util = { version = "0.7", features = ["io"] }
+tokio-util = { version = "0.7", features = ["io", "compat"] }
+# Connexion multiplexée des relais : un flux par connexion d'agent du site.
+yamux = "0.14"
 # Expédition des journaux vers un syslog TLS ou une entrée GELF TCP/TLS : le
 # même connecteur que les collecteurs (déjà dans le verrou de dépendances).
 tokio-rustls = "0.26"
@@ -125,12 +129,10 @@ saml-rs = { version = "0.6", default-features = false, features = ["crypto-aws-l
 ldap3 = { version = "0.12", default-features = false, features = ["tls-rustls-ring"] }
 
 # Surveillance des changements de sites (`webchange`) : expressions d'exclusion
-# saisies par l'utilisateur, plans de site XML, et le protocole DevTools d'un
-# Chromium externe pour les captures d'écran. Les trois sont déjà dans le
-# verrou de dépendances (agent et paquets, collecteurs, axum `ws`).
+# saisies par l'utilisateur et plans de site XML. Les deux sont déjà dans le
+# verrou de dépendances (agent et paquets, collecteurs).
 regex = "1"
 roxmltree = "0.20"
-tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect"] }
 
 # Notifications Web Push (RFC 8030/8291/8188) : chiffrement `aes128gcm` du
 # message pour le navigateur, en RustCrypto pur (pas d'OpenSSL, compatible musl),

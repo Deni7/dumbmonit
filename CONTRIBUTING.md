@@ -249,37 +249,13 @@ For developers:
   `npm run i18n:merge` (see `web/messages/README.md`) to merge fragments.
   Do not block a PR on extracting a string outside the area you are changing.
 
-### Translating the documentation
+### Documentation language
 
-The docs (Markdown, published at <https://dumbmonit.selfhostr.io/docs/>) are multilingual through the
-[`mkdocs-static-i18n`](https://github.com/ultrabug/mkdocs-static-i18n) plugin,
-with the same languages as the UI: `fr`, `de`, `es`, `it`, `pt`, `pt-BR`, `ru`,
-`zh-Hans` (English is the source). A translation is a sibling file with the
-locale before the extension:
-
-```
-docs/index.md                  English (source)
-docs/index.fr.md               French
-docs/install/docker.zh-Hans.md Simplified Chinese
-```
-
-- A page without a translation is served in English under the language's
-  URL, with a notice at the top; the language selector in the header lists
-  the languages by their native names. Nothing breaks when a page is missing.
-- Translate prose, headings, table cells, image alt text, link text and the
-  comments inside code blocks. Leave commands, code, environment variables,
-  paths, URLs and link targets untouched; keep links to other pages as in
-  English (`../devices/agent.md`), the plugin points them to the translated
-  page when there is one.
-- Other pages link to heading anchors, so give each translated heading an
-  explicit id equal to the English slug: `## Première installation {#first-start}`.
-  `mkdocs build --strict` fails on a broken anchor.
-- Navigation titles of the top-level sections are translated in
-  `mkdocs.yml` (`nav_translations` of each language); the title of a page is
-  its translated first heading.
-- `scripts/docs-i18n-status.sh` lists, per language, the pages translated and
-  missing. Check the build with
-  `docker run --rm -v "$PWD:/docs" -w /docs python:3-slim sh -c "pip install -q -r docs/requirements.txt && mkdocs build --strict"`.
+The documentation (Markdown under `docs/`, published at
+<https://dumbmonit.selfhostr.io/docs/>) is written in English only; only the
+web UI is translated. Add or edit pages in English, give headings stable
+anchors (other pages and the UI link to them), and check the build with
+`docker run --rm -v "$PWD:/docs" -w /docs python:3-slim sh -c "pip install -q -r docs/requirements.txt && mkdocs build --strict"`.
 
 ## Conventions
 
@@ -316,13 +292,16 @@ Releases are tagged from `main`, after `dev` has been merged into it.
 Before tagging `vX.Y.Z`:
 
 0. Check that the **Upgrade test** workflow is green on `main`. It starts the
-   last published release, creates a user, monitors of several kinds, a rule, a
-   silence, a channel and a status page, waits for metrics, then starts the
+   last published release, creates real data (users and teams, monitors of
+   several kinds, encrypted secrets, a simulated agent, rules, silences, a
+   channel, a status page, settings), waits for metrics, then starts the
    candidate image on the same `/data` volume and checks that health, login,
-   every object and the VictoriaMetrics history survived. Run it by hand
-   against any image with `scripts/upgrade-test.sh [IMAGE]` (needs docker,
-   curl and python3; default image `ghcr.io/selfhostr/dumbmonit:edge`;
-   `OLD_IMAGE=…` picks another starting point). A failure means an existing
+   every object, the secrets, the VictoriaMetrics history and a backup
+   restore survived. It also runs on pull requests into `dev` and `main` that
+   touch the image. Run it by hand against any image with
+   `scripts/upgrade-test.sh [IMAGE]` (needs docker, curl, git and python3;
+   default image `ghcr.io/selfhostr/dumbmonit:edge`; `OLD_IMAGE=…` picks another
+   starting point, see `docs/development.md`). A failure means an existing
    install would lose data when updating: fix it before tagging.
 
 1. Move the `Unreleased` section of `CHANGELOG.md` under the new version and date.

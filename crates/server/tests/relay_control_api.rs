@@ -80,7 +80,11 @@ async fn a_remote_site_token_makes_the_enrolled_agent_a_relay_without_any_manual
     // Le premier lot vient d'un agent installé par la commande ordinaire.
     let first = push(&app, &enrolment, None, &batch(true, false, None)).await;
     assert_eq!(first.status, StatusCode::OK, "{}", first.body);
-    assert_eq!(first.body["relay"], json!({ "enabled": true, "site": "Agence de Lyon" }));
+    // La passerelle des agents du site est ouverte d'office, dès ce premier accusé.
+    assert_eq!(
+        first.body["relay"],
+        json!({ "enabled": true, "site": "Agence de Lyon", "gateway_port": 8443 })
+    );
     let secret = first.body["agent_secret"].as_str().expect("secret").to_string();
     let host = first.body["target_id"].as_i64().expect("hôte");
 
@@ -116,7 +120,8 @@ async fn the_relay_switch_reaches_the_agent_in_its_next_acknowledgement() {
     assert_eq!(on.body["relay"], json!(false), "l'agent ne l'a pas encore adopté");
 
     let next = push(&app, &enrolment, Some(&secret), &batch(true, false, None)).await;
-    assert_eq!(next.body["relay"], json!({ "enabled": true, "site": "Annexe" }));
+    let opened = json!({ "enabled": true, "site": "Annexe", "gateway_port": 8443 });
+    assert_eq!(next.body["relay"], opened, "la passerelle s'ouvre avec le mode relais");
 
     let off = set_relay(&app, &admin, host, json!({ "enabled": false })).await;
     assert_eq!(off.status, StatusCode::OK, "{}", off.body);

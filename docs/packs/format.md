@@ -60,11 +60,12 @@ sources:
     type: http              # http or prometheus
     path: /rpc/Switch.GetStatus?id={{option.switch_id}}
     method: GET             # GET (default) or POST
-    format: json            # http only: json (default) or text
+    format: json            # http only: json (default), xml or text
     headers:
       Accept: application/json
     body: '{"id": {{option.switch_id}}}'   # POST only
     auth: auto              # auto (default), none, bearer or basic
+    optional: false         # true: a refusal or an HTTP error skips this source
 ```
 
 - `path` must start with a single `/`. The request URL is the monitor's address
@@ -81,6 +82,65 @@ sources:
   `401` and `403` are reported as authentication errors, other non-2xx statuses
   as protocol errors.
 - A poll makes at most 16 requests and reads at most 4 MiB per response.
+- `optional: true`: when this source answers with a refusal (`401`, `403`), an
+  HTTP error or an unreadable body, it produces nothing and the poll goes on.
+  A device that does not answer at all (unreachable, timeout) still fails the
+  poll. For reads a narrower role, a licence or a firmware may refuse.
+
+### XML sources
+
+`format: xml` reads the answer as XML converted to JSON, so the same `json`
+paths, `discover` rows and labels apply:
+
+- the document becomes `{"<root>": …}`;
+- an element without attributes nor child elements becomes its text, trimmed:
+  `<state>up</state>` → `"up"`;
+- otherwise an object: attributes under `@<name>`, text under `#text`, each
+  child under its name (namespace prefixes dropped);
+- several children with the same name become a list. Names listed in `lists`
+  are always lists, even when the answer carries a single one, so
+  `$.response.result.entry[*]` reads one entry like ten.
+
+```yaml
+sources:
+  - id: licenses
+    type: http
+    path: /api/?type=op&cmd=%3Crequest%3E%3Clicense%3E%3Cinfo%3E%3C%2Finfo%3E%3C%2Flicense%3E%3C%2Frequest%3E
+    format: xml
+    lists: [entry]
+metrics:
+  - name: answer_ok
+    source: licenses
+    json: "$.response['@status']"
+    map: {success: 1, "*": 0}
+```
+
+A DTD is refused (no entity is expanded).
+
+### Session
+
+Some APIs want a session opened before reading and closed afterwards, such as
+SonicOS, which allows one API session at a time. `session` declares both
+requests; they follow the same rules as sources (the device's own address,
+credentials in headers or `auth` only) and their answer is not read, only its
+status:
+
+```yaml
+session:
+  login:
+    path: /api/sonicos/auth
+    method: POST            # GET or POST
+    auth: basic
+  logout:                   # optional; sent even when a source failed
+    path: /api/sonicos/auth
+    method: DELETE          # GET, POST or DELETE
+    auth: none
+```
+
+A failed login fails the poll. Nothing is copied from the login answer into
+the following requests: the session must be kept by the device itself (per
+client, or through the credential sent again). The logout does not count in
+the 16 requests of the sources.
 
 ### Prometheus sources
 
@@ -126,13 +186,37 @@ metrics:
 
 | Extractor | Source | Value | `labels` |
 |---|---|---|---|
-| `json: <JSONPath>` | `http`, format `json` | Every node the path matches ([RFC 9535](https://www.rfc-editor.org/rfc/rfc9535) JSONPath, wildcards and filters included) makes one series. | label → JSONPath evaluated on the object that *contains* the value: `$.sensors[*].value` with `sensor: $.name` labels each value with its sibling `name`. |
+| `json: <JSONPath>` | `http`, format `json` or `xml` | Every node the path matches ([RFC 9535](https://www.rfc-editor.org/rfc/rfc9535) JSONPath, wildcards and filters included) makes one series. | label → JSONPath evaluated on the object that *contains* the value: `$.sensors[*].value` with `sensor: $.name` labels each value with its sibling `name`. |
 | `regex: <expression>` | `http`, format `text` | Every match makes one series; the value is the group named `value`, else the first group. | label → name of a capture group. |
 | `prom: <sample name>` | `prometheus` | Every sample with this exact name. | label → source label. Empty: all source labels are kept. |
 
 Values: numbers are taken as they are; `true`/`false` become 1/0; text is
 looked up in `map`, or parsed as a number when there is no `map`. A value that
-is missing, `null`, or outside the `map` produces nothing for this poll.
+is missing, `null`, or outside the `map` produces nothing for this poll. The
+key `"*"` (quoted) of a `map` stands for every other text: `{OK: 1, "*": 0}`
+turns any status but `OK` into 0, and `{"*": 1}` makes an *info* series whose
+labels carry the text (a version, a model).
+
+`date` reads a date instead of a number, written in Unix seconds: `rfc3339`
+(`2026-10-31T00:00:00Z`), or a [strftime pattern](https://docs.rs/chrono/latest/chrono/format/strftime/index.html)
+such as `"%B %d, %Y"` (`November 18, 2026`). Without a time zone the date is
+UTC, without a time it is midnight. A text that is not a date (`Never`)
+produces nothing; `date` and `map` exclude each other. A rule then compares it
+with `time()`:
+
+```yaml
+metrics:
+  - name: license_expiration_timestamp_seconds
+    source: licenses
+    json: $.expirationDate
+    date: "%b %d, %Y UTC"
+rules:
+  - name: license_expiring
+    expr: (dumbmonit_my_pack_license_expiration_timestamp_seconds - time()) / 86400
+    op: "<"
+    threshold: 30
+    unit: d
+```
 
 ## Discover
 
@@ -156,8 +240,30 @@ discover:
         map: {ok: 1, degraded: 0}
 ```
 
-Row metrics accept `name`, `help`, `kind`, `json`, `scale` and `map`. Rows
-beyond `max_rows` are ignored.
+Row metrics accept `name`, `help`, `kind`, `json`, `scale`, `map` and `date`.
+Rows beyond `max_rows` are ignored.
+
+When each row carries a list of its own (the ports of a switch, the uplinks of
+a router), `each` reads the metrics on every element of that list, which keeps
+the labels of its row and adds `each_labels`:
+
+```yaml
+discover:
+  - name: uplinks
+    source: uplinks
+    rows: $[*]              # one row per router
+    labels:
+      serial: $.serial
+    each: $.uplinks[*]      # JSONPath evaluated on each row
+    each_labels:            # JSONPath evaluated on each element
+      interface: $.interface
+    metrics:
+      - name: uplink_up
+        json: $.status      # evaluated on each element
+        map: {active: 1, failed: 0}
+```
+
+`max_rows` then bounds the total number of elements read.
 
 ## Rules
 
@@ -228,8 +334,8 @@ updating a pack with SNMP profiles.
 
 ## Fixtures and expected output
 
-`dumbmonit pack test <dir>` reads `fixtures/<source id>.json`, `.txt` or
-`.prom`, runs the same extraction as the server, and compares the result with
+`dumbmonit pack test <dir>` reads `fixtures/<source id>.json`, `.xml`, `.txt`
+or `.prom`, runs the same extraction as the server, and compares the result with
 `expected.prom`: the Prometheus text format, sorted, without timestamps and
 without the monitor labels (`target`, `host`, `tag_*`) the server adds.
 `--update` writes `expected.prom` from the fixtures; review the diff before

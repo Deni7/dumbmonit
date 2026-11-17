@@ -33,10 +33,16 @@ NAS, a switch or a website.
 
 Right after sign-in, a short wizard can walk you through the basics. Every step
 can be skipped, and everything is changeable later in **Settings**. Use
-**Continue**, **Skip this step**, or **Skip setup** to leave. It covers: the
-instance name, language and time zone; an agent; your first monitors; a
-notification channel; an optional on-call rotation; optional single sign-on;
-and data retention. You can reopen it from **Settings → System**.
+**Continue**, **Skip this step**, or **Skip setup** to leave.
+
+It opens on **Your first alert**: type one address to watch (an URL, a host or
+`host:port`), pick where alerts go in one click (ntfy, Discord, Telegram, email,
+webhook or any other channel), then **Send a test alert**. The monitor is probed
+at once and the test proves the chain end to end, in about two minutes: see
+[First alert in five minutes](quickstart.md). The next steps cover the instance
+name, language and time zone; more monitors; an agent; an optional on-call
+rotation; optional single sign-on; and data retention. You can reopen it from
+**Settings → System**.
 
 ## The three first steps {#the-three-first-steps}
 
@@ -60,8 +66,10 @@ monitors and a channel.
    site**. There is no default site: a monitor with **No site** is simply not
    tied to a place on the map. Sites are optional, so with no location at all
    you go straight to the list of types.
-3. Pick a type. The most common ones come first; use the search box
-   (*Search: switch, NAS, Docker, backup, website…*) for the rest.
+3. Pick a type. Every type sits under a category; use the search box
+   (*Search: switch, NAS, Docker, backup, website…*) and the filter chips
+   (category, no login needed, beta, community packs) to narrow the list. A
+   **Beta** badge marks an integration still being tested on real installations.
 4. A notice on the right (or above on a phone) lists what to prepare on the
    device. The form only shows the fields that matter for that type.
 5. Fill in the form and click **Add monitor**.
@@ -197,9 +205,11 @@ you once a channel exists.
    PagerDuty and more. Fill in the fields it asks for.
 3. Click **Send a test**. You should see *Test sent*, and the message should
    arrive. Built-in rules notify every enabled channel.
-4. To see a real alert, pause the monitored device or unplug it. After the
-   delay of the rule the alert appears under **Alerts → Now**, and the channel
-   gets the message.
+4. To see a real alert, stop the monitored device or unplug it (pausing the
+   monitor in DumbMonit stops its alerts too). After the delay of the rule the
+   alert appears under **Alerts → Now**, and the channel gets the message: under
+   4 minutes for a website, ping or port check, under 4.5 minutes for a device
+   that stops reporting (see [When does a real alert arrive?](quickstart.md#when-does-a-real-alert-arrive)).
 
 All channel types and their settings: [Notifications](../notifications.md).
 The alerts page: [Alerts](../using/alerts.md).

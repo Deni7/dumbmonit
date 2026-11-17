@@ -131,6 +131,8 @@ export interface Target {
 	multisite: MultisiteConfig | null;
 	interval_secs: number;
 	enabled: boolean;
+	/** Known-vulnerability (CVE) check on for this device; absent from older servers (treat as on). */
+	cve_scan?: boolean;
 	tags: Record<string, string>;
 	credential_kind: string;
 	/** A secret is saved: leaving its field blank on edit keeps it. */
@@ -226,6 +228,8 @@ export interface TargetPayload {
 	multisite?: MultisiteConfig | null;
 	interval_secs?: number;
 	enabled?: boolean;
+	/** CVE check of this device; absent on edit keeps it (on at creation). */
+	cve_scan?: boolean;
 	tags?: Record<string, string>;
 	/** Flat folder shown on `/targets`. Absent or empty: no folder. */
 	group_name?: string;
@@ -277,8 +281,8 @@ export interface ProbeReport {
  *
  * `error` is set when the last fetch of this page failed (page unreachable,
  * removed…); `status` is the HTTP status of that attempt, or `null` before
- * the first check. `latest_snapshot` is the id to pass to the screenshot
- * route for the most recent capture, or `null` when none was ever taken.
+ * the first check. `latest_snapshot` is the id of its most recent stored text,
+ * or `null` when none was ever taken.
  */
 export interface WebchangePage {
 	url: string;
@@ -293,8 +297,6 @@ export interface WebchangePage {
 
 /** `GET /api/targets/{id}/webchange/pages`. */
 export interface WebchangePagesResponse {
-	/** False when the server has no headless browser configured: text diffing still works. */
-	screenshots_available: boolean;
 	/** Pages found when Max pages stopped the last crawl (read and still queued); `null` when the whole site was read. */
 	found: number | null;
 	pages: WebchangePage[];
@@ -323,7 +325,6 @@ export interface WebchangeSnapshot {
 	id: number;
 	fetched_at: string;
 	title: string | null;
-	has_screenshot: boolean;
 }
 
 export type WebchangeDiffOp = 'equal' | 'insert' | 'delete' | 'skip';
@@ -674,6 +675,8 @@ export interface NthWeekday {
 /** Maintenance-window schedule: one-off, weekly or monthly. */
 export type SilenceSchedule =
 	| { kind: 'once'; starts_at: string; ends_at: string }
+	/** "Seen, I am on it": no end; the server lifts it when the monitor answers again. */
+	| { kind: 'recovery'; starts_at: string }
 	| {
 			kind: 'weekly';
 			/** Days it covers, 0 = Monday … 6 = Sunday. */
@@ -790,14 +793,14 @@ export interface CollectorSetup {
 
 /**
  * Something the server's deployment must provide for a device type to work
- * fully (not something to do on the device): a headless browser, ICMP rights.
+ * fully (not something to do on the device): ICMP rights.
  *
  * The server only sends the identifier, whether it found the requirement in
  * place and the exact YAML to copy; the sentences are written by the interface
  * from `id` (see `RequirementNotice.svelte`), and an unknown `id` still renders.
  */
 export interface CollectorRequirement {
-	/** Stable identifier: `browser`, `icmp`, or one a later server adds. */
+	/** Stable identifier: `icmp`, or one a later server adds. */
 	id: string;
 	/** True when the server found the requirement met; the notice is then hidden. */
 	satisfied: boolean;
@@ -938,6 +941,8 @@ export interface CollectorInfo {
 	metrics: MetricDescription[];
 	/** Recommended device-page views; empty: the page charts every family, as before. */
 	views: ViewDescription[];
+	/** Beta integration, still being tested on real installations. */
+	beta: boolean;
 }
 
 /**
@@ -989,6 +994,7 @@ export function normalizeCollector(raw: Partial<CollectorInfo> & { kind: string 
 		options: options
 			.filter((option) => option && typeof option.key === 'string' && option.key.trim())
 			.map(normalizeOption),
+		beta: raw.beta === true,
 		requirements: Array.isArray(raw.requirements)
 			? raw.requirements
 					.filter((r) => r && typeof r.id === 'string' && r.id.trim())
@@ -1372,7 +1378,19 @@ export interface AgentChannelCheck {
 	listen_port: number | null;
 	/** Absent through a relay (the server cannot see the site's network) or when the channel is off. */
 	outcome: AgentChannelOutcome | null;
-	relay: { relay_id: number; relay_name: string; host: string; port: number; listening: boolean } | null;
+	relay: {
+		relay_id: number;
+		relay_name: string;
+		host: string;
+		port: number;
+		listening: boolean;
+		/** The relay tests its own gateway (up-to-date agent): wait for `reachable`. */
+		self_check?: boolean;
+		/** Outcome of its last test at `host:port`; `null`: not tested there yet. */
+		reachable?: boolean | null;
+		/** What failed, as the relay reports it (English). */
+		check_error?: string | null;
+	} | null;
 }
 
 export interface CreateUserPayload {
@@ -1743,6 +1761,8 @@ export interface AgentTokenPayload {
 	relay_id?: TargetId | null;
 	/** Address the site reaches the relay at. Left out: the one set, else its host name. */
 	relay_host?: string | null;
+	/** Commands that use the agent port only (a remote site). Always on for a relay token. */
+	agent_port_only?: boolean;
 }
 
 /** A machine enrolled with a token. `GET /api/agent/tokens/{id}/machines`. */
@@ -1900,6 +1920,44 @@ export interface AgentHost {
 	gateway_port?: number | null;
 	gateway_host?: string | null;
 	gateway_tunnels?: number;
+	/** The relay's last test of its own gateway. Mirrors `GatewayCheck` in `crates/proto/src/push.rs`. */
+	gateway_check?: GatewayCheck | null;
+	/**
+	 * Server the agent reports to when its configuration lists several
+	 * (`server_urls`): the primary or a backup. `null` with a single address;
+	 * absent on an older server.
+	 */
+	server_link?: ServerLink | null;
+}
+
+/**
+ * A relay's test of its own gateway: it connected to `address` as a machine of
+ * its site would, and reached this server through it (or not, and why).
+ */
+export interface GatewayCheck {
+	/** `host:port` tested. */
+	address: string;
+	ok: boolean;
+	error?: string | null;
+	checked_at_ms: number;
+}
+
+/**
+ * Address of the server an agent uses among those of its configuration
+ * (`server_url`, then `server_urls`). Mirrors `ServerLink` in
+ * `crates/proto/src/push.rs`.
+ */
+export interface ServerLink {
+	/** Rank of the address in use: 0 for the primary. */
+	active: number;
+	/** Addresses configured, the primary included. */
+	servers: number;
+	/** Address in use, `https://host:port`. */
+	url: string;
+	/** When the agent moved to a backup server (Unix ms); absent on the primary. */
+	since_ms?: number | null;
+	/** Last error seen on the primary, in English; absent on the primary. */
+	primary_error?: string | null;
 }
 
 /** Response of `POST /api/targets/{id}/agent/rebind`. */
@@ -2174,7 +2232,7 @@ export interface StatusPage {
 	scenes: string[];
 	/** Legacy: kept for compatibility, the UI neither shows nor sends it. */
 	scene_rotation: StatusPageSceneRotation;
-	/** Simple mode: the public page has no mascot or animation. */
+	/** Retired: the public page is always plain. Still accepted and returned. */
 	simple: boolean;
 	/** Public 90-day calendar. */
 	show_calendar: boolean;
@@ -2462,7 +2520,7 @@ export interface PublicStatus {
 		/** Legacy: no longer drawn by the UI. */
 		scenes: string[];
 		scene_rotation: StatusPageSceneRotation;
-		/** Simple mode: no mascot or animation; light/dark follows the visitor. */
+		/** Retired: no effect any more. Still accepted and returned. */
 		simple: boolean;
 		/** Present (true) only when the page shows the calendar / response times. */
 		show_calendar?: boolean;
@@ -3959,6 +4017,21 @@ export interface OnboardingState {
 	has_channel: boolean;
 	/** A message really left on some channel — a test counts. */
 	notification_confirmed: boolean;
+	/** When the instance first passed each step. Older servers omit it. */
+	first_run?: FirstRunTimings;
+}
+
+/**
+ * First-run stopwatch, kept on the instance only. UTC without suffix (read with
+ * `parseServerDate`), `null` until the step happens. Mirrors `first_run::Timings`.
+ */
+export interface FirstRunTimings {
+	first_boot_at: string | null;
+	setup_at: string | null;
+	first_target_at: string | null;
+	first_channel_at: string | null;
+	first_notification_at: string | null;
+	first_alert_at: string | null;
 }
 
 export type OnboardingStep = 'device' | 'channel' | 'test';
@@ -5750,6 +5823,17 @@ export interface CveSettingsInput {
 	nvd_api_key?: string;
 }
 
+/** Body of `POST /api/security/cves/targets`: the CVE check of several devices (1 to 500 ids). */
+export interface CveTargetsInput {
+	target_ids: TargetId[];
+	enabled: boolean;
+}
+
+/** `updated`: devices whose setting really changed (unknown ids and those already so do not count). */
+export interface CveTargetsResult {
+	updated: number;
+}
+
 export interface CveSource {
 	name: 'nvd' | 'osv' | 'debian' | 'kev';
 	last_success: string | null;
@@ -6463,6 +6547,12 @@ export type AgentUpdateStatus =
 	| 'manual'
 	| 'waiting_window'
 	| 'waiting_canary'
+	/** Rollout waves: its wave is not open yet. */
+	| 'waiting_wave'
+	/** The rollout is paused. */
+	| 'paused'
+	/** The rollout stopped: too many agents failed in a wave. */
+	| 'halted'
 	| 'newer'
 	| 'legacy'
 	| 'container'
@@ -6472,6 +6562,44 @@ export type AgentUpdateStatus =
 	| 'no_binary'
 	/** The shipped build has no signature and unsigned builds are not accepted. */
 	| 'unsigned';
+/** One rollout wave: how it picks agents among those the previous waves left. */
+export type AgentUpdateWave =
+	| { by: 'count'; value: number }
+	/** Cumulative: enough agents for the waves so far to cover this share of the fleet. */
+	| { by: 'percent'; value: number }
+	| { by: 'site'; value: string }
+	/** The folder of the device. */
+	| { by: 'group'; value: string }
+	| { by: 'tag'; key: string; value?: string | null };
+export interface AgentUpdateWaveView {
+	/** `null`: the implicit last wave, every agent the others did not take. */
+	select: AgentUpdateWave | null;
+	members: number;
+	updated: number;
+	failed: number;
+	state: 'done' | 'active' | 'waiting' | 'upcoming';
+}
+export interface AgentUpdateRolloutPolicy {
+	waves: AgentUpdateWave[];
+	delay_minutes: number;
+	/** Share of failed agents in a wave that stops the rollout; 0 never stops. */
+	max_failure_percent: number;
+}
+export interface AgentUpdateRollout {
+	canaries: number;
+	canaries_updated: number;
+	open: boolean;
+	reason: string | null;
+	policy: AgentUpdateRolloutPolicy;
+	paused: boolean;
+	halted: { wave: number; failed: number; attempted: number } | null;
+	/** Empty without waves (canary agents first). */
+	waves: AgentUpdateWaveView[];
+	/** Rank, from 1, of the wave being updated. */
+	current_wave: number | null;
+	/** UTC, no suffix; only when the delay alone holds the next wave back. */
+	next_wave_at: string | null;
+}
 export interface AgentUpdateOutcome {
 	outcome: 'succeeded' | 'failed' | 'rolled_back' | 'refused';
 	version: string | null;
@@ -6489,6 +6617,8 @@ export interface AgentUpdateAgent {
 	enabled: boolean | null;
 	canary: boolean;
 	requested: boolean;
+	/** Rank, from 1, of its rollout wave; `null` without waves. */
+	wave: number | null;
 	status: AgentUpdateStatus;
 	reason: string | null;
 	last: AgentUpdateOutcome | null;
@@ -6502,7 +6632,7 @@ export interface AgentUpdates {
 	/** Updates are blocked: a shipped build is unsigned and unsigned builds are not accepted. */
 	blocked_unsigned: boolean;
 	binaries: { platform: string; sha256: string; signed: boolean }[];
-	rollout: { canaries: number; canaries_updated: number; open: boolean; reason: string | null };
+	rollout: AgentUpdateRollout;
 	agents: AgentUpdateAgent[];
 }
 
@@ -6872,4 +7002,28 @@ export interface AgentSentinel {
 	/** A channel is stored; its content never comes back. */
 	has_secret: boolean;
 	channel_kind: 'webhook' | 'ntfy' | null;
+}
+
+/** A place picked for the wall's weather. Mirrors `weather::Place`. */
+export interface WallWeatherPlace {
+	name: string;
+	region?: string | null;
+	country?: string | null;
+	latitude: number;
+	longitude: number;
+}
+
+export type WallWeatherCondition = 'clear' | 'partly_cloudy' | 'cloudy' | 'fog' | 'rain' | 'snow' | 'thunder';
+
+/** `GET /api/wall/weather`: the setting and, when a place is chosen, the weather there now. */
+export interface WallWeather {
+	place: WallWeatherPlace | null;
+	unit: 'c' | 'f';
+	/** Null without a place, or when the weather service does not answer: the wall shows nothing. */
+	current: {
+		/** Outside temperature in `unit`, rounded. */
+		temperature: number;
+		condition: WallWeatherCondition;
+		is_day: boolean;
+	} | null;
 }

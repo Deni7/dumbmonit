@@ -1,0 +1,38 @@
+[
+  {
+    "id": "66d025b301ebc903e4000001",
+    "modelKey": "camera",
+    "state": "CONNECTED",
+    "name": "Entrance",
+    "mac": "F4E2C6000001",
+    "isMicEnabled": true,
+    "micVolume": 100,
+    "videoMode": "default",
+    "hdrType": "auto",
+    "hasPackageCamera": false
+  },
+  {
+    "id": "66d025b301ebc903e4000002",
+    "modelKey": "camera",
+    "state": "DISCONNECTED",
+    "name": "Garage",
+    "mac": "F4E2C6000002",
+    "isMicEnabled": false,
+    "micVolume": 0,
+    "videoMode": "default",
+    "hdrType": "off",
+    "hasPackageCamera": false
+  },
+  {
+    "id": "66d025b301ebc903e4000003",
+    "modelKey": "camera",
+    "state": "CONNECTED",
+    "name": "Garden",
+    "mac": "F4E2C6000003",
+    "isMicEnabled": true,
+    "micVolume": 80,
+    "videoMode": "default",
+    "hdrType": "auto",
+    "hasPackageCamera": false
+  }
+]

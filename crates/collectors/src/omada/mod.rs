@@ -168,7 +168,7 @@ impl Session<'_> {
                 return Err(ProbeError::Auth(format!(
                     "Omada refused the OpenAPI client (error {code}): {}. Check the client ID, \
                      the secret and the controller ID.",
-                    text(&reply, "msg").unwrap_or("no message")
+                    sentence(text(&reply, "msg").unwrap_or("no message"))
                 )));
             }
             None => {
@@ -321,8 +321,14 @@ impl Session<'_> {
     }
 }
 
+/// Un message du contrôleur sans sa ponctuation finale (« … is Invalid. »),
+/// pour pouvoir le citer dans une phrase sans doubler le point.
+fn sentence(message: &str) -> &str {
+    message.trim().trim_end_matches(['.', ' ', '!'])
+}
+
 fn api_error(code: i64, reply: &Value, path: &str) -> ProbeError {
-    let message = text(reply, "msg").unwrap_or("no message");
+    let message = sentence(text(reply, "msg").unwrap_or("no message"));
     let lowered = message.to_ascii_lowercase();
     if TOKEN_CODES.contains(&code) {
         ProbeError::Auth(format!("Omada refused the access token on {path} (error {code})."))
@@ -791,6 +797,28 @@ mod tests {
         let error = OmadaCollector::new().probe(&target).await.unwrap_err();
         assert!(matches!(error, ProbeError::Auth(_)), "{error}");
         assert!(!error.means_down());
+        // Réponse réelle d'un contrôleur 6.3 : le message se termine par un point,
+        // qui ne doit pas être doublé.
+        let message = error.to_string();
+        assert!(
+            message.contains(
+                "(error -44106): The Client Id Or Client Secret is Invalid. Check the client ID"
+            ),
+            "{message}"
+        );
+        assert!(!message.contains(".."), "{message}");
+    }
+
+    #[test]
+    fn la_ponctuation_finale_d_un_message_du_controleur_est_retiree() {
+        let real = "The Client Id Or Client Secret is Invalid.";
+        assert_eq!(sentence(real), "The Client Id Or Client Secret is Invalid");
+        assert_eq!(sentence("Invalid.."), "Invalid");
+        assert_eq!(sentence("Success. "), "Success");
+        assert_eq!(sentence("No dot"), "No dot");
+        let reply = serde_json::json!({"errorCode": -1001, "msg": "No permission."});
+        let error = api_error(-1001, &reply, "/x");
+        assert!(!error.to_string().contains(".."), "{error}");
     }
 
     #[tokio::test]

@@ -146,7 +146,11 @@ pub async fn create_in(
         }
         anyhow::bail!("unknown client {client}");
     };
-    row.try_get("id").context("identifiant de la cible créée")
+    let id: TargetId = row.try_get("id").context("identifiant de la cible créée")?;
+    crate::first_run::record(pool, crate::first_run::Milestone::FirstTarget).await;
+    // Sondé tout de suite, pas au prochain rechargement du planificateur.
+    crate::scheduler::wake();
+    Ok(id)
 }
 
 pub async fn update(
@@ -207,6 +211,9 @@ pub async fn update(
     }
     .context("mise à jour de la cible")?;
 
+    // Nouvelle adresse, nouvelle période ou remise en service : pris en compte
+    // au tour suivant du planificateur.
+    crate::scheduler::wake();
     Ok(result.rows_affected() > 0)
 }
 
@@ -350,7 +357,49 @@ pub async fn set_enabled(pool: &SqlitePool, id: TargetId, enabled: bool) -> Resu
     .execute(pool)
     .await
     .context("activation de la cible")?;
+    crate::scheduler::wake();
     Ok(result.rows_affected() > 0)
+}
+
+/// Contrôle CVE par équipement : `false` écarte la cible du moteur des failles
+/// connues (voir `crate::vulns`). Tenu hors de [`Target`] : c'est un réglage du
+/// serveur, que les collecteurs et l'agent n'ont pas à connaître.
+pub async fn cve_scan_of(pool: &SqlitePool, id: TargetId) -> Result<bool> {
+    let flag: Option<i64> = sqlx::query_scalar("SELECT cve_scan FROM targets WHERE id = ?")
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+        .context("lecture du contrôle CVE d'une cible")?;
+    Ok(flag.is_none_or(|flag| flag != 0))
+}
+
+/// Cibles dont le contrôle CVE est coupé.
+pub async fn cve_scan_off(pool: &SqlitePool) -> Result<std::collections::HashSet<TargetId>> {
+    let ids: Vec<TargetId> = sqlx::query_scalar("SELECT id FROM targets WHERE cve_scan = 0")
+        .fetch_all(pool)
+        .await
+        .context("lecture des cibles sans contrôle CVE")?;
+    Ok(ids.into_iter().collect())
+}
+
+/// Active ou coupe le contrôle CVE de plusieurs cibles. Rend le nombre de
+/// cibles dont le réglage a réellement changé (les inconnues et celles qui
+/// l'avaient déjà ne comptent pas).
+pub async fn set_cve_scan(pool: &SqlitePool, ids: &[TargetId], enabled: bool) -> Result<u64> {
+    let mut tx = pool.begin().await.context("ouverture de la transaction CVE")?;
+    let mut changed = 0;
+    for id in ids {
+        let done = sqlx::query("UPDATE targets SET cve_scan = ? WHERE id = ? AND cve_scan <> ?")
+            .bind(i64::from(enabled))
+            .bind(id)
+            .bind(i64::from(enabled))
+            .execute(&mut *tx)
+            .await
+            .context("réglage du contrôle CVE")?;
+        changed += done.rows_affected();
+    }
+    tx.commit().await.context("validation du contrôle CVE")?;
+    Ok(changed)
 }
 
 /// Associe un profil détecté à une cible.

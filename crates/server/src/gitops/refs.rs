@@ -320,6 +320,7 @@ mod tests {
             via_agent: None,
             interval_secs: 60,
             enabled: true,
+            cve_scan: true,
             tags: Default::default(),
             credential: Some(json!({"type": "snmp_v3", "username": "bob",
                 "auth": {"protocol": "sha", "passphrase": "hunter2"}})),

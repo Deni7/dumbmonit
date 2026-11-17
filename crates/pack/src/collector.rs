@@ -17,6 +17,17 @@ use crate::{MAX_REQUESTS, MAX_SERIES, Pack, http};
 /// Délai par requête quand la cible ne le règle pas.
 const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// Requêtes réservées à la fermeture de session (une, plus une redirection),
+/// hors du budget des sources : la session se referme même si elles l'ont épuisé.
+const LOGOUT_REQUESTS: usize = 2;
+
+/// Ce qu'une source facultative peut rencontrer sans faire échouer
+/// l'interrogation : un refus, une erreur HTTP, un corps illisible. Une panne
+/// (injoignable, délai) ou une erreur de configuration reste une erreur.
+fn skippable(error: &ProbeError) -> bool {
+    matches!(error, ProbeError::Auth(_) | ProbeError::Protocol(_))
+}
+
 pub struct PackCollector {
     pack: Arc<Pack>,
 }
@@ -125,14 +136,20 @@ impl Pack {
             timeout: connection.request_timeout,
         };
 
-        let ts_ms = chrono::Utc::now().timestamp_millis();
         let mut budget = MAX_REQUESTS;
-        let mut samples = Vec::new();
-        for source in &self.sources {
-            let bytes = http::fetch(&request, source, &mut budget).await?;
-            let body = source.decode(&bytes).map_err(ProbeError::Protocol)?;
-            source.extract(&body, ts_ms, &mut samples);
+        if let Some(login) = &self.session_login {
+            http::fetch(&request, login, &mut budget).await?;
         }
+        let result = self.read_sources(&request, &mut budget).await;
+        // Fermée même après un échec : un équipement qui n'admet qu'une session
+        // d'API à la fois resterait sinon fermé jusqu'à son délai d'inactivité.
+        if let Some(logout) = &self.session_logout {
+            let mut spare = LOGOUT_REQUESTS;
+            if let Err(error) = http::fetch(&request, logout, &mut spare).await {
+                tracing::debug!(pack = self.id(), %error, "fermeture de session impossible");
+            }
+        }
+        let mut samples = result?;
         if samples.len() > MAX_SERIES {
             tracing::warn!(
                 pack = self.id(),
@@ -141,6 +158,37 @@ impl Pack {
                 "trop de séries pour un paquet : les suivantes sont abandonnées"
             );
             samples.truncate(MAX_SERIES);
+        }
+        Ok(samples)
+    }
+
+    /// Chaque source, dans l'ordre ; une source facultative en échec est passée.
+    async fn read_sources(
+        &self,
+        request: &http::Request<'_>,
+        budget: &mut usize,
+    ) -> Result<Vec<Sample>, ProbeError> {
+        let ts_ms = chrono::Utc::now().timestamp_millis();
+        let mut samples = Vec::new();
+        for source in &self.sources {
+            let read = match http::fetch(request, source, budget).await {
+                Ok(bytes) => source.decode(&bytes).map_err(ProbeError::Protocol),
+                Err(error) => Err(error),
+            };
+            let body = match read {
+                Ok(body) => body,
+                Err(error) if source.optional && skippable(&error) => {
+                    tracing::debug!(
+                        pack = self.id(),
+                        source = %source.id,
+                        %error,
+                        "source facultative passée"
+                    );
+                    continue;
+                }
+                Err(error) => return Err(error),
+            };
+            source.extract(&body, ts_ms, &mut samples);
         }
         Ok(samples)
     }

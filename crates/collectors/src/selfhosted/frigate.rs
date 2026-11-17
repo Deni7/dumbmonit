@@ -18,6 +18,7 @@
 
 use async_trait::async_trait;
 use dumbmonit_proto::{Collector, Credential, ProbeError, Sample, Target};
+use reqwest::StatusCode;
 use serde_json::Value;
 
 use super::client::{Auth, HttpClient};
@@ -116,16 +117,37 @@ pub fn samples(stats: &Value, now_s: i64, ts_ms: i64) -> Vec<Sample> {
         }
         let used = (100.0 * (1.0 - free / total)).clamp(0.0, 100.0);
         out.push(gauge(&metric(P, "storage_used_percent"), used, ts_ms).with_label("path", path));
-        out.push(gauge(&metric(P, "storage_free_bytes"), free, ts_ms).with_label("path", path));
+        // `/api/stats` donne `total`, `used` et `free` en mébioctets, pas en octets.
+        out.push(
+            gauge(&metric(P, "storage_free_bytes"), free * BYTES_PER_MIB, ts_ms)
+                .with_label("path", path),
+        );
     }
     out
 }
+
+/// Frigate exprime le stockage en Mio.
+const BYTES_PER_MIB: f64 = 1_048_576.0;
+
+/// Frigate ne renouvelle pas un jeton de session : il expire au bout de 24 h.
+const TOKEN_REFUSED: &str = "Frigate refused the credentials on /api/stats (401). The \
+    authenticated port (8971) needs a bearer token (the session token returned by \
+    POST /api/login), and Frigate's session tokens expire after 24 hours: log in again and paste \
+    a fresh one, or use the internal port (5000), which needs none.";
 
 // ------------------------------------------------------------------ sonde
 
 pub async fn probe(client: &HttpClient, ts_ms: i64) -> Result<Vec<Sample>, ProbeError> {
     // Un seul appel : s'il répond, tout est là.
-    let stats: Value = client.get_json("/api/stats").await?;
+    let path = "/api/stats";
+    let (status, body) = client.get(path).await?;
+    if status == StatusCode::UNAUTHORIZED {
+        return Err(ProbeError::Auth(TOKEN_REFUSED.to_string()));
+    }
+    if !status.is_success() {
+        return Err(client.status_error(status, &body, path));
+    }
+    let stats: Value = client.decode(&body, path)?;
     Ok(samples(&stats, ts_ms / 1000, ts_ms))
 }
 
@@ -193,6 +215,26 @@ mod tests {
     // figé sur une inférence et un disque plein.
     const STATS: &str = include_str!("testdata/frigate_0.15.1/stats.json");
     const STALLED: &str = include_str!("testdata/frigate_0.15.1/stats_stalled_detector.json");
+
+    // `/api/stats` d'un Frigate 0.18.2 réel (une caméra hors ligne, détecteur CPU) :
+    // le stockage y est en Mio (311990.6 Mio libres sur un disque de 311 Gio),
+    // d'où `storage_free_bytes` converti. Le total (514900 Mio) est déduit des
+    // 39,41 % d'occupation relevés.
+    const STATS_0182: &str = include_str!("testdata/frigate_0.18.2/stats.json");
+
+    #[test]
+    fn le_stockage_libre_est_converti_de_mio_en_octets() {
+        let samples = samples(&json(STATS_0182), 1_794_400_000, 0);
+        let path = "/media/frigate/recordings";
+        let free = with(&samples, "frigate_storage_free_bytes", "path", path).unwrap();
+        assert!((free - 311_990.6 * 1_048_576.0).abs() < 1.0, "{free}");
+        assert!(free > 3.2e11 && free < 3.3e11, "{free}");
+        let used = with(&samples, "frigate_storage_used_percent", "path", path).unwrap();
+        assert!((used - 39.41).abs() < 0.01, "{used}");
+        assert!(with(&samples, "frigate_storage_free_bytes", "path", "/dev/shm").is_none());
+        assert_eq!(value(&samples, "frigate_cameras_offline"), Some(1.0));
+        assert_eq!(value(&samples, "frigate_update_available"), Some(0.0));
+    }
 
     fn json(text: &str) -> Value {
         serde_json::from_str(text).unwrap()
@@ -310,6 +352,23 @@ mod tests {
         let error =
             FrigateCollector::new().probe(&target(base, Credential::None)).await.unwrap_err();
         assert!(matches!(error, ProbeError::Auth(_)));
+        // Un jeton de session expiré : le message dit pourquoi et que faire.
+        let expired = Credential::ApiToken { token: "perime".into() };
+        let error = FrigateCollector::new()
+            .probe(&target(serve_unauthorized().await, expired))
+            .await
+            .unwrap_err();
+        assert!(!error.means_down());
+        let message = error.to_string();
+        assert!(message.contains("24 hours") && message.contains("5000"), "{message}");
+    }
+
+    async fn serve_unauthorized() -> String {
+        serve(Router::new().route(
+            "/api/stats",
+            get(|| async { (StatusCode::UNAUTHORIZED, r#"{"message":"Unauthorized"}"#) }),
+        ))
+        .await
     }
 
     #[tokio::test]

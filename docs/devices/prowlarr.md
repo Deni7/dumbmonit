@@ -1,6 +1,6 @@
 # Prowlarr (beta)
 
-Whether Prowlarr still serves its indexers: health errors, indexers disabled after failures, disk space and updates.
+Whether Prowlarr still serves its indexers: health errors, indexers disabled after failures and updates.
 
 !!! note "Beta"
     Written from the vendor's API documentation and tested against realistic recorded-style responses, not yet against a live instance. Tell us what you see.
@@ -27,10 +27,9 @@ All metrics are prefixed `dumbmonit_prowlarr_`.
 | `health_errors`, `health_warnings` | checks of the System → Status page that report an error or a warning |  |
 | `health_issue` | value 1 for each error or warning, at most 32 | `source`, `level` |
 | `indexers_disabled` | indexers still disabled after repeated failures |  |
-| `disk_used_percent`, `disk_free_bytes` | each disk Prowlarr reports (root folders, download folder), at most 32 | `path` |
 | `scrape_errors` | calls that failed on the last probe |  |
 
-The [built-in rules](../alerting/rules.md#self-hosted-applications) that apply: Prowlarr health error, Prowlarr indexers disabled, Prowlarr disk almost full, Prowlarr update available, plus Monitor unreachable.
+The [built-in rules](../alerting/rules.md#self-hosted-applications) that apply: Prowlarr health error, Prowlarr indexers disabled, Prowlarr update available, plus Monitor unreachable.
 
 ## Read the API key in Prowlarr
 

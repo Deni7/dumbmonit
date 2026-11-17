@@ -412,3 +412,170 @@ rules:
         "must be \"acme-ups\" or start with",
     );
 }
+
+#[test]
+fn une_source_xml_se_lit_par_jsonpath_et_une_date_en_secondes_unix() {
+    let yaml = r#"
+schema: 1
+id: fw
+version: 1.0.0
+label: Firewall
+sources:
+  - id: licenses
+    type: http
+    method: POST
+    path: /api/
+    body: type=op
+    format: xml
+    lists: [entry]
+metrics:
+  - name: answer_ok
+    source: licenses
+    json: "$.response['@status']"
+    map: { success: 1, error: 0 }
+discover:
+  - name: licenses
+    source: licenses
+    rows: $.response.result.licenses.entry[*]
+    labels:
+      license: $.feature
+    metrics:
+      - name: license_expired
+        json: $.expired
+        map: { "yes": 1, "no": 0 }
+      - name: license_expires_timestamp_seconds
+        json: $.expires
+        date: "%B %d, %Y"
+"#;
+    // Une seule entrée : `lists` la garde en liste, et « Never » n'est pas une date.
+    let one = r#"<response status="success"><result><licenses>
+        <entry><feature>Threat Prevention</feature><expires>November 18, 2026</expires>
+               <expired>no</expired></entry>
+        </licenses></result></response>"#;
+    assert_eq!(
+        keys(&extract(yaml, &[("licenses", one)])),
+        [
+            "fw_answer_ok 1",
+            "fw_license_expired{license=\"Threat Prevention\"} 0",
+            "fw_license_expires_timestamp_seconds{license=\"Threat Prevention\"} 1794960000",
+        ]
+    );
+    let never = one.replace("November 18, 2026", "Never");
+    assert_eq!(extract(yaml, &[("licenses", never.as_str())]).len(), 2);
+
+    let pack = Pack::parse(yaml).unwrap();
+    let mut bodies = BTreeMap::new();
+    bodies.insert("licenses".to_string(), b"<response><unclosed></response>".to_vec());
+    assert!(pack.extract(&bodies, 0).unwrap_err().contains("invalid XML"));
+}
+
+#[test]
+fn letoile_dune_enumeration_vaut_pour_toute_autre_valeur_textuelle() {
+    let yaml = BASE.replace("json: $.up", "json: $.up\n    map: { OK: 1, \"*\": 0 }");
+    assert_eq!(keys(&extract(&yaml, &[("status", r#"{"up": "OK"}"#)])), ["demo_app_up_value 1"]);
+    assert_eq!(
+        keys(&extract(&yaml, &[("status", r#"{"up": "Out of compliance"}"#)])),
+        ["demo_app_up_value 0"]
+    );
+}
+
+#[test]
+fn les_reglages_xml_et_date_sont_verifies() {
+    let xml = BASE.replace("path: /api/status", "path: /api/status\n    lists: [entry]");
+    assert_refused(&xml, "lists only applies to sources in xml format");
+    let date = BASE.replace("json: $.up", "json: $.up\n    date: tomorrow");
+    assert_refused(&date, "neither rfc3339 nor a strftime pattern");
+    let both = BASE.replace("json: $.up", "json: $.up\n    date: rfc3339\n    map: { a: 1 }");
+    assert_refused(&both, "date and map exclude each other");
+    let rfc = BASE.replace("json: $.up", "json: $.up\n    date: rfc3339");
+    assert_eq!(
+        keys(&extract(&rfc, &[("status", r#"{"up": "2026-01-01T01:00:00+01:00"}"#)])),
+        ["demo_app_up_value 1767225600"]
+    );
+}
+
+#[test]
+fn each_lit_une_liste_imbriquee_avec_les_etiquettes_de_sa_ligne() {
+    let yaml = r#"
+schema: 1
+id: wan
+version: 1.0.0
+label: WAN
+sources:
+  - id: uplinks
+    type: http
+    path: /uplinks
+discover:
+  - name: uplinks
+    source: uplinks
+    rows: $[*]
+    max_rows: 3
+    labels:
+      serial: $.serial
+    each: $.uplinks[*]
+    each_labels:
+      interface: $.interface
+    metrics:
+      - name: uplink_up
+        json: $.status
+        map: { active: 1, failed: 0 }
+      - name: last_seen_timestamp_seconds
+        json: $.seen
+        date: rfc3339
+"#;
+    let body = r#"[
+        {"serial": "A", "uplinks": [
+            {"interface": "wan1", "status": "failed", "seen": "2026-01-01T00:00:10Z"},
+            {"interface": "wan2", "status": "active"}]},
+        {"serial": "B", "uplinks": [
+            {"interface": "wan1", "status": "active"},
+            {"interface": "wan2", "status": "active"}]}]"#;
+    // `max_rows` borne le total des éléments : B/wan2 est laissé.
+    assert_eq!(
+        keys(&extract(yaml, &[("uplinks", body)])),
+        [
+            "wan_last_seen_timestamp_seconds{interface=\"wan1\",serial=\"A\"} 1767225610",
+            "wan_uplink_up{interface=\"wan1\",serial=\"A\"} 0",
+            "wan_uplink_up{interface=\"wan1\",serial=\"B\"} 1",
+            "wan_uplink_up{interface=\"wan2\",serial=\"A\"} 1",
+        ]
+    );
+    assert_refused(&yaml.replace("    each: $.uplinks[*]\n", ""), "each_labels needs each");
+    assert_refused(
+        &yaml.replace("interface: $.interface", "serial: $.interface"),
+        "already a label of the row",
+    );
+}
+
+#[test]
+fn une_session_se_verifie_comme_une_source() {
+    let session = r#"
+credentials: [username_password]
+session:
+  login:
+    path: /api/auth
+    method: POST
+    auth: basic
+  logout:
+    path: /api/auth
+    method: DELETE
+"#;
+    let yaml = format!("{BASE}{session}");
+    let pack = Pack::parse(&yaml).unwrap_or_else(|error| panic!("{error}"));
+    assert!(pack.warnings().is_empty(), "{:?}", pack.warnings());
+    assert_eq!(pack.source_ids().collect::<Vec<_>>(), ["status"]);
+
+    assert_refused(
+        &yaml.replace("path: /api/auth\n    method: POST", "path: //evil/auth\n    method: POST"),
+        "session.login",
+    );
+    assert_refused(
+        &yaml.replace("method: POST\n    auth: basic", "method: DELETE\n    auth: basic"),
+        "a login is a GET or a POST",
+    );
+    assert_refused(&yaml.replace("auth: basic", "auth: bearer"), "auth: bearer needs api_token");
+    assert_refused(
+        &BASE.replace("path: /api/status", "path: /api/status\n    method: DELETE"),
+        "DELETE is only for session.logout",
+    );
+}

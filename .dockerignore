@@ -5,3 +5,6 @@ web/build
 web/.svelte-kit
 .git
 *.db*
+web/e2e
+web/test-results
+web/playwright-report

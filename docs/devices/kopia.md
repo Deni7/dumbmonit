@@ -26,6 +26,18 @@ with HTTP Basic authentication (the server user name and password):
   its schedule and its last snapshot (start and end time, size, files,
   errors). Read only when the repository is connected.
 
+A server started normally also wants a CSRF token on these routes, and
+answers `401 Invalid or missing CSRF token.` without it, even with the right
+password. DumbMonit does what the web interface does: it opens `/` once, keeps
+the session cookie (`Kopia-Session-Cookie`) and the token found in the page
+(`<meta name="kopia-csrf-token">`), and sends them back with the
+`X-Kopia-Csrf-Token` header. The session is kept between probes and reopened
+when the server restarts. A server started with `--disable-csrf-token-checks`
+is read without it. The two refusals stay apart: a wrong password reads
+"refused the user name or password", a server whose web interface is off (so
+that `/` gives no token) reads "requires a CSRF token" and names
+`--disable-csrf-token-checks`.
+
 The snapshot history of each source (`/api/v1/snapshots`) is not read: the
 last snapshot already comes with the source, and that is all the alerts need.
 Sources whose state is `REMOTE` belong to other machines that use the same
