@@ -334,6 +334,11 @@ todos os sistemas.
 | `--sha256=LIST` | `-Sha256` | SHA-256 esperado do download, como pares `platform-arch:hex` separados por vírgulas (um valor hex simples também serve). Incluído no comando que o DumbMonit mostra; obrigatório a menos que a flag seguinte seja dada. |
 | `--insecure-skip-checksum` | `-InsecureSkipChecksum` | Instalar um binário descarregado sem o verificar, com um aviso. Apenas para configurações isoladas da rede ou manuais. |
 | `--no-start` | | Instalar tudo, mas não contactar o servidor nem iniciar o serviço (imagem de máquina, testes). |
+| `--open-gateway` | `-OpenGateway` | Retransmissor: abrir a porta do gateway na firewall local (firewalld, ufw, firewall do Windows), apenas para a sub-rede local. Implícito com `--relay`; o comando de um token de retransmissor inclui-o. `--uninstall` retira a regra. |
+| `--gateway-port=N` | `-GatewayPort N` | Porta do gateway do retransmissor aberta na firewall (8443 por omissão). |
+| `--no-firewall` | `-NoFirewall` | Não mexer na firewall local. |
+| `--proxy=URL` | `-Proxy` | Proxy HTTP de saída até ao servidor, `http://[utilizador:palavra-passe@]anfitrião:porta` ou `none` (`-Proxy` aceita também `system`). Usado nas transferências e escrito no `agent.yaml`. Ver [Proxy de saída](#outbound-proxy). |
+| `--no-proxy=LIST` | `-NoProxy` | Anfitriões alcançados sem o proxy, separados por vírgulas. |
 | `--uninstall` | `-Uninstall` | Desinstalar o agente e apagar a sua configuração. |
 | `--help` | | Mostrar a ajuda. |
 
@@ -638,6 +643,55 @@ Aplicam-se três [regras incorporadas](../alerting/rules.md#hyper-v):
   durante quinze minutos (Advisory).
 - **Hyper-V virtual disk errors**: um disco virtual reportou erros de E/S na
   última hora (Advisory).
+
+## Proxy de saída {#outbound-proxy}
+
+Onde as máquinas só saem por um proxy HTTP, o agente chega ao servidor através
+dele com `CONNECT`: o proxy abre um túnel TCP até à porta dos agentes, e a
+sessão TLS 1.3 do agente (certificado de cliente, autoridade fixada) vai de
+ponta a ponta até ao servidor. O proxy só vê o nome e a porta, depois dados
+cifrados; um proxy que inspeciona TLS é recusado pela fixação, como qualquer
+intermediário.
+
+```yaml
+proxy: http://proxy.corp.example:3128   # or none, or system (Windows)
+no_proxy: [.corp.example, 10.0.0.0/8]    # reached directly
+proxy_user: CORP\monitoring             # optional, instead of user:password@ in the URL
+proxy_password: …
+```
+
+- `proxy` (ou `DUMBMONIT_AGENT_PROXY`): `http://[utilizador:palavra-passe@]anfitrião:porta`,
+  codificado em percentagem no URL, ou as chaves à parte `proxy_user` /
+  `proxy_password` (`DUMBMONIT_AGENT_PROXY_USER`,
+  `DUMBMONIT_AGENT_PROXY_PASSWORD`). Só proxies `http://`: a ligação ao proxy
+  não é cifrada, o que ela transporta é. `none` vai sempre direto.
+- `no_proxy` (ou `DUMBMONIT_AGENT_NO_PROXY`, separados por vírgulas):
+  anfitriões, domínios (com subdomínios), endereços ou redes alcançados
+  diretamente.
+- Sem `proxy`, aplicam-se as variáveis habituais: `HTTPS_PROXY`, `HTTP_PROXY`,
+  `ALL_PROXY` e `NO_PROXY` (também em minúsculas). Um serviço não herda a sua
+  shell: coloque-as na unit (`systemctl edit dumbmonit-agent`,
+  `Environment=HTTPS_PROXY=…`) ou use a chave.
+- Os instaladores aceitam `--proxy=URL --no-proxy=LISTA` (`-Proxy`,
+  `-NoProxy`): usam-no nas suas próprias transferências e escrevem-no no
+  `agent.yaml`.
+- `proxy: system` no Windows usa o proxy WinHTTP da máquina (o dos serviços) e
+  depois o do Internet Explorer da conta do serviço. Para o definir:
+
+```powershell
+netsh winhttp set proxy proxy-server="proxy.corp.example:3128" bypass-list="*.corp.example"
+netsh winhttp import proxy source=ie   # or copy the Internet Explorer settings
+```
+
+  A configuração automática (PAC, WPAD) não é seguida: indique o proxy
+  explicitamente.
+- O proxy só se aplica às ligações ao servidor DumbMonit (medições, comandos,
+  retransmissor, atualizações, sentinela). Um retransmissor consulta os
+  equipamentos do seu site, e testa o seu próprio gateway, diretamente.
+- Já as variáveis como `HTTPS_PROXY` aplicam-se a todas as ligações do agente, sondagens do retransmissor incluídas: exclua as redes do site com `NO_PROXY`.
+
+No arranque, o agente regista o proxy que usa (`outbound proxy to the server`),
+nunca as credenciais.
 
 ## Executar o agente no Docker / noutra rede {#run-the-agent-in-docker--on-another-network}
 

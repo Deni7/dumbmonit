@@ -19,7 +19,7 @@ only needs to reach the server on the agent port, also from another site.
 
 | Where | Port | Why |
 |-------|------|-----|
-| Server, inbound | **TCP 8443** | Encrypted agent channel. The only port agents on other networks need. |
+| Server, inbound | **TCP 8443** | Encrypted agent channel, plus the install scripts and agent downloads for remote sites. The only port agents on other networks need. |
 | Server, inbound | TCP 8080 | Web interface, install scripts and agent downloads. Can stay private (LAN, VPN). |
 | Agents | none | Agents only make outbound connections. |
 | Relay with a gateway | TCP 8443 (configurable), **from the site's network only** | Agents of a site that cannot reach the server connect to the relay (see below). |
@@ -33,7 +33,11 @@ With Docker, publish the agent port next to the web port:
 ```
 
 If a router or a TCP proxy publishes it under another number, set
-`DUMBMONIT_AGENT_PUBLIC_PORT` so the install commands use that number.
+`DUMBMONIT_AGENT_PUBLIC_PORT` so the install commands use that number. To give
+the agents a name of their own (for example `https://agents.example.com:443`
+behind an SNI passthrough), set `DUMBMONIT_AGENT_PUBLIC_URL`: it wins over both
+the browser's host and the public port (see
+[Dedicated agent address](../reference/configuration.md#dedicated-agent-address)).
 
 Before showing an install command, the add-an-agent screen asks the server to
 dial its own agent channel at the address the command carries, complete the
@@ -43,8 +47,10 @@ does not resolve, or leads to another service, the screen says so with the
 exact `ports:` line and firewall commands (firewalld, ufw, Windows) instead of
 the command; *Show the command anyway* covers a network where the server cannot
 reach itself (NAT without hairpin). Through a relay, the screen waits until the
-relay reports that its gateway listens, and reminds which port to open on the
-relay. The install scripts run the same diagnosis when their test send fails,
+relay reports that its gateway listens and that its own test of the gateway, at
+the address the site dials, reached the server; a failed test is shown with its
+cause instead of the command. It also reminds which port to open on the relay
+(the install command of a relay opens it, to the local subnet only). The install scripts run the same diagnosis when their test send fails,
 rather than a bare "server unreachable".
 
 ## What protects the channel
@@ -74,8 +80,12 @@ rather than a bare "server unreachable".
   cannot speak for another machine.
 - **Throttled enrolment.** Wrong tokens are counted per address and blocked
   after a few attempts. Tokens are single use unless made reusable.
-- **Nothing leaks before authentication.** The agent port serves the agent
-  protocol only: no web interface, no version, no API description.
+- **Nothing leaks before authentication.** Without a client certificate, the
+  agent port answers enrolment and the public install files only
+  (`/install.sh`, `/install.ps1`, `/download/<agent file>`, the same as on the
+  web port): no web interface, no version, no API description. A remote site
+  installs through this single port: the command pins the key of its
+  certificate and the SHA-256 of each binary.
 - **Keys at rest.** The authority's private key is stored encrypted with the
   instance key (`/data/secret.key`). On the agent, `agent-tls.json` (key and
   certificate) sits next to `agent.yaml`, readable by its owner only (mode 0600
@@ -145,7 +155,7 @@ Not protected against:
   key, as they can read anything else there);
 - someone with access to both the server's `/data` and its instance key;
 - the very first download: the install script and the binary come from the web
-  port, over HTTPS. The command shown in the interface carries the fingerprint
+  port (or, for a remote site, from the agent port), over HTTPS. The command shown in the interface carries the fingerprint
   of the server's certificate and pins it, so the download is verified even
   with the self-signed certificate (a reverse proxy with a public certificate is
   verified the usual way). The agent channel itself is pinned from the first
@@ -254,8 +264,16 @@ the agent's own pinned channel, with its token, binding secret and machine key.
 Do not put a TLS-terminating reverse proxy in front of the agent port: the
 client certificate would stop at the proxy. A TCP pass-through (HAProxy `mode
 tcp`, nginx `stream`, Traefik TCP router with TLS passthrough, port forwarding)
-works. The web port can stay behind your usual reverse proxy, which connects to
-it over HTTPS.
+works. To share port 443 with websites, route on the server name (SNI) with
+`DUMBMONIT_AGENT_PUBLIC_URL` set to that name: HAProxy and Traefik examples in
+[Dedicated agent address](../reference/configuration.md#dedicated-agent-address).
+The web port can stay behind your usual reverse proxy, which connects to it over
+HTTPS.
+
+On the agent's side, an outbound HTTP proxy is fine: the agent opens a `CONNECT`
+tunnel through it and its TLS session stays end to end, client certificate and
+pinning included; a proxy that intercepts TLS is refused. See
+[Outbound proxy](../devices/agent.md#outbound-proxy).
 
 ## Rotating the certificate authority
 
@@ -274,6 +292,7 @@ In **Settings → Agents → Agent channel → Certificate authority rotation**:
 |----------|---------|---------|
 | `DUMBMONIT_AGENT_LISTEN` | `0.0.0.0:8443` | Listen address of the agent channel; `off` closes it. |
 | `DUMBMONIT_AGENT_PUBLIC_PORT` | listen port | Port written in the install commands. |
+| `DUMBMONIT_AGENT_PUBLIC_URL` | unset | Dedicated address of the agent channel (`https://host[:port]`), written in the install commands and announced to agents; wins over the browser's host and `DUMBMONIT_AGENT_PUBLIC_PORT`. |
 | `DUMBMONIT_AGENT_LEGACY_DAYS` | unset | Close the plain channel N days after the update. |
 
 On the agent (`agent.yaml` or environment): `tls_url` /
@@ -285,5 +304,7 @@ On the agent (`agent.yaml` or environment): `tls_url` /
 `GET /api/agent/install?base_url=…` returns the web URL, the agent channel URL,
 the CA fingerprint, the binary checksums, and the Unix and PowerShell install
 commands with `{TOKEN}` to replace. With `relay_id=<relay>` (and optionally
-`relay_host=`), the commands go through that relay's gateway. GPO or Ansible generators should use it
+`relay_host=`), the commands go through that relay's gateway. With
+`agent_port_only=true`, scripts and binaries come from the agent port as well:
+one port for a remote site. GPO or Ansible generators should use it
 rather than rebuilding the command.

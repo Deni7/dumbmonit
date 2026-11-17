@@ -13,6 +13,13 @@
 
 ## 1. 通过HTTPS发布服务器 {#1-publish-the-server-over-https}
 
+!!! tip "远程站点只需一个端口"
+    为中继显示的安装命令**只使用代理端口**：安装脚本、代理二进制文件和加密通道都来自
+    `https://<服务器>:8443`（或 `DUMBMONIT_AGENT_PUBLIC_URL`）。命令固定该端口证书的密钥以及每个二进制文件的 SHA-256：
+    下载过程端到端受验证，无需向站点开放 Web 端口（8080）。部署工具可通过
+    `GET /api/agent/install?agent_port_only=true` 获取同样的命令。下文关于 Web
+    端口的段落只适用于仍通过旧通道连接的代理。
+
 中继从服务器获取其作业：服务器必须从远程网站可到达，通常 `https://monitor.example.org` 在反向代理后。两件事在该链接上传导：
 
 - **注册令牌** (`dmon_…`)，在每个请求的 `Authorization` 标头中——对任何代理如此；
@@ -31,7 +38,9 @@ Web 端口只接受 HTTPS，因此两者在途中都是加密的。在互联网�
 任何在远程网站有Docker的机器，使用来自仓库的 `docker-compose.agent.yml`：
 
 ```sh
-DUMBMONIT_AGENT_URL=https://monitor.example.org \
+DUMBMONIT_AGENT_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_TLS_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_CA_PIN=… \
 DUMBMONIT_AGENT_TOKEN=dmon_… \
 DUMBMONIT_AGENT_HOSTNAME=relay-lyon \
 DUMBMONIT_AGENT_RELAY=true \
@@ -77,7 +86,7 @@ site: Lyon office
 
 **在 DumbMonit 中**添加一个监控项，选择**安装了代理的服务器**，并在*机器如何到达此服务器？*下选择**通过 &lt;中继&gt;（站点）**。填写站点访问中继所用的地址（IP 或本地名称）。显示的命令——Linux/macOS、Windows、Docker——随即指向中继的网关（`--url=http://192.168.10.5:8443 --tls-url=https://192.168.10.5:8443`），并且仍带有**服务器**证书颁发机构的指纹。接着流程会等待第一次连接，让你不离开页面就为机器命名、放入文件夹并归到某个站点。从*按站点添加*中的某个站点进入时，**安装了代理的服务器**会预选该站点的中继；中继自己的页面上有**通过它安装代理**。
 
-为某次安装选择中继，会请它在下次上报时打开网关（默认端口 8443）。中继页面的 *Relay* 面板显示网关——*正在监听端口 8443 — 已连接 3 个代理*——并允许修改端口和地址，或关闭网关。在中继自身的防火墙上开放该端口，**仅对站点网络开放**。对于 Docker 中继，发布该端口（`-p 8443:8443`，或 `docker-compose.agent.yml` 中被注释的 `ports:`）。中继 `agent.yaml` 中的 `gateway_listen: 0.0.0.0:9443`（`DUMBMONIT_AGENT_GATEWAY_LISTEN`）优先于界面中的设置。
+中继一连上服务器就会打开网关（默认端口 8443）；当你为某次安装选择它或修改网关时，也会立即打开：服务器会结束中继的长轮询，无需等待下一次上报。随后中继会像站点中的机器那样，在站点使用的地址上自行测试网关并报告结果：测试通过后添加页面才显示命令，否则说明失败原因。该测试看不到站点机器与中继之间的防火墙（中继访问自身时不会经过它）。中继页面的 *Relay* 面板显示网关——*正在监听端口 8443 — 已连接 3 个代理*——并允许修改端口和地址，或关闭网关。中继的安装命令会在中继自身的防火墙上开放该端口，**仅对站点网络开放**（Linux 上为 firewalld 或 ufw，Windows 防火墙使用 `LocalSubnet`），并在屏幕上说明；`--uninstall`（`-Uninstall`）会删除该规则，`--no-firewall`（`-NoFirewall`）则不触碰防火墙。对于 Docker 中继，`docker-compose.agent.yml` 会发布 8443（`DUMBMONIT_AGENT_GATEWAY_PUBLISH=192.168.10.5:8443` 将其限制在局域网地址上）。中继 `agent.yaml` 中的 `gateway_listen: 0.0.0.0:9443`（`DUMBMONIT_AGENT_GATEWAY_LISTEN`）优先于界面中的设置。在此行为之前安装的中继会保持关闭从未打开过的网关。
 
 经由中继传输的内容：
 

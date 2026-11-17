@@ -10,7 +10,7 @@ you monitor remote sites.** DumbMonit only serves HTTPS.
 | Port | Protocol | Role | Who must reach it | Exposure |
 |------|----------|------|-------------------|----------|
 | **8080** | TCP (HTTPS) | Web interface, API, install scripts, public status pages | Your browsers; agents on the same network | LAN only. WAN only for public status pages, behind a reverse proxy. |
-| **8443** | TCP (TLS 1.3, client certificates) | Agent channel | Agents, including those on other sites | LAN, or WAN if restricted to the agents' IPs. |
+| **8443** | TCP (TLS 1.3, client certificates) | Agent channel, and the install scripts and agent downloads for remote sites | Agents, including those on other sites | LAN, or WAN if restricted to the agents' IPs. |
 | **5514** | UDP and TCP | Syslog input (off by default) | Devices that send logs | LAN only. Never WAN. |
 | **1162** | UDP | SNMP trap input (off by default) | Devices that send traps | LAN only. Never WAN. |
 | 8428, 8429, 9428 | TCP | Bundled storage (metrics, long-term metrics, logs) | Nobody but DumbMonit itself | Never published. They listen on `127.0.0.1`. |
@@ -40,12 +40,20 @@ the Internet, but it still deserves a source filter. Change it with
 `DUMBMONIT_AGENT_LISTEN` (`off` closes it) and
 `DUMBMONIT_AGENT_PUBLIC_PORT` if a port forward publishes another number.
 
+- **Installs:** without a client certificate, this port also serves the
+  install scripts and the agent binaries (the same files as the web port). The
+  install command shown for a relay uses this port only, so a remote site
+  never needs 8080. The command pins the key of the port's certificate and the
+  SHA-256 of each binary.
 - **Closed:** agents on other networks cannot report. Agents on the same
   network as the server can still use the web port.
 - **Open on the Internet:** anyone can try a TLS handshake, but without an
   agent certificate they get nothing. Restrict it to your agents' IPs anyway.
 - **Relay gateway:** a relay agent opens its own gateway, also on 8443 by
-  default. Open it on the relay's firewall to the site's network only.
+  default, as soon as it connects. Its install command opens that port on the
+  relay's firewall (firewalld, ufw or the Windows firewall) to the local subnet
+  only, and `--uninstall` closes it again. A relay in Docker publishes it
+  through `docker-compose.agent.yml`.
 
 See [Agent channel security](agent-security.md).
 
@@ -98,7 +106,8 @@ Make sure your router has no port forward to the server. That is all.
 
 ### 2. Agents on remote sites
 
-Only 8443 must be reachable. Keep 8080 private.
+Only 8443 must be reachable. Keep 8080 private: the install command of a
+relay downloads the script and the agent from 8443 too.
 
 On the router or the cloud firewall, forward TCP 8443 to the server. Then
 allow it **only from the IPs of your sites**. Replace `203.0.113.10` and
@@ -107,7 +116,11 @@ examples below). If a site has a dynamic IP, use a VPN instead, or a
 DNS-based rule on your firewall.
 
 If the router publishes another number (for example 18443), set
-`DUMBMONIT_AGENT_PUBLIC_PORT=18443`.
+`DUMBMONIT_AGENT_PUBLIC_PORT=18443`. If the agents have a name of their own,
+for example `agents.example.com` on port 443 shared with websites through an
+SNI passthrough, set `DUMBMONIT_AGENT_PUBLIC_URL=https://agents.example.com:443`
+instead (see
+[Dedicated agent address](../reference/configuration.md#dedicated-agent-address)).
 
 ### 3. Public status pages behind a reverse proxy
 

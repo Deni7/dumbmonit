@@ -80,3 +80,52 @@ DumbMonit 被称为 EzyMonit 直到 2026 年 9 月。每个 `DUMBMONIT_*` 变量
 ## Ports {#ports}
 
 | Port | Container | Purpose |
+
+### 代理专用地址与 SNI 直通 {#dedicated-agent-address}
+
+`DUMBMONIT_AGENT_PUBLIC_URL=https://agents.example.com:443` 为代理提供一个专用地址。在安装命令（`--tls-url`，对于中继或使用 `agent_port_only=true` 时还有 `--url`）以及代理在注册时和每次响应中收到的通道公告里，它优先于浏览器打开的主机和 `DUMBMONIT_AGENT_PUBLIC_PORT`（后者仍然受支持）：未使用 `--tls-url` 安装的代理会自行切换到该地址。只接受 `https://主机[:端口]`，并在启动时检查：`http://`、路径、用户名或已关闭的代理通道（`DUMBMONIT_AGENT_LISTEN=off`）都会使服务器带着提示信息停止。
+
+常见情况：只有一个公网 IP，其 443 端口已经承载网站。TCP 代理读取 TLS ClientHello 中的服务器名称（SNI），把仍然加密的连接转交给 DumbMonit 的 8443 端口。**切勿在此终止 TLS**：代理的客户端证书和固定的证书颁发机构必须原样到达 DumbMonit。
+
+HAProxy（`web` 表示已经在提供 443 服务的部分）：
+
+```haproxy
+frontend https_in
+    bind :443
+    mode tcp
+    tcp-request inspect-delay 5s
+    tcp-request content accept if { req.ssl_hello_type 1 }
+    use_backend dumbmonit_agents if { req.ssl_sni -i agents.example.com }
+    default_backend web
+
+backend dumbmonit_agents
+    mode tcp
+    server dumbmonit 192.168.1.5:8443
+
+backend web
+    mode tcp
+    server proxy 127.0.0.1:8444
+```
+
+Traefik v3（文件提供程序；入口点 `websecure` 监听 443）：
+
+```yaml
+tcp:
+  routers:
+    dumbmonit-agents:
+      entryPoints: [websecure]
+      rule: "HostSNI(`agents.example.com`)"
+      service: dumbmonit-agents
+      tls:
+        passthrough: true
+  services:
+    dumbmonit-agents:
+      loadBalancer:
+        servers:
+          - address: "192.168.1.5:8443"
+```
+
+- URL 中请使用 DNS 名称：名称随 SNI 传输，IP 则不会。
+- 服务器看到的是代理的地址：失败的注册尝试按地址计数，因此代理后面的所有代理程序共用一个计数器。
+- 从外部检查：`curl -k https://agents.example.com/install.sh` 会返回安装脚本（代理端口无需客户端证书即可提供它）。
+- Cloudflare Tunnel 或任何终止 TLS 的代理都无法承载代理通道。

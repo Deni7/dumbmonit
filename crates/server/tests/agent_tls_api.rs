@@ -32,8 +32,17 @@ struct Lab {
 /// préparation du canal chiffré (pour simuler une instance qui avait déjà des
 /// agents au moment de la mise à jour).
 async fn lab_with<T>(before_init: impl AsyncFnOnce(&TestApp, &str) -> T) -> (Lab, String, T) {
+    lab_configured(|_| {}, before_init).await
+}
+
+/// Comme [`lab_with`], avec une configuration retouchée.
+async fn lab_configured<T>(
+    configure: impl FnOnce(&mut dumbmonit_server::config::Config),
+    before_init: impl AsyncFnOnce(&TestApp, &str) -> T,
+) -> (Lab, String, T) {
     let dir = tempfile::tempdir().expect("répertoire temporaire");
-    let config = common::base_config(dir.path());
+    let mut config = common::base_config(dir.path());
+    configure(&mut config);
     let pool = db::open(&config.database_path()).await.expect("base");
     let cipher = db::init_cipher(&pool, "secret-de-test-suffisamment-long").await.expect("chiffre");
     common::accept_enrolments(&pool).await;
@@ -684,13 +693,33 @@ async fn only_a_relay_with_its_certificate_can_open_a_tunnel() {
 }
 
 #[tokio::test]
-async fn the_install_files_are_read_over_tls_through_a_relay_only() {
+async fn the_install_files_are_read_over_tls_directly_or_through_a_relay() {
     let (lab, admin) = lab().await;
     let ca = authority(&lab).await;
-    // En direct, le port des agents ne sert aucun fichier d'installation.
+    // En direct, sans certificat client : un site distant s'installe par ce
+    // seul port.
     let direct =
         client(&lab, &ca, None).get(url(&lab, "/install.sh")).send().await.expect("direct");
-    assert_eq!(direct.status(), StatusCode::NOT_FOUND);
+    assert_eq!(direct.status(), StatusCode::OK);
+    assert!(direct.text().await.unwrap().starts_with("#!/bin/sh"));
+    let windows =
+        client(&lab, &ca, None).get(url(&lab, "/install.ps1")).send().await.expect("direct");
+    assert_eq!(windows.status(), StatusCode::OK);
+    // Les binaires suivent la même liste fermée que sur le port de l'interface.
+    let unknown = client(&lab, &ca, None)
+        .get(url(&lab, "/download/..%2Fsecret.key"))
+        .send()
+        .await
+        .expect("direct");
+    assert_eq!(unknown.status(), StatusCode::NOT_FOUND);
+    // Le reste du protocole exige toujours un certificat client.
+    let ingest = client(&lab, &ca, None)
+        .post(url(&lab, "/api/ingest"))
+        .json(&batch("id-anonyme"))
+        .send()
+        .await
+        .expect("lot");
+    assert_eq!(ingest.status(), StatusCode::UNAUTHORIZED);
 
     // À travers la passerelle d'un relais : les scripts, sous TLS jusqu'au
     // serveur ; le relais ne voit que du chiffré.
@@ -804,4 +833,167 @@ async fn install_commands_through_a_relay_point_at_its_gateway_and_open_it() {
         )
         .await;
     assert_eq!(reply.status, StatusCode::BAD_REQUEST, "{}", reply.body);
+}
+
+#[tokio::test]
+async fn a_relay_install_command_uses_the_agent_port_only() {
+    let (lab, admin) = lab().await;
+    let reply = lab
+        .app
+        .post(
+            "/api/agent/tokens",
+            json!({ "relay": true, "site": "Lyon", "base_url": "https://monit.example.com:8080" }),
+            Some(&admin),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::CREATED, "{}", reply.body);
+    let server_pin = lab.state.agent_tls().server_pin().expect("épingle du port des agents");
+    let pin = lab.state.agent_tls().pins()[0].clone();
+    let linux = reply.body["install_linux"].as_str().unwrap();
+    let fetch = format!(
+        "curl -sSL -k --pinnedpubkey {server_pin} https://monit.example.com:8443/install.sh"
+    );
+    assert!(linux.starts_with(&fetch), "{linux}");
+    assert!(linux.contains(" --url=https://monit.example.com:8443"), "{linux}");
+    assert!(linux.contains(" --tls-url=https://monit.example.com:8443"), "{linux}");
+    assert!(linux.contains(&format!("--ca-pin={pin}")), "{linux}");
+    assert!(!linux.contains(":8080"), "un seul port : {linux}");
+    let windows = reply.body["install_windows"].as_str().unwrap();
+    assert!(
+        windows.contains("DownloadString('https://monit.example.com:8443/install.ps1')"),
+        "{windows}"
+    );
+    assert!(windows.contains(&format!("-PinnedKey {server_pin}")), "{windows}");
+    assert!(!windows.contains(":8080"), "{windows}");
+
+    // Les mêmes paramètres, sans jeton, pour les générateurs de déploiement.
+    let query = "/api/agent/install?base_url=https://monit.example.com:8080";
+    let params = lab.app.get(&format!("{query}&agent_port_only=true"), Some(&admin)).await;
+    assert_eq!(params.status, StatusCode::OK, "{}", params.body);
+    assert_eq!(params.body["agent_port_only"], true);
+    assert_eq!(params.body["base_url"], "https://monit.example.com:8443");
+    assert_eq!(params.body["https_pin"], server_pin.as_str());
+    // Sans l'option, l'interface reste le point d'entrée des scripts.
+    let web = lab.app.get(query, Some(&admin)).await;
+    assert_eq!(web.body["agent_port_only"], false);
+    assert_eq!(web.body["base_url"], "https://monit.example.com:8080");
+}
+
+#[tokio::test]
+async fn a_dedicated_agent_address_wins_in_commands_and_in_the_channel_announcement() {
+    let public = "https://agents.example.com:443";
+    let (lab, admin, ()) = lab_configured(
+        |config| {
+            config.agent_public_port = Some(18443);
+            config.agent_public_url = Some(public.to_string());
+        },
+        async |_, _| {},
+    )
+    .await;
+    let query = "/api/agent/install?base_url=https://monit.example.com:8080";
+    let reply = lab.app.get(query, Some(&admin)).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(reply.body["agent_url"], public, "prime sur l'hôte et sur le port publié");
+    let linux = reply.body["linux_template"].as_str().unwrap();
+    assert!(linux.contains(&format!(" --tls-url={public} ")), "{linux}");
+    // Un seul port : scripts et binaires viennent aussi de l'adresse dédiée.
+    let single = lab.app.get(&format!("{query}&agent_port_only=true"), Some(&admin)).await;
+    assert_eq!(single.body["base_url"], public);
+
+    // L'annonce du canal (enrôlement, lots) porte l'adresse dédiée.
+    let ca = authority(&lab).await;
+    let enrolment = token(&lab.app, &admin).await;
+    let key = rcgen::KeyPair::generate_for(&rcgen::PKCS_ECDSA_P256_SHA256).expect("clé");
+    let response = client(&lab, &ca, None)
+        .post(url(&lab, "/api/agent/tls/enroll"))
+        .bearer_auth(&enrolment)
+        .json(&json!({ "identity": identity("id-dedie"), "public_key": BASE64.encode(key.public_key_raw()) }))
+        .send()
+        .await
+        .expect("enrôlement");
+    assert_eq!(response.status(), StatusCode::OK);
+    let header = response
+        .headers()
+        .get(dumbmonit_proto::AGENT_TLS_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .expect("annonce");
+    let offer = dumbmonit_proto::TlsOffer::parse(header).expect("annonce lisible");
+    assert_eq!(offer.url.as_deref(), Some(public));
+    assert_eq!(offer.port, 18443, "les agents antérieurs gardent le port publié");
+}
+
+#[tokio::test]
+async fn a_relay_learns_of_an_install_at_once_and_its_own_gateway_test_gates_the_command() {
+    let (lab, admin) = lab().await;
+    let enrolment = relay_token(&lab.app, &admin).await;
+    let relay = enrolled(&lab, &enrolment, "id-relais", None).await;
+    let relay_id = target_of(&lab, "id-relais").await;
+    let check = || {
+        lab.app.post(
+            "/api/agent/tls/check",
+            json!({ "base_url": "https://monit.example.com", "relay_id": relay_id,
+                    "relay_host": "192.168.10.5" }),
+            Some(&admin),
+        )
+    };
+
+    // Une installation à travers ce relais : il en est prévenu sur-le-champ
+    // (fin de son attente longue), pas à son prochain lot.
+    let reply = lab
+        .app
+        .post(
+            "/api/agent/tokens",
+            json!({ "relay_id": relay_id, "relay_host": "192.168.10.5" }),
+            Some(&admin),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::CREATED, "{}", reply.body);
+    assert!(lab.state.relay().take_resync(relay_id), "le relais est prévenu aussitôt");
+
+    // Avant tout essai : ni joignable ni injoignable.
+    let before = check().await;
+    assert_eq!(before.status, StatusCode::OK, "{}", before.body);
+    assert_eq!(before.body["relay"]["self_check"], false);
+    assert_eq!(before.body["relay"]["reachable"], Value::Null);
+
+    // Le relais écoute et rapporte l'essai de sa passerelle à une adresse.
+    let report = |ok: bool, address: &str| {
+        let error = if ok { Value::Null } else { json!("cannot connect: refused") };
+        let mut body = batch("id-relais");
+        let identity = body["identity"].as_object_mut().unwrap();
+        identity.insert("relay".into(), json!(true));
+        identity.insert("relay_gateway".into(), json!(8443));
+        identity.insert(
+            "relay_gateway_check".into(),
+            json!({ "address": address, "ok": ok, "error": error, "checked_at_ms": 1 }),
+        );
+        body
+    };
+    let ca = authority(&lab).await;
+    let secret = relay.secret.clone().expect("secret de liaison");
+    let send = |body: Value| {
+        client(&lab, &ca, Some((relay.certificate.as_slice(), relay.key.as_slice())))
+            .post(url(&lab, "/api/ingest"))
+            .bearer_auth(&enrolment)
+            .header("x-dumbmonit-agent-secret", secret.as_str())
+            .json(&body)
+            .send()
+    };
+    let sent = send(report(false, "192.168.10.5:8443")).await.expect("lot");
+    assert_eq!(sent.status(), StatusCode::OK);
+    let failed = check().await;
+    assert_eq!(failed.body["relay"]["listening"], true, "{}", failed.body);
+    assert_eq!(failed.body["relay"]["self_check"], true);
+    assert_eq!(failed.body["relay"]["reachable"], false);
+    assert_eq!(failed.body["relay"]["check_error"], "cannot connect: refused");
+
+    // Un essai à une autre adresse ne dit rien de celle-ci.
+    send(report(true, "127.0.0.1:8443")).await.expect("lot");
+    assert_eq!(check().await.body["relay"]["reachable"], Value::Null);
+
+    send(report(true, "192.168.10.5:8443")).await.expect("lot");
+    let passed = check().await;
+    assert_eq!(passed.body["relay"]["reachable"], true, "{}", passed.body);
+    let view = lab.app.get(&format!("/api/targets/{relay_id}/agent"), Some(&admin)).await;
+    assert_eq!(view.body["gateway_check"]["ok"], true, "{}", view.body);
 }

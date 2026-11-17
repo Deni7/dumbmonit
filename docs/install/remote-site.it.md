@@ -17,6 +17,16 @@ istanza da guardare.
 
 ## 1. Pubblica il server su HTTPS
 
+!!! tip "Una sola porta per un sito remoto"
+    Il comando di installazione mostrato per un relay usa **solo la porta degli
+    agent**: lo script di installazione, il binario dell'agent e il canale
+    cifrato arrivano tutti da `https://<server>:8443` (o `DUMBMONIT_AGENT_PUBLIC_URL`). Il comando fissa la chiave
+    del certificato di quella porta e lo SHA-256 di ogni binario: il download è
+    verificato da un capo all'altro senza aprire al sito la porta web (8080). Gli
+    strumenti di distribuzione ottengono lo stesso comando con
+    `GET /api/agent/install?agent_port_only=true`. I paragrafi seguenti sulla
+    porta web riguardano solo gli agent che usano ancora il vecchio canale.
+
 L'agente relè recupera i suoi lavori dal server: il server deve essere raggiungibile dal
 sito remoto, tipicamente `https://monitor.example.org` dietro un reverse proxy. Due cose viaggiano su
 quel collegamento:
@@ -50,7 +60,9 @@ Qualsiasi macchina al sito remoto con Docker, usando `docker-compose.agent.yml`
 dal repository:
 
 ```sh
-DUMBMONIT_AGENT_URL=https://monitor.example.org \
+DUMBMONIT_AGENT_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_TLS_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_CA_PIN=… \
 DUMBMONIT_AGENT_TOKEN=dmon_… \
 DUMBMONIT_AGENT_HOSTNAME=relay-lyon \
 DUMBMONIT_AGENT_RELAY=true \
@@ -122,20 +134,33 @@ connessione fino al server.
 macchina questo server?*, scegli **Tramite &lt;relay&gt; (sito)**. Indica l'indirizzo con cui il
 sito raggiunge il relay (un IP o un nome locale). I comandi mostrati — Linux/macOS, Windows,
 Docker — puntano allora al gateway del relay
-(`--url=http://192.168.10.5:8443 --tls-url=https://192.168.10.5:8443`) e portano ancora
+(`--url=https://192.168.10.5:8443 --tls-url=https://192.168.10.5:8443`) e portano ancora
 l'impronta dell'autorità di certificazione del **server**. Il percorso attende poi la prima
 connessione e ti lascia dare un nome alla macchina, metterla in una cartella e collocarla in una
 sede senza lasciare la pagina. Da un sito in *Aggiungi per sito*, **Server con l'agente**
 preseleziona il relay di quel sito; la pagina del relay stesso ha **Installa un agente attraverso
 di esso**.
 
-Scegliere un relay per un'installazione gli chiede di aprire il suo gateway (sulla porta 8443 per
-impostazione predefinita) al prossimo invio. Il pannello *Relay* della pagina del relay mostra il
-gateway — *In ascolto sulla porta 8443 — 3 agent collegati* — e permette di cambiare porta e
-indirizzo, o di chiuderlo. Apri quella porta sul firewall del relay stesso, **solo verso la rete
-del sito**. Su un relay Docker, pubblica la porta (`-p 8443:8443`, o i `ports:` commentati di
-`docker-compose.agent.yml`). `gateway_listen: 0.0.0.0:9443` nell'`agent.yaml` del relay
-(`DUMBMONIT_AGENT_GATEWAY_LISTEN`) prevale sull'impostazione dell'interfaccia.
+Un relay apre il suo gateway (porta 8443 per impostazione predefinita) appena
+si connette, e subito quando lo scegli per un'installazione o cambi il gateway:
+il server chiude l'attesa lunga del relay, non c'è nessun invio da aspettare.
+Il relay prova poi da sé il proprio gateway, all'indirizzo usato dal sito, come
+farebbe una macchina del sito, e ne riferisce l'esito: la schermata di aggiunta
+mostra il comando quando la prova riesce, oppure dice cosa non ha funzionato.
+La prova non vede un firewall posto tra le macchine del sito e il relay (il
+relay non lo attraversa per raggiungere sé stesso). Il pannello *Relay* della
+pagina del relay mostra il gateway — *In ascolto sulla porta 8443 — 3 agent
+collegati* — e permette di cambiare porta e indirizzo, o di chiuderlo. Il
+comando di installazione di un relay apre quella porta sul firewall del relay,
+**solo verso la rete del sito** (firewalld o ufw su Linux, il firewall di
+Windows con `LocalSubnet`), lo dice a schermo, e `--uninstall` (`-Uninstall`)
+rimuove la regola; `--no-firewall` (`-NoFirewall`) lascia il firewall com'è. Su
+un relay Docker, `docker-compose.agent.yml` pubblica la 8443
+(`DUMBMONIT_AGENT_GATEWAY_PUBLISH=192.168.10.5:8443` la limita all'indirizzo
+della LAN). `gateway_listen: 0.0.0.0:9443` nell'`agent.yaml` del relay
+(`DUMBMONIT_AGENT_GATEWAY_LISTEN`) prevale sull'impostazione dell'interfaccia. I
+relay installati prima di questo comportamento tengono chiuso un gateway che non
+avevano mai aperto.
 
 Cosa passa attraverso il relay:
 

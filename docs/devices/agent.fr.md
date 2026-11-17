@@ -454,6 +454,11 @@ la même chose.
 | `--sha256=LIST` | `-Sha256` | SHA-256 attendu du téléchargement, comme des paires `platform-arch:hex` séparées par des virgules (une valeur hex seule fonctionne aussi). Inclus dans la commande que DumbMonit montre ; requis sauf si l'option suivante est donnée. |
 | `--insecure-skip-checksum` | `-InsecureSkipChecksum` | Installer un binaire téléchargé sans le vérifier, avec un avertissement. Seulement pour les configurations isolées ou manuelles. |
 | `--no-start` | | Tout installer, mais ne pas contacter le serveur ni démarrer le service (image de machine, test). |
+| `--open-gateway` | `-OpenGateway` | Relais : ouvrir le port de la passerelle sur le pare-feu local (firewalld, ufw, pare-feu Windows), au seul sous-réseau local. Implicite avec `--relay` ; la commande d'un jeton de relais le porte. `--uninstall` retire la règle. |
+| `--gateway-port=N` | `-GatewayPort N` | Port de la passerelle ouvert sur le pare-feu (8443 par défaut). |
+| `--no-firewall` | `-NoFirewall` | Ne pas toucher au pare-feu local. |
+| `--proxy=URL` | `-Proxy` | Mandataire HTTP sortant vers le serveur, `http://[utilisateur:mot de passe@]hôte:port` ou `none` (`-Proxy` accepte aussi `system`). Sert aux téléchargements et est écrit dans `agent.yaml`. Voir [Mandataire sortant](#outbound-proxy). |
+| `--no-proxy=LIST` | `-NoProxy` | Hôtes joints sans le mandataire, séparés par des virgules. |
 | `--uninstall` | `-Uninstall` | Désinstaller l'agent et supprimer sa configuration. |
 | `--help` | | Montrer l'aide. |
 
@@ -1006,6 +1011,57 @@ L'agent Windows peut aussi déclencher des alertes sur des événements Windows
 disque) : les règles se règlent par machine sur sa page d'équipement, aucune
 n'existe par défaut. Voir
 [Alertes du journal d'événements Windows](agent-windows-events.md).
+
+## Mandataire sortant {#outbound-proxy}
+
+Là où les machines ne sortent que par un mandataire HTTP, l'agent joint le
+serveur à travers lui par `CONNECT` : le mandataire ouvre un tuyau TCP vers le
+port des agents, et la session TLS 1.3 de l'agent (certificat client, autorité
+épinglée) va de bout en bout jusqu'au serveur. Le mandataire ne voit que le nom
+et le port, puis du chiffré ; un mandataire qui inspecte TLS est refusé par
+l'épinglage, comme tout intermédiaire.
+
+```yaml
+proxy: http://proxy.corp.example:3128   # or none, or system (Windows)
+no_proxy: [.corp.example, 10.0.0.0/8]    # reached directly
+proxy_user: CORP\monitoring             # optional, instead of user:password@ in the URL
+proxy_password: …
+```
+
+- `proxy` (ou `DUMBMONIT_AGENT_PROXY`) : `http://[utilisateur:mot de passe@]hôte:port`,
+  encodé en pourcentage dans l'URL, ou les clés à part `proxy_user` /
+  `proxy_password` (`DUMBMONIT_AGENT_PROXY_USER`,
+  `DUMBMONIT_AGENT_PROXY_PASSWORD`). Seulement des mandataires `http://` : la
+  connexion au mandataire n'est pas chiffrée, ce qu'elle transporte l'est.
+  `none` passe toujours en direct.
+- `no_proxy` (ou `DUMBMONIT_AGENT_NO_PROXY`, séparés par des virgules) : hôtes,
+  domaines (sous-domaines compris), adresses ou réseaux joints en direct.
+- Sans `proxy`, les variables habituelles s'appliquent : `HTTPS_PROXY`,
+  `HTTP_PROXY`, `ALL_PROXY` et `NO_PROXY` (en minuscules aussi). Un service
+  n'hérite pas de votre shell : mettez-les dans l'unité
+  (`systemctl edit dumbmonit-agent`, `Environment=HTTPS_PROXY=…`) ou utilisez la
+  clé.
+- Les installateurs acceptent `--proxy=URL --no-proxy=LISTE` (`-Proxy`,
+  `-NoProxy`) : ils s'en servent pour leurs propres téléchargements et
+  l'écrivent dans `agent.yaml`.
+- `proxy: system` sous Windows prend le mandataire WinHTTP de la machine (celui
+  des services), puis celui d'Internet Explorer du compte du service. Pour le
+  régler :
+
+```powershell
+netsh winhttp set proxy proxy-server="proxy.corp.example:3128" bypass-list="*.corp.example"
+netsh winhttp import proxy source=ie   # or copy the Internet Explorer settings
+```
+
+  La configuration automatique (PAC, WPAD) n'est pas suivie : donnez le
+  mandataire explicitement.
+- Le mandataire ne vaut que pour les connexions au serveur DumbMonit (mesures,
+  commandes, relais, mises à jour, sentinelle). Un relais interroge les
+  équipements de son site, et essaie sa propre passerelle, en direct.
+- Les variables comme `HTTPS_PROXY`, elles, valent pour toutes les connexions de l'agent, sondes du relais comprises : excluez les réseaux du site avec `NO_PROXY`.
+
+L'agent journalise au démarrage le mandataire qu'il utilise
+(`outbound proxy to the server`), jamais ses identifiants.
 
 ## Faire tourner l'agent dans Docker / sur un autre réseau {#run-the-agent-in-docker--on-another-network}
 

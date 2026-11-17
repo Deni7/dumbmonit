@@ -56,6 +56,37 @@ All notable changes to this project are documented here. The format follows
   goes through a TLS-terminating proxy. Non-root, read-only root filesystem, HTTPS health probes,
   optional NetworkPolicy and PodDisruptionBudget, external VictoriaMetrics. CI lints, renders and
   validates it with kubeconform. See the new Kubernetes page in the installation guide.
+- **One port for a remote site.** The agent port (8443) now also serves `install.sh`, `install.ps1`
+  and the agent binaries, without a client certificate (like enrolment). The install command shown
+  for a relay uses that port only: script, binary and encrypted channel come from
+  `https://<server>:8443`, pinned by the key of its certificate and the SHA-256 of each binary, so
+  the web port can stay private. Deployment tools get the same command with
+  `GET /api/agent/install?agent_port_only=true` (or `agent_port_only` when creating a token).
+- **Reliable relay gateway.** A relay opens its gateway (8443) as soon as it connects, and at once
+  when it is chosen for an install or its gateway is changed: the server ends its long poll and the
+  relay reports right away, instead of at its next batch. The relay then tests its own gateway at
+  the address the site dials, through its tunnel to the server, and reports the result: the add
+  screen shows the command for the site's machines once that test passes, or explains what failed
+  (retried every minute). The relay install command opens the gateway port on the local firewall,
+  to the local subnet only (firewalld or ufw, Windows firewall with `LocalSubnet`), says so, and
+  `--uninstall` (or a remote uninstall) removes the rule; `--no-firewall` opts out.
+  `docker-compose.agent.yml` now publishes 8443 for relays (`DUMBMONIT_AGENT_GATEWAY_PUBLISH` to
+  bind it to one address). Relays installed earlier keep a gateway they never opened closed.
+- **Dedicated address for agents: `DUMBMONIT_AGENT_PUBLIC_URL`.** For example
+  `https://agents.example.com:443` behind an SNI passthrough sharing port 443 with websites. It
+  wins over the browser's host and `DUMBMONIT_AGENT_PUBLIC_PORT` (still supported) in the install
+  commands, and the channel announcement carries it, so agents installed without `--tls-url` use it
+  too. Checked at startup (`https://host[:port]` only). The configuration reference has HAProxy and
+  Traefik examples (TLS passed through, never terminated).
+- **Agent behind an outbound proxy.** `proxy:` in `agent.yaml` (or `DUMBMONIT_AGENT_PROXY`):
+  `http://[user:password@]host:port`, `none`, or `system` on Windows (the machine's WinHTTP proxy,
+  then the Internet Explorer one of the service account); `no_proxy:` lists the hosts reached
+  directly, `proxy_user` / `proxy_password` keep credentials out of the URL. Without the key,
+  `HTTPS_PROXY` / `NO_PROXY` apply as before. The agent's TLS session crosses the proxy by
+  `CONNECT`, end to end (client certificate and pinning unchanged); only `http://` proxies are
+  accepted. The installers take `--proxy` / `--no-proxy` (`-Proxy`, `-NoProxy`) for their own
+  downloads and write them to `agent.yaml`; `docker-compose.agent.yml` passes
+  `DUMBMONIT_AGENT_PROXY`.
 
 ### Changed
 

@@ -27,6 +27,17 @@ surveiller.
 
 ## 1. Publier le serveur sur HTTPS
 
+!!! tip "Un seul port pour un site distant"
+    La commande d'installation affichée pour un relais n'utilise **que le port des
+    agents** : le script d'installation, le binaire de l'agent et le canal chiffré
+    viennent tous de `https://<serveur>:8443` (ou `DUMBMONIT_AGENT_PUBLIC_URL`). La commande épingle la clé du
+    certificat de ce port et l'empreinte SHA-256 de chaque binaire : le
+    téléchargement est vérifié de bout en bout sans ouvrir le port de
+    l'interface (8080) au site. Les outils de déploiement obtiennent la même
+    commande par `GET /api/agent/install?agent_port_only=true`. Les paragraphes
+    ci-dessous sur le port de l'interface ne concernent que les agents qui
+    passent encore par l'ancien canal.
+
 Le relais récupère ses tâches depuis le serveur : le serveur doit être
 accessible depuis le site distant, typiquement
 `https://monitor.example.org` derrière un reverse proxy. Deux choses
@@ -78,9 +89,13 @@ Sous Linux, macOS ou FreeBSD, l'installateur en une ligne avec `--relay` et le
 site (inutile avec un jeton de relais créé depuis la page d'ajout) :
 
 ```sh
-curl -sSL https://monitor.example.org/install.sh | sudo sh -s -- \
-  --token=dmon_… --url=https://monitor.example.org --relay --site='Lyon office'
+curl -sSL -k --pinnedpubkey sha256//… https://monitor.example.org:8443/install.sh | sudo sh -s -- \
+  --token=dmon_… --url=https://monitor.example.org:8443 --pinned-key=sha256//… \
+  --tls-url=https://monitor.example.org:8443 --ca-pin=… --relay --site='Lyon office'
 ```
+
+Copiez la vraie commande depuis DumbMonit : elle porte les épingles et les
+empreintes.
 
 Sous Windows, ajoutez `-Relay -Site 'Lyon office'` à la commande d'installation
 PowerShell.
@@ -89,7 +104,9 @@ Ou n'importe quelle machine sur le site distant avec Docker, en utilisant
 `docker-compose.agent.yml` du dépôt :
 
 ```sh
-DUMBMONIT_AGENT_URL=https://monitor.example.org \
+DUMBMONIT_AGENT_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_TLS_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_CA_PIN=… \
 DUMBMONIT_AGENT_TOKEN=dmon_… \
 DUMBMONIT_AGENT_HOSTNAME=relay-lyon \
 DUMBMONIT_AGENT_RELAY=true \
@@ -164,7 +181,7 @@ l'agent**, et sous *Comment la machine joint-elle ce serveur ?* choisissez
 **Via &lt;relais&gt; (site)**. Indiquez l'adresse par laquelle le site joint
 le relais (une IP ou un nom local). Les commandes affichées — Linux/macOS,
 Windows, Docker — visent alors la passerelle du relais
-(`--url=http://192.168.10.5:8443 --tls-url=https://192.168.10.5:8443`) et
+(`--url=https://192.168.10.5:8443 --tls-url=https://192.168.10.5:8443`) et
 portent toujours l'empreinte de l'autorité **du serveur**. Le flux attend
 ensuite la première connexion et permet de nommer la machine, de la ranger
 dans un dossier et de la placer sur un site, sans quitter la page. Depuis un
@@ -172,15 +189,26 @@ site dans *Ajouter par site*, **Serveur avec l'agent** présélectionne le
 relais de ce site ; la page du relais propose **Installer un agent à travers
 lui**.
 
-Choisir un relais pour une installation lui demande d'ouvrir sa passerelle
-(port 8443 par défaut) à son prochain envoi. Le panneau *Relais* de sa page
-montre la passerelle — *À l'écoute sur le port 8443 — 3 agents connectés* — et
-permet d'en changer le port et l'adresse, ou de la fermer. Ouvrez ce port sur
-le pare-feu du relais lui-même, **pour le réseau du site seulement**. Pour un
-relais Docker, publiez le port (`-p 8443:8443`, ou les `ports:` commentés de
-`docker-compose.agent.yml`). `gateway_listen: 0.0.0.0:9443` dans l'`agent.yaml`
-du relais (`DUMBMONIT_AGENT_GATEWAY_LISTEN`) prime sur le réglage de
-l'interface.
+Un relais ouvre sa passerelle (port 8443 par défaut) dès qu'il se connecte, et
+aussitôt quand vous le choisissez pour une installation ou changez sa
+passerelle : le serveur met fin à l'attente longue du relais, il n'y a pas
+d'envoi à attendre. Le relais essaie ensuite lui-même sa passerelle, à
+l'adresse qu'utilise le site, comme le ferait une machine du site, et en rend
+compte : l'écran d'ajout affiche la commande une fois cet essai réussi, ou dit
+ce qui a échoué. L'essai ne voit pas un pare-feu placé entre les machines du
+site et le relais (le relais ne le traverse pas pour se joindre lui-même). Le
+panneau *Relais* de sa page montre la passerelle — *À l'écoute sur le port 8443
+— 3 agents connectés* — et permet d'en changer le port et l'adresse, ou de la
+fermer. La commande d'installation d'un relais ouvre ce port sur le pare-feu du
+relais, **au seul réseau du site** (firewalld ou ufw sous Linux, le pare-feu
+Windows avec `LocalSubnet`), le dit à l'écran, et `--uninstall` (`-Uninstall`)
+retire la règle ; `--no-firewall` (`-NoFirewall`) laisse le pare-feu tel quel.
+Sur un relais Docker, `docker-compose.agent.yml` publie 8443
+(`DUMBMONIT_AGENT_GATEWAY_PUBLISH=192.168.10.5:8443` le limite à l'adresse du
+LAN). `gateway_listen: 0.0.0.0:9443` dans l'`agent.yaml` du relais
+(`DUMBMONIT_AGENT_GATEWAY_LISTEN`) prime sur le réglage de l'interface. Les
+relais installés avant ce fonctionnement gardent fermée une passerelle qu'ils
+n'avaient jamais ouverte.
 
 Ce qui passe par le relais :
 
@@ -233,7 +261,7 @@ Un moniteur n'a pas à choisir entre le serveur et un relais : il peut être son
 | La page de l'agent n'indique pas *Relais* | L'interrupteur relais est éteint. Ouvrez la surveillance, utilisez la **roue crantée**, activez *Relais pour un site distant*, indiquez le site, enregistrez. C'est pris en compte au prochain envoi. |
 | Une surveillance affiche *Timed out: relay agent … did not pick up the probe* (message du serveur, en anglais) | Le relais est arrêté ou pas en mode relais. Vérifiez le service sur la machine relais et que `relay: true` est défini. |
 | Une surveillance affiche un message rouge sous son adresse | Le relais ne joint pas l'équipement. L'adresse doit être celle **vue depuis le site distant**, et le relais a besoin des mêmes accès que le serveur. |
-| Les agents installés derrière le relais n'apparaissent pas | Lancez la commande copiée depuis la page *Installer un agent derrière ce relais*, pas la commande directe. Le relais ouvre sa passerelle à son prochain envoi, en moins d'une minute. |
+| Les agents installés derrière le relais n'apparaissent pas | Lancez la commande copiée depuis la page *Installer un agent derrière ce relais*, pas la commande directe. Le relais ouvre sa passerelle en quelques secondes ; l'écran d'ajout dit s'il a pu la joindre à l'adresse du site. |
 
 ## Limites
 

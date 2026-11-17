@@ -285,6 +285,8 @@ pub struct AgentHostView {
     pub gateway_port: Option<u16>,
     pub gateway_host: Option<String>,
     pub gateway_tunnels: usize,
+    /// Dernier essai de sa passerelle par le relais lui-même.
+    pub gateway_check: Option<dumbmonit_proto::GatewayCheck>,
 }
 
 impl AgentHostView {
@@ -294,6 +296,7 @@ impl AgentHostView {
             gateway_port: info.relay_gateway_port,
             gateway_host: info.relay_gateway_host.clone(),
             gateway_tunnels: tunnels,
+            gateway_check: info.relay_gateway_check.clone(),
             commands_supported: info.commands_supported(),
             binding: info.binding_state(),
             hostname: info.hostname,
@@ -935,7 +938,8 @@ pub struct GatewayChoice {
 }
 
 /// `PUT /api/targets/{id}/agent/relay` : allume ou éteint le mode relais de la
-/// machine depuis l'interface. L'agent l'applique à chaud à son prochain lot.
+/// machine depuis l'interface. L'agent l'applique à chaud à son prochain lot ;
+/// un relais déjà en marche, aussitôt (voir [`crate::collectors::relay::RelayHub::nudge`]).
 async fn set_relay(
     State(state): State<AppState>,
     Path(id): Path<TargetId>,
@@ -966,6 +970,9 @@ async fn set_relay(
     if let Some((port, host)) = gateway {
         agent::set_relay_gateway(&state.pool, id, port, host.as_deref()).await?;
     }
+    // Un relais en attente de sondes reçoit le réglage tout de suite, sans
+    // attendre son prochain lot.
+    state.relay().nudge(id);
     tracing::info!(
         cible = id,
         relais = choice.enabled,

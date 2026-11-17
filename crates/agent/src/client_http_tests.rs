@@ -23,6 +23,7 @@ fn batch() -> PushBatch {
         binding_supported: true,
         self_update: None,
         relay_gateway: None,
+        relay_gateway_check: None,
         remediation: None,
     };
     PushBatch::new(identity, Vec::new(), 1_000)
@@ -215,4 +216,51 @@ async fn any_favourable_answer_wakes_whoever_waits_for_the_server() {
     let waiting = signal.notified();
     client.fetch_commands("k").await.expect("commandes");
     tokio::time::timeout(Duration::from_secs(1), waiting).await.expect("réveil attendu");
+}
+
+#[tokio::test]
+async fn the_encrypted_channel_crosses_an_http_proxy_by_connect_end_to_end() {
+    use base64::Engine as _;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    // Faux mandataire : il note la demande CONNECT, l'accepte, puis relève le
+    // premier octet du tunnel. Un ClientHello TLS (0x16), pas du HTTP : la
+    // session de l'agent va au-delà du mandataire, qui ne voit que du chiffré.
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let proxy_url = format!("http://jo:s3cret@{}", listener.local_addr().unwrap());
+    let seen = Arc::new(Mutex::new((String::new(), 0u8)));
+    let record = seen.clone();
+    tokio::spawn(async move {
+        let Ok((mut socket, _)) = listener.accept().await else { return };
+        let mut head = Vec::new();
+        let mut byte = [0u8; 1];
+        while !head.ends_with(b"\r\n\r\n") {
+            if socket.read(&mut byte).await.unwrap_or(0) == 0 {
+                return;
+            }
+            head.push(byte[0]);
+        }
+        let _ = socket.write_all(b"HTTP/1.1 200 Connection established\r\n\r\n").await;
+        let mut first = [0u8; 1];
+        let _ = socket.read_exact(&mut first).await;
+        *record.lock().unwrap() = (String::from_utf8_lossy(&head).into_owned(), first[0]);
+    });
+
+    let proxy = crate::proxy::ProxyConfig::parse(Some(proxy_url.as_str()), Vec::new(), None, None)
+        .expect("mandataire");
+    let channel = "https://agents.example.test:8443";
+    let client = client(channel, None).with_proxy(proxy).expect("client");
+    client.set_pins(vec!["a".repeat(64)]);
+    client.use_tls(channel, None).expect("canal chiffré");
+    // Personne au bout du tunnel : l'envoi échoue, seul compte ce que le
+    // mandataire a vu passer.
+    assert!(client.send(&batch()).await.is_err());
+
+    let (head, first) = seen.lock().unwrap().clone();
+    assert!(head.starts_with("CONNECT agents.example.test:8443 HTTP/1.1\r\n"), "{head}");
+    let credentials = base64::engine::general_purpose::STANDARD.encode("jo:s3cret");
+    let expected = format!("proxy-authorization: basic {}", credentials.to_lowercase());
+    assert!(head.to_lowercase().contains(&expected), "identifiants absents : {head}");
+    assert_eq!(first, 0x16, "un ClientHello TLS, pas du HTTP en clair");
+    assert!(!head.contains("/api/ingest") && !head.contains("dmon_jeton"), "{head}");
 }

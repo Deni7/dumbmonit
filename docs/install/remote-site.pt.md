@@ -17,6 +17,16 @@ segunda instância para vigiar.
 
 ## 1. Publicar o servidor por HTTPS {#1-publish-the-server-over-https}
 
+!!! tip "Uma só porta para um site remoto"
+    O comando de instalação mostrado para um retransmissor usa **apenas a porta
+    dos agentes**: o script de instalação, o binário do agente e o canal cifrado
+    vêm todos de `https://<servidor>:8443` (ou `DUMBMONIT_AGENT_PUBLIC_URL`). O comando fixa a chave do certificado
+    dessa porta e o SHA-256 de cada binário: a transferência é verificada de
+    ponta a ponta sem abrir a porta web (8080) ao site. As ferramentas de
+    implementação obtêm o mesmo comando com
+    `GET /api/agent/install?agent_port_only=true`. Os parágrafos abaixo sobre a
+    porta web só se aplicam a agentes que ainda usam o canal antigo.
+
 O retransmissor obtém os seus trabalhos do servidor: o servidor tem de ser
 alcançável a partir do site remoto, tipicamente `https://monitor.example.org`
 atrás de um proxy inverso. Duas coisas viajam nessa ligação:
@@ -52,7 +62,9 @@ Qualquer máquina no site remoto com Docker, usando `docker-compose.agent.yml`
 do repositório:
 
 ```sh
-DUMBMONIT_AGENT_URL=https://monitor.example.org \
+DUMBMONIT_AGENT_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_TLS_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_CA_PIN=… \
 DUMBMONIT_AGENT_TOKEN=dmon_… \
 DUMBMONIT_AGENT_HOSTNAME=relay-lyon \
 DUMBMONIT_AGENT_RELAY=true \
@@ -124,20 +136,33 @@ este leva a ligação até ao servidor.
 máquina a este servidor?*, escolha **Através de &lt;retransmissor&gt; (site)**. Indique o endereço
 pelo qual o site chega ao retransmissor (um IP ou um nome local). Os comandos mostrados —
 Linux/macOS, Windows, Docker — apontam então para o gateway do retransmissor
-(`--url=http://192.168.10.5:8443 --tls-url=https://192.168.10.5:8443`) e continuam a levar a
+(`--url=https://192.168.10.5:8443 --tls-url=https://192.168.10.5:8443`) e continuam a levar a
 impressão digital da autoridade de certificação do **servidor**. O fluxo espera pela primeira
 ligação e deixa-o dar nome à máquina, arrumá-la numa pasta e colocá-la num site sem sair da
 página. A partir de um site em *Adicionar por site*, **Servidor com o agente** pré-seleciona o
 retransmissor desse site; a página do próprio retransmissor tem **Instalar um agente através
 dele**.
 
-Escolher um retransmissor para uma instalação pede-lhe que abra o seu gateway (na porta 8443 por
-predefinição) no próximo envio. O painel *Relay* da página do retransmissor mostra o gateway — *À
-escuta na porta 8443 — 3 agentes ligados* — e permite mudar a porta e o endereço, ou fechá-lo.
-Abra essa porta na firewall do próprio retransmissor, **só para a rede do site**. Num
-retransmissor Docker, publique a porta (`-p 8443:8443`, ou os `ports:` comentados de
-`docker-compose.agent.yml`). `gateway_listen: 0.0.0.0:9443` no `agent.yaml` do retransmissor
-(`DUMBMONIT_AGENT_GATEWAY_LISTEN`) prevalece sobre a definição na interface.
+Um retransmissor abre o seu gateway (porta 8443 por omissão) assim que se liga,
+e de imediato quando o escolhe para uma instalação ou muda o gateway: o
+servidor termina a espera longa do retransmissor, não há envio a aguardar.
+Depois, o retransmissor testa ele próprio o gateway, no endereço que o site
+usa, como faria uma máquina do site, e comunica o resultado: o ecrã de adição
+mostra o comando quando o teste passa, ou diz o que falhou. O teste não vê uma
+firewall entre as máquinas do site e o retransmissor (o retransmissor não a
+atravessa para chegar a si próprio). O painel *Relay* da página do
+retransmissor mostra o gateway — *À escuta na porta 8443 — 3 agentes ligados* —
+e permite mudar a porta e o endereço, ou fechá-lo. O comando de instalação de
+um retransmissor abre essa porta na firewall do próprio retransmissor,
+**apenas para a rede do site** (firewalld ou ufw em Linux, a firewall do
+Windows com `LocalSubnet`), indica-o no ecrã, e `--uninstall` (`-Uninstall`)
+retira a regra; `--no-firewall` (`-NoFirewall`) deixa a firewall como está. Num
+retransmissor Docker, o `docker-compose.agent.yml` publica a 8443
+(`DUMBMONIT_AGENT_GATEWAY_PUBLISH=192.168.10.5:8443` limita-a ao endereço da
+LAN). `gateway_listen: 0.0.0.0:9443` no `agent.yaml` do retransmissor
+(`DUMBMONIT_AGENT_GATEWAY_LISTEN`) prevalece sobre a definição na interface. Os
+retransmissores instalados antes deste comportamento mantêm fechado um gateway
+que nunca tinham aberto.
 
 O que passa pelo retransmissor:
 

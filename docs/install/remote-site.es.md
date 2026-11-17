@@ -17,6 +17,16 @@ remoto, sin VPN, sin una segunda instancia que consultar.
 
 ## 1. Publicar el servidor por HTTPS {#1-publish-the-server-over-https}
 
+!!! tip "Un solo puerto para un sitio remoto"
+    El comando de instalación que se muestra para un relé usa **solo el puerto de
+    los agentes**: el script de instalación, el binario del agente y el canal
+    cifrado vienen todos de `https://<servidor>:8443` (o `DUMBMONIT_AGENT_PUBLIC_URL`). El comando fija la clave
+    del certificado de ese puerto y el SHA-256 de cada binario: la descarga se
+    verifica de extremo a extremo sin abrir el puerto web (8080) al sitio. Las
+    herramientas de despliegue obtienen el mismo comando con
+    `GET /api/agent/install?agent_port_only=true`. Los párrafos siguientes sobre
+    el puerto web solo afectan a los agentes que aún usan el canal antiguo.
+
 El relay obtiene sus trabajos del servidor: el servidor debe ser
 accesible desde el sitio remoto, normalmente
 `https://monitor.example.org` detrás de un proxy inverso. Dos cosas
@@ -54,7 +64,9 @@ Cualquier máquina del sitio remoto con Docker, usando
 `docker-compose.agent.yml` del repositorio:
 
 ```sh
-DUMBMONIT_AGENT_URL=https://monitor.example.org \
+DUMBMONIT_AGENT_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_TLS_URL=https://monitor.example.org:8443 \
+DUMBMONIT_AGENT_CA_PIN=… \
 DUMBMONIT_AGENT_TOKEN=dmon_… \
 DUMBMONIT_AGENT_HOSTNAME=relay-lyon \
 DUMBMONIT_AGENT_RELAY=true \
@@ -128,19 +140,32 @@ lleva su conexión hasta el servidor.
 a este servidor?*, elige **A través de &lt;relé&gt; (sitio)**. Indica la dirección por la que el
 sitio llega al relé (una IP o un nombre local). Los comandos mostrados — Linux/macOS, Windows,
 Docker — apuntan entonces a la pasarela del relé
-(`--url=http://192.168.10.5:8443 --tls-url=https://192.168.10.5:8443`) y siguen llevando la huella
+(`--url=https://192.168.10.5:8443 --tls-url=https://192.168.10.5:8443`) y siguen llevando la huella
 de la autoridad de certificación del **servidor**. El flujo espera la primera conexión y te deja
 nombrar la máquina, archivarla en una carpeta y situarla en un sitio sin salir de la página. Desde
 un sitio en *Añadir por sitio*, **Servidor con el agente** preselecciona el relé de ese sitio; la
 página del propio relé tiene **Instalar un agente a través de él**.
 
-Elegir un relé para una instalación le pide que abra su pasarela (en el puerto 8443 por defecto)
-en su próximo envío. El panel *Relay* de la página del relé muestra la pasarela — *Escuchando en el
-puerto 8443 — 3 agentes conectados* — y permite cambiar el puerto y la dirección, o cerrarla. Abre
-ese puerto en el cortafuegos del propio relé, **solo hacia la red del sitio**. En un relé Docker,
-publica el puerto (`-p 8443:8443`, o los `ports:` comentados de `docker-compose.agent.yml`).
-`gateway_listen: 0.0.0.0:9443` en el `agent.yaml` del relé (`DUMBMONIT_AGENT_GATEWAY_LISTEN`)
-prevalece sobre el ajuste de la interfaz.
+Un relé abre su pasarela (puerto 8443 por defecto) en cuanto se conecta, y al
+instante cuando lo eliges para una instalación o cambias la pasarela: el
+servidor termina la espera larga del relé, no hay que esperar a su próximo
+envío. Después, el relé prueba él mismo su pasarela, en la dirección que usa el
+sitio, como lo haría una máquina del sitio, e informa del resultado: la pantalla
+de alta muestra el comando cuando la prueba sale bien, o dice qué falló. La
+prueba no ve un cortafuegos situado entre las máquinas del sitio y el relé (el
+relé no lo atraviesa para llegar a sí mismo). El panel *Relay* de la página del
+relé muestra la pasarela — *Escuchando en el puerto 8443 — 3 agentes
+conectados* — y permite cambiar el puerto y la dirección, o cerrarla. El comando
+de instalación de un relé abre ese puerto en el cortafuegos del propio relé,
+**solo para la red del sitio** (firewalld o ufw en Linux, el cortafuegos de
+Windows con `LocalSubnet`), lo indica en pantalla, y `--uninstall`
+(`-Uninstall`) retira la regla; `--no-firewall` (`-NoFirewall`) deja el
+cortafuegos como está. En un relé Docker, `docker-compose.agent.yml` publica el
+8443 (`DUMBMONIT_AGENT_GATEWAY_PUBLISH=192.168.10.5:8443` lo limita a la
+dirección de la LAN). `gateway_listen: 0.0.0.0:9443` en el `agent.yaml` del
+relé (`DUMBMONIT_AGENT_GATEWAY_LISTEN`) prevalece sobre el ajuste de la
+interfaz. Los relés instalados antes de este comportamiento mantienen cerrada
+una pasarela que nunca habían abierto.
 
 Lo que pasa por el relé:
 

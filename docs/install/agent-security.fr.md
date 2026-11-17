@@ -21,7 +21,7 @@ site.
 
 | Où | Port | Pourquoi |
 |----|------|----------|
-| Serveur, entrant | **TCP 8443** | Canal chiffré des agents. Le seul port nécessaire aux agents d'autres réseaux. |
+| Serveur, entrant | **TCP 8443** | Canal chiffré des agents, et scripts d'installation et téléchargement de l'agent pour les sites distants. Le seul port nécessaire aux agents d'autres réseaux. |
 | Serveur, entrant | TCP 8080 | Interface web, scripts d'installation et téléchargement de l'agent. Peut rester privé (LAN, VPN). |
 | Agents | aucun | Les agents n'établissent que des connexions sortantes. |
 | Relais avec passerelle | TCP 8443 (réglable), **depuis le réseau du site seulement** | Les agents d'un site qui ne joignent pas le serveur se connectent au relais (voir plus bas). |
@@ -36,6 +36,11 @@ Avec Docker, publiez le port agents à côté du port web :
 
 Si un routeur ou un mandataire TCP le publie sous un autre numéro, réglez
 `DUMBMONIT_AGENT_PUBLIC_PORT` pour que les commandes d'installation l'utilisent.
+Pour donner aux agents un nom à eux (par exemple
+`https://agents.example.com:443` derrière un aiguillage SNI), réglez
+`DUMBMONIT_AGENT_PUBLIC_URL` : elle prime sur l'hôte du navigateur et sur le
+port publié (voir
+[Adresse dédiée aux agents](../reference/configuration.md#dedicated-agent-address)).
 
 Avant d'afficher une commande d'installation, l'écran d'ajout d'un agent demande
 au serveur de composer son propre canal des agents à l'adresse que porte la
@@ -46,7 +51,10 @@ l'écran le dit, avec la ligne `ports:` exacte et les commandes de pare-feu
 (firewalld, ufw, Windows), au lieu de la commande ; *Afficher la commande quand
 même* couvre un réseau où le serveur ne peut pas se joindre lui-même (NAT sans
 « hairpin »). À travers un relais, l'écran attend que le relais annonce que sa
-passerelle écoute, et rappelle le port à ouvrir sur le relais. Les scripts
+passerelle écoute et que son propre essai de la passerelle, à l'adresse que
+compose le site, a joint le serveur ; un essai raté est affiché avec sa cause à
+la place de la commande. Il rappelle aussi le port à ouvrir sur le relais (la
+commande d'installation d'un relais l'ouvre, au seul sous-réseau local). Les scripts
 d'installation font le même diagnostic quand leur envoi de test échoue, plutôt
 qu'un simple « serveur injoignable ».
 
@@ -79,8 +87,12 @@ qu'un simple « serveur injoignable ».
 - **Enrôlement freiné.** Les jetons erronés sont comptés par adresse et bloqués
   après quelques essais. Un jeton est à usage unique, sauf s'il est créé
   réutilisable.
-- **Rien ne fuit avant l'authentification.** Le port agents ne sert que le
-  protocole des agents : ni interface, ni version, ni description de l'API.
+- **Rien ne fuit avant l'authentification.** Sans certificat client, le port
+  agents ne répond qu'à l'enrôlement et aux fichiers d'installation publics
+  (`/install.sh`, `/install.ps1`, `/download/<fichier de l'agent>`, les mêmes
+  que sur le port web) : ni interface, ni version, ni description de l'API. Un
+  site distant s'installe par ce seul port : la commande épingle la clé de son
+  certificat et l'empreinte SHA-256 de chaque binaire.
 - **Clés au repos.** La clé privée de l'autorité est chiffrée par la clé de
   l'instance (`/data/secret.key`). Sur l'agent, `agent-tls.json` (clé et
   certificat) est rangé à côté d'`agent.yaml`, lisible par son seul
@@ -154,7 +166,7 @@ Non protégé contre :
   reste) ;
 - quiconque accède à la fois à `/data` et à la clé de l'instance du serveur ;
 - le tout premier téléchargement : le script et le binaire viennent du port
-  web, en HTTPS. La commande affichée dans l'interface porte l'empreinte du
+  web (ou, pour un site distant, du port agents), en HTTPS. La commande affichée dans l'interface porte l'empreinte du
   certificat du serveur et l'épingle, donc le téléchargement est vérifié même
   avec le certificat autosigné (un reverse proxy avec un certificat public est
   vérifié de la façon habituelle). Le canal des agents, lui, est épinglé dès la
@@ -196,8 +208,17 @@ de liaison et sa clé de machine.
 Ne placez pas de mandataire inverse qui termine TLS devant le port agents : le
 certificat client s'arrêterait au mandataire. Un relais TCP transparent
 (HAProxy `mode tcp`, nginx `stream`, routeur TCP Traefik en passthrough,
-redirection de port) fonctionne. Le port web peut rester derrière votre
-mandataire habituel, qui s'y connecte en HTTPS.
+redirection de port) fonctionne. Pour partager le port 443 avec des sites,
+aiguillez sur le nom de serveur (SNI) et réglez `DUMBMONIT_AGENT_PUBLIC_URL` sur
+ce nom : exemples HAProxy et Traefik dans
+[Adresse dédiée aux agents](../reference/configuration.md#dedicated-agent-address).
+Le port web peut rester derrière votre mandataire habituel, qui s'y connecte en
+HTTPS.
+
+Côté agent, un mandataire HTTP sortant convient : l'agent y ouvre un tunnel
+`CONNECT` et sa session TLS reste de bout en bout, certificat client et
+épinglage compris ; un mandataire qui intercepte TLS est refusé. Voir
+[Mandataire sortant](../devices/agent.md#outbound-proxy).
 
 ## Rotation de l'autorité de certification
 
@@ -218,6 +239,7 @@ certification** :
 |----------|--------|------|
 | `DUMBMONIT_AGENT_LISTEN` | `0.0.0.0:8443` | Adresse d'écoute du canal des agents ; `off` le ferme. |
 | `DUMBMONIT_AGENT_PUBLIC_PORT` | port d'écoute | Port écrit dans les commandes d'installation. |
+| `DUMBMONIT_AGENT_PUBLIC_URL` | non réglée | Adresse dédiée du canal des agents (`https://hôte[:port]`), écrite dans les commandes d'installation et annoncée aux agents ; prime sur l'hôte du navigateur et sur `DUMBMONIT_AGENT_PUBLIC_PORT`. |
 | `DUMBMONIT_AGENT_LEGACY_DAYS` | absent | Fermer le canal en clair N jours après la mise à jour. |
 
 Sur l'agent (`agent.yaml` ou environnement) : `tls_url` /
@@ -230,6 +252,8 @@ Sur l'agent (`agent.yaml` ou environnement) : `tls_url` /
 agents, l'empreinte de l'autorité, les empreintes des binaires, et les
 commandes d'installation Unix et PowerShell avec `{TOKEN}` à remplacer. Avec
 `relay_id=<relais>` (et éventuellement `relay_host=`), les commandes passent
-par la passerelle de ce relais. Un
+par la passerelle de ce relais. Avec `agent_port_only=true`, scripts et
+binaires viennent eux aussi du port agents : un seul port pour un site
+distant. Un
 générateur GPO ou Ansible doit s'en servir plutôt que de reconstruire la
 commande.

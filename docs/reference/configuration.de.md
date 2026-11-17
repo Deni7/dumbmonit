@@ -107,6 +107,74 @@ Ausgehend: SNMP (standardmäßig UDP 161) zu Geräten, HTTPS zu Proxmox, PBS, Sy
 Benachrichtigungsdiensten sowie alles, worauf Ihre Dienstmonitore zielen. ICMP-Ping braucht den
 Sysctl `net.ipv4.ping_group_range` in der Compose-Datei (keine Capability).
 
+### Eigene Adresse für Agenten und SNI-Passthrough {#dedicated-agent-address}
+
+`DUMBMONIT_AGENT_PUBLIC_URL=https://agents.example.com:443` gibt den Agenten
+eine eigene Adresse. Sie hat Vorrang vor dem vom Browser geöffneten Host und vor
+`DUMBMONIT_AGENT_PUBLIC_PORT` (weiterhin unterstützt), in den
+Installationsbefehlen (`--tls-url`, für ein Relay oder mit
+`agent_port_only=true` auch `--url`) und in der Kanalankündigung, die Agenten
+bei der Registrierung und mit jeder Antwort erhalten: Ein ohne `--tls-url`
+installierter Agent wechselt von selbst dorthin. Akzeptiert wird nur
+`https://host[:port]`, geprüft beim Start: `http://`, ein Pfad, ein Benutzername
+oder ein geschlossener Agentenkanal (`DUMBMONIT_AGENT_LISTEN=off`) beenden den
+Server mit einer Meldung.
+
+Der übliche Fall: eine einzige öffentliche IP, deren Port 443 bereits Websites
+ausliefert. Ein TCP-Proxy liest den Servernamen (SNI) des TLS-ClientHello und
+reicht die Verbindung, weiterhin verschlüsselt, an Port 8443 von DumbMonit
+weiter. **Terminieren Sie TLS dort niemals**: Das Client-Zertifikat des Agenten
+und die gepinnte Zertifizierungsstelle müssen unverändert bei DumbMonit
+ankommen.
+
+HAProxy (`web` steht für das, was 443 bereits bedient):
+
+```haproxy
+frontend https_in
+    bind :443
+    mode tcp
+    tcp-request inspect-delay 5s
+    tcp-request content accept if { req.ssl_hello_type 1 }
+    use_backend dumbmonit_agents if { req.ssl_sni -i agents.example.com }
+    default_backend web
+
+backend dumbmonit_agents
+    mode tcp
+    server dumbmonit 192.168.1.5:8443
+
+backend web
+    mode tcp
+    server proxy 127.0.0.1:8444
+```
+
+Traefik v3 (File-Provider; der Entrypoint `websecure` lauscht auf 443):
+
+```yaml
+tcp:
+  routers:
+    dumbmonit-agents:
+      entryPoints: [websecure]
+      rule: "HostSNI(`agents.example.com`)"
+      service: dumbmonit-agents
+      tls:
+        passthrough: true
+  services:
+    dumbmonit-agents:
+      loadBalancer:
+        servers:
+          - address: "192.168.1.5:8443"
+```
+
+- Verwenden Sie einen DNS-Namen in der URL: Der Name reist im SNI mit, eine IP
+  nicht.
+- Der Server sieht die Adresse des Proxys: Fehlgeschlagene
+  Registrierungsversuche werden pro Adresse gezählt, alle Agenten hinter dem
+  Proxy teilen sich also einen Zähler.
+- Prüfen Sie von außen: `curl -k https://agents.example.com/install.sh` liefert
+  das Installationsskript (der Agenten-Port liefert es ohne Client-Zertifikat).
+- Cloudflare Tunnel oder ein anderer Proxy, der TLS terminiert, kann den
+  Agentenkanal nicht tragen.
+
 ## Volumes und Dateien {#volumes-and-files}
 
 Ein Volume, `dumbmonit-data`, eingebunden unter `/data`. Sein Name ist in der Compose-Datei fest

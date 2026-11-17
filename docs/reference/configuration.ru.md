@@ -110,6 +110,70 @@ PBS, Synology и сервисам уведомлений, плюс всё, на 
 сервисов. ICMP ping требует sysctl `net.ipv4.ping_group_range`, заданный в файле
 Compose (без capability).
 
+### Отдельный адрес для агентов и SNI passthrough {#dedicated-agent-address}
+
+`DUMBMONIT_AGENT_PUBLIC_URL=https://agents.example.com:443` даёт агентам
+собственный адрес. Он важнее хоста, открытого в браузере, и
+`DUMBMONIT_AGENT_PUBLIC_PORT` (который по-прежнему поддерживается) в командах
+установки (`--tls-url`, а для релея или с `agent_port_only=true` — и `--url`) и
+в объявлении канала, которое агенты получают при регистрации и с каждым ответом:
+агент, установленный без `--tls-url`, сам переходит на этот адрес. Принимается
+только `https://хост[:порт]`, проверка выполняется при запуске: `http://`, путь,
+имя пользователя или закрытый канал агентов (`DUMBMONIT_AGENT_LISTEN=off`)
+останавливают сервер с сообщением.
+
+Обычный случай: один публичный IP, порт 443 которого уже обслуживает сайты.
+TCP-прокси читает имя сервера (SNI) из TLS ClientHello и передаёт соединение,
+по-прежнему зашифрованное, на порт 8443 DumbMonit. **Никогда не завершайте TLS
+на прокси**: клиентский сертификат агента и закреплённый центр сертификации
+должны дойти до DumbMonit нетронутыми.
+
+HAProxy (`web` — то, что уже обслуживает 443):
+
+```haproxy
+frontend https_in
+    bind :443
+    mode tcp
+    tcp-request inspect-delay 5s
+    tcp-request content accept if { req.ssl_hello_type 1 }
+    use_backend dumbmonit_agents if { req.ssl_sni -i agents.example.com }
+    default_backend web
+
+backend dumbmonit_agents
+    mode tcp
+    server dumbmonit 192.168.1.5:8443
+
+backend web
+    mode tcp
+    server proxy 127.0.0.1:8444
+```
+
+Traefik v3 (файловый провайдер; точка входа `websecure` слушает 443):
+
+```yaml
+tcp:
+  routers:
+    dumbmonit-agents:
+      entryPoints: [websecure]
+      rule: "HostSNI(`agents.example.com`)"
+      service: dumbmonit-agents
+      tls:
+        passthrough: true
+  services:
+    dumbmonit-agents:
+      loadBalancer:
+        servers:
+          - address: "192.168.1.5:8443"
+```
+
+- Указывайте в URL DNS-имя: имя передаётся в SNI, IP-адрес — нет.
+- Сервер видит адрес прокси: неудачные попытки регистрации считаются по адресу,
+  поэтому все агенты за прокси делят один счётчик.
+- Проверьте снаружи: `curl -k https://agents.example.com/install.sh` возвращает
+  скрипт установки (порт агентов отдаёт его без клиентского сертификата).
+- Cloudflare Tunnel и любой прокси, завершающий TLS, не могут нести канал
+  агентов.
+
 ## Тома и файлы
 
 Один том, `dumbmonit-data`, смонтированный в `/data`. Его имя зафиксировано в файле
