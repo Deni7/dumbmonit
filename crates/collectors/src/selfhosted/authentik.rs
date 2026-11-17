@@ -581,9 +581,9 @@ mod tests {
         assert_eq!(value(&samples, "authentik_scrape_errors"), Some(2.0));
 
         let client = AuthentikCollector::client(&target).unwrap();
-        let error = first_route(&client, &WORKERS).await.unwrap_err();
+        let error = first_route(&client, &super::WORKERS).await.unwrap_err();
         assert!(matches!(error, ProbeError::Protocol(ref m) if m.contains("web page")), "{error}");
-        let error = first_route(&client, &TASKS).await.unwrap_err();
+        let error = first_route(&client, &super::TASKS).await.unwrap_err();
         assert!(
             matches!(error, ProbeError::Protocol(ref m) if m.contains("none of these routes")),
             "{error}"

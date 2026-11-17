@@ -409,6 +409,7 @@ impl PushClient {
         let current = self.channel();
         let channel = Channel {
             http: current.http.clone(),
+            upgrade: current.upgrade.clone(),
             base_url: base_url.trim_end_matches('/').to_string(),
             encrypted: current.encrypted,
         };
