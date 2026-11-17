@@ -171,7 +171,8 @@ impl HaConfig {
                 let minutes = raw.parse::<u64>().with_context(|| {
                     format!("DUMBMONIT_HA_TAKEOVER_MINUTES: a number of minutes (got '{raw}')")
                 })?;
-                (minutes > 0).then(|| Duration::from_secs(minutes * 60).max(MIN_TAKEOVER))
+                let after = Duration::from_secs(minutes.saturating_mul(60));
+                (minutes > 0).then_some(after.max(MIN_TAKEOVER))
             }
         };
         let snapshot_secs = match get("DUMBMONIT_HA_SNAPSHOT_SECS") {
