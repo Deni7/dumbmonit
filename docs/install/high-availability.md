@@ -23,7 +23,9 @@ database nor any port and probes nothing until it becomes active.
   (a few megabytes), nothing else. The server runs as uid 65532 (or `PUID`):
   give that user write access to it (`chown 65532:65532` on the export, or
   `anonuid`/`all_squash` on NFS). Keep it on reliable storage: when it is
-  unreachable, nothing can change hands.
+  unreachable, nothing can change hands. Protect it like `/data`: it holds a
+  copy of the database (configuration, password hashes; credentials stay
+  encrypted by the instance secret, which is never written there).
 - **The same instance secret on both**: either `DUMBMONIT_SECRET` with the
   same value, or a copy of `/data/secret.key` from the first server put in the
   standby's volume **before its first start**. The standby checks every copy

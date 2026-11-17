@@ -26,7 +26,9 @@ ni sa base ni aucun port et ne sonde rien tant qu'il n'est pas devenu actif.
   l'uid 65532 (ou `PUID`) : donnez-lui le droit d'y écrire
   (`chown 65532:65532` sur le partage, ou `anonuid`/`all_squash` en NFS).
   Gardez-le sur un stockage fiable : tant qu'il est injoignable, rien ne peut
-  changer de mains.
+  changer de mains. Protégez-le comme `/data` : il contient une copie de la base
+  (configuration, empreintes des mots de passe ; les identifiants restent
+  chiffrés par le secret d'instance, qui n'y est jamais écrit).
 - **Le même secret d'instance des deux côtés** : soit `DUMBMONIT_SECRET` avec
   la même valeur, soit une copie de `/data/secret.key` du premier serveur posée
   dans le volume du second **avant son premier démarrage**. Le serveur en
