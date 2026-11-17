@@ -10115,8 +10115,9 @@ mod tests {
         assert_eq!(describe("webchange").credential_types, &["none"]);
     }
 
-    #[test]
-    fn seuls_les_types_qui_en_ont_besoin_declarent_un_prerequis() {
+    // La sonde ICMP ouvre un socket tokio : il lui faut un runtime.
+    #[tokio::test]
+    async fn seuls_les_types_qui_en_ont_besoin_declarent_un_prerequis() {
         assert_eq!(requirements("ping")[0].id, "icmp");
         for kind in ["snmp", "http", "tcp", "proxmox", "agent", "website"] {
             assert!(requirements(kind).is_empty(), "« {kind} » n'exige rien");
