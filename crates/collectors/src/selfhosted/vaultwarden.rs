@@ -57,9 +57,8 @@ pub fn server_version(body: &str) -> Option<String> {
 /// Bitwarden* (`2026.6.0`), pas celle de Vaultwarden : on lui préfère
 /// `server_version` (`/api/version`) et on ne retombe sur elle que faute de mieux.
 pub fn config_samples(body: &Value, server_version: Option<&str>, ts_ms: i64) -> Vec<Sample> {
-    let version = server_version
-        .or_else(|| body.get("version").and_then(Value::as_str))
-        .unwrap_or("unknown");
+    let version =
+        server_version.or_else(|| body.get("version").and_then(Value::as_str)).unwrap_or("unknown");
     let mut out =
         vec![gauge(&metric(P, "version_info"), 1.0, ts_ms).with_label("version", version)];
     if let Some(closed) = body.pointer("/settings/disableUserRegistration").and_then(Value::as_bool)
@@ -79,8 +78,7 @@ fn bool_field(user: &Value, keys: &[&str]) -> Option<bool> {
 /// `GET /admin/users` : uniquement des compteurs.
 pub fn user_samples(body: &Value, ts_ms: i64) -> Vec<Sample> {
     let users = body.as_array().map(Vec::as_slice).unwrap_or(&[]);
-    let enabled =
-        |user: &Value| bool_field(user, &["userEnabled", "user_enabled"]).unwrap_or(true);
+    let enabled = |user: &Value| bool_field(user, &["userEnabled", "user_enabled"]).unwrap_or(true);
     let two_factor = |user: &Value| {
         bool_field(user, &["twoFactorEnabled", "TwoFactorEnabled", "two_factor_enabled"])
             .unwrap_or(false)
@@ -533,8 +531,7 @@ mod tests {
         let logins = Arc::new(AtomicUsize::new(0));
         let app = app_with(logins, Arc::new(AtomicBool::new(false)), USERS_1_37);
         let base = serve(app).await;
-        let samples =
-            VaultwardenCollector::new().probe(&target(base, admin("bon"))).await.unwrap();
+        let samples = VaultwardenCollector::new().probe(&target(base, admin("bon"))).await.unwrap();
         let info = samples.iter().find(|s| s.metric == "vaultwarden_version_info").unwrap();
         assert_eq!(info.labels["version"], "1.37.5");
         assert_eq!(value(&samples, "vaultwarden_users_disabled"), Some(1.0));

@@ -70,10 +70,10 @@ pub use dumbmonit_collectors::{
 };
 pub use dumbmonit_collectors::{KubernetesCollector, kubernetes};
 pub use dumbmonit_collectors::{MdaemonCollector, SecurityGatewayCollector, mdaemon};
-pub use dumbmonit_collectors::{OmadaCollector, omada};
 pub use dumbmonit_collectors::{
     MqttCollector, MysqlCollector, PostgresCollector, SmtpCollector, WebsocketCollector,
 };
+pub use dumbmonit_collectors::{OmadaCollector, omada};
 pub use dumbmonit_collectors::{OpenvpnCollector, openvpn};
 pub use dumbmonit_collectors::{RedfishCollector, redfish};
 #[allow(unused_imports)]

@@ -6,7 +6,9 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use super::{HaConfig, Lease, Manifest, PROMOTE_FILE, PromoteRequest, STATE_FILE, Status, WORK_DIR};
+use super::{
+    HaConfig, Lease, Manifest, PROMOTE_FILE, PromoteRequest, STATE_FILE, Status, WORK_DIR,
+};
 
 /// Attente maximale du résultat d'une promotion : le relevé suivant, le
 /// délai d'observation du bail et sa relecture tiennent largement dedans.

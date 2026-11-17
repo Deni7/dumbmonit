@@ -262,12 +262,9 @@ mod tests {
     #[test]
     fn an_announced_address_is_https_host_and_port_or_nothing() {
         let header = |url: &str| format!("port=8443; pins={PIN_A}; url={url}");
-        for refused in [
-            "http://agents.example.com:80",
-            "https://a.example/p",
-            "https://",
-            "ftp://x",
-        ] {
+        for refused in
+            ["http://agents.example.com:80", "https://a.example/p", "https://", "ftp://x"]
+        {
             assert_eq!(TlsOffer::parse(&header(refused)).unwrap().url, None, "{refused}");
         }
         let offer = TlsOffer::parse(&header(" https://[fd00::5]:9443 ")).unwrap();

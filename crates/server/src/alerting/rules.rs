@@ -7765,7 +7765,6 @@ fn apps_rules() -> Vec<Rule> {
         )
     });
 
-
     // Frigate.
     rules.push(app_rule(
         "frigate_camera_offline",

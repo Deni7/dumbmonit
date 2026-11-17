@@ -448,8 +448,7 @@ impl Backlog {
                     max = (count / 2).max(1);
                     warn!(
                         reason = message,
-                        max,
-                        "relay catch-up batch too large, sending smaller ones"
+                        max, "relay catch-up batch too large, sending smaller ones"
                     );
                     continue;
                 }
@@ -546,8 +545,7 @@ mod tests {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let mode =
-                std::fs::metadata(dir.path().join(KEY_FILE)).unwrap().permissions().mode();
+            let mode = std::fs::metadata(dir.path().join(KEY_FILE)).unwrap().permissions().mode();
             assert_eq!(mode & 0o777, 0o600, "la clé n'est lisible que par l'agent");
         }
 

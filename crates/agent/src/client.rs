@@ -568,9 +568,8 @@ impl PushClient {
 
     /// Planning des sondes de ce relais, gardé pour les coupures du lien.
     pub async fn fetch_plan(&self, key: &str) -> Result<RelayPlan, PushError> {
-        let response = self
-            .exchange(|| self.keyed(reqwest::Method::GET, RELAY_PLAN_PATH, key, ""))
-            .await?;
+        let response =
+            self.exchange(|| self.keyed(reqwest::Method::GET, RELAY_PLAN_PATH, key, "")).await?;
         self.read_json(response).await
     }
 

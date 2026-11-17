@@ -590,8 +590,7 @@ async fn a_relay_gets_its_plan_and_its_offline_results_are_taken_once() {
 
     // Le planning : les équipements de ce relais, et eux seuls.
     let (status, plan) =
-        as_agent(&app, "GET", "/api/agent/relay/plan?key=machine-lyon", &token, Value::Null)
-            .await;
+        as_agent(&app, "GET", "/api/agent/relay/plan?key=machine-lyon", &token, Value::Null).await;
     assert_eq!(status, StatusCode::OK, "{plan}");
     let planned: Vec<i64> = plan["probes"]
         .as_array()
@@ -637,8 +636,7 @@ async fn a_relay_gets_its_plan_and_its_offline_results_are_taken_once() {
     // L'autre relais ne range rien pour un équipement qui n'est pas le sien.
     let foreign = json!({ "spool_id": "e5f6", "results": [offline_result(1, mine, then)] });
     let (status, ack) =
-        as_agent(&app, "POST", "/api/agent/relay/backlog?key=machine-paris", &token, foreign)
-            .await;
+        as_agent(&app, "POST", "/api/agent/relay/backlog?key=machine-paris", &token, foreign).await;
     assert_eq!(status, StatusCode::OK, "{ack}");
     assert_eq!(ack["ignored"], json!(1));
     assert_eq!(ack["accepted"], json!(0));

@@ -1087,9 +1087,8 @@ async fn the_single_port_serves_agents_by_alpn_and_everything_else_as_the_interf
     web_tls::load(&lab.state).await.expect("certificat de l'interface");
     let tcp = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("port");
     let web = web_tls::listen(lab.state.web_tls().clone(), tcp).expect("écoute de l'interface");
-    let single = dumbmonit_server::single_port::listen(lab.state.clone(), &web)
-        .await
-        .expect("port unique");
+    let single =
+        dumbmonit_server::single_port::listen(lab.state.clone(), &web).await.expect("port unique");
     let router = api::router(lab.state.clone());
     tokio::spawn(async move {
         let _ = axum::serve(web, router.into_make_service_with_connect_info::<WebPeer>()).await;
@@ -1344,8 +1343,7 @@ async fn a_relay_without_a_certificate_cannot_open_a_multiplexed_connection() {
     };
     assert_eq!(ask(None).await.expect("réponse").status(), StatusCode::UNAUTHORIZED);
     let plain = enrolled(&lab, &token(&lab.app, &admin).await, "id-ordinaire", None).await;
-    let refused = ask(Some((plain.certificate.as_slice(), plain.key.as_slice())))
-        .await
-        .expect("réponse");
+    let refused =
+        ask(Some((plain.certificate.as_slice(), plain.key.as_slice()))).await.expect("réponse");
     assert_eq!(refused.status(), StatusCode::FORBIDDEN, "un agent ordinaire n'est pas un relais");
 }

@@ -156,9 +156,7 @@ fn is_snapshot_name(name: &str) -> bool {
     let Some(rest) = name.strip_prefix(SNAPSHOT_PREFIX) else { return false };
     let Some(rest) = rest.strip_suffix(SNAPSHOT_SUFFIX) else { return false };
     let Some((stamp, node)) = rest.split_once('-') else { return false };
-    !stamp.is_empty()
-        && stamp.bytes().all(|b| b.is_ascii_digit())
-        && super::is_node_name(node)
+    !stamp.is_empty() && stamp.bytes().all(|b| b.is_ascii_digit()) && super::is_node_name(node)
 }
 
 /// Lit un fichier JSON ; `None` s'il n'existe pas.

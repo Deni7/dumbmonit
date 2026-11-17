@@ -438,10 +438,8 @@ pub async fn plan_for(state: &AppState, agent_id: TargetId) -> anyhow::Result<Re
             !(multisite.contains_key(&target.id) && crate::multisite::supports(&target.kind))
         })
         .map(|target| {
-            let timeout = dumbmonit_collectors::Registry::deadline_for(
-                &target,
-                state.config.probe_timeout,
-            );
+            let timeout =
+                dumbmonit_collectors::Registry::deadline_for(&target, state.config.probe_timeout);
             PlannedProbe { target, timeout_secs: timeout.as_secs().max(1) }
         })
         .collect();

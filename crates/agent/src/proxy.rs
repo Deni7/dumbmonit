@@ -221,11 +221,8 @@ fn parse_url(raw: &str, user: Option<&str>, password: Option<&str>) -> Result<Pr
     }
     let from_url_user = (!url.username().is_empty()).then(|| percent_decode(url.username()));
     let from_url_password = url.password().map(percent_decode);
-    let username = user
-        .map(str::trim)
-        .filter(|user| !user.is_empty())
-        .map(str::to_string)
-        .or(from_url_user);
+    let username =
+        user.map(str::trim).filter(|user| !user.is_empty()).map(str::to_string).or(from_url_user);
     let password = password.filter(|p| !p.is_empty()).map(str::to_string).or(from_url_password);
     if password.is_some() && username.is_none() {
         bail!("proxy: a password without a user name");

@@ -40,7 +40,11 @@ enum Inflight {
     Memory,
     /// Du disque : les enregistrements entiers jusqu'à `seq` (`whole`), ou le
     /// début de l'enregistrement `seq`, jusqu'à l'échantillon `skip` exclu.
-    Disk { seq: u64, whole: bool, skip: usize },
+    Disk {
+        seq: u64,
+        whole: bool,
+        skip: usize,
+    },
 }
 
 pub struct PendingBuffer {

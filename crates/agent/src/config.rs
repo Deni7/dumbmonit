@@ -979,9 +979,10 @@ impl Config {
             bail!("the catch-up buffer cannot be zero");
         }
         let buffer_max_mb = match env.get("DUMBMONIT_AGENT_BUFFER_MAX_MB") {
-            Some(raw) => raw.trim().parse::<u64>().with_context(|| {
-                format!("DUMBMONIT_AGENT_BUFFER_MAX_MB: invalid value '{raw}'")
-            })?,
+            Some(raw) => raw
+                .trim()
+                .parse::<u64>()
+                .with_context(|| format!("DUMBMONIT_AGENT_BUFFER_MAX_MB: invalid value '{raw}'"))?,
             None => file.buffer_max_mb.unwrap_or(DEFAULT_BUFFER_MAX_MB),
         };
 
@@ -1398,7 +1399,9 @@ fn gateway_config(
     max_connections: Option<usize>,
     rate_kib: Option<u32>,
 ) -> Result<crate::gateway::GatewayConfig> {
-    use crate::gateway::{DEFAULT_MAX_CONNECTIONS, DEFAULT_RATE_KIB, GatewayConfig, MAX_CONNECTIONS};
+    use crate::gateway::{
+        DEFAULT_MAX_CONNECTIONS, DEFAULT_RATE_KIB, GatewayConfig, MAX_CONNECTIONS,
+    };
 
     let listen = match env
         .get("DUMBMONIT_AGENT_GATEWAY_LISTEN")
@@ -2217,10 +2220,8 @@ system_health:
 
         // La variable prime, la liste se lit séparée par des virgules.
         let file = from_yaml("proxy: http://proxy.corp:3128\n");
-        let vars = env(&[
-            ("DUMBMONIT_AGENT_PROXY", "none"),
-            ("DUMBMONIT_AGENT_NO_PROXY", "a.lan, b.lan"),
-        ]);
+        let vars =
+            env(&[("DUMBMONIT_AGENT_PROXY", "none"), ("DUMBMONIT_AGENT_NO_PROXY", "a.lan, b.lan")]);
         let config = Config::merge(file, vars).unwrap();
         assert_eq!(config.proxy.mode, ProxyMode::Direct);
         assert_eq!(config.proxy.no_proxy, ["a.lan", "b.lan"]);

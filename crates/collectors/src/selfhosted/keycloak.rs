@@ -300,10 +300,8 @@ async fn admin_samples(
         let encoded = encode(name);
         let stats_path = format!("/admin/realms/{encoded}/client-session-stats");
         let users_path = format!("/admin/realms/{encoded}/users/count");
-        let (sessions, users) = futures::join!(
-            admin_get(admin_ref, &stats_path),
-            admin_get(admin_ref, &users_path),
-        );
+        let (sessions, users) =
+            futures::join!(admin_get(admin_ref, &stats_path), admin_get(admin_ref, &users_path),);
         // `[]` : aucun client n'a de session, ou le compte ne voit pas les clients.
         let sessions = match sessions {
             Ok(Some(list)) if list.as_array().is_some_and(Vec::is_empty) => {

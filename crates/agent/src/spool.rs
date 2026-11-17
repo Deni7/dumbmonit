@@ -282,8 +282,7 @@ impl Spool {
                 self.start_segment()?;
             } else if self.writer.is_none() {
                 let name = self.segments.back().map_or(self.next_seq, |s| s.name);
-                self.writer =
-                    Some(OpenOptions::new().append(true).open(self.segment_path(name))?);
+                self.writer = Some(OpenOptions::new().append(true).open(self.segment_path(name))?);
             }
             let seq = self.next_seq;
             let record = frame(seq, weight, payload);

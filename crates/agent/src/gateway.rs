@@ -118,7 +118,9 @@ enum Multiplexed {
     Closed,
     Open(MuxHandle),
     /// Refusée par le serveur : un tunnel par connexion jusqu'à cet instant.
-    Unsupported { retry: Instant },
+    Unsupported {
+        retry: Instant,
+    },
 }
 
 impl ServerUpstream {
