@@ -2101,7 +2101,8 @@
     "label": "authentik",
     "summary": "Readiness, workers, failed system tasks, outpost connections, version updates, users.",
     "examples": [
-      "authentik 2025.x"
+      "authentik 2025.10 and later",
+      "authentik 2025.8 and earlier"
     ],
     "credential_types": [
       "api_token"
@@ -2157,7 +2158,7 @@
           "optional": true
         }
       ],
-      "warning": "authentik has no read-only role for its system pages: the token's user must be allowed into the interface, so keep the key only in DumbMonit. Pages the token cannot read are skipped, not failed.",
+      "warning": "authentik has no read-only role for its system pages: the token's user must be allowed into the interface, so keep the key only in DumbMonit. Pages the token cannot read are skipped; a page this authentik version does not have counts as a scrape error.",
       "doc_url": "https://dumbmonit.selfhostr.io/docs/devices/authentik/"
     },
     "options": [
@@ -9555,7 +9556,7 @@
       {
         "kind": "username_password",
         "label": "Client ID / secret",
-        "help": "A service-account client with read-only roles. DumbMonit asks for a token at each probe.",
+        "help": "A service-account client with read-only roles and the kc-admin-api client scope. DumbMonit asks for a token at each probe.",
         "fields": [
           {
             "key": "username",
@@ -9585,7 +9586,8 @@
       "steps": [
         "Run Keycloak with health checks on, with the option below. From Keycloak 25 they answer on the management port 9000.\nKC_HEALTH_ENABLED=true",
         "Optional, for realms, sessions and users: in the master realm, create a client named as follows, with Client authentication and Service accounts roles on, and Standard flow off.\ndumbmonit",
-        "On that client's Service accounts roles tab, assign the client roles listed below, then copy the secret from its Credentials tab.",
+        "On that client's Client scopes tab, choose Add client scope and add the scope named as follows as Default. From Keycloak 26.8.2 the admin API refuses tokens without it.\nkc-admin-api",
+        "On that client's Service accounts roles tab, assign the roles below from the client of each realm to read (master-realm, or homelab-realm for a realm named homelab), then copy the secret from its Credentials tab.",
         "In DumbMonit, enter Keycloak's address and the client ID and secret, or choose None (health checks only)."
       ],
       "ports": [
@@ -9612,8 +9614,10 @@
         }
       ],
       "permissions": [
-        "view-realm\nMaster-realm client role: realms and their state",
-        "view-users\nMaster-realm client role: user counts"
+        "view-realm\nPer realm: realms and their state",
+        "view-users\nPer realm: user counts",
+        "view-clients\nPer realm: session counts. Without it Keycloak hides them, and DumbMonit reports an error instead of zero",
+        "manage-realm (optional)\nOn master-realm only: version, uptime and memory. A powerful role: leave it out unless you need these"
       ],
       "warning": "Keycloak 24 and earlier serve the health checks on the main port: set the health port option to same. Health checks must be enabled on the server, or DumbMonit reports a missing /health/ready.",
       "doc_url": "https://dumbmonit.selfhostr.io/docs/devices/keycloak/"
@@ -21868,7 +21872,7 @@
   {
     "kind": "prowlarr",
     "label": "Prowlarr",
-    "summary": "Health warnings, indexers disabled after failures, disk space, updates.",
+    "summary": "Health warnings, indexers disabled after failures, updates.",
     "examples": [
       "Prowlarr"
     ],
@@ -22008,22 +22012,6 @@
         "kind": "gauge"
       },
       {
-        "name": "prowlarr_disk_used_percent",
-        "label": "Disk used",
-        "unit": "%",
-        "kind": "gauge",
-        "better": "lower",
-        "min": 0.0,
-        "max": 100.0
-      },
-      {
-        "name": "prowlarr_disk_free_bytes",
-        "label": "Disk free",
-        "unit": "B",
-        "kind": "gauge",
-        "better": "higher"
-      },
-      {
         "name": "prowlarr_indexers_disabled",
         "label": "Indexers disabled",
         "kind": "gauge"
@@ -22058,8 +22046,6 @@
           "prowlarr_health_errors",
           "prowlarr_health_warnings",
           "prowlarr_health_issue",
-          "prowlarr_disk_used_percent",
-          "prowlarr_disk_free_bytes",
           "prowlarr_indexers_disabled",
           "prowlarr_update_available",
           "prowlarr_version_info"
