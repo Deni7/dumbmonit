@@ -83,7 +83,8 @@ impl Failover {
         self.servers.len() > 1
     }
 
-    /// Rang de l'adresse en service (0 : la primaire).
+    /// Rang de l'adresse en service (0 : la primaire). Lu par les tests.
+    #[cfg(test)]
     pub fn active(&self) -> usize {
         self.active
     }
