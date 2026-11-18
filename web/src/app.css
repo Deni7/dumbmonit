@@ -120,7 +120,8 @@ html.dark,
    status pages keep the two lights above. Same token names, so every page and
    component follows unchanged.
    --------------------------------------------------------------------------- */
-html.obsidian {
+html.obsidian,
+html.obsidian .sp-preview-dark {
 	color-scheme: dark;
 
 	--c-canvas: #07080a;
@@ -175,7 +176,8 @@ html.obsidian {
    control borders ≥ 3:1. Status hues without `-ink` are for marks and fills,
    never for text. The Overview banner keeps its night sky.
    --------------------------------------------------------------------------- */
-html.obsidian.console-light {
+html.obsidian.console-light,
+html.obsidian .sp-preview-light {
 	color-scheme: light;
 
 	--c-canvas: #f6f6f7;
@@ -335,7 +337,9 @@ html.obsidian .font-sans {
    hue is an ink: ≥ 4.5:1 against the surface in its light, and `on-accent`
    text is ≥ 4.5:1 on it. `default` is the page's own ink.
    --------------------------------------------------------------------------- */
-:root {
+:root,
+.sp-preview-dark,
+.sp-preview-light {
 	--c-accent: var(--c-ink);
 	--c-on-accent: var(--c-surface);
 }
@@ -349,6 +353,18 @@ html.dark .sp-accent-teal { --c-accent: #5fe0d4; }
 html.dark .sp-accent-violet { --c-accent: #c3a8ff; }
 html.dark .sp-accent-rose { --c-accent: #ff8fae; }
 html.dark .sp-accent-amber { --c-accent: #ffc864; }
+/* The status page editor's preview wears the page's own light whatever the
+   console's (`.sp-preview-dark` / `.sp-preview-light` carry the tokens above). */
+html .sp-preview-light .sp-accent-blue { --c-accent: #1f5fae; }
+html .sp-preview-light .sp-accent-teal { --c-accent: #0b6d66; }
+html .sp-preview-light .sp-accent-violet { --c-accent: #6a3fb5; }
+html .sp-preview-light .sp-accent-rose { --c-accent: #b0284f; }
+html .sp-preview-light .sp-accent-amber { --c-accent: #8f5d12; }
+html .sp-preview-dark .sp-accent-blue { --c-accent: #8fbaff; }
+html .sp-preview-dark .sp-accent-teal { --c-accent: #5fe0d4; }
+html .sp-preview-dark .sp-accent-violet { --c-accent: #c3a8ff; }
+html .sp-preview-dark .sp-accent-rose { --c-accent: #ff8fae; }
+html .sp-preview-dark .sp-accent-amber { --c-accent: #ffc864; }
 
 @theme inline {
 	--color-accent: var(--c-accent);

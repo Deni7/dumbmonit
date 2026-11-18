@@ -261,6 +261,34 @@ pub struct Head {
     pub robots: &'static str,
     /// Retire la description générique de l'interface.
     pub replaces_description: bool,
+    /// Marque blanche de la page (réglage « Hide DumbMonit branding ») ; `None` :
+    /// l'index garde l'icône et le nom du produit.
+    pub white_label: Option<WhiteLabel>,
+}
+
+/// Ce qui remplace la marque du produit sur une page en marque blanche.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WhiteLabel {
+    /// Icône d'onglet : le logo de la page, sinon `data:,` (aucune icône, et le
+    /// navigateur ne va pas chercher `/favicon.ico`).
+    pub icon: String,
+    /// Nom d'application d'un raccourci sur l'écran d'accueil.
+    pub app_name: String,
+}
+
+/// Titre neutre d'une page en marque blanche dont rien ne doit sortir.
+pub const NEUTRAL_TITLE: &str = "Status";
+/// Icône vide : ni celle du produit, ni la requête de repli `/favicon.ico`.
+pub const NO_ICON: &str = "data:,";
+
+/// Icône d'onglet d'une page en marque blanche : son propre logo, sinon aucune.
+fn white_label_icon(page: &StatusPage) -> String {
+    if page.logo_type.is_some() && page.is_public() {
+        let version: String = page.updated_at.chars().filter(char::is_ascii_digit).collect();
+        format!("/api/public/status/{}/logo?v={version}", page.slug)
+    } else {
+        NO_ICON.to_string()
+    }
 }
 
 /// Page ou variante qui ne doit jamais être indexée (inconnue, non publiée,
@@ -272,6 +300,7 @@ pub fn noindex_head() -> Head {
         fragment: format!("<meta name=\"robots\" content=\"{ROBOTS_NOINDEX}\" data-dm-seo>"),
         robots: ROBOTS_NOINDEX,
         replaces_description: false,
+        white_label: None,
     }
 }
 
@@ -280,7 +309,19 @@ pub fn noindex_head() -> Head {
 pub fn head_for(page: Option<&StatusPage>) -> Head {
     let Some(page) = page.filter(|page| page.published && page.is_public()) else {
         // Inconnue, non publiée ou privée : rien de son titre ne sort.
-        return noindex_head();
+        let mut head = noindex_head();
+        // Une page privée publiée en marque blanche ne montre pas non plus le
+        // produit devant son écran de mot de passe : titre neutre, sans icône.
+        // Une page non publiée reste indiscernable d'une page absente.
+        if let Some(page) = page.filter(|page| page.published && page.hide_branding) {
+            head.title = Some(NEUTRAL_TITLE.to_string());
+            head.replaces_description = true;
+            head.white_label = Some(WhiteLabel {
+                icon: white_label_icon(page),
+                app_name: NEUTRAL_TITLE.to_string(),
+            });
+        }
+        return head;
     };
     let r = resolve(page);
     let robots = if r.indexable { ROBOTS_INDEX } else { ROBOTS_NOINDEX };
@@ -331,12 +372,17 @@ pub fn head_for(page: Option<&StatusPage>) -> Head {
             json_for_script(&json_ld(&r, page))
         ));
     }
+    let white_label = page.hide_branding.then(|| WhiteLabel {
+        icon: white_label_icon(page),
+        app_name: page.title.trim().to_string(),
+    });
     Head {
         title: Some(r.title),
         lang: Some(r.lang),
         fragment: tags.join("\n"),
         robots,
         replaces_description: true,
+        white_label,
     }
 }
 
@@ -393,7 +439,41 @@ pub fn apply(html: &str, head: &Head) -> String {
     if let Some(lang) = head.lang.as_deref().filter(|lang| is_valid_lang(lang)) {
         out = out.replacen("<html lang=\"en\"", &format!("<html lang=\"{}\"", esc(lang)), 1);
     }
-    out.replacen("</head>", &format!("{}</head>", head.fragment), 1)
+    let mut fragment = head.fragment.clone();
+    if let Some(white) = &head.white_label {
+        fragment.push_str(&unbrand(&mut out, white));
+    }
+    out.replacen("</head>", &format!("{fragment}</head>"), 1)
+}
+
+/// Retire de l'index ce qui nomme ou montre le produit, et rend les balises qui
+/// le remplacent (à ajouter avant `</head>`).
+fn unbrand(html: &mut String, white: &WhiteLabel) -> String {
+    // Icône, icône d'écran d'accueil et manifeste (qui porte le nom du produit).
+    remove_span(html, "<link rel=\"icon\"", ">");
+    remove_span(html, "<link rel=\"apple-touch-icon\"", ">");
+    remove_span(html, "<link rel=\"manifest\"", ">");
+    remove_span(html, "<meta name=\"apple-mobile-web-app-title\"", ">");
+    // Message des navigateurs trop anciens (script en ligne de l'index) : sans
+    // le nom ni le logo du produit.
+    if let Some(from) = html.find("<img src=\"")
+        && let Some(len) = html[from..].find("favicon.svg\" alt=\"\">")
+        && len < 120
+    {
+        let end = from + len + "favicon.svg\" alt=\"\">".len();
+        html.replace_range(from..end, "");
+    }
+    *html = html
+        .replace("<span class=\"brand\">DumbMonit</span>", "<span class=\"brand\"></span>")
+        .replace("too old for DumbMonit", "too old for this page");
+    let mut tags = format!("<link rel=\"icon\" href=\"{}\">", esc(&white.icon));
+    if !white.app_name.is_empty() {
+        tags.push_str(&format!(
+            "<meta name=\"apple-mobile-web-app-title\" content=\"{}\">",
+            esc(&white.app_name)
+        ));
+    }
+    tags
 }
 
 // --------------------------------------------------------------------------
@@ -488,6 +568,7 @@ mod tests {
             seo: seo.to_json(),
             access_mode: "public".into(),
             has_password: false,
+            hide_branding: false,
         }
     }
 
@@ -635,6 +716,60 @@ mod tests {
         assert!(bad(Seo { lang: "english please".into(), ..Seo::default() }));
         assert!(bad(Seo { title: "a\nb".into(), ..Seo::default() }));
         assert!(bad(Seo { title: "x".repeat(MAX_TITLE + 1), ..Seo::default() }));
+    }
+
+    /// Index proche du vrai build : icône, manifeste, nom d'application et le
+    /// message des navigateurs trop anciens.
+    const BRANDED_INDEX: &str = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\" />\
+        <meta name=\"description\" content=\"DumbMonit generic\" />\
+        <link rel=\"icon\" href=\"./favicon.svg\" />\
+        <link rel=\"manifest\" href=\"./manifest.webmanifest\" />\
+        <link rel=\"apple-touch-icon\" href=\"./apple-touch-icon.png\" />\
+        <meta name=\"apple-mobile-web-app-title\" content=\"DumbMonit\" />\
+        <title>DumbMonit</title>\
+        <script>var x = '<img src=\"./favicon.svg\" alt=\"\"><span class=\"brand\">DumbMonit</span>' +\
+        '<h1>This browser is too old for DumbMonit</h1>';</script>\
+        </head><body></body></html>";
+
+    #[test]
+    fn a_white_label_page_names_nothing_of_the_product() {
+        let mut white = page(Seo::default(), true);
+        white.hide_branding = true;
+        let html = apply(BRANDED_INDEX, &head_for(Some(&white)));
+        assert!(!html.contains("DumbMonit"), "{html}");
+        assert!(!html.contains("favicon.svg"), "{html}");
+        assert!(!html.contains("manifest.webmanifest"));
+        assert!(!html.contains("apple-touch-icon"));
+        // Sans logo : aucune icône (et pas de repli sur `/favicon.ico`).
+        assert!(html.contains("<link rel=\"icon\" href=\"data:,\">"));
+        assert!(html.contains("content=\"Acme &lt;Cloud&gt;\""), "nom d'application : {html}");
+        assert_eq!(html.matches("rel=\"icon\"").count(), 1);
+
+        // Avec un logo : il devient l'icône d'onglet.
+        white.logo_type = Some("image/png".into());
+        let html = apply(BRANDED_INDEX, &head_for(Some(&white)));
+        let icon = "<link rel=\"icon\" href=\"/api/public/status/acme/logo?v=20261021080000\">";
+        assert!(html.contains(icon), "{html}");
+
+        // Une page privée publiée : titre neutre, ni nom ni icône du produit.
+        white.access_mode = "password".into();
+        let html = apply(BRANDED_INDEX, &head_for(Some(&white)));
+        assert!(!html.contains("DumbMonit"), "{html}");
+        assert!(html.contains("<title>Status</title>"));
+        assert!(html.contains("<link rel=\"icon\" href=\"data:,\">"), "logo privé non servi");
+        assert!(!html.contains("Acme"), "rien du titre d'une page privée : {html}");
+
+        // Non publiée : indiscernable d'une page absente.
+        white.published = false;
+        assert_eq!(head_for(Some(&white)), noindex_head());
+    }
+
+    #[test]
+    fn branding_stays_by_default() {
+        let html = apply(BRANDED_INDEX, &head_for(Some(&page(Seo::default(), true))));
+        assert!(html.contains("favicon.svg"));
+        assert!(html.contains("manifest.webmanifest"));
+        assert!(html.contains("too old for DumbMonit"));
     }
 
     #[test]

@@ -49,6 +49,20 @@ All notable changes to this project are documented here. The format follows
   bar chart of availability with the objective marked, and statuses that read in black and white
   (bad ones in bold). A status page used to brand the report now brings its logo too.
 
+
+- **White-label status pages.** A "Hide DumbMonit branding" switch per status page: the public
+  page then names nothing of DumbMonit, not even in the browser tab (title and icon), the phone
+  shortcut name or the page served before the app loads. The tab icon becomes the page's logo, or
+  no icon. Saved in backups and GitOps files (`hide_branding`).
+
+### Changed
+
+- **A two-pane status page editor.** Settings on the left, a live preview on the right drawn
+  exactly like the public page, from what is not saved yet (title, colours, logo, groups,
+  monitors, white label). Groups and monitors are reordered by dragging their grip, or with their
+  Move up / Move down buttons from the keyboard; monitors are added to a group from its own
+  search box. Save and Cancel stay at the bottom, and leaving with unsaved changes asks first.
+  On phones and tablets, Settings and Preview become two tabs. Replaces the previous form.
 - **A plainer overview health panel.** The "health river" gives way to a grid of small tiles, one
   per monitor (state as a shape and a colour, problems first, shrinking from 10 to 500 monitors),
   and, below, only what is wrong: each failing monitor with its last 24 hours, how long it has

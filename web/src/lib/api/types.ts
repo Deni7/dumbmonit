@@ -2252,6 +2252,8 @@ export interface StatusPage {
 	access_mode: StatusPageAccess;
 	/** A page password is stored (the hash itself never leaves the server). */
 	has_password: boolean;
+	/** White label: the public page names nothing of DumbMonit; its tab icon is the logo, or none. */
+	hide_branding: boolean;
 	/** Checked monitor folders (dynamic): their current members are shown. */
 	groups: string[];
 	/** Public names of the monitors that come in through a ticked group; none: the monitor name. */
@@ -2286,6 +2288,8 @@ export interface StatusPagePayload {
 	groups?: string[];
 	/** Public names of group members; omitted: kept. */
 	group_labels?: StatusPageGroupLabel[];
+	/** White label (no DumbMonit name or icon on the public page); omitted: kept. */
+	hide_branding?: boolean;
 }
 
 export type StatusSubscriptionKind = 'email' | 'sms' | 'webhook' | 'slack';
@@ -2450,6 +2454,8 @@ export interface PublicCalendarDay {
 export interface PublicStatusItem {
 	/** Stable public key of the service (from its label), used in badge URLs. */
 	key: string;
+	/** Editor preview only (`GET /api/status-pages/{id}/preview`): the monitor shown. */
+	target_id?: TargetId;
 	label: string;
 	state: PublicItemState;
 	uptime_24h: number | null;
@@ -2535,6 +2541,8 @@ export interface PublicStatus {
 		subscribe: boolean;
 		/** Subscriptions offered. */
 		subscribe_kinds: StatusSubscriptionKind[];
+		/** White label: no DumbMonit icon or name around the page. Older servers omit it. */
+		hide_branding?: boolean;
 		/** Effective search-engine values (settings, or defaults built from the page name). */
 		seo?: {
 			indexable: boolean;

@@ -194,6 +194,12 @@ pub fn normalize(desired: &mut ConfigDoc, current: &ConfigDoc) {
         {
             page.seo = old.seo.clone();
         }
+        // Marque blanche non déclarée : le réglage en place n'est pas un écart.
+        if let Some(old) = pages.get(page.slug.as_str())
+            && page.hide_branding.is_none()
+        {
+            page.hide_branding = old.hide_branding;
+        }
     }
 }
 

@@ -120,7 +120,7 @@ test('3. notification channel and public status page, both healthy', async ({ pa
 	await page.getByLabel('Title', { exact: true }).fill(NAMES.statusTitle);
 	await page.getByLabel('Address', { exact: true }).fill(NAMES.statusSlug);
 	await page.getByRole('switch', { name: 'Published' }).click();
-	await page.getByRole('combobox', { name: 'Search a service' }).click();
+	await page.getByRole('combobox', { name: /^Add monitors to/ }).first().click();
 	await page.getByRole('option', { name: NAMES.monitor }).click();
 	await expectNoHorizontalOverflow(page);
 	await page.getByRole('button', { name: 'Create page', exact: true }).click();
