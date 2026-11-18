@@ -42,11 +42,32 @@ All notable changes to this project are documented here. The format follows
   `GET /api/deadlines?upcoming=true` adds the `disk` and `backup` kinds (and a `value` field: used
   percent, or days since the last success); without the parameter the answer is unchanged.
 
+- **A two-letter code for each location.** A location has a "Badge code" (two letters or digits,
+  upper case, no accents): the first two letters of its name by default ("CR" for Crissier), editable
+  in the location form, and kept in backups. Existing locations get theirs from their name when the
+  server updates. The Monitors list shows it as a small pill (the full name on hover).
+
 ### Changed
 
 - **No icon in page titles.** The access screen of a protected status page no longer puts a padlock
   or a sign-in icon before its title, like every other page title.
 
+
+- **Monitors list, tidied.** In the list every piece of information has its own column, the same
+  width on every line whether or not the monitor has an alert, a score or a location, so the score and
+  the alert count no longer move. The columns fold with the width (the address goes under the name,
+  then the age and the score are dropped on a phone). Lines no longer repeat what the icon, the folder
+  or the page already say: the kind's name (on hover), the "Last seen" prefix, an address equal to the
+  name and the location when the list is filtered to one. The age is compact ("2min", "3h", "5d") with
+  the full date on hover; alerts and score are plain icons rather than outlined plates; the state is
+  the status light and its word.
+- **Tiles, plainer.** Tiles are bordered cards like the rest of the app: no shadow, light that
+  follows the pointer, lift or staggered entrance.
+- **Selection and folders.** "Select" and "Create folder" are labelled buttons. The selection bar
+  keeps enable, disable, move to folder and delete in view and puts location, "Reached through" and
+  the CVE check in one "More" menu.
+- **Tag filter in one control.** The row of tag chips is now one button that shows the chosen tags on
+  one line ("prod, db +1") and opens a searchable checklist, with a × to clear.
 - **On-call schedules are optional.** The On-call tab of Alerts, the "DumbMonit on-call" channel type
   and the on-call step of the setup wizard are hidden until you turn on **On-call schedules** in
   Settings › System (for teams that take turns handling alerts at night and on weekends). Turned off,

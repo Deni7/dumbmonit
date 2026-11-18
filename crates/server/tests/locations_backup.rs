@@ -22,8 +22,9 @@ async fn les_emplacements_et_les_affectations_sont_restaures() {
     let source_dir = tempfile::tempdir().unwrap();
     let (source, cipher) = instance(&source_dir).await;
     sqlx::query(
-        "INSERT INTO locations (name, address, latitude, longitude, site)
-         VALUES ('Siège', 'Lausanne', 46.52, 6.63, ''), ('Annexe', '', 48.85, 2.35, 'annexe')",
+        "INSERT INTO locations (name, address, latitude, longitude, site, code)
+         VALUES ('Siège', 'Lausanne', 46.52, 6.63, '', 'HQ'),
+                ('Annexe', '', 48.85, 2.35, 'annexe', '')",
     )
     .execute(&source)
     .await
@@ -38,6 +39,7 @@ async fn les_emplacements_et_les_affectations_sont_restaures() {
 
     let lot = collect(&source, &cipher, ExportOptions::default()).await.expect("export");
     assert_eq!(lot.locations.len(), 2);
+    assert_eq!(lot.locations[0].code, "HQ");
     assert_eq!(lot.targets[0].location.as_deref(), Some("Annexe"));
 
     let target_dir = tempfile::tempdir().unwrap();
@@ -52,6 +54,12 @@ async fn les_emplacements_et_les_affectations_sont_restaures() {
     .await
     .unwrap();
     assert_eq!(placed.as_deref(), Some("Annexe"));
+    let codes: Vec<String> = sqlx::query_scalar("SELECT code FROM locations ORDER BY id")
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    // Le code saisi voyage ; un emplacement sans code reçoit celui de son nom.
+    assert_eq!(codes, ["HQ", "AN"]);
 
     let again = restore(&pool, &cipher, &lot, true).await.expect("seconde restauration");
     assert_eq!(counts(&again, "locations"), (0, 0, 2), "rien ne bouge : {again:#?}");

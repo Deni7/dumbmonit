@@ -2589,8 +2589,13 @@ async fn restore_locations(
             report.notes.push(format!("location \"{name}\" has no valid name or coordinates"));
             continue;
         }
+        // Un lot sans code (ancienne version) reçoit celui que le nom donne par défaut.
+        let code = match crate::api::locations::default_code(&entry.code) {
+            code if code.is_empty() => crate::api::locations::default_code(name),
+            code => code,
+        };
         let existing = sqlx::query(
-            "SELECT id, address, latitude, longitude, site FROM locations
+            "SELECT id, address, latitude, longitude, site, code FROM locations
              WHERE name = ? COLLATE NOCASE",
         )
         .bind(name)
@@ -2602,22 +2607,24 @@ async fn restore_locations(
             && row.try_get::<f64, _>("latitude")? == entry.latitude
             && row.try_get::<f64, _>("longitude")? == entry.longitude
             && row.try_get::<String, _>("site")? == entry.site
+            && row.try_get::<String, _>("code")? == code
         {
             report.skipped += 1;
             continue;
         }
         let result = sqlx::query(
-            "INSERT INTO locations (name, address, latitude, longitude, site)
-             VALUES (?, ?, ?, ?, ?)
+            "INSERT INTO locations (name, address, latitude, longitude, site, code)
+             VALUES (?, ?, ?, ?, ?, ?)
              ON CONFLICT(name) DO UPDATE SET address = excluded.address,
                  latitude = excluded.latitude, longitude = excluded.longitude,
-                 site = excluded.site",
+                 site = excluded.site, code = excluded.code",
         )
         .bind(name)
         .bind(&entry.address)
         .bind(entry.latitude)
         .bind(entry.longitude)
         .bind(&entry.site)
+        .bind(&code)
         .execute(&mut **tx)
         .await;
         match result {

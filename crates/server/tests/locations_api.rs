@@ -258,3 +258,32 @@ async fn le_fond_de_carte_ouvre_seulement_son_origine() {
     assert_eq!(reply.status, StatusCode::OK);
     assert!(!csp(&app, &admin).await.contains("tiles.lan"));
 }
+
+#[tokio::test]
+async fn le_code_par_defaut_vient_du_nom_et_se_modifie() {
+    let app = TestApp::configured().await;
+    let admin = app.admin_cookie().await;
+    let reply = app
+        .post(
+            "/api/locations",
+            json!({ "name": "Crissier", "latitude": 46.5, "longitude": 6.5 }),
+            Some(&admin),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::CREATED);
+    assert_eq!(reply.body["code"], "CR", "deux premières lettres du nom");
+    let id = reply.body["id"].as_i64().unwrap();
+
+    let reply = app
+        .put(
+            &format!("/api/locations/{id}"),
+            json!({ "name": "Crissier", "latitude": 46.5, "longitude": 6.5, "code": "é1x" }),
+            Some(&admin),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::OK);
+    // Saisie normalisée : deux caractères, majuscules, sans accent.
+    assert_eq!(reply.body["code"], "E1");
+    let reply = app.get("/api/locations", Some(&admin)).await;
+    assert_eq!(reply.body["locations"][0]["code"], "E1");
+}

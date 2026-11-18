@@ -5,10 +5,9 @@
 	/**
 	 * Monitors › List — the first tab of /targets (the other tabs are the map, the logs and security).
 	 *
-	 * One sober toolbar (search, Filter, Compact/Tiles, Select, More, Add);
-	 * the filters, the sort and the tags fold behind "Filter", the map, a new
-	 * folder and the two imports behind "More". Children are listed under
-	 * their parent, in folders.
+	 * One sober toolbar (search, Filter, List/Tiles, New folder, Select, Add);
+	 * the filters, the sort and the tags fold behind "Filter". Children are
+	 * listed under their parent, in folders.
 	 * Targets and probe states come from the shared store (polled app-wide by
 	 * the root layout, see `alertsStore`); this page only adds the sparklines,
 	 * from one batched query refreshed every 30 s.
@@ -36,6 +35,7 @@
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import ReviewNotice from '#lib/components/device-form/ReviewNotice.svelte';
 	import { Button, ClickSpark, Confirm, EmptyState, ErrorNotice, Menu, SelectionBar, Skeleton, Toast } from '#lib/ui/index.js';
+	import TagFilter from './TagFilter.svelte';
 	import RackList from '#lib/components/devices/RackList.svelte';
 	import type { ReorderControls, RowSelection } from '#lib/components/devices/RackList.svelte';
 	import FolderHeader from '#lib/components/devices/FolderHeader.svelte';
@@ -72,6 +72,7 @@
 	import {
 		ArrowUpDown,
 		ChevronRight,
+		EllipsisVertical,
 		FolderInput,
 		FolderPlus,
 		ListChecks,
@@ -190,11 +191,8 @@
 		return [...seen].sort((a, b) => a[1].localeCompare(b[1], 'en'));
 	});
 
-	/** Free tags in use (with their device count), offered as filter chips. */
+	/** Free tags in use (with their device count), offered in the tag filter. */
 	const tagChips = $derived(tagCounts(targets, optionKeysOf));
-	function toggleTag(tag: string) {
-		tagFilter = tagFilter.includes(tag) ? tagFilter.filter((t) => t !== tag) : [...tagFilter, tag];
-	}
 
 	/** Devices matching the search box, the kind select and the tags, before the segment. */
 	const narrowed = $derived.by(() => {
@@ -312,7 +310,7 @@
 		sortDir = 'asc';
 	}
 
-	// The map and "Create folder" are icon buttons next to "Select".
+	// "New folder" and "Select" are quiet buttons beside the view switch.
 	let folderFormOpen = $state(false);
 	function toggleFolderForm() {
 		folderFormOpen = !folderFormOpen;
@@ -322,7 +320,9 @@
 
 	// Sites (locations of the world map): a badge on each monitor and a filter.
 	let siteLocations = $state<MapLocation[]>([]);
-	const siteNames = $derived(new Map(siteLocations.map((l) => [l.id, l.name])));
+	const sites = $derived(new Map(siteLocations.map((l) => [l.id, { code: l.code, name: l.name }])));
+	/** Filtered to one site, every line would carry the same badge: none does. */
+	const showSite = $derived(site === '');
 	$effect(() => {
 		const controller = new AbortController();
 		listLocations(controller.signal)
@@ -592,6 +592,10 @@
 			(t) => updateTarget(t.id, targetToPayload(t, { group_name: group }))
 		);
 	const bulkDelete = () => bulk(selectedTargets, (t) => deleteTarget(t.id));
+
+	// Menu rows of the selection bar.
+	const bulkItem = 'flex min-h-10 w-full items-center rounded-lg px-3 text-left text-[0.8125rem] text-ink hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-signal';
+	const bulkHeading = 'flex items-center gap-1.5 px-2 pt-1 pb-0.5 text-[0.75rem] font-semibold text-ink-3';
 
 	// CVE check in bulk: one request for the whole selection. Turning it off is
 	// armed first (second click in the menu); the result comes back as a toast
@@ -1101,27 +1105,27 @@
 			{#if auth.isAdmin}
 				<Button
 					variant="ghost"
-					aria-pressed={selecting}
-					aria-label={m.devices_list_select()}
-					title={m.devices_list_select()}
-					class={`!w-10 !px-0 ${selecting ? 'bg-surface-2 text-ink' : ''}`}
-					onclick={() => (selecting ? stopSelecting() : (selecting = true))}
-				>
-					<ListChecks class="size-4" aria-hidden="true" />
-				</Button>
-			{/if}
-			{#if auth.isAdmin}
-				<Button
-					variant="ghost"
 					aria-pressed={folderFormOpen}
 					aria-expanded={folderFormOpen}
 					aria-controls="monitors-new-folder"
 					aria-label={m.devices_targets_create_folder()}
 					title={m.devices_targets_create_folder()}
-					class={`!w-10 !px-0 ${folderFormOpen ? 'bg-surface-2 text-ink' : ''}`}
+					class={`max-sm:!w-10 max-sm:!px-0 ${folderFormOpen ? 'bg-surface-2 text-ink' : 'text-ink-2'}`}
 					onclick={toggleFolderForm}
 				>
 					<FolderPlus class="size-4" aria-hidden="true" />
+					<span class="max-lg:sr-only">{m.devices_targets_create_folder()}</span>
+				</Button>
+				<Button
+					variant="ghost"
+					aria-pressed={selecting}
+					aria-label={m.devices_list_select()}
+					title={m.devices_list_select()}
+					class={`max-sm:!w-10 max-sm:!px-0 ${selecting ? 'bg-surface-2 text-ink' : 'text-ink-2'}`}
+					onclick={() => (selecting ? stopSelecting() : (selecting = true))}
+				>
+					<ListChecks class="size-4" aria-hidden="true" />
+					<span class="max-lg:sr-only">{m.devices_list_select()}</span>
 				</Button>
 			{/if}
 		</div>
@@ -1142,6 +1146,7 @@
 			class="mb-4 flex max-w-md items-center gap-2"
 			onsubmit={(e) => {
 				e.preventDefault();
+				if (!newFolderDraft.trim()) return;
 				createFolder(newFolderDraft);
 				newFolderDraft = '';
 				folderFormOpen = false;
@@ -1150,10 +1155,11 @@
 			<input
 				bind:this={newFolderInput}
 				bind:value={newFolderDraft}
-				class="input !h-10 min-w-0 flex-1 text-[0.8125rem]"
+				class="input min-w-0 flex-1"
 				placeholder={m.devices_targets_folder_placeholder()}
 				maxlength="80"
 				aria-label={m.devices_targets_folder_aria()}
+				autocomplete="off"
 				onkeydown={(e) => {
 					if (e.key === 'Escape') {
 						e.preventDefault();
@@ -1161,13 +1167,7 @@
 					}
 				}}
 			/>
-			<button
-				type="submit"
-				class="min-h-10 shrink-0 rounded-lg bg-signal px-3 py-1.5 text-[0.8125rem] font-semibold text-on-signal disabled:opacity-50"
-				disabled={!newFolderDraft.trim()}
-			>
-				{m.devices_targets_folder_create()}
-			</button>
+			<Button type="submit" variant="secondary" disabled={!newFolderDraft.trim()}>{m.devices_targets_folder_create()}</Button>
 		</form>
 	{/if}
 
@@ -1203,6 +1203,12 @@
 						</select>
 					</label>
 				{/if}
+				{#if tagChips.length > 0 || tagFilter.length > 0}
+					<div class="flex min-w-0 flex-col gap-1.5 max-sm:w-full">
+						<span class="label-tape">{m.devices_targets_filter_tags_label()}</span>
+						<TagFilter chips={tagChips} value={tagFilter} onchange={(next) => (tagFilter = next)} />
+					</div>
+				{/if}
 				<div class="flex min-w-0 flex-col gap-1.5">
 					<label class="label-tape" for="monitors-sort">{m.devices_list_sort_label()}</label>
 					<div class="flex items-center gap-1">
@@ -1226,27 +1232,6 @@
 					</div>
 				</div>
 			</div>
-			{#if tagChips.length > 0 || tagFilter.length > 0}
-				<div class="flex flex-col gap-1.5">
-					<span class="label-tape">{m.devices_targets_filter_tags_label()}</span>
-					<div class="flex flex-wrap items-center gap-1.5" role="group" aria-label={m.devices_targets_filter_tags()}>
-						{#each [...new Set([...tagFilter, ...tagChips.map(([tag]) => tag)])] as tag (tag)}
-							{@const active = tagFilter.includes(tag)}
-							<button
-								type="button"
-								aria-pressed={active}
-								onclick={() => toggleTag(tag)}
-								class="inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3 text-[0.8125rem] {active
-									? 'border-ink bg-ink text-surface'
-									: 'border-line bg-surface text-ink-2 hover:border-ink-3 hover:text-ink'}"
-							>
-								<span class="break-all">{tag}</span>
-								<span class="tnum opacity-70">{tagChips.find(([t]) => t === tag)?.[1] ?? 0}</span>
-							</button>
-						{/each}
-					</div>
-				</div>
-			{/if}
 			{#if activeFilters > 0}
 				<div>
 					<Button variant="ghost" class="-ml-3" onclick={clearFilters}>{m.devices_targets_clear_filters()}</Button>
@@ -1327,17 +1312,17 @@
 			}}
 			onexit={stopSelecting}
 		>
-			<Button size="sm" variant="secondary" disabled={bulkBusy || selectedTargets.length === 0} onclick={() => void bulkSetEnabled(true)}>
+			<Button size="sm" variant="ghost" disabled={bulkBusy || selectedTargets.length === 0} onclick={() => void bulkSetEnabled(true)}>
 				<Power class="size-4" aria-hidden="true" />
 				{m.devices_list_bulk_enable()}
 			</Button>
-			<Button size="sm" variant="secondary" disabled={bulkBusy || selectedTargets.length === 0} onclick={() => void bulkSetEnabled(false)}>
+			<Button size="sm" variant="ghost" disabled={bulkBusy || selectedTargets.length === 0} onclick={() => void bulkSetEnabled(false)}>
 				<PowerOff class="size-4" aria-hidden="true" />
 				{m.devices_list_bulk_disable()}
 			</Button>
 			<Menu label={m.devices_list_bulk_move()} align="left" placement="up">
 				{#snippet trigger({ toggle, open })}
-					<Button size="sm" variant="secondary" disabled={bulkBusy || selectedTargets.length === 0} aria-haspopup="menu" aria-expanded={open} onclick={() => { bulkFolderDraft = ''; toggle(); }}>
+					<Button size="sm" variant="ghost" disabled={bulkBusy || selectedTargets.length === 0} aria-haspopup="menu" aria-expanded={open} onclick={() => { bulkFolderDraft = ''; toggle(); }}>
 						<FolderInput class="size-4" aria-hidden="true" />
 						{m.devices_list_bulk_move()}
 					</Button>
@@ -1345,13 +1330,13 @@
 				{#snippet children({ close })}
 					<ul class="flex min-w-48 flex-col gap-0.5">
 						<li>
-							<button type="button" class="flex min-h-10 w-full items-center rounded-lg px-3 text-left text-[0.8125rem] text-ink hover:bg-surface-2" onclick={() => { close(); void bulkMove(''); }}>
+							<button type="button" role="menuitem" class={bulkItem} onclick={() => { close(); void bulkMove(''); }}>
 								{m.devices_list_bulk_no_folder()}
 							</button>
 						</li>
 						{#each folderChoices as folder (folder)}
 							<li>
-								<button type="button" class="flex min-h-10 w-full items-center rounded-lg px-3 text-left text-[0.8125rem] text-ink hover:bg-surface-2" onclick={() => { close(); void bulkMove(folder); }}>
+								<button type="button" role="menuitem" class={bulkItem} onclick={() => { close(); void bulkMove(folder); }}>
 									{folder}
 								</button>
 							</li>
@@ -1368,99 +1353,66 @@
 						}}
 					>
 						<input class="input !h-10 min-w-0 flex-1 text-[0.8125rem]" bind:value={bulkFolderDraft} placeholder={m.devices_list_bulk_folder_placeholder()} aria-label={m.devices_list_bulk_folder_placeholder()} maxlength="80" />
-						<button type="submit" class="min-h-10 shrink-0 rounded-lg bg-signal px-3 py-1.5 text-[0.8125rem] font-semibold text-on-signal disabled:opacity-50" disabled={!bulkFolderDraft.trim()}>
-							{m.devices_list_bulk_folder_apply()}
-						</button>
+						<Button type="submit" size="sm" variant="secondary" disabled={!bulkFolderDraft.trim()}>{m.devices_list_bulk_folder_apply()}</Button>
 					</form>
 				{/snippet}
 			</Menu>
-			{#if bulkLocations.length > 0}
-				<Menu label={m.devices_list_bulk_location()} align="left" placement="up">
-					{#snippet trigger({ toggle, open })}
-						<Button size="sm" variant="secondary" disabled={bulkBusy || selectedTargets.length === 0} aria-haspopup="menu" aria-expanded={open} onclick={toggle}>
-							<MapPin class="size-4" aria-hidden="true" />
-							{m.devices_list_bulk_location()}
-						</Button>
-					{/snippet}
-					{#snippet children({ close })}
-						<ul class="flex max-h-72 min-w-48 flex-col gap-0.5 overflow-y-auto">
-							<li>
-								<button type="button" role="menuitem" class="flex min-h-10 w-full items-center rounded-lg px-3 text-left text-[0.8125rem] text-ink hover:bg-surface-2" onclick={() => { close(); void bulkPlace(null); }}>
-									{m.devices_list_bulk_location_auto()}
-								</button>
-							</li>
-							{#each bulkLocations as location (location.id)}
-								<li>
-									<button type="button" role="menuitem" class="flex min-h-10 w-full items-center rounded-lg px-3 text-left text-[0.8125rem] text-ink hover:bg-surface-2" onclick={() => { close(); void bulkPlace(location.id); }}>
-										{location.name}
-									</button>
-								</li>
-							{/each}
-						</ul>
-					{/snippet}
-				</Menu>
-			{/if}
-			{#if bulkRelays.length > 0}
-				<Menu label={m.devices_list_bulk_relay()} align="left" placement="up">
-					{#snippet trigger({ toggle, open })}
-						<Button size="sm" variant="secondary" disabled={bulkBusy || selectedTargets.length === 0} aria-haspopup="menu" aria-expanded={open} onclick={toggle}>
-							<RadioTower class="size-4" aria-hidden="true" />
-							{m.devices_list_bulk_relay()}
-						</Button>
-					{/snippet}
-					{#snippet children({ close })}
-						<ul class="flex max-h-72 min-w-48 flex-col gap-0.5 overflow-y-auto">
-							<li>
-								<button type="button" role="menuitem" class="flex min-h-10 w-full items-center rounded-lg px-3 text-left text-[0.8125rem] text-ink hover:bg-surface-2" onclick={() => { close(); void bulkRelay(null); }}>
-									{m.devices_list_bulk_relay_direct()}
-								</button>
-							</li>
-							{#each bulkRelays as relay (relay.id)}
-								<li>
-									<button type="button" role="menuitem" class="flex min-h-10 w-full items-center rounded-lg px-3 text-left text-[0.8125rem] text-ink hover:bg-surface-2" onclick={() => { close(); void bulkRelay(relay); }}>
-										{relay.site ? m.deviceform_form_relay_site({ name: relay.name, site: relay.site }) : relay.name}
-									</button>
-								</li>
-							{/each}
-						</ul>
-					{/snippet}
-				</Menu>
-			{/if}
-			<Menu label={m.devices_list_bulk_cve()} align="left" placement="up">
+			<!-- Location, relay and CVE check: rarer, so they share one menu. -->
+			<Menu label={m.devices_list_bulk_more()} align="left" placement="up">
 				{#snippet trigger({ toggle, open })}
-					<Button size="sm" variant="secondary" disabled={bulkBusy || selectedTargets.length === 0} aria-haspopup="menu" aria-expanded={open} onclick={() => { cveArmed = false; toggle(); }}>
-						<ShieldCheck class="size-4" aria-hidden="true" />
-						{m.devices_list_bulk_cve()}
+					<Button size="sm" variant="ghost" disabled={bulkBusy || selectedTargets.length === 0} aria-haspopup="menu" aria-expanded={open} onclick={() => { cveArmed = false; toggle(); }}>
+						<EllipsisVertical class="size-4" aria-hidden="true" />
+						{m.devices_list_bulk_more()}
 					</Button>
 				{/snippet}
 				{#snippet children({ close })}
-					<ul class="flex min-w-48 flex-col gap-0.5">
-						<li>
-							<button type="button" role="menuitem" class="flex min-h-10 w-full items-center rounded-lg px-3 text-left text-[0.8125rem] text-ink hover:bg-surface-2" onclick={() => { close(); void bulkCve(true); }}>
-								{m.devices_list_bulk_cve_on()}
+					<div class="flex w-64 max-w-full flex-col gap-0.5">
+						{#if bulkLocations.length > 0}
+							<p class={bulkHeading}><MapPin class="size-3.5" aria-hidden="true" />{m.devices_list_bulk_location()}</p>
+							<button type="button" role="menuitem" class={bulkItem} onclick={() => { close(); void bulkPlace(null); }}>
+								{m.devices_list_bulk_location_auto()}
 							</button>
-						</li>
-						<li>
-							<button
-								type="button"
-								role="menuitem"
-								class={`flex min-h-10 w-full items-center rounded-lg px-3 text-left text-[0.8125rem] hover:bg-surface-2 ${cveArmed ? 'font-semibold text-warning-ink' : 'text-ink'}`}
-								onclick={() => {
-									if (!cveArmed) {
-										cveArmed = true;
-										return;
-									}
-									cveArmed = false;
-									close();
-									void bulkCve(false);
-								}}
-							>
-								{cveArmed ? m.devices_list_bulk_cve_off_confirm({ count: selectedTargets.length }) : m.devices_list_bulk_cve_off()}
+							{#each bulkLocations as location (location.id)}
+								<button type="button" role="menuitem" class={bulkItem} onclick={() => { close(); void bulkPlace(location.id); }}>
+									{location.name}
+								</button>
+							{/each}
+						{/if}
+						{#if bulkRelays.length > 0}
+							<p class={`${bulkHeading} ${bulkLocations.length > 0 ? 'mt-1 border-t border-line pt-2' : ''}`}><RadioTower class="size-3.5" aria-hidden="true" />{m.devices_list_bulk_relay()}</p>
+							<button type="button" role="menuitem" class={bulkItem} onclick={() => { close(); void bulkRelay(null); }}>
+								{m.devices_list_bulk_relay_direct()}
 							</button>
-						</li>
-					</ul>
+							{#each bulkRelays as relay (relay.id)}
+								<button type="button" role="menuitem" class={bulkItem} onclick={() => { close(); void bulkRelay(relay); }}>
+									{relay.site ? m.deviceform_form_relay_site({ name: relay.name, site: relay.site }) : relay.name}
+								</button>
+							{/each}
+						{/if}
+						<p class={`${bulkHeading} ${bulkLocations.length > 0 || bulkRelays.length > 0 ? 'mt-1 border-t border-line pt-2' : ''}`}><ShieldCheck class="size-3.5" aria-hidden="true" />{m.devices_list_bulk_cve()}</p>
+						<button type="button" role="menuitem" class={bulkItem} onclick={() => { close(); void bulkCve(true); }}>
+							{m.devices_list_bulk_cve_on()}
+						</button>
+						<button
+							type="button"
+							role="menuitem"
+							class={`${bulkItem} ${cveArmed ? 'font-semibold text-warning-ink' : ''}`}
+							onclick={() => {
+								if (!cveArmed) {
+									cveArmed = true;
+									return;
+								}
+								cveArmed = false;
+								close();
+								void bulkCve(false);
+							}}
+						>
+							{cveArmed ? m.devices_list_bulk_cve_off_confirm({ count: selectedTargets.length }) : m.devices_list_bulk_cve_off()}
+						</button>
+					</div>
 				{/snippet}
 			</Menu>
+			<span class="flex-1 max-sm:hidden" aria-hidden="true"></span>
 			<Confirm confirmLabel={m.devices_list_bulk_delete_confirm({ count: selectedTargets.length })} loading={bulkBusy} disabled={bulkBusy || selectedTargets.length === 0} onconfirm={bulkDelete}>
 				<Trash2 class="size-4" aria-hidden="true" />
 				{m.devices_list_bulk_delete()}
@@ -1523,7 +1475,8 @@
 					rows={section.rows}
 					{sparklines}
 					{kindLabels}
-					{siteNames}
+					{sites}
+					{showSite}
 					reorder={canReorder ? reorderControls() : null}
 					layout={view}
 					{names}
@@ -1549,7 +1502,7 @@
 					</button>
 				{/if}
 				{#if disabledExpanded}
-					<RackList rows={disabledRows} {sparklines} {kindLabels} {siteNames} layout={view} {names} {alertCounts} {selection} />
+					<RackList rows={disabledRows} {sparklines} {kindLabels} {sites} {showSite} layout={view} {names} {alertCounts} {selection} />
 				{/if}
 			</section>
 		{/if}

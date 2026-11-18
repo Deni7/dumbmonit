@@ -2,8 +2,8 @@
 	import { m } from '#lib/paraglide/messages.js';
 	/**
 	 * The rack itself, in one of two layouts (`view.ts`): one dense line each
-	 * with children indented under their parent, or tiles in a grid (entrance
-	 * staggered 30 ms apart). Ordering lives in `rack.ts`.
+	 * with children indented under their parent, or plain tiles in a grid.
+	 * Ordering lives in `rack.ts`.
 	 *
 	 * `reorder`, when given, makes the row itself the drag surface — no
 	 * separate handle. Pointer-based (mouse and touch — HTML5 drag-and-drop
@@ -57,8 +57,10 @@
 		sparklines: Map<TargetId, Serie[]>;
 		/** kind → human label, from the collectors list. */
 		kindLabels: Map<string, string>;
-		/** location id → name, for the site badge. */
-		siteNames?: Map<number, string>;
+		/** location id → name and code, for the site badge. */
+		sites?: Map<number, { code: string; name: string }>;
+		/** Show the site badge: off when the list is already filtered to one site. */
+		showSite?: boolean;
 		reorder?: ReorderControls | null;
 		/** One dense line each (default) or tiles in a grid. */
 		layout?: RackView;
@@ -72,16 +74,16 @@
 		selection?: RowSelection | null;
 	}
 
-	let { rows, sparklines, kindLabels, siteNames = new Map(), reorder = null, layout = 'compact', names = new Map(), security = new Map(), alertCounts = new Map(), selection = null }: Props = $props();
+	let { rows, sparklines, kindLabels, sites = new Map(), showSite = true, reorder = null, layout = 'compact', names = new Map(), security = new Map(), alertCounts = new Map(), selection = null }: Props = $props();
 
 	const LIST_CLASS: Record<RackView, string> = {
-		compact: 'flex flex-col divide-y divide-line rounded-[var(--radius-card)] border border-line bg-surface shadow-lift',
+		compact: 'flex flex-col divide-y divide-line rounded-[var(--radius-card)] border border-line bg-surface',
 		tiles: 'grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-3 max-sm:grid-cols-2 max-sm:gap-2'
 	};
 </script>
 
 <ol class={LIST_CLASS[layout]} aria-label={m.devices_rack_aria()}>
-	{#each rows as row, i (row.target.id)}
+	{#each rows as row (row.target.id)}
 		{@const id = row.target.id}
 		{@const slot = reorder?.dropSlot?.id === id ? reorder.dropSlot : null}
 		{@const isDragging = reorder?.dragging === id}
@@ -92,7 +94,7 @@
 					target={row.target}
 					state={row.state}
 					kindLabel={kindLabels.get(row.target.kind)}
-					site={row.target.location_id != null ? (siteNames.get(row.target.location_id) ?? null) : null}
+					site={showSite && row.target.location_id != null ? (sites.get(row.target.location_id) ?? null) : null}
 					depth={row.depth}
 					shadowed={row.shadowed}
 					security={security.get(row.target.id) ?? null}
@@ -103,7 +105,7 @@
 					target={row.target}
 					state={row.state}
 					kindLabel={kindLabels.get(row.target.kind)}
-					site={row.target.location_id != null ? (siteNames.get(row.target.location_id) ?? null) : null}
+					site={showSite && row.target.location_id != null ? (sites.get(row.target.location_id) ?? null) : null}
 					sparkline={sparklines.get(row.target.id) ?? null}
 					parentName={row.target.parent_id !== null ? (names.get(row.target.parent_id) ?? null) : null}
 					shadowed={row.shadowed}
@@ -119,8 +121,7 @@
 			cost more than building them.
 		-->
 		<li
-			class={`relative flex min-w-0 items-stretch gap-1.5 first:rounded-t-[inherit] last:rounded-b-[inherit] ${layout === 'compact' ? 'overflow-hidden [content-visibility:auto] [contain-intrinsic-block-size:auto_2.75rem]' : 'rise-in'}`}
-			style="--rise-delay: {Math.min(i, 14) * 30}ms;"
+			class={`relative flex min-w-0 items-stretch gap-1.5 first:rounded-t-[inherit] last:rounded-b-[inherit] ${layout === 'compact' ? 'overflow-hidden [content-visibility:auto] [contain-intrinsic-block-size:auto_3rem]' : ''}`}
 			{@attach (node) => {
 				reorder?.registerRow(id, node);
 				return () => reorder?.registerRow(id, null);
@@ -144,7 +145,7 @@
 			{#if selection}
 				<label
 					class={layout === 'tiles'
-						? 'absolute top-2 right-9 z-10 flex size-8 cursor-pointer items-center justify-center'
+						? 'absolute -top-2 -left-2 z-10 flex size-10 cursor-pointer items-center justify-center'
 						: 'flex w-9 shrink-0 cursor-pointer items-center justify-center'}
 				>
 					<input
