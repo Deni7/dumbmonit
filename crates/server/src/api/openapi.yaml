@@ -3932,7 +3932,7 @@ paths:
       description: >-
         A full replacement: `title` is required and every omitted field goes back
         to its default — except `accent`, `footer_text`, `homepage_url`,
-        `subscribe_channel_id` and `domain`, which keep their stored value when omitted.
+        `subscribe_channel_id`, `domain` and `hide_branding`, which keep their stored value when omitted.
       x-token-scope: write
       requestBody:
         required: true
@@ -3987,6 +3987,30 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/StatusPageItem" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/status-pages/{id}/preview:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      operationId: previewStatusPage
+      tags: [Status pages]
+      summary: Editor preview of a status page
+      description: >-
+        The public document of the saved page, published or not and whatever its
+        access mode, for the page editor. Each service also carries `target_id`,
+        the monitor it shows, so the editor can keep its state and history while
+        the page is being changed. Never cached; the public route never carries
+        `target_id`.
+      x-token-scope: read
+      responses:
+        "200":
+          description: The page as visitors would read it.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicStatus" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -13414,6 +13438,7 @@ components:
         seo: { $ref: "#/components/schemas/StatusPageSeo" }
         access_mode: { type: string, enum: [public, password, users], description: "Who can read the page; set through `PUT /api/status-pages/{id}/access`." }
         has_password: { type: boolean, description: A page password is stored (the hash is never returned). }
+        hide_branding: { type: boolean, description: "White label: the public page shows no DumbMonit name, icon or app name; its browser-tab icon is the page logo, or none." }
         group_labels:
           type: array
           items: { $ref: "#/components/schemas/StatusPageGroupLabel" }
@@ -13487,6 +13512,7 @@ components:
         simple: { type: boolean, default: false, description: Omitted keeps the saved value. }
         show_calendar: { type: boolean, default: false, description: Public 90-day calendar. Omitted keeps the saved value. }
         show_latency: { type: boolean, default: false, description: Public response-time graph per service. Omitted keeps the saved value. }
+        hide_branding: { type: boolean, default: false, description: "White label: nothing of DumbMonit on the public page (tab title, icon, app name). The tab icon becomes the page logo, or none. Omitted keeps the saved value." }
         subscribe_channel_id: { type: [integer, "null"], format: int64, description: "An `smtp` channel; `null` turns email subscription off." }
         seo:
           $ref: "#/components/schemas/StatusPageSeo"
@@ -13615,6 +13641,7 @@ components:
               items: { type: string, enum: [email, sms, webhook, slack] }
             show_calendar: { type: boolean, description: Present (true) only when the page shows the calendar. }
             show_latency: { type: boolean, description: Present (true) only when the page shows response times. }
+            hide_branding: { type: boolean, description: "White label: the page names nothing of DumbMonit; the tab icon is the logo, or none." }
             seo:
               type: object
               description: Effective search-engine values (settings, or defaults built from the page name).
@@ -13651,6 +13678,7 @@ components:
                   type: object
                   properties:
                     key: { type: string }
+                    target_id: { type: integer, format: int64, description: "Editor preview (`GET /api/status-pages/{id}/preview`) only: the monitor of the service." }
                     label: { type: string }
                     state: { type: string }
                     uptime_24h: { type: [number, "null"] }

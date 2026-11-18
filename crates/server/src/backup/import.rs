@@ -1484,6 +1484,22 @@ async fn restore_status_pages(
             .await
             .context("mode simple de la page de statut")?;
 
+        // Marque blanche : absente (ancienne sauvegarde), la page garde son réglage.
+        if let Some(hide) = page.hide_branding {
+            let changed = sqlx::query(
+                "UPDATE status_pages SET hide_branding = ? WHERE id = ? AND hide_branding != ?",
+            )
+            .bind(i64::from(hide))
+            .bind(id)
+            .bind(i64::from(hide))
+            .execute(&mut **tx)
+            .await
+            .context("marque blanche de la page de statut")?;
+            if changed.rows_affected() > 0 && outcome == RestoreOutcome::Skipped {
+                outcome = RestoreOutcome::Updated;
+            }
+        }
+
         // Accès : revalidé contre le jeu fermé. Absent (page publique, ou ancienne
         // sauvegarde), la page garde son accès.
         if let Some(mode) = page.access_mode.as_deref()

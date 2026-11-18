@@ -363,6 +363,7 @@ async fn seed_status_pages(
                 // `/s/<slug>`.
                 domain: None,
                 seo: Default::default(),
+                hide_branding: false,
                 groups: None,
                 group_labels: None,
             },

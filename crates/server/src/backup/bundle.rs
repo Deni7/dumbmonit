@@ -709,6 +709,10 @@ pub struct BundleStatusPage {
     /// voyagent pas. Absent d'une ancienne sauvegarde : réglages inchangés.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subscriptions: Option<BundleSubscriptions>,
+    /// Marque blanche (migration 0243). Absent d'une ancienne sauvegarde : la
+    /// page garde son réglage (`false` sur une page créée).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hide_branding: Option<bool>,
 }
 
 /// Nom public d'une surveillance arrivée par un groupe coché.
