@@ -17,6 +17,7 @@ pub mod gateway;
 pub mod guard;
 pub mod http;
 pub mod incident;
+pub mod mail_server;
 pub mod message;
 pub mod messaging;
 pub mod oncall;

@@ -138,6 +138,7 @@ pub async fn restore(
     report.push(restore_agent_enrolment(&mut tx, bundle).await?);
     report.push(restore_wall_weather(&mut tx, bundle).await?);
     report.push(restore_agent_update_rollout(&mut tx, bundle).await?);
+    report.push(restore_mail_server(&mut tx, cipher, bundle).await?);
     report.push(restore_instance(&mut tx, bundle).await?);
     report.push(restore_silences(&mut tx, bundle, &refs).await?);
     report.push(restore_status_pages(&mut tx, bundle, &refs).await?);
@@ -966,6 +967,80 @@ async fn restore_wall_weather(
     Ok(report)
 }
 
+/// Serveur de courriel de l'instance : remplacé par celui du lot, mot de
+/// passe compris (rechiffré par la clé de cette instance). Un lot sans section
+/// ne touche pas au réglage ; un réglage illisible est signalé et laissé de côté.
+async fn restore_mail_server(
+    tx: &mut Transaction<'_, Sqlite>,
+    cipher: &Cipher,
+    bundle: &Bundle,
+) -> Result<SectionReport> {
+    use crate::notify::mail_server::{PASSWORD_KEY, SETTINGS_KEY, check_password};
+    let mut report = SectionReport::new("mail_server");
+    let Some(saved) = &bundle.mail_server else { return Ok(report) };
+    let server = saved.server.clone().trimmed();
+    let password = saved.password.as_deref().filter(|password| !password.is_empty());
+    if !server.is_configured()
+        || server.validate().is_err()
+        || password.is_some_and(|password| check_password(password).is_err())
+    {
+        report.skipped += 1;
+        report.notes.push("The email server settings of the backup are unreadable".into());
+        return Ok(report);
+    }
+    let value = serde_json::to_vec(&server)?;
+    let existing: Option<Vec<u8>> =
+        sqlx::query_scalar("SELECT value FROM settings WHERE key = ?")
+            .bind(SETTINGS_KEY)
+            .fetch_optional(&mut **tx)
+            .await
+            .context("lecture du serveur de courriel")?;
+    let sealed: Option<Vec<u8>> = sqlx::query_scalar("SELECT value FROM settings WHERE key = ?")
+        .bind(PASSWORD_KEY)
+        .fetch_optional(&mut **tx)
+        .await
+        .context("lecture du mot de passe du serveur de courriel")?;
+    let stored_password = sealed.and_then(|sealed| cipher.decrypt(&sealed).ok());
+    if existing.as_deref() == Some(value.as_slice())
+        && stored_password.as_deref() == password.map(str::as_bytes)
+    {
+        report.skipped += 1;
+        return Ok(report);
+    }
+    let write = "INSERT INTO settings (key, value) VALUES (?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value,
+             updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')";
+    sqlx::query(write)
+        .bind(SETTINGS_KEY)
+        .bind(&value)
+        .execute(&mut **tx)
+        .await
+        .context("écriture du serveur de courriel")?;
+    match password {
+        Some(password) => {
+            sqlx::query(write)
+                .bind(PASSWORD_KEY)
+                .bind(cipher.encrypt(password.as_bytes())?)
+                .execute(&mut **tx)
+                .await
+                .context("écriture du mot de passe du serveur de courriel")?;
+        }
+        None => {
+            sqlx::query("DELETE FROM settings WHERE key = ?")
+                .bind(PASSWORD_KEY)
+                .execute(&mut **tx)
+                .await
+                .context("effacement du mot de passe du serveur de courriel")?;
+        }
+    }
+    report.count(if existing.is_some() {
+        RestoreOutcome::Updated
+    } else {
+        RestoreOutcome::Created
+    });
+    Ok(report)
+}
+
 /// Garde de l'enrôlement des agents (validation, débit, mise en veille) :
 /// remplacée par celle du lot, après contrôle. Un réglage illisible est
 /// signalé et laissé de côté, l'instance garde le sien.
@@ -1639,16 +1714,24 @@ async fn restore_status_pages(
                     ));
                 }
             }
+            // Une sauvegarde d'avant l'interrupteur (0246) ouvrait le courriel
+            // en nommant un canal ; sans canal ni interrupteur, rien ne change.
+            let email_open = subscriptions
+                .email
+                .or(subscriptions.email_channel.as_ref().map(|_| true))
+                .map(i64::from);
             sqlx::query(
                 "UPDATE status_pages SET subscribe_webhook = ?, subscribe_slack = ?,
                      subscribe_channel_id = COALESCE(?, subscribe_channel_id),
-                     subscribe_sms_channel_id = COALESCE(?, subscribe_sms_channel_id)
+                     subscribe_sms_channel_id = COALESCE(?, subscribe_sms_channel_id),
+                     subscribe_email = COALESCE(?, subscribe_email)
                  WHERE id = ?",
             )
             .bind(i64::from(subscriptions.webhook))
             .bind(i64::from(subscriptions.slack))
             .bind(email)
             .bind(sms)
+            .bind(email_open)
             .bind(id)
             .execute(&mut **tx)
             .await

@@ -6,9 +6,11 @@
 //! message porte un lien de désabonnement ; le courriel ajoute les en-têtes du
 //! désabonnement en un clic.
 //!
-//! Le courriel passe par un canal SMTP, le SMS par un canal Vonage, Telnyx ou
-//! ASPSMS déjà configurés dans les notifications ; webhook et Slack ne
-//! demandent rien, le visiteur donne son URL. Sans canal ouvert, la page ne
+//! Le courriel s'ouvre d'un interrupteur et part par le serveur de courriel de
+//! l'instance (`notify::mail_server`), ou par le canal SMTP choisi pour la
+//! page, prioritaire ; le SMS passe par un canal Vonage, Telnyx ou ASPSMS déjà
+//! configuré dans les notifications ; webhook et Slack ne demandent rien, le
+//! visiteur donne son URL. Sans canal ouvert, la page ne
 //! propose que son flux RSS. Le point d'inscription est public : il est limité
 //! par adresse de client, par page et globalement, pour que la page ne devienne
 //! pas un relais de messages vers des inconnus.
@@ -139,17 +141,21 @@ fn too_many(retry_after: u64) -> Response {
 // Canal et liens
 // --------------------------------------------------------------------------
 
-/// Canal SMTP actif choisi par la page, s'il y en a un.
+/// Ce qui envoie les courriels des abonnés de la page : le canal SMTP qu'elle a
+/// choisi, s'il est actif, sinon le serveur de courriel de l'instance. `None` :
+/// abonnement par courriel fermé, ou rien pour l'envoyer.
 async fn channel_of(state: &AppState, page: &StatusPage) -> Option<ChannelConfig> {
-    let id = page.subscribe_channel_id?;
-    match db::alerts::get_channel(&state.pool, &state.cipher, id).await {
-        Ok(Some(channel)) if channel.enabled && channel.kind == "smtp" => Some(channel),
-        Ok(_) => None,
-        Err(error) => {
-            tracing::warn!(%error, "status page: subscription channel unreadable");
-            None
+    if !page.subscribe_email {
+        return None;
+    }
+    if let Some(id) = page.subscribe_channel_id {
+        match db::alerts::get_channel(&state.pool, &state.cipher, id).await {
+            Ok(Some(channel)) if channel.enabled && channel.kind == "smtp" => return Some(channel),
+            Ok(_) => {}
+            Err(error) => tracing::warn!(%error, "status page: subscription channel unreadable"),
         }
     }
+    crate::notify::mail_server::channel(&state.pool, &state.cipher).await
 }
 
 /// Canal SMS choisi par la page, s'il est actif et d'un type qui envoie des SMS.
@@ -470,7 +476,7 @@ pub async fn subscribe(
                  address is forgotten within two days.\n\n-- \n{title}\n{home}\n",
             );
             tokio::spawn(async move {
-                let result = match Smtp::new(&channel) {
+                let result = match Smtp::sender(&channel) {
                     Ok(smtp) => smtp.send_to(&destination, &subject, body, None).await,
                     Err(error) => Err(error),
                 };
@@ -863,7 +869,7 @@ async fn announce_now(
             continue;
         }
         let Some(channel) = channel_of(state, &page).await else { continue };
-        let smtp = match Smtp::new(&channel) {
+        let smtp = match Smtp::sender(&channel) {
             Ok(smtp) => smtp,
             Err(error) => {
                 tracing::warn!(%error, "status page: subscription channel misconfigured");

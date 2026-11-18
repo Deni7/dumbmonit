@@ -569,6 +569,7 @@ mod tests {
             access_mode: "public".into(),
             has_password: false,
             hide_branding: false,
+            subscribe_email: false,
         }
     }
 

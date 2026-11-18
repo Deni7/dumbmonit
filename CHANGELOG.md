@@ -7,6 +7,16 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Email server in Settings.** Settings › Notifications › Email server takes one SMTP server for the
+  instance (host, port, STARTTLS / TLS / none, username, password, sender address and name), with
+  "Send a test email" that shows the server's own error when it fails. The password is stored
+  encrypted, never shown again and backed up with the other secrets. The `DUMBMONIT_SMTP_*`
+  variables can set it instead; the setting is then read-only.
+- **Email subscriptions in one switch.** A status page offers email subscriptions with "Let visitors
+  subscribe by email", sent through the email server: no notification channel to create first. A
+  page that used an email channel keeps it (it still wins while enabled), and SMS, webhook and Slack
+  subscriptions are unchanged. Scheduled reports also fall back on the email server when no email
+  channel is enabled.
 - **Swiss cross.** A "Made in Switzerland" cross in the side bar next to the name, and one beside the
   name on the sign-in page with a tagline under it: "Monitoring with Swiss precision" (translated in
   the nine languages).

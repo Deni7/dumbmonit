@@ -39,7 +39,8 @@ pub struct StatusPage {
     pub homepage_url: String,
     /// Type MIME du logo déposé ; `None` : pas de logo.
     pub logo_type: Option<String>,
-    /// Canal SMTP des abonnés ; `None` : pas d'abonnement par courriel.
+    /// Canal SMTP choisi pour les abonnés ; `None` : le serveur de courriel de
+    /// l'instance (`notify::mail_server`), si l'abonnement est ouvert.
     pub subscribe_channel_id: Option<i64>,
     /// Base des liens des courriels, vue par l'administrateur (voir la migration).
     #[serde(skip)]
@@ -57,6 +58,8 @@ pub struct StatusPage {
     /// Marque blanche (migration 0243) : aucune mention de DumbMonit sur la page
     /// publique ; son icône d'onglet est le logo de la page, ou aucune.
     pub hide_branding: bool,
+    /// Abonnement par courriel ouvert aux visiteurs (migration 0246).
+    pub subscribe_email: bool,
 }
 
 impl StatusPage {
@@ -134,7 +137,8 @@ macro_rules! select_page {
             "SELECT id, slug, title, description, published, theme, show_uptime_days, ",
             "created_at, updated_at, accent, scenes, scene_rotation, simple, show_calendar, show_latency, footer_text, homepage_url, ",
             "logo_type, subscribe_channel_id, link_origin, domain, seo, access_mode, ",
-            "(access_password_hash IS NOT NULL) AS has_password, hide_branding FROM status_pages ",
+            "(access_password_hash IS NOT NULL) AS has_password, hide_branding, subscribe_email ",
+            "FROM status_pages ",
             $tail
         )
     };
@@ -165,6 +169,7 @@ pub struct StatusPageInput {
     /// Déjà validé (`status_seo::Seo::validate`).
     pub seo: crate::status_seo::Seo,
     pub hide_branding: bool,
+    pub subscribe_email: bool,
     /// Groupes cochés, dans l'ordre ; `None` : inchangés.
     pub groups: Option<Vec<String>>,
     /// Noms publics des membres de groupes ; `None` : inchangés.
@@ -263,8 +268,8 @@ pub async fn create_page(pool: &SqlitePool, input: &StatusPageInput) -> Result<i
     let (id,): (i64,) = sqlx::query_as(
         "INSERT INTO status_pages (slug, title, description, published, theme, show_uptime_days,
              accent, scenes, scene_rotation, simple, show_calendar, show_latency, footer_text, homepage_url,
-             subscribe_channel_id, link_origin, domain, seo, hide_branding)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             subscribe_channel_id, link_origin, domain, seo, hide_branding, subscribe_email)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          RETURNING id",
     )
     .bind(&input.slug)
@@ -286,6 +291,7 @@ pub async fn create_page(pool: &SqlitePool, input: &StatusPageInput) -> Result<i
     .bind(&input.domain)
     .bind(input.seo.to_json())
     .bind(i64::from(input.hide_branding))
+    .bind(i64::from(input.subscribe_email))
     .fetch_one(pool)
     .await
     .context("création de la page de statut")?;
@@ -361,7 +367,7 @@ pub async fn update_page(pool: &SqlitePool, id: i64, input: &StatusPageInput) ->
              show_uptime_days = ?, accent = ?, scenes = ?, scene_rotation = ?, simple = ?,
              show_calendar = ?, show_latency = ?,
              footer_text = ?, homepage_url = ?, subscribe_channel_id = ?, link_origin = ?,
-             domain = ?, seo = ?, hide_branding = ?,
+             domain = ?, seo = ?, hide_branding = ?, subscribe_email = ?,
              updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
          WHERE id = ?",
     )
@@ -384,6 +390,7 @@ pub async fn update_page(pool: &SqlitePool, id: i64, input: &StatusPageInput) ->
     .bind(&input.domain)
     .bind(input.seo.to_json())
     .bind(i64::from(input.hide_branding))
+    .bind(i64::from(input.subscribe_email))
     .bind(id)
     .execute(pool)
     .await
