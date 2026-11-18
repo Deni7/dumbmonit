@@ -29,10 +29,7 @@ pub fn routes() -> Router<AppState> {
         .route("/reports/schedules/{id}", get(get_one).put(update).delete(remove))
         .route("/reports/schedules/{id}/send-test", post(send_test))
         .route("/reports/sla", get(download_sla))
-        .route(
-            "/reports/logo",
-            get(report_logo).put(upload_report_logo).delete(delete_report_logo),
-        )
+        .route("/reports/logo", get(report_logo).put(upload_report_logo).delete(delete_report_logo))
 }
 
 #[derive(Debug, Serialize)]
