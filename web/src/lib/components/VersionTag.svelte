@@ -12,7 +12,6 @@
 	 */
 	import { getHealth } from '#lib/api/index.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
-	import SwissCross from '#lib/components/SwissCross.svelte';
 	import UpdatePill from '#lib/components/UpdatePill.svelte';
 
 	let { inline = false }: { inline?: boolean } = $props();
@@ -34,7 +33,6 @@
 			title={version.build ? `Version ${version.number}, build ${version.build}` : `Version ${version.number}`}
 			>v{version.number}{#if version.build}<span class="font-mono"> · {version.build}</span>{/if}</a
 		>
-		<SwissCross class="size-3" />
 	</div>
 {/if}
 

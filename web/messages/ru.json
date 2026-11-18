@@ -957,8 +957,6 @@
 	"console_kpi_availability": "Доступность 30 д",
 	"console_kpi_availability_note": "Измерено мониторов: {count}",
 	"console_kpi_none": "Данных пока нет",
-	"console_kpi_p95": "Ответ p95",
-	"console_kpi_p95_note": "Период: {range}",
 	"console_kpi_up": "Мониторы в норме",
 	"console_kpi_up_note": "Недоступны: {down}, приостановлены: {paused}",
 	"console_kpi_up_unit": "/ {total}",
@@ -2447,7 +2445,6 @@
 	"devices_target_details": "Сведения о мониторе",
 	"devices_target_disabled_empty": "Этот монитор отключён. Включите его, чтобы собирать данные.",
 	"devices_target_enable": "Включить",
-	"devices_target_enabled": "Включено",
 	"devices_target_err_availability": "Не удалось загрузить данные о доступности",
 	"devices_target_err_delete": "Не удалось удалить этот монитор",
 	"devices_target_err_enabled": "Не удалось изменить состояние включения",
@@ -5592,11 +5589,6 @@
 	"overview_ack_err": "Не удалось подтвердить этот монитор.",
 	"overview_ack_hint": "Вижу, занимаюсь: тишина до возвращения в норму.",
 	"overview_ack_item": "Подтвердить",
-	"overview_alerts_fired": "Сработало",
-	"overview_alerts_hint": "Сработало: {fired}, решено: {resolved}",
-	"overview_alerts_none": "За последние {days} дн. оповещений не было.",
-	"overview_alerts_resolved": "Решено",
-	"overview_alerts_title": "Оповещения за {days} дн.",
 	"overview_all_good_text": "Ничего не упало, и ни одно оповещение вас не ждёт. Голубь дремлет.",
 	"overview_all_good_title": "Всё в порядке",
 	"overview_chart_error": "Не удалось загрузить график. Повторная попытка через минуту.",
@@ -5623,30 +5615,9 @@
 	"overview_first_test_text": "Отправьте тест из канала. Шаг станет зелёным, когда сообщение действительно уйдёт.",
 	"overview_first_test_title": "Проверьте, что сообщение доходит",
 	"overview_first_title": "Ваши первые пять минут",
-	"overview_fleet_availability": "{percent} % за 24 ч",
-	"overview_fleet_bar_label": "Последние 24 часа, старые слева",
-	"overview_fleet_calm": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "Всё работает · {count} монитор",
-				"countPlural=few": "Всё работает · {count} монитора",
-				"countPlural=many": "Всё работает · {count} мониторов",
-				"countPlural=other": "Всё работает · {count} монитора"
-			}
-		}
-	],
-	"overview_fleet_down_for": "Не работает {duration}",
 	"overview_fleet_tile_title": "{name}: {status}",
 	"overview_fleet_tiles_label": "Все мониторы, сначала проблемные",
 	"overview_fleet_title": "Состояние парка",
-	"overview_fleet_wrong_title": "Что не так",
 	"overview_latency_empty": "За этот период время ответа ещё не измерялось.",
 	"overview_latency_hint": "p95 и медиана всех проверок за {range}",
 	"overview_latency_median": "Медиана",
@@ -5855,25 +5826,6 @@
 	"overview_sky_plate_unreachable": "Недоступен",
 	"overview_sky_sentence": "{parts}.",
 	"overview_sky_waiting": "Ожидание первых данных",
-	"overview_week_more": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "ещё {count}",
-				"countPlural=few": "ещё {count}",
-				"countPlural=many": "ещё {count}",
-				"countPlural=other": "ещё {count}"
-			}
-		}
-	],
-	"overview_week_none": "В ближайшие 7 дней ничего не истекает.",
-	"overview_week_title": "Ближайшая неделя",
 	"push_runs_description": "Каждый старт, успех и сбой, о которых сообщила задача, от новых к старым.",
 	"push_runs_duration": "заняло {duration}",
 	"push_runs_duration_unknown": "длительность неизвестна",
@@ -9331,5 +9283,15 @@
 	"deviceform_picker_facets_label": "Фильтры",
 	"deviceform_picker_no_match_filters": "Ничего не подходит под эти фильтры.",
 	"deviceform_picker_pack_learn": "Как работают пакеты",
-	"deviceform_picker_pack_note": "Пакеты сообщества добавляют типы мониторов из одного YAML-файла, без кода и без нового релиза. Устанавливайте их в настройках."
+	"deviceform_picker_pack_note": "Пакеты сообщества добавляют типы мониторов из одного YAML-файла, без кода и без нового релиза. Устанавливайте их в настройках.",
+	"overview_incidents_title": "Инциденты за последние {days} дн.",
+	"overview_incidents_explain": "Инцидент начинается, когда срабатывает оповещение, и заканчивается, когда оно разрешено. Один столбец на день.",
+	"overview_incidents_count_label": "Инциденты",
+	"overview_incidents_open_label": "Время в открытом состоянии",
+	"overview_incidents_before": "Неделей раньше: {value}",
+	"overview_incidents_noisiest": "Самый шумный монитор",
+	"overview_incidents_day_title": "{day}. Инциденты: {count}. Время в открытом состоянии: {duration}.",
+	"overview_incidents_none": "Нет инцидентов за последние {days} дн.",
+	"overview_incidents_bars_label": "Инциденты по дням, самый старый слева",
+	"devices_target_disable": "Отключить"
 }

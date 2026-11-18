@@ -937,8 +937,6 @@
 	"console_kpi_availability": "Disponibilidad 30 d",
 	"console_kpi_availability_note": "Monitores medidos: {count}",
 	"console_kpi_none": "Aún sin datos",
-	"console_kpi_p95": "Respuesta p95",
-	"console_kpi_p95_note": "Intervalo: {range}",
 	"console_kpi_up": "Monitores activos",
 	"console_kpi_up_note": "Caídos: {down}, en pausa: {paused}",
 	"console_kpi_up_unit": "/ {total}",
@@ -2425,7 +2423,6 @@
 	"devices_target_details": "Detalles del monitor",
 	"devices_target_disabled_empty": "Este monitor está desactivado. Actívalo para recopilar datos.",
 	"devices_target_enable": "Activar",
-	"devices_target_enabled": "Activado",
 	"devices_target_err_availability": "No se pudo cargar la disponibilidad",
 	"devices_target_err_delete": "No se pudo eliminar este monitor",
 	"devices_target_err_enabled": "No se pudo cambiar el estado de activación",
@@ -5510,11 +5507,6 @@
 	"overview_ack_err": "No se pudo reconocer este monitor.",
 	"overview_ack_hint": "Visto, me ocupo: en silencio hasta que vuelva a la normalidad.",
 	"overview_ack_item": "Reconocer",
-	"overview_alerts_fired": "Disparadas",
-	"overview_alerts_hint": "Disparadas: {fired}, resueltas: {resolved}",
-	"overview_alerts_none": "No se disparó ninguna alerta en los últimos {days} días.",
-	"overview_alerts_resolved": "Resueltas",
-	"overview_alerts_title": "Alertas, últimos {days} días",
 	"overview_all_good_text": "Nada está caído y ninguna alerta te espera. La paloma se echa una siesta.",
 	"overview_all_good_title": "Todo bien",
 	"overview_chart_error": "No se pudo cargar este gráfico. Se reintenta en un minuto.",
@@ -5541,28 +5533,9 @@
 	"overview_first_test_text": "Envía una prueba desde el canal. Este paso se pone en verde cuando sale un mensaje de verdad.",
 	"overview_first_test_title": "Comprueba que llega un mensaje",
 	"overview_first_title": "Tus primeros cinco minutos",
-	"overview_fleet_availability": "{percent} % en 24 h",
-	"overview_fleet_bar_label": "Últimas 24 horas, la más antigua a la izquierda",
-	"overview_fleet_calm": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "Todo funciona · {count} monitor",
-				"countPlural=other": "Todo funciona · {count} monitores"
-			}
-		}
-	],
-	"overview_fleet_down_for": "Caído desde hace {duration}",
 	"overview_fleet_tile_title": "{name}: {status}",
 	"overview_fleet_tiles_label": "Todos los monitores, los peores primero",
 	"overview_fleet_title": "Salud de la flota",
-	"overview_fleet_wrong_title": "Lo que falla",
 	"overview_latency_empty": "Aún no se midió ningún tiempo de respuesta en este periodo.",
 	"overview_latency_hint": "p95 y mediana de todas las sondas, últimas {range}",
 	"overview_latency_median": "Mediana",
@@ -5751,23 +5724,6 @@
 	"overview_sky_plate_unreachable": "Inaccesible",
 	"overview_sky_sentence": "{parts}.",
 	"overview_sky_waiting": "Esperando los primeros informes",
-	"overview_week_more": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} más",
-				"countPlural=other": "{count} más"
-			}
-		}
-	],
-	"overview_week_none": "Nada vence en los próximos 7 días.",
-	"overview_week_title": "Próxima semana",
 	"push_runs_description": "Cada inicio, éxito y fallo que informó el trabajo, de más reciente a más antiguo.",
 	"push_runs_duration": "duró {duration}",
 	"push_runs_duration_unknown": "duración desconocida",
@@ -9159,5 +9115,15 @@
 	"deviceform_picker_facets_label": "Filtros",
 	"deviceform_picker_no_match_filters": "Nada coincide con estos filtros.",
 	"deviceform_picker_pack_learn": "Cómo funcionan los packs",
-	"deviceform_picker_pack_note": "Los packs de la comunidad añaden tipos de monitor desde un único archivo YAML, sin código ni nueva versión. Instálalos en Ajustes."
+	"deviceform_picker_pack_note": "Los packs de la comunidad añaden tipos de monitor desde un único archivo YAML, sin código ni nueva versión. Instálalos en Ajustes.",
+	"overview_incidents_title": "Incidentes, últimos {days} días",
+	"overview_incidents_explain": "Un incidente empieza cuando salta una alerta y termina cuando se resuelve. Una barra por día.",
+	"overview_incidents_count_label": "Incidentes",
+	"overview_incidents_open_label": "Tiempo abierto",
+	"overview_incidents_before": "Semana anterior: {value}",
+	"overview_incidents_noisiest": "Monitor más ruidoso",
+	"overview_incidents_day_title": "{day}. Incidentes: {count}. Tiempo abierto: {duration}.",
+	"overview_incidents_none": "Ningún incidente en los últimos {days} días.",
+	"overview_incidents_bars_label": "Incidentes por día, el más antiguo a la izquierda",
+	"devices_target_disable": "Desactivar"
 }

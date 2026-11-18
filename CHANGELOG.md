@@ -7,18 +7,27 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- **Swiss cross.** A small "Made in Switzerland" cross after the version number at the foot of the
-  page and beside the name on the sign-in page, and a tagline under it: "Monitoring with Swiss
-  precision" (translated in the nine languages).
+- **Swiss cross.** A "Made in Switzerland" cross in the side bar next to the name, and one beside the
+  name on the sign-in page with a tagline under it: "Monitoring with Swiss precision" (translated in
+  the nine languages).
+- **Incidents of the week, first on the overview.** A block above everything else shows how many
+  incidents the last seven days had (an incident starts when an alert fires and ends when it
+  resolves), how long they stayed open, the figures of the week before, one bar per day and the
+  monitor behind the most of them. It replaces the "Alerts, last 7 days" chart.
 
 ### Changed
 
-- **A plainer overview health panel.** The "health river" gives way to a grid of small tiles, one
-  per monitor (state as a shape and a colour, problems first, shrinking from 10 to 500 monitors),
-  and, below, only what is wrong: each failing monitor with its last 24 hours, how long it has
-  been down and its last error. When all is well, one calm line.
-
-- **Calmer monitor header.** The monitor page header is a flat surface with one main action (Probe now) and Settings; silencing, logs, the on/off switch and Delete sit in a quiet strip below, replacing the row of icon buttons and the "..." menu. Rules ignored on a monitor are no longer listed under its alerts.
+- **A plainer overview.** The "health river" gives way to a grid of small tiles, one per monitor
+  (state as a shape and a colour, problems first, shrinking from 10 to 500 monitors); what is wrong
+  is listed once, under "Needs attention", no longer again beside the tiles. The p95 figure and the
+  "Week ahead" line are gone from the overview (the p95 still has its chart; expiry dates stay on
+  Status › Reports and on each monitor).
+- **Calmer monitor header.** The monitor page header is a flat surface with one main action (Probe
+  now) and a Settings gear. The gear opens a menu: enable or disable, snooze with its durations,
+  logs, Delete (apart, in the danger tone) and, at the foot, Settings. This replaces the row of icon
+  buttons, the "..." menu and the strip under the name. The security badge no longer shows in grey
+  when a monitor has no security grade. Rules ignored on a monitor are no longer listed under its
+  alerts.
 - **Clearer, more detailed Alerts panel.** Each alert row now unfolds with what used to need a trip
   to the monitor: how long it has lasted, the monitor and its address, the rule, the current value
   against its limit, the last check and last data received, the probe error, notifications sent and

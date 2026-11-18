@@ -906,8 +906,6 @@
 	"console_kpi_availability": "30 天可用率",
 	"console_kpi_availability_note": "已测量监控项：{count}",
 	"console_kpi_none": "暂无数据",
-	"console_kpi_p95": "p95 响应",
-	"console_kpi_p95_note": "范围：{range}",
 	"console_kpi_up": "正常监控项",
 	"console_kpi_up_note": "宕机：{down}，已暂停：{paused}",
 	"console_kpi_up_unit": "/ {total}",
@@ -2393,7 +2391,6 @@
 	"devices_target_details": "监控项详情",
 	"devices_target_disabled_empty": "此监控项已停用。启用后才会收集数据。",
 	"devices_target_enable": "启用",
-	"devices_target_enabled": "已启用",
 	"devices_target_err_availability": "无法加载可用性",
 	"devices_target_err_delete": "无法删除此监控项",
 	"devices_target_err_enabled": "无法更改启用状态",
@@ -5455,11 +5452,6 @@
 	"overview_ack_err": "无法确认此监控项。",
 	"overview_ack_hint": "已知晓并在处理：恢复正常前不再通知。",
 	"overview_ack_item": "确认",
-	"overview_alerts_fired": "触发",
-	"overview_alerts_hint": "触发：{fired}，已解决：{resolved}",
-	"overview_alerts_none": "最近 {days} 天没有触发告警。",
-	"overview_alerts_resolved": "已解决",
-	"overview_alerts_title": "告警，最近 {days} 天",
 	"overview_all_good_text": "没有宕机，也没有等待处理的告警。鸽子正在打盹。",
 	"overview_all_good_title": "一切正常",
 	"overview_chart_error": "无法加载此图表，一分钟后重试。",
@@ -5486,27 +5478,9 @@
 	"overview_first_test_text": "在渠道里发送一条测试。消息真正发出后，此步骤会变绿。",
 	"overview_first_test_title": "确认能收到消息",
 	"overview_first_title": "最初的五分钟",
-	"overview_fleet_availability": "24 小时 {percent} %",
-	"overview_fleet_bar_label": "过去 24 小时，最早的在左侧",
-	"overview_fleet_calm": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "一切正常 · {count} 个监控项"
-			}
-		}
-	],
-	"overview_fleet_down_for": "已中断 {duration}",
 	"overview_fleet_tile_title": "{name}: {status}",
 	"overview_fleet_tiles_label": "所有监控项，故障优先",
 	"overview_fleet_title": "整体健康",
-	"overview_fleet_wrong_title": "出问题的项目",
 	"overview_latency_empty": "此时间范围内尚未测得响应时间。",
 	"overview_latency_hint": "所有探测的 p95 和中位数，最近 {range}",
 	"overview_latency_median": "中位数",
@@ -5685,22 +5659,6 @@
 	"overview_sky_plate_unreachable": "无法访问",
 	"overview_sky_sentence": "{parts}。",
 	"overview_sky_waiting": "等待首批上报",
-	"overview_week_more": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "另有 {count} 项"
-			}
-		}
-	],
-	"overview_week_none": "未来 7 天内没有到期事项。",
-	"overview_week_title": "未来一周",
 	"push_runs_description": "任务报告的每次开始、成功和失败，最新的在前。",
 	"push_runs_duration": "耗时 {duration}",
 	"push_runs_duration_unknown": "时长未知",
@@ -9066,5 +9024,15 @@
 	"deviceform_picker_facets_label": "筛选",
 	"deviceform_picker_no_match_filters": "没有符合这些筛选条件的项目。",
 	"deviceform_picker_pack_learn": "包如何工作",
-	"deviceform_picker_pack_note": "社区包通过单个 YAML 文件添加监控类型，无需代码，也无需新版本。请在设置中安装。"
+	"deviceform_picker_pack_note": "社区包通过单个 YAML 文件添加监控类型，无需代码，也无需新版本。请在设置中安装。",
+	"overview_incidents_title": "最近 {days} 天的事件",
+	"overview_incidents_explain": "告警触发时事件开始，告警恢复时事件结束。每天一根柱。",
+	"overview_incidents_count_label": "事件",
+	"overview_incidents_open_label": "持续时间",
+	"overview_incidents_before": "前一周：{value}",
+	"overview_incidents_noisiest": "最吵的监控项",
+	"overview_incidents_day_title": "{day}。事件：{count}。持续时间：{duration}。",
+	"overview_incidents_none": "最近 {days} 天没有事件。",
+	"overview_incidents_bars_label": "每日事件数，最早的在左侧",
+	"devices_target_disable": "停用"
 }

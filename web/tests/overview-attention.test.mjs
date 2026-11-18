@@ -1,7 +1,7 @@
-// The Overview's "Needs attention", week ahead and alerts per day. Run: npm test
+// The Overview's "Needs attention" and incidents of the week. Run: npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { attentionRows, attentionMonitors, weekAhead, alertsPerDay } from '../src/lib/components/overview/attention.ts';
+import { attentionRows, attentionMonitors, incidentWeek } from '../src/lib/components/overview/attention.ts';
 
 const target = (id) => ({ id, name: `m${id}` });
 const device = (id) => ({ kind: 'device', key: `device:${id}`, rank: 0, target: target(id) });
@@ -58,31 +58,46 @@ test('monitors are counted once, alerts without a monitor apart', () => {
 	assert.equal(attentionMonitors(rows), 3);
 });
 
-test('week ahead: within the horizon, expired first, soonest first', () => {
-	const items = [{ days_left: 12 }, { days_left: 3 }, { days_left: -1 }, { days_left: 7 }];
-	assert.deepEqual(
-		weekAhead(items).map((i) => i.days_left),
-		[-1, 3, 7]
-	);
+test('incidents of the week: flapping counts each firing, durations clipped per day, week before compared', () => {
+	const now = new Date(2026, 10, 10, 15, 0, 0).getTime();
+	const utc = (d) => d.toISOString().replace('Z', '');
+	const row = (fingerprint, target_id, when, from_phase, to_phase) => ({
+		at: utc(when),
+		fingerprint,
+		target_id,
+		from_phase,
+		to_phase
+	});
+	const history = [
+		// m1 flaps twice today: 1 h then still open since 14:00 (1 h until now).
+		row('a', 1, new Date(2026, 10, 10, 9), 'pending', 'firing'),
+		row('a', 1, new Date(2026, 10, 10, 10), 'firing', 'resolved'),
+		row('a', 1, new Date(2026, 10, 10, 14), 'pending', 'firing'),
+		// m2 across midnight: yesterday 23:00 to today 01:00.
+		row('b', 2, new Date(2026, 10, 9, 23), 'pending', 'firing'),
+		row('b', 2, new Date(2026, 10, 10, 1), 'firing', 'resolved'),
+		// previous week.
+		row('c', 3, new Date(2026, 10, 2, 8), 'pending', 'firing'),
+		row('c', 3, new Date(2026, 10, 2, 9), 'firing', 'resolved'),
+		// a pending that never fired is no incident.
+		row('d', 4, new Date(2026, 10, 10, 12), 'inactive', 'pending')
+	];
+	const week = incidentWeek(history, now);
+	assert.equal(week.days.length, 7);
+	assert.equal(week.days[6].day, Math.round(new Date(2026, 10, 10).getTime() / 1000));
+	assert.equal(week.days[6].count, 2);
+	assert.equal(week.days[5].count, 1);
+	assert.equal(week.count, 3);
+	assert.equal(week.days[5].seconds, 3600);
+	assert.equal(week.days[6].seconds, 3600 + 3600 + 3600);
+	assert.equal(week.seconds, 3600 * 4);
+	assert.equal(week.previousCount, 1);
+	assert.equal(week.previousSeconds, 3600);
+	assert.deepEqual(week.noisiest, { target: 1, count: 2 });
 });
 
-test('alerts per day: seven local days, today last, flapping counts each firing', () => {
-	const now = new Date(2026, 10, 1, 15, 0, 0).getTime();
-	const utc = (d) => d.toISOString().replace('Z', '');
-	const history = [
-		{ at: utc(new Date(2026, 10, 1, 9)), to_phase: 'firing' },
-		{ at: utc(new Date(2026, 10, 1, 10)), to_phase: 'resolved' },
-		{ at: utc(new Date(2026, 10, 1, 11)), to_phase: 'firing' },
-		{ at: utc(new Date(2026, 9, 31, 23, 30)), to_phase: 'firing' },
-		{ at: utc(new Date(2026, 9, 26, 0, 10)), to_phase: 'resolved' },
-		{ at: utc(new Date(2026, 9, 20)), to_phase: 'firing' },
-		{ at: utc(new Date(2026, 10, 1, 12)), to_phase: 'pending' }
-	];
-	const days = alertsPerDay(history, now);
-	assert.equal(days.length, 7);
-	assert.equal(days[6].day, Math.round(new Date(2026, 10, 1).getTime() / 1000));
-	assert.deepEqual(days[6], { day: days[6].day, opened: 2, resolved: 1 });
-	assert.equal(days[5].opened, 1);
-	assert.equal(days[0].resolved, 1);
-	assert.equal(days.reduce((sum, d) => sum + d.opened + d.resolved, 0), 5);
+test('incidents of the week: nothing in the history is an empty week', () => {
+	const week = incidentWeek([], Date.now());
+	assert.equal(week.count, 0);
+	assert.equal(week.noisiest, null);
 });

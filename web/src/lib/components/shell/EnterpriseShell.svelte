@@ -34,6 +34,7 @@
 	import UserMenu from '#lib/components/UserMenu.svelte';
 	import GithubMark from '#lib/components/GithubMark.svelte';
 	import Logo from '#lib/components/Logo.svelte';
+	import SwissCross from '#lib/components/SwissCross.svelte';
 	import ClientSwitcher from '#lib/components/ClientSwitcher.svelte';
 	import VersionTag from '#lib/components/VersionTag.svelte';
 	import { isTypingTarget } from '#lib/palette/logic.js';
@@ -196,6 +197,7 @@
 			>
 				<Logo class="size-8 shrink-0" />
 				<span class="rail-label min-w-0 truncate text-sm font-semibold text-ink" aria-hidden="true">{instanceStore.displayName}</span>
+				<SwissCross class="ml-auto size-[17px]" />
 			</a>
 			<button
 				bind:this={closeButton}

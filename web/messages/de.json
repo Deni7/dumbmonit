@@ -937,8 +937,6 @@
 	"console_kpi_availability": "Verfügbarkeit 30 T",
 	"console_kpi_availability_note": "Gemessene Monitore: {count}",
 	"console_kpi_none": "Noch keine Daten",
-	"console_kpi_p95": "p95-Antwortzeit",
-	"console_kpi_p95_note": "Zeitraum: {range}",
 	"console_kpi_up": "Monitore online",
 	"console_kpi_up_note": "Ausgefallen: {down}, pausiert: {paused}",
 	"console_kpi_up_unit": "/ {total}",
@@ -2425,7 +2423,6 @@
 	"devices_target_details": "Monitordetails",
 	"devices_target_disabled_empty": "Dieser Monitor ist deaktiviert. Aktivieren Sie ihn, um Daten zu sammeln.",
 	"devices_target_enable": "Aktivieren",
-	"devices_target_enabled": "Aktiviert",
 	"devices_target_err_availability": "Die Verfügbarkeit konnte nicht geladen werden",
 	"devices_target_err_delete": "Dieser Monitor konnte nicht gelöscht werden",
 	"devices_target_err_enabled": "Der Aktivierungsstatus konnte nicht geändert werden",
@@ -5510,11 +5507,6 @@
 	"overview_ack_err": "Dieser Monitor konnte nicht bestätigt werden.",
 	"overview_ack_hint": "Gesehen, ich kümmere mich: Ruhe bis zur Normalisierung.",
 	"overview_ack_item": "Bestätigen",
-	"overview_alerts_fired": "Ausgelöst",
-	"overview_alerts_hint": "Ausgelöst: {fired}, behoben: {resolved}",
-	"overview_alerts_none": "In den letzten {days} Tagen wurde keine Warnung ausgelöst.",
-	"overview_alerts_resolved": "Behoben",
-	"overview_alerts_title": "Warnungen, letzte {days} Tage",
 	"overview_all_good_text": "Nichts ist ausgefallen und keine Warnung wartet auf dich. Die Taube macht ein Nickerchen.",
 	"overview_all_good_title": "Alles gut",
 	"overview_chart_error": "Diagramm konnte nicht geladen werden. Neuer Versuch in einer Minute.",
@@ -5541,28 +5533,9 @@
 	"overview_first_test_text": "Senden Sie einen Test über den Kanal. Dieser Schritt wird grün, sobald wirklich eine Nachricht gesendet wird.",
 	"overview_first_test_title": "Prüfen, ob eine Nachricht ankommt",
 	"overview_first_title": "Ihre ersten fünf Minuten",
-	"overview_fleet_availability": "{percent} % in 24 Std.",
-	"overview_fleet_bar_label": "Letzte 24 Stunden, älteste links",
-	"overview_fleet_calm": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "Alles funktioniert · {count} Monitor",
-				"countPlural=other": "Alles funktioniert · {count} Monitore"
-			}
-		}
-	],
-	"overview_fleet_down_for": "Seit {duration} ausgefallen",
 	"overview_fleet_tile_title": "{name}: {status}",
 	"overview_fleet_tiles_label": "Jeder Monitor, die schlechtesten zuerst",
 	"overview_fleet_title": "Zustand der Flotte",
-	"overview_fleet_wrong_title": "Was nicht stimmt",
 	"overview_latency_empty": "In diesem Zeitraum wurde noch keine Antwortzeit gemessen.",
 	"overview_latency_hint": "p95 und Median aller Prüfungen, letzte {range}",
 	"overview_latency_median": "Median",
@@ -5751,23 +5724,6 @@
 	"overview_sky_plate_unreachable": "Nicht erreichbar",
 	"overview_sky_sentence": "{parts}.",
 	"overview_sky_waiting": "Warten auf die ersten Meldungen",
-	"overview_week_more": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} weitere",
-				"countPlural=other": "{count} weitere"
-			}
-		}
-	],
-	"overview_week_none": "In den nächsten 7 Tagen läuft nichts ab.",
-	"overview_week_title": "Die nächsten 7 Tage",
 	"push_runs_description": "Jeder vom Job gemeldete Start, Erfolg und Fehlschlag, neueste zuerst.",
 	"push_runs_duration": "dauerte {duration}",
 	"push_runs_duration_unknown": "Dauer unbekannt",
@@ -9159,5 +9115,15 @@
 	"deviceform_picker_facets_label": "Filter",
 	"deviceform_picker_no_match_filters": "Keine Treffer für diese Filter.",
 	"deviceform_picker_pack_learn": "So funktionieren Packs",
-	"deviceform_picker_pack_note": "Community-Packs fügen Monitor-Typen aus einer einzigen YAML-Datei hinzu, ohne Code und ohne neues Release. Installieren Sie sie in den Einstellungen."
+	"deviceform_picker_pack_note": "Community-Packs fügen Monitor-Typen aus einer einzigen YAML-Datei hinzu, ohne Code und ohne neues Release. Installieren Sie sie in den Einstellungen.",
+	"overview_incidents_title": "Vorfälle, letzte {days} Tage",
+	"overview_incidents_explain": "Ein Vorfall beginnt, wenn ein Alarm auslöst, und endet, wenn er behoben ist. Ein Balken pro Tag.",
+	"overview_incidents_count_label": "Vorfälle",
+	"overview_incidents_open_label": "Dauer insgesamt",
+	"overview_incidents_before": "Vorwoche: {value}",
+	"overview_incidents_noisiest": "Lauteste Überwachung",
+	"overview_incidents_day_title": "{day}. Vorfälle: {count}. Dauer insgesamt: {duration}.",
+	"overview_incidents_none": "Kein Vorfall in den letzten {days} Tagen.",
+	"overview_incidents_bars_label": "Vorfälle pro Tag, der älteste links",
+	"devices_target_disable": "Deaktivieren"
 }

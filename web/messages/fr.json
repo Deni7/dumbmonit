@@ -937,8 +937,6 @@
 	"console_kpi_availability": "Disponibilité 30 j",
 	"console_kpi_availability_note": "Moniteurs mesurés : {count}",
 	"console_kpi_none": "Pas encore de données",
-	"console_kpi_p95": "Réponse p95",
-	"console_kpi_p95_note": "Période : {range}",
 	"console_kpi_up": "Moniteurs actifs",
 	"console_kpi_up_note": "En panne : {down}, en pause : {paused}",
 	"console_kpi_up_unit": "/ {total}",
@@ -2425,7 +2423,6 @@
 	"devices_target_details": "Détails de la surveillance",
 	"devices_target_disabled_empty": "Cette surveillance est désactivée. Activez-la pour collecter des données.",
 	"devices_target_enable": "Activer",
-	"devices_target_enabled": "Activée",
 	"devices_target_err_availability": "Impossible de charger la disponibilité",
 	"devices_target_err_delete": "Impossible de supprimer cette surveillance",
 	"devices_target_err_enabled": "Impossible de modifier l’état d’activation",
@@ -5510,11 +5507,6 @@
 	"overview_ack_err": "Impossible d’acquitter cette surveillance.",
 	"overview_ack_hint": "Vu, je m’en occupe : silence jusqu’au retour à la normale.",
 	"overview_ack_item": "Acquitter",
-	"overview_alerts_fired": "Déclenchées",
-	"overview_alerts_hint": "Déclenchées : {fired}, résolues : {resolved}",
-	"overview_alerts_none": "Aucune alerte déclenchée ces {days} derniers jours.",
-	"overview_alerts_resolved": "Résolues",
-	"overview_alerts_title": "Alertes, {days} derniers jours",
 	"overview_all_good_text": "Rien n'est hors service et aucune alerte ne vous attend. Le pigeon fait la sieste.",
 	"overview_all_good_title": "Tout va bien",
 	"overview_chart_error": "Impossible de charger ce graphique. Nouvel essai dans une minute.",
@@ -5541,28 +5533,9 @@
 	"overview_first_test_text": "Envoyez un test depuis le canal. Cette étape passe au vert dès qu’un message part vraiment.",
 	"overview_first_test_title": "Vérifiez qu’un message arrive",
 	"overview_first_title": "Vos cinq premières minutes",
-	"overview_fleet_availability": "{percent} % sur 24 h",
-	"overview_fleet_bar_label": "Dernières 24 heures, la plus ancienne à gauche",
-	"overview_fleet_calm": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "Tout fonctionne · {count} moniteur",
-				"countPlural=other": "Tout fonctionne · {count} moniteurs"
-			}
-		}
-	],
-	"overview_fleet_down_for": "En panne depuis {duration}",
 	"overview_fleet_tile_title": "{name}: {status}",
 	"overview_fleet_tiles_label": "Chaque moniteur, les pires d'abord",
 	"overview_fleet_title": "Santé du parc",
-	"overview_fleet_wrong_title": "Ce qui ne va pas",
 	"overview_latency_empty": "Aucun temps de réponse mesuré sur cette période.",
 	"overview_latency_hint": "p95 et médiane de toutes les sondes, dernières {range}",
 	"overview_latency_median": "Médiane",
@@ -5751,23 +5724,6 @@
 	"overview_sky_plate_unreachable": "Injoignable",
 	"overview_sky_sentence": "{parts}.",
 	"overview_sky_waiting": "En attente des premiers relevés",
-	"overview_week_more": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} autre",
-				"countPlural=other": "{count} autres"
-			}
-		}
-	],
-	"overview_week_none": "Rien n'expire dans les 7 prochains jours.",
-	"overview_week_title": "Semaine à venir",
 	"push_runs_description": "Chaque début, succès et échec signalé par le travail, du plus récent au plus ancien.",
 	"push_runs_duration": "durée {duration}",
 	"push_runs_duration_unknown": "durée inconnue",
@@ -9159,5 +9115,15 @@
 	"deviceform_picker_facets_label": "Filtres",
 	"deviceform_picker_no_match_filters": "Rien ne correspond à ces filtres.",
 	"deviceform_picker_pack_learn": "Comment fonctionnent les packs",
-	"deviceform_picker_pack_note": "Les packs communautaires ajoutent des types de moniteurs à partir d’un simple fichier YAML, sans code ni nouvelle version. Installez-les dans Réglages."
+	"deviceform_picker_pack_note": "Les packs communautaires ajoutent des types de moniteurs à partir d’un simple fichier YAML, sans code ni nouvelle version. Installez-les dans Réglages.",
+	"overview_incidents_title": "Incidents, {days} derniers jours",
+	"overview_incidents_explain": "Un incident commence quand une alerte se déclenche et finit quand elle est résolue. Une barre par jour.",
+	"overview_incidents_count_label": "Incidents",
+	"overview_incidents_open_label": "Durée cumulée",
+	"overview_incidents_before": "Semaine précédente : {value}",
+	"overview_incidents_noisiest": "Moniteur le plus bruyant",
+	"overview_incidents_day_title": "{day}. Incidents : {count}. Durée cumulée : {duration}.",
+	"overview_incidents_none": "Aucun incident ces {days} derniers jours.",
+	"overview_incidents_bars_label": "Incidents par jour, le plus ancien à gauche",
+	"devices_target_disable": "Désactiver"
 }

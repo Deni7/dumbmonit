@@ -17,9 +17,11 @@
 		target: Target;
 		/** Bumped by the page on each refresh so the icon follows the server. */
 		refreshKey?: number;
+		/** Only the options, no button and no menu of its own: for a menu that holds them among others. */
+		inline?: boolean;
 	}
 
-	let { target, refreshKey = 0 }: Props = $props();
+	let { target, refreshKey = 0, inline = false }: Props = $props();
 
 	let silences = $state<Silence[]>([]);
 	let picking = $state(false);
@@ -51,7 +53,7 @@
 
 	// A closed menu forgets its half-filled picker.
 	$effect(() => {
-		if (!menuOpen) {
+		if (!inline && !menuOpen) {
 			picking = false;
 			error = null;
 		}
@@ -120,50 +122,58 @@
 	const triggerLabel = $derived(own ? m.devices_silence_silenced({ until: untilLabel(own) }) : m.devices_silence_menu());
 </script>
 
-<Menu label={m.devices_silence_menu()} align="right" bind:open={menuOpen}>
-	{#snippet trigger({ toggle, open })}
-		<button
-			type="button"
-			class={`flex size-10 items-center justify-center rounded-lg border hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal ${
-				own || global ? 'border-advisory/50 bg-advisory-soft text-advisory-ink' : 'border-line text-ink-2 hover:bg-surface-2'
-			}`}
-			onclick={toggle}
-			aria-haspopup="menu"
-			aria-expanded={open}
-			aria-label={triggerLabel}
-			title={triggerLabel}
-		>
-			<BellOff class="size-4" aria-hidden="true" />
-		</button>
-	{/snippet}
-	{#snippet children()}
-		<div class="flex w-64 max-w-full flex-col items-stretch gap-1">
-			{#if own}
-				<p class="px-2 py-1 text-sm font-semibold text-advisory-ink">{m.devices_silence_silenced({ until: untilLabel(own) })}</p>
-				<Confirm size="md" variant="secondary" class="w-full justify-start" confirmLabel={m.devices_silence_lift_confirm()} loading={busy} onconfirm={() => lift(own)}>{m.devices_silence_lift()}</Confirm>
+{#snippet options()}
+	<div class="flex w-64 max-w-full flex-col items-stretch gap-1">
+		{#if own}
+			<p class="px-2 py-1 text-sm font-semibold text-advisory-ink">{m.devices_silence_silenced({ until: untilLabel(own) })}</p>
+			<Confirm size="md" variant="secondary" class="w-full justify-start" confirmLabel={m.devices_silence_lift_confirm()} loading={busy} onconfirm={() => lift(own)}>{m.devices_silence_lift()}</Confirm>
+		{:else}
+			{#if global}
+				<p class="px-2 py-1 text-sm text-advisory-ink">{m.devices_silence_all({ until: untilLabel(global) })}</p>
+			{/if}
+			<Button variant="ghost" class="w-full justify-start" onclick={silenceOneHour} loading={busy && !picking} disabled={picking}>
+				{m.devices_silence_one_hour()}
+			</Button>
+			{#if !picking}
+				<Button variant="ghost" class="w-full justify-start" onclick={openPicker} disabled={busy}>{m.devices_silence_pick_until()}</Button>
 			{:else}
-				{#if global}
-					<p class="px-2 py-1 text-sm text-advisory-ink">{m.devices_silence_all({ until: untilLabel(global) })}</p>
-				{/if}
-				<Button variant="ghost" class="w-full justify-start" onclick={silenceOneHour} loading={busy && !picking} disabled={picking}>
-					{m.devices_silence_one_hour()}
-				</Button>
-				{#if !picking}
-					<Button variant="ghost" class="w-full justify-start" onclick={openPicker} disabled={busy}>{m.devices_silence_pick_until()}</Button>
-				{:else}
-					<form class="grid gap-2 px-1 pb-1" onsubmit={submitPicker} aria-label={m.devices_silence_until_label()}>
-						<label for="silence-until" class="text-sm font-semibold text-ink">{m.devices_silence_until_label()}</label>
-						<input id="silence-until" type="datetime-local" class="input tnum w-full min-w-0" bind:value={until} bind:this={pickerInput} required />
-						<div class="flex flex-wrap gap-2">
-							<Button type="submit" variant="secondary" loading={busy}>{m.devices_silence_submit()}</Button>
-							<Button type="button" variant="ghost" disabled={busy} onclick={() => (picking = false)}>{m.devices_cancel()}</Button>
-						</div>
-					</form>
-				{/if}
+				<form class="grid gap-2 px-1 pb-1" onsubmit={submitPicker} aria-label={m.devices_silence_until_label()}>
+					<label for="silence-until" class="text-sm font-semibold text-ink">{m.devices_silence_until_label()}</label>
+					<input id="silence-until" type="datetime-local" class="input tnum w-full min-w-0" bind:value={until} bind:this={pickerInput} required />
+					<div class="flex flex-wrap gap-2">
+						<Button type="submit" variant="secondary" loading={busy}>{m.devices_silence_submit()}</Button>
+						<Button type="button" variant="ghost" disabled={busy} onclick={() => (picking = false)}>{m.devices_cancel()}</Button>
+					</div>
+				</form>
 			{/if}
-			{#if error}
-				<p class="px-2 text-[0.8125rem] font-medium text-warning-ink" role="alert">{error}</p>
-			{/if}
-		</div>
-	{/snippet}
-</Menu>
+		{/if}
+		{#if error}
+			<p class="px-2 text-[0.8125rem] font-medium text-warning-ink" role="alert">{error}</p>
+		{/if}
+	</div>
+{/snippet}
+
+{#if inline}
+	{@render options()}
+{:else}
+	<Menu label={m.devices_silence_menu()} align="right" bind:open={menuOpen}>
+		{#snippet trigger({ toggle, open })}
+			<button
+				type="button"
+				class={`flex size-10 items-center justify-center rounded-lg border hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal ${
+					own || global ? 'border-advisory/50 bg-advisory-soft text-advisory-ink' : 'border-line text-ink-2 hover:bg-surface-2'
+				}`}
+				onclick={toggle}
+				aria-haspopup="menu"
+				aria-expanded={open}
+				aria-label={triggerLabel}
+				title={triggerLabel}
+			>
+				<BellOff class="size-4" aria-hidden="true" />
+			</button>
+		{/snippet}
+		{#snippet children()}
+			{@render options()}
+		{/snippet}
+	</Menu>
+{/if}

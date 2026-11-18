@@ -1,15 +1,14 @@
 <script lang="ts">
 	import { withBase } from '#lib/paths.js';
 	/**
-	 * Overview: four figures, then what needs attention (only what is broken, with its
-	 * quick action, and the week ahead) beside the fleet health (a tile per
-	 * monitor, then what is wrong with its last 24 hours), then two
-	 * charts worth reading — the fleet's response time over the range, the
-	 * alerts of the last seven days. The whole fleet lives on Monitors. A fresh
-	 * instance gets the first-run guide (administrators) or a way in instead.
+	 * Overview: the incidents of the week, three figures, then what needs attention
+	 * (only what is broken, with its quick action) beside the fleet health (a tile
+	 * per monitor), then the fleet's response time over the range. The whole fleet
+	 * lives on Monitors. A fresh instance gets the first-run guide (administrators)
+	 * or a way in instead.
 	 *
 	 * Monitors, probes and alerts come from the app-wide store (polled every
-	 * 30 s); the 24 hour bars, p95, availability and the alert history from the fleet
+	 * 30 s); availability, latency and the alert history from the fleet
 	 * store (one set of queries, refreshed every minute while LIVE is on).
 	 */
 	import { untrack } from 'svelte';
@@ -25,7 +24,7 @@
 	import FleetLatency from '#lib/components/overview/FleetLatency.svelte';
 	import AlertTrend from '#lib/components/overview/AlertTrend.svelte';
 	import { fleetStore } from './fleet.svelte.js';
-	import { DAY_SECONDS, mean } from './fleet.js';
+	import { mean } from './fleet.js';
 	import FleetHealth from './FleetHealth.svelte';
 	import { consoleStatus, type ConsoleStatus } from './status.js';
 
@@ -50,12 +49,11 @@
 	const healthRows = $derived(
 		alertsStore.targets.map((target) => ({
 			target,
-			status: consoleStatus(target, alertsStore.probes.get(target.id), alertCounts.get(target.id)),
-			reason: alertsStore.probes.get(target.id)?.reason ?? null
+			status: consoleStatus(target, alertsStore.probes.get(target.id), alertCounts.get(target.id))
 		}))
 	);
 
-	// --- The four figures (MTTR lives in Status › Reports) -----------------------
+	// --- The three figures (MTTR lives in Status › Reports) -----------------------
 	const total = $derived(monitors.filter((r) => r.status !== 'paused').length);
 	const up = $derived(monitors.filter((r) => r.status === 'up' || r.status === 'degraded').length);
 	const down = $derived(monitors.filter((r) => r.status === 'down').length);
@@ -80,14 +78,6 @@
 			value: availability === null ? '—' : availability >= 99.9995 ? '100' : availability.toFixed(2),
 			unit: availability === null ? '' : '%',
 			note: availability === null ? m.console_kpi_none() : m.console_kpi_availability_note({ count: fleetStore.figures.uptime30.size }),
-			noteTone: 'text-ink-2'
-		},
-		{
-			id: 'p95',
-			label: m.console_kpi_p95(),
-			value: fleetStore.figures.fleetP95 === null ? '—' : String(Math.round(fleetStore.figures.fleetP95)),
-			unit: fleetStore.figures.fleetP95 === null ? '' : 'ms',
-			note: m.console_kpi_p95_note({ range: consoleState.range }),
 			noteTone: 'text-ink-2'
 		},
 		{
@@ -169,9 +159,11 @@
 			{/snippet}
 		</EmptyState>
 	{:else}
-		<div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+		<AlertTrend />
+
+		<div class="grid grid-cols-2 gap-3 lg:grid-cols-3">
 			{#each kpis as kpi, i (kpi.id)}
-				<div class={`min-w-0 rounded-xl border border-line bg-surface px-4 py-3.5 sm:px-[18px] sm:py-4 ${animate ? 'rise-in' : ''}`} style={`--rise-delay: ${i * 40}ms`}>
+				<div class={`min-w-0 rounded-xl border border-line bg-surface px-4 py-3.5 max-lg:last:col-span-2 sm:px-[18px] sm:py-4 ${animate ? 'rise-in' : ''}`} style={`--rise-delay: ${i * 40}ms`}>
 					<p class="m-0 truncate text-sm font-medium text-ink-2">{kpi.label}</p>
 					<p class="m-0 mt-2 flex items-baseline gap-1.5">
 						{#key kpi.value}
@@ -190,12 +182,9 @@
 
 		<div class="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
 			<NeedsAttention />
-			<FleetHealth rows={healthRows} day={fleetStore.river} daySeconds={DAY_SECONDS} />
+			<FleetHealth rows={healthRows} />
 		</div>
 
-		<div class="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-			<FleetLatency />
-			<AlertTrend />
-		</div>
+		<FleetLatency />
 	{/if}
 </div>

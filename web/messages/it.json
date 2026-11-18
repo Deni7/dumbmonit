@@ -937,8 +937,6 @@
 	"console_kpi_availability": "Disponibilità 30 g",
 	"console_kpi_availability_note": "Monitor misurati: {count}",
 	"console_kpi_none": "Ancora nessun dato",
-	"console_kpi_p95": "Risposta p95",
-	"console_kpi_p95_note": "Intervallo: {range}",
 	"console_kpi_up": "Monitor attivi",
 	"console_kpi_up_note": "Non attivi: {down}, in pausa: {paused}",
 	"console_kpi_up_unit": "/ {total}",
@@ -2425,7 +2423,6 @@
 	"devices_target_details": "Dettagli del monitor",
 	"devices_target_disabled_empty": "Questo monitor è disattivato. Attivalo per raccogliere dati.",
 	"devices_target_enable": "Attiva",
-	"devices_target_enabled": "Attivato",
 	"devices_target_err_availability": "Impossibile caricare la disponibilità",
 	"devices_target_err_delete": "Impossibile eliminare questo monitor",
 	"devices_target_err_enabled": "Impossibile cambiare lo stato di attivazione",
@@ -5510,11 +5507,6 @@
 	"overview_ack_err": "Impossibile prendere in carico questo monitor.",
 	"overview_ack_hint": "Visto, me ne occupo: silenzio fino al ritorno alla normalità.",
 	"overview_ack_item": "Prendi in carico",
-	"overview_alerts_fired": "Scattati",
-	"overview_alerts_hint": "Scattati: {fired}, risolti: {resolved}",
-	"overview_alerts_none": "Nessun avviso scattato negli ultimi {days} giorni.",
-	"overview_alerts_resolved": "Risolti",
-	"overview_alerts_title": "Avvisi, ultimi {days} giorni",
 	"overview_all_good_text": "Niente è fuori servizio e nessun avviso ti aspetta. Il piccione fa un pisolino.",
 	"overview_all_good_title": "Tutto bene",
 	"overview_chart_error": "Impossibile caricare il grafico. Nuovo tentativo tra un minuto.",
@@ -5541,28 +5533,9 @@
 	"overview_first_test_text": "Invia un test dal canale. Questo passaggio diventa verde appena un messaggio parte davvero.",
 	"overview_first_test_title": "Verifica che arrivi un messaggio",
 	"overview_first_title": "I tuoi primi cinque minuti",
-	"overview_fleet_availability": "{percent} % in 24 h",
-	"overview_fleet_bar_label": "Ultime 24 ore, la più vecchia a sinistra",
-	"overview_fleet_calm": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "Tutto funziona · {count} monitor",
-				"countPlural=other": "Tutto funziona · {count} monitor"
-			}
-		}
-	],
-	"overview_fleet_down_for": "Fermo da {duration}",
 	"overview_fleet_tile_title": "{name}: {status}",
 	"overview_fleet_tiles_label": "Ogni monitor, i peggiori per primi",
 	"overview_fleet_title": "Salute della flotta",
-	"overview_fleet_wrong_title": "Cosa non va",
 	"overview_latency_empty": "Nessun tempo di risposta misurato in questo intervallo.",
 	"overview_latency_hint": "p95 e mediana di tutte le sonde, ultime {range}",
 	"overview_latency_median": "Mediana",
@@ -5751,23 +5724,6 @@
 	"overview_sky_plate_unreachable": "Irraggiungibile",
 	"overview_sky_sentence": "{parts}.",
 	"overview_sky_waiting": "In attesa dei primi rapporti",
-	"overview_week_more": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} altra",
-				"countPlural=other": "{count} altre"
-			}
-		}
-	],
-	"overview_week_none": "Niente scade nei prossimi 7 giorni.",
-	"overview_week_title": "Settimana in arrivo",
 	"push_runs_description": "Ogni avvio, successo e fallimento segnalato dal job, dal più recente.",
 	"push_runs_duration": "durata {duration}",
 	"push_runs_duration_unknown": "durata sconosciuta",
@@ -9159,5 +9115,15 @@
 	"deviceform_picker_facets_label": "Filtri",
 	"deviceform_picker_no_match_filters": "Nessun risultato per questi filtri.",
 	"deviceform_picker_pack_learn": "Come funzionano i pack",
-	"deviceform_picker_pack_note": "I pack della community aggiungono tipi di monitor da un singolo file YAML, senza codice né nuova versione. Installali nelle Impostazioni."
+	"deviceform_picker_pack_note": "I pack della community aggiungono tipi di monitor da un singolo file YAML, senza codice né nuova versione. Installali nelle Impostazioni.",
+	"overview_incidents_title": "Incidenti, ultimi {days} giorni",
+	"overview_incidents_explain": "Un incidente inizia quando scatta un avviso e finisce quando viene risolto. Una barra al giorno.",
+	"overview_incidents_count_label": "Incidenti",
+	"overview_incidents_open_label": "Tempo aperto",
+	"overview_incidents_before": "Settimana precedente: {value}",
+	"overview_incidents_noisiest": "Monitor più rumoroso",
+	"overview_incidents_day_title": "{day}. Incidenti: {count}. Tempo aperto: {duration}.",
+	"overview_incidents_none": "Nessun incidente negli ultimi {days} giorni.",
+	"overview_incidents_bars_label": "Incidenti al giorno, il più vecchio a sinistra",
+	"devices_target_disable": "Disattiva"
 }

@@ -937,8 +937,6 @@
 	"console_kpi_availability": "Availability 30 d",
 	"console_kpi_availability_note": "Monitors measured: {count}",
 	"console_kpi_none": "No data yet",
-	"console_kpi_p95": "p95 response",
-	"console_kpi_p95_note": "Range: {range}",
 	"console_kpi_up": "Monitors up",
 	"console_kpi_up_note": "Down: {down}, paused: {paused}",
 	"console_kpi_up_unit": "/ {total}",
@@ -2425,7 +2423,6 @@
 	"devices_target_details": "Monitor details",
 	"devices_target_disabled_empty": "This monitor is disabled. Enable it to collect data.",
 	"devices_target_enable": "Enable",
-	"devices_target_enabled": "Enabled",
 	"devices_target_err_availability": "Could not load the availability",
 	"devices_target_err_delete": "Could not delete this monitor",
 	"devices_target_err_enabled": "Could not change the enabled state",
@@ -5510,11 +5507,6 @@
 	"overview_ack_err": "Could not acknowledge this monitor.",
 	"overview_ack_hint": "Seen, I am on it: quiet until it is back to normal.",
 	"overview_ack_item": "Acknowledge",
-	"overview_alerts_fired": "Fired",
-	"overview_alerts_hint": "Fired: {fired}, resolved: {resolved}",
-	"overview_alerts_none": "No alert fired in the last {days} days.",
-	"overview_alerts_resolved": "Resolved",
-	"overview_alerts_title": "Alerts, last {days} days",
 	"overview_all_good_text": "Nothing is down and no alert is waiting for you. The pigeon is taking a nap.",
 	"overview_all_good_title": "All good",
 	"overview_chart_error": "Could not load this chart. It tries again in a minute.",
@@ -5541,28 +5533,9 @@
 	"overview_first_test_text": "Send a test from the channel. This step turns green once one really leaves.",
 	"overview_first_test_title": "Check a message arrives",
 	"overview_first_title": "Your first five minutes",
-	"overview_fleet_availability": "{percent} % in 24 h",
-	"overview_fleet_bar_label": "Last 24 hours, oldest on the left",
-	"overview_fleet_calm": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "Everything is working · {count} monitor",
-				"countPlural=other": "Everything is working · {count} monitors"
-			}
-		}
-	],
-	"overview_fleet_down_for": "Down for {duration}",
 	"overview_fleet_tile_title": "{name}: {status}",
 	"overview_fleet_tiles_label": "Every monitor, worst first",
 	"overview_fleet_title": "Fleet health",
-	"overview_fleet_wrong_title": "What is wrong",
 	"overview_latency_empty": "No response time measured in this range yet.",
 	"overview_latency_hint": "p95 and median of every probe, last {range}",
 	"overview_latency_median": "Median",
@@ -5751,23 +5724,6 @@
 	"overview_sky_plate_unreachable": "Unreachable",
 	"overview_sky_sentence": "{parts}.",
 	"overview_sky_waiting": "Waiting for the first reports",
-	"overview_week_more": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} more",
-				"countPlural=other": "{count} more"
-			}
-		}
-	],
-	"overview_week_none": "Nothing expires in the next 7 days.",
-	"overview_week_title": "Week ahead",
 	"push_runs_description": "Every start, success and failure the job reported, newest first.",
 	"push_runs_duration": "took {duration}",
 	"push_runs_duration_unknown": "duration unknown",
@@ -9159,5 +9115,15 @@
 	"deviceform_picker_facets_label": "Filters",
 	"deviceform_picker_no_match_filters": "Nothing matches these filters.",
 	"deviceform_picker_pack_learn": "How packs work",
-	"deviceform_picker_pack_note": "Community packs add monitor types from a single YAML file, with no code and no new release. Install them in Settings."
+	"deviceform_picker_pack_note": "Community packs add monitor types from a single YAML file, with no code and no new release. Install them in Settings.",
+	"overview_incidents_title": "Incidents, last {days} days",
+	"overview_incidents_explain": "An incident starts when an alert fires and ends when it resolves. One bar per day.",
+	"overview_incidents_count_label": "Incidents",
+	"overview_incidents_open_label": "Time open",
+	"overview_incidents_before": "Week before: {value}",
+	"overview_incidents_noisiest": "Noisiest monitor",
+	"overview_incidents_day_title": "{day}. Incidents: {count}. Time open: {duration}.",
+	"overview_incidents_none": "No incident in the last {days} days.",
+	"overview_incidents_bars_label": "Incidents per day, oldest on the left",
+	"devices_target_disable": "Disable"
 }
