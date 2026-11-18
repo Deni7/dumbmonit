@@ -199,9 +199,8 @@ async fn the_json_view_follows_the_scope_and_the_layout() {
         assert_eq!(created.status, StatusCode::CREATED, "{}", created.body);
         ids.push(created.body["id"].as_i64().unwrap());
     }
-    let all = app
-        .get("/api/reports/sla?from=2024-10-01&to=2024-10-31&format=json", Some(&admin))
-        .await;
+    let all =
+        app.get("/api/reports/sla?from=2024-10-01&to=2024-10-31&format=json", Some(&admin)).await;
     assert_eq!(all.status, StatusCode::OK, "{}", all.body);
     assert_eq!(all.body["monitors"].as_array().unwrap().len(), 2);
     assert_eq!(all.body["layout"]["template"], "detailed");

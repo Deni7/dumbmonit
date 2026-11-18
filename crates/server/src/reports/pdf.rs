@@ -169,11 +169,8 @@ impl Page {
 
     /// Contour d'un rectangle : reste visible quand l'imprimante ignore les fonds.
     pub fn rect_stroke(&mut self, x: f64, y: f64, w: f64, h: f64, width: f64, color: Rgb) {
-        let _ = writeln!(
-            self.ops,
-            "{} RG {width:.2} w {x:.2} {y:.2} {w:.2} {h:.2} re S",
-            color.ops()
-        );
+        let _ =
+            writeln!(self.ops, "{} RG {width:.2} w {x:.2} {y:.2} {w:.2} {h:.2} re S", color.ops());
     }
 
     /// Filet en pointillés (`dash` points tracés, autant d'espace).

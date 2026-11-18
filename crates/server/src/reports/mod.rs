@@ -168,7 +168,10 @@ pub async fn sla_options(
         None => None,
     };
     let mut logo = None;
-    if want_logo && let Some(page) = &page && page.logo_type.is_some() {
+    if want_logo
+        && let Some(page) = &page
+        && page.logo_type.is_some()
+    {
         let path = crate::api::status_pages::branding::logo_path(state, page.id);
         if let Ok(bytes) = tokio::fs::read(&path).await {
             logo = logo::for_pdf(&bytes);

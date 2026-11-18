@@ -495,10 +495,9 @@ fn summary_section(sheet: &mut Sheet, data: &ReportData, options: &Options) {
             "Objective {goal:.3}%: {}",
             status_word(data.fleet_uptime, Some(goal)).to_lowercase()
         ),
-        None => format!(
-            "{word}; {} vs previous",
-            delta(data.fleet_uptime, data.fleet_previous_uptime)
-        ),
+        None => {
+            format!("{word}; {} vs previous", delta(data.fleet_uptime, data.fleet_previous_uptime))
+        }
     };
     let fleet_word = status_word(data.fleet_uptime, options.objective);
     let stats = [
@@ -701,13 +700,7 @@ fn incident_length(incident: &Incident, end: DateTime<Utc>) -> String {
     length
 }
 
-fn incidents_table(
-    sheet: &mut Sheet,
-    data: &ReportData,
-    tz: Tz,
-    list: &[&Incident],
-    title: &str,
-) {
+fn incidents_table(sheet: &mut Sheet, data: &ReportData, tz: Tz, list: &[&Incident], title: &str) {
     sheet.heading(title);
     if list.is_empty() {
         sheet.note("No incident in this period.");
@@ -732,11 +725,7 @@ fn incidents_table(
                 plain(incident.device.clone()),
                 plain(incident_started(incident, tz)),
                 plain(incident_length(incident, data.period.end)),
-                (
-                    incident.severity.clone(),
-                    INK,
-                    if critical { Font::Bold } else { Font::Regular },
-                ),
+                (incident.severity.clone(), INK, if critical { Font::Bold } else { Font::Regular }),
                 plain(incident.rule.clone()),
             ],
         );
@@ -799,12 +788,7 @@ fn response_table(sheet: &mut Sheet, data: &ReportData) {
     }
     let placed = table_open(
         sheet,
-        &[
-            ("Monitor", 3.2, false),
-            ("Group", 2.0, false),
-            ("Mean", 1.0, true),
-            ("P95", 1.0, true),
-        ],
+        &[("Monitor", 3.2, false), ("Group", 2.0, false), ("Mean", 1.0, true), ("P95", 1.0, true)],
     );
     for device in list.iter().take(MAX_PDF_MONITORS) {
         table_row(
@@ -1101,9 +1085,8 @@ mod tests {
 
     fn with_incidents() -> ReportData {
         let mut data = sample();
-        for (i, severity) in ["warning", "critical", "warning", "critical", "warning", "warning"]
-            .iter()
-            .enumerate()
+        for (i, severity) in
+            ["warning", "critical", "warning", "critical", "warning", "warning"].iter().enumerate()
         {
             data.incidents.push(crate::reports::collect::Incident {
                 device: format!("dev-{i}"),

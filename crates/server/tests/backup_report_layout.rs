@@ -84,7 +84,6 @@ async fn the_layout_and_the_scope_of_a_report_survive_a_backup() {
 
     // Relire le lot exporté ne change rien.
     let again = restore(&pool, &cipher, &exported, true).await.expect("relecture");
-    let section =
-        again.sections.iter().find(|s| s.section == "report_schedules").expect("section");
+    let section = again.sections.iter().find(|s| s.section == "report_schedules").expect("section");
     assert_eq!((section.created, section.updated), (0, 0), "{section:?}");
 }

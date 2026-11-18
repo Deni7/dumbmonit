@@ -641,8 +641,7 @@ fn sla_view(
     use crate::reports::sla;
     let objective = options.objective;
     let major = sla::major_incidents(data);
-    let grouped =
-        data.groups.len() > 1 || data.groups.first().is_some_and(|g| g.name != UNGROUPED);
+    let grouped = data.groups.len() > 1 || data.groups.first().is_some_and(|g| g.name != UNGROUPED);
     SlaReportView {
         brand: options.brand.clone(),
         title: sla::heading_title(&options.layout),
