@@ -232,6 +232,10 @@ pub struct Bundle {
     /// par `DUMBMONIT_SMTP_*` n'y est jamais.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mail_server: Option<BundleMailServer>,
+    /// Logo téléversé pour les rapports SLA (migration 0247). Absent : pas de
+    /// logo propre aux rapports, et l'instance restaurée garde le sien.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub report_logo: Option<BundleReportLogo>,
 }
 
 /// Serveur de courriel enregistré et son mot de passe.
@@ -628,6 +632,13 @@ pub struct BundleSilence {
     pub matchers: Value,
     pub schedule: Value,
     pub enabled: bool,
+}
+
+/// Logo des rapports : son type MIME et ses octets en base64.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BundleReportLogo {
+    pub logo_type: String,
+    pub data: String,
 }
 
 /// Rapport périodique : le canal SMTP est référencé par son nom, comme pour les

@@ -8,7 +8,7 @@
 	 */
 	import type { Silence, Target } from '#lib/api/index.js';
 	import { createSilence, deleteSilence, listSilences } from '#lib/api/index.js';
-	import { Button, Confirm, Menu } from '#lib/ui/index.js';
+	import { Button, Confirm, DateTimeField, Menu } from '#lib/ui/index.js';
 	import { BellOff } from 'lucide-svelte';
 	import { formatDateTime } from '#lib/format.js';
 	import { datetimeLocalIn, quickSilencePayload, scheduleLabel } from '#lib/components/alerts/helpers.js';
@@ -28,7 +28,6 @@
 	let until = $state('');
 	let busy = $state(false);
 	let error = $state<string | null>(null);
-	let pickerInput = $state<HTMLInputElement | null>(null);
 	let menuOpen = $state(false);
 
 	/** Windows covering this device right now: its own, then the global ones. */
@@ -70,7 +69,7 @@
 		until = datetimeLocalIn();
 		error = null;
 		picking = true;
-		queueMicrotask(() => pickerInput?.focus());
+		queueMicrotask(() => document.getElementById('silence-until')?.focus());
 	}
 
 	async function silenceFor(endsAt: Date) {
@@ -139,7 +138,7 @@
 			{:else}
 				<form class="grid gap-2 px-1 pb-1" onsubmit={submitPicker} aria-label={m.devices_silence_until_label()}>
 					<label for="silence-until" class="text-sm font-semibold text-ink">{m.devices_silence_until_label()}</label>
-					<input id="silence-until" type="datetime-local" class="input tnum w-full min-w-0" bind:value={until} bind:this={pickerInput} required />
+					<DateTimeField id="silence-until" bind:value={until} label={m.devices_silence_until_label()} class="w-[17rem] max-w-full" />
 					<div class="flex flex-wrap gap-2">
 						<Button type="submit" variant="secondary" loading={busy}>{m.devices_silence_submit()}</Button>
 						<Button type="button" variant="ghost" disabled={busy} onclick={() => (picking = false)}>{m.devices_cancel()}</Button>

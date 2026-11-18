@@ -24,6 +24,28 @@ All notable changes to this project are documented here. The format follows
   page that used an email channel keeps it (it still wins while enabled), and SMS, webhook and Slack
   subscriptions are unchanged. Scheduled reports also fall back on the email server when no email
   channel is enabled.
+
+- **A page for the availability (SLA) report.** Status › Reports › Open the report leads to
+  `/reports/sla`: the period, the monitors, the template (Summary or Detailed) and the options on the
+  left, the report itself on the right, rebuilt a moment after each change, and Print, Download PDF,
+  CSV and Schedule at the top. The options stay in the address, so a report can be linked; Schedule
+  opens a new scheduled SLA report prefilled with them. Also in the command palette.
+- **Monitor picker for SLA reports.** Search, groups with a checkbox each (half-checked when only some
+  of their monitors are in), All and None, and one line saying how many monitors are covered. A whole
+  group is kept as the group, so monitors added to it later are covered too.
+- **Report logo.** The logo at the top of an SLA report is now a choice: automatic (the client's, else
+  the status page's, as before), the client's, the status page's, a logo uploaded for reports
+  (`GET`/`PUT`/`DELETE /api/reports/logo`, PNG or JPEG up to 256 KiB, stored in the database and in
+  the backup as `report_logo`), or none. The layout field is `logo` (`auto`, `client`, `page`,
+  `custom`, `none`), and so is the `logo` parameter of `GET /api/reports/sla` (`true` and `false`
+  still work). The report data (`format=json`) gives `logo_url`. PNG logos with a palette now go in
+  the PDF too.
+- **The app's own calendar.** Every date and time field (silences, mutes, maintenance and incident
+  dates, on-call rotations and overrides, quiet hours, log search, SLA period) uses a calendar and a
+  time box in the app's theme instead of the device's picker: full keyboard (arrows, Page Up/Down,
+  Home/End, Escape), month and day names in the interface language, the week starting where the
+  language says, 40px targets. The SLA period has shortcuts: last 7 or 30 days, this month, last
+  month, last quarter. Values sent to the API are unchanged.
 - **Swiss cross.** A "Made in Switzerland" cross in the side bar next to the name, and one beside the
   name on the sign-in page with a tagline under it: "Monitoring with Swiss precision" (translated in
   the nine languages).
@@ -68,6 +90,10 @@ All notable changes to this project are documented here. The format follows
   the CVE check in one "More" menu.
 - **Tag filter in one control.** The row of tag chips is now one button that shows the chosen tags on
   one line ("prod, db +1") and opens a searchable checklist, with a × to clear.
+
+- **SLA report forms line up with the rest of the settings.** Same field heights, labels, grid and
+  spacing as the other forms; the template, kind and frequency choices are 40px segmented controls;
+  the layout options no longer sit in a box inside a box. The printable page is now the SLA page.
 - **On-call schedules are optional.** The On-call tab of Alerts, the "DumbMonit on-call" channel type
   and the on-call step of the setup wizard are hidden until you turn on **On-call schedules** in
   Settings › System (for teams that take turns handling alerts at night and on weekends). Turned off,

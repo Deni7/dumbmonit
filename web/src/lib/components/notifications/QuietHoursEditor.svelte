@@ -6,7 +6,7 @@
 	 */
 	import { untrack } from 'svelte';
 	import type { QuietHours } from '#lib/api/index.js';
-	import { Field, Toggle } from '#lib/ui/index.js';
+	import { Field, TimeField, Toggle } from '#lib/ui/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { pad2 } from '#lib/format.js';
 	import { getLocale } from '#lib/paraglide/runtime.js';
@@ -117,10 +117,10 @@
 			</div>
 			<div class="grid gap-3 sm:grid-cols-2">
 				<Field label={m.notifications_quiet_from()} for={`${idPrefix}-start`} help={m.notifications_quiet_from_help()}>
-					<input id={`${idPrefix}-start`} type="time" class="input tnum" bind:value={start} {disabled} onchange={emit} />
+					<TimeField id={`${idPrefix}-start`} bind:value={start} {disabled} onchange={emit} />
 				</Field>
 				<Field label={m.notifications_quiet_to()} for={`${idPrefix}-end`}>
-					<input id={`${idPrefix}-end`} type="time" class="input tnum" bind:value={end} {disabled} onchange={emit} />
+					<TimeField id={`${idPrefix}-end`} bind:value={end} {disabled} onchange={emit} />
 				</Field>
 			</div>
 			{#if problem}

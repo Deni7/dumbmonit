@@ -11,6 +11,18 @@ export type ReportTemplate = 'detailed' | 'summary';
 
 export type ReportPaper = 'a4' | 'letter';
 
+/**
+ * Where the logo at the top comes from. `auto`: the client's (MSP mode), else
+ * the status page's; `custom`: the logo uploaded for reports. Mirrors
+ * `reports::layout::LogoSource`.
+ */
+export type ReportLogo = 'auto' | 'client' | 'page' | 'custom' | 'none';
+
+export const REPORT_LOGOS: ReportLogo[] = ['auto', 'client', 'page', 'custom', 'none'];
+
+const readLogo = (raw: unknown): ReportLogo | null =>
+	raw === 'false' ? 'none' : raw === 'true' ? 'auto' : REPORT_LOGOS.includes(raw as ReportLogo) ? (raw as ReportLogo) : null;
+
 /** Sections of the SLA report, in report order. Mirrors `reports::layout::Sections`. */
 export interface ReportSections {
 	summary: boolean;
@@ -41,7 +53,9 @@ export interface ReportLayout {
 	title: string | null;
 	/** Printed in the Notes section. 2000 characters at most. */
 	notes: string;
+	/** Kept for layouts saved before `logo`: always `logo !== 'none'`. */
 	show_logo: boolean;
+	logo: ReportLogo;
 }
 
 /** The monitors listed and those of the groups listed (union); empty: everything. Mirrors `reports::layout::Scope`. */
@@ -64,19 +78,22 @@ export function sectionsFor(template: ReportTemplate): ReportSections {
 }
 
 export function defaultReportLayout(): ReportLayout {
-	return { template: 'detailed', paper: 'a4', sections: sectionsFor('detailed'), title: null, notes: '', show_logo: true };
+	return { template: 'detailed', paper: 'a4', sections: sectionsFor('detailed'), title: null, notes: '', show_logo: true, logo: 'auto' };
 }
 
 /** A stored layout with every field present (an old schedule may lack some). */
 export function normaliseLayout(layout: Partial<ReportLayout> | null | undefined): ReportLayout {
 	const base = defaultReportLayout();
+	// An old layout only says whether a logo is shown; `false` wins.
+	const logo = layout?.show_logo === false ? 'none' : (readLogo(layout?.logo) ?? 'auto');
 	return {
 		template: layout?.template === 'summary' ? 'summary' : 'detailed',
 		paper: layout?.paper === 'letter' ? 'letter' : 'a4',
 		sections: { ...base.sections, ...(layout?.sections ?? {}) },
 		title: layout?.title ?? null,
 		notes: layout?.notes ?? '',
-		show_logo: layout?.show_logo ?? true
+		show_logo: logo !== 'none',
+		logo
 	};
 }
 
@@ -103,9 +120,15 @@ export interface SlaRequest {
 	scope?: ReportScope;
 }
 
+/** The same layout with `logo` and `show_logo` in step (what the editors hand out). */
+export function withLogo(layout: ReportLayout, logo: ReportLogo): ReportLayout {
+	return { ...layout, logo, show_logo: logo !== 'none' };
+}
+
 /**
  * Query string of `GET /api/reports/sla`: the layout travels as `template`,
- * `paper`, `sections` (comma list), `title`, `notes`, `logo`; the scope as JSON.
+ * `paper`, `sections` (comma list), `title`, `notes`, `logo` (left out when
+ * `auto`); the scope as JSON.
  */
 export function slaParams(request_: SlaRequest): URLSearchParams {
 	const params = new URLSearchParams();
@@ -121,7 +144,8 @@ export function slaParams(request_: SlaRequest): URLSearchParams {
 		params.set('sections', sections.length > 0 ? sections.join(',') : 'summary');
 		if (layout.title && layout.title.trim() !== '') params.set('title', layout.title.trim());
 		if (layout.notes.trim() !== '') params.set('notes', layout.notes.trim());
-		if (!layout.show_logo) params.set('logo', 'false');
+		const logo = layout.show_logo ? layout.logo : 'none';
+		if (logo !== 'auto') params.set('logo', logo);
 	}
 	if (scope && (scope.targets.length > 0 || scope.groups.length > 0)) {
 		params.set('scope', JSON.stringify(scope));
@@ -146,7 +170,8 @@ export function slaRequestFrom(params: URLSearchParams): SlaRequest {
 	}
 	layout.title = params.get('title') || null;
 	layout.notes = params.get('notes') ?? '';
-	layout.show_logo = params.get('logo') !== 'false';
+	layout.logo = readLogo(params.get('logo')) ?? 'auto';
+	layout.show_logo = layout.logo !== 'none';
 	let scope = emptyScope();
 	try {
 		const parsed: unknown = JSON.parse(params.get('scope') ?? 'null');
@@ -184,6 +209,8 @@ export interface SlaReport {
 	generated_at: string;
 	objective: number | null;
 	layout: ReportLayout;
+	/** Address of the logo at the top, relative to `/api`; `null` without one. */
+	logo_url: string | null;
 	availability_known: boolean;
 	fleet_uptime: number | null;
 	fleet_previous_uptime: number | null;
@@ -249,4 +276,46 @@ export function chartFloor(values: number[], objective: number | null): number {
 export function chartShare(value: number, floor: number): number {
 	if (floor >= 100) return 1;
 	return (Math.min(100, Math.max(floor, value)) - floor) / (100 - floor);
+}
+
+// ---- Monitor selection --------------------------------------------------------
+
+/** A monitor as the scope picker sees it: its id and its group (`Ungrouped` when it has none). */
+export interface ScopeMonitor {
+	id: number;
+	group: string;
+}
+
+/** The group a monitor counts in: its folder, or `Ungrouped`. */
+export function scopeGroup(groupName: string | null | undefined): string {
+	const name = (groupName ?? '').trim();
+	return name === '' ? UNGROUPED_GROUP : name;
+}
+
+/** The monitors a scope keeps (an empty scope keeps them all). Mirrors `Scope::keeps`. */
+export function scopeIds(scope: ReportScope, monitors: ScopeMonitor[]): Set<number> {
+	const all = scope.targets.length === 0 && scope.groups.length === 0;
+	const groups = new Set(scope.groups);
+	const targets = new Set(scope.targets);
+	return new Set(monitors.filter((mon) => all || targets.has(mon.id) || groups.has(mon.group)).map((mon) => mon.id));
+}
+
+/**
+ * The scope of a set of ticked monitors, as short as it goes: every monitor
+ * is the empty scope (and keeps monitors added later), a whole group is its
+ * name (same), the rest are ids. An empty set has no scope: `null`.
+ */
+export function scopeOf(selected: Set<number>, monitors: ScopeMonitor[]): ReportScope | null {
+	const kept = monitors.filter((mon) => selected.has(mon.id));
+	if (kept.length === 0) return null;
+	if (kept.length === monitors.length) return emptyScope();
+	const byGroup = new Map<string, ScopeMonitor[]>();
+	for (const mon of monitors) byGroup.set(mon.group, [...(byGroup.get(mon.group) ?? []), mon]);
+	const groups: string[] = [];
+	const targets: number[] = [];
+	for (const [group, members] of byGroup) {
+		if (members.every((mon) => selected.has(mon.id))) groups.push(group);
+		else targets.push(...members.filter((mon) => selected.has(mon.id)).map((mon) => mon.id));
+	}
+	return { targets: targets.sort((a, b) => a - b), groups: groups.sort((a, b) => a.localeCompare(b)) };
 }

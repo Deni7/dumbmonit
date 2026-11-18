@@ -18,7 +18,7 @@ use chrono::{DateTime, Datelike, TimeDelta, Utc};
 use chrono_tz::Tz;
 
 use super::collect::{DeviceStat, Incident, ReportData, UNGROUPED};
-use super::layout::{Layout, Paper, Template};
+use super::layout::{Layout, LogoSource, Paper, Template};
 use super::pdf::{self, Document, Font, Page, Rgb};
 use super::render::{count_delta, delta, duration, one_line, verdict, when};
 
@@ -34,9 +34,12 @@ pub struct Options {
     pub objective: Option<f64>,
     /// Instant de génération, écrit dans le pied de page et les métadonnées.
     pub generated: DateTime<Utc>,
-    /// Logo en tête à droite : celui du client (mode MSP) ou de la page de
-    /// statut choisie.
+    /// Logo en tête à droite, selon [`Layout::logo`] : celui du client (mode
+    /// MSP), de la page de statut choisie ou le logo téléversé des rapports.
     pub logo: Option<pdf::Image>,
+    /// Adresse (relative à `/api`) du même logo, pour l'aperçu à l'écran ;
+    /// `None` quand le PDF n'en a pas.
+    pub logo_url: Option<String>,
     /// Gabarit, papier, sections, titre et notes.
     pub layout: Layout,
 }
@@ -819,7 +822,7 @@ fn notes_section(sheet: &mut Sheet, notes: &str) {
 pub fn pdf(data: &ReportData, tz: Tz, options: &Options) -> Vec<u8> {
     let layout = &options.layout;
     let sections = layout.sections;
-    let logo = layout.show_logo && options.logo.is_some();
+    let logo = layout.logo_source() != LogoSource::Hidden && options.logo.is_some();
     let mut sheet = Sheet::new(layout.paper);
     first_header(&mut sheet, data, tz, options, logo);
 
@@ -1067,6 +1070,7 @@ mod tests {
             objective: Some(99.9),
             generated: at("2026-11-03T08:00:00Z"),
             logo: None,
+            logo_url: None,
             layout: Layout::default(),
         }
     }

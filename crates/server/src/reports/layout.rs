@@ -67,6 +67,40 @@ impl Paper {
     }
 }
 
+/// Origine du logo en tête du PDF.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LogoSource {
+    /// Celui du client du rapport (mode MSP), sinon celui de la page de statut
+    /// choisie : le comportement d'avant ce choix.
+    #[default]
+    Auto,
+    /// Le logo du client du rapport seulement.
+    Client,
+    /// Le logo de la page de statut choisie seulement.
+    Page,
+    /// Le logo téléversé pour les rapports (`report_logo`, migration 0247).
+    Custom,
+    /// Pas de logo.
+    #[serde(rename = "none")]
+    Hidden,
+}
+
+impl LogoSource {
+    /// Valeur du paramètre `logo` de l'API : `auto` (ou `true`), `client`,
+    /// `page`, `custom`, `none` (ou `false`).
+    pub fn parse(raw: &str) -> Option<Self> {
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "" | "auto" | "true" => Some(Self::Auto),
+            "client" => Some(Self::Client),
+            "page" => Some(Self::Page),
+            "custom" => Some(Self::Custom),
+            "none" | "false" => Some(Self::Hidden),
+            _ => None,
+        }
+    }
+}
+
 /// Sections du rapport. Toutes incluses par défaut.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
@@ -162,7 +196,11 @@ pub struct Layout {
     /// Notes libres, imprimées dans la section « Notes ».
     pub notes: String,
     /// Faux : pas de logo, même si le client ou la page de statut en a un.
+    /// Gardé pour les mises en page enregistrées avant [`LogoSource`] ;
+    /// toujours égal à `logo != none` après [`Layout::validate`].
     pub show_logo: bool,
+    /// D'où vient le logo.
+    pub logo: LogoSource,
 }
 
 impl Default for Layout {
@@ -174,6 +212,7 @@ impl Default for Layout {
             title: None,
             notes: String::new(),
             show_logo: true,
+            logo: LogoSource::Auto,
         }
     }
 }
@@ -190,8 +229,16 @@ fn clean_notes(raw: &str) -> String {
 }
 
 impl Layout {
+    /// Le logo à mettre en tête : `show_logo` à faux (mise en page ancienne)
+    /// l'emporte sur tout choix.
+    pub fn logo_source(&self) -> LogoSource {
+        if self.show_logo { self.logo } else { LogoSource::Hidden }
+    }
+
     /// Valide et normalise : titre d'une ligne et borné, notes bornées.
     pub fn validate(mut self) -> Result<Self, String> {
+        self.logo = self.logo_source();
+        self.show_logo = self.logo != LogoSource::Hidden;
         self.title = match self.title.as_deref().map(str::trim) {
             None | Some("") => None,
             Some(title) => {
@@ -343,6 +390,26 @@ mod tests {
         assert_eq!(scope.groups, vec!["A".to_string()]);
         let many = Scope { targets: (0..=MAX_SCOPE_TARGETS as i64).collect(), groups: Vec::new() };
         assert!(many.validate().is_err());
+    }
+
+    #[test]
+    fn the_logo_source_reads_old_layouts_and_query_values() {
+        // Mise en page d'avant le choix : `show_logo` seul.
+        let old = Layout::from_json(r#"{"show_logo":false}"#);
+        assert_eq!(old.logo_source(), LogoSource::Hidden);
+        assert_eq!(Layout::from_json("{}").logo_source(), LogoSource::Auto);
+        let custom = Layout::from_json(r#"{"logo":"custom"}"#);
+        assert_eq!(custom.logo_source(), LogoSource::Custom);
+        let hidden = Layout::from_json(r#"{"logo":"none"}"#).validate().expect("valid");
+        assert!(!hidden.show_logo, "validate keeps both fields in step");
+        let shown = Layout { show_logo: false, logo: LogoSource::Page, ..Layout::default() };
+        assert_eq!(shown.validate().expect("valid").logo, LogoSource::Hidden);
+        assert_eq!(LogoSource::parse("false"), Some(LogoSource::Hidden));
+        assert_eq!(LogoSource::parse("true"), Some(LogoSource::Auto));
+        assert_eq!(LogoSource::parse("Client"), Some(LogoSource::Client));
+        assert_eq!(LogoSource::parse("svg"), None);
+        let json = serde_json::to_string(&LogoSource::Hidden).expect("json");
+        assert_eq!(json, "\"none\"");
     }
 
     #[test]

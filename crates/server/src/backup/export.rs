@@ -111,6 +111,9 @@ pub async fn collect(pool: &SqlitePool, cipher: &Cipher, options: ExportOptions)
             crate::collectors::agent::rollout::load(pool).await?,
         )?),
         mail_server: mail_server(pool, cipher).await?,
+        report_logo: crate::reports::logo::stored(pool)
+            .await?
+            .map(|(logo_type, bytes)| BundleReportLogo { logo_type, data: BASE64.encode(bytes) }),
     })
 }
 

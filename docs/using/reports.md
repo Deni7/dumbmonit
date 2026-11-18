@@ -69,13 +69,13 @@ library. It is made for paper: print margins, no background fills, table
 headers repeated on every page, the name and period at the top of each
 following page, and a footer with the generation date and the page number.
 Statuses are words (bad ones in bold), so the report reads in black and white.
-The logo of the client (MSP mode) or of the status page that brands the report
-heads it when it is a PNG or a JPEG.
+A logo heads the report when it is a PNG or a JPEG (see the **logo** option
+below).
 
 ### Customize the report {#customize}
 
-**Customize the report**, both in a schedule and when you download a period,
-chooses:
+**Customize the report** in a schedule, and the left column of the
+[availability report page](#download-a-period), choose:
 
 - the **template**: *Detailed* (every monitor, incident and maintenance window)
   or *Summary* (one or two pages: overall availability against the objective,
@@ -84,26 +84,37 @@ chooses:
 - the **sections**: key figures, availability chart, monitors, incidents,
   maintenance windows, response times, notes;
 - the **paper**: A4 or US Letter;
-- a **title** printed under the name (default: "Availability report"), free
-  **notes** (2,000 characters at most) and whether the **logo** is shown;
-- the **monitors covered**: groups, monitors, or both (a monitor is in the
-  report when it is picked or its group is). Nothing picked covers every
-  monitor. Incidents and maintenance windows follow the same scope.
+- a **title** printed under the name (default: "Availability report") and free
+  **notes** (2,000 characters at most);
+- the **logo**: *automatic* (the client's in MSP mode, otherwise the logo of
+  the status page that brands the report), the *client's*, the *status page's*,
+  a *logo uploaded for reports* (PNG or JPEG, 256 KiB at most, one for the
+  instance, kept in the backup) or *none*. A client without a logo gets one on
+  the Clients page;
+- the **monitors covered**: tick monitors, or a whole group with its checkbox
+  (a ticked group also covers the monitors added to it later). **All** and
+  **None** apply to what the search shows. Every monitor ticked is the whole
+  estate; at least one must be. Incidents and maintenance windows follow the
+  same scope.
 
 A schedule keeps these options, and so does a [backup](../install/backup.md).
 
 ### Download a period
 
-At the top of the page, **Availability report (SLA)** builds the same report on
-demand, for any period of one year at most (both days included, in the timezone
-you choose, ending now if it has not ended). Choose the PDF, the monitors CSV or
-the incidents CSV. The default is the previous calendar month. In MSP mode,
-choose the client the report is about. Administrators only.
+**Open the report**, at the top of Status › Reports, leads to the availability
+report page. It builds the same report on demand, for any period of one year
+at most (both days included, in the timezone you choose, ending now if it has
+not ended). The period has shortcuts: last 7 or 30 days, this month, last
+month, last quarter; the default is the previous calendar month. In MSP mode,
+choose the client the report is about. Administrators only, and in MSP mode the
+members of a client for that client.
 
-**Open printable page** shows the same report, with the same options, in the
-browser. Printing it (or saving it as PDF from the print dialog) gives only the
-report, black on white, with table headers repeated on each page;
-**Download PDF** there gives the PDF built by the server.
+The right column shows the report as it will print, rebuilt a moment after each
+change. **Print** prints only the report, black on white, with table headers
+repeated on each page; **Download PDF** gives the PDF built by the server;
+**CSV** gives the monitors or the incidents as CSV; **Schedule** opens a new
+scheduled report with the same options. The address of the page holds the
+options, so a report can be bookmarked or shared with another administrator.
 
 ### Sending history
 

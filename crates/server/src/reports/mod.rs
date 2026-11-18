@@ -146,9 +146,10 @@ async fn resolve_channel(
 const NO_SENDER: &str = "No email server is set (Settings, Notifications) and no email (SMTP) \
                          notification channel is enabled.";
 
-/// Habillage d'un rapport SLA : le client (mode MSP : son nom et son logo),
-/// sinon le nom et le logo de la page de statut choisie, à défaut
-/// « DumbMonit ». Le logo n'est pas lu quand la mise en page l'écarte.
+/// Habillage d'un rapport SLA : le nom du client (mode MSP), sinon celui de
+/// la page de statut choisie, à défaut « DumbMonit » ; le logo selon
+/// [`layout::Layout::logo`] — `auto` : celui du client, sinon celui de la page.
+/// Un logo qui ne s'incorpore pas (WebP…) est laissé de côté, aperçu compris.
 pub async fn sla_options(
     state: &AppState,
     page_id: Option<i64>,
@@ -157,35 +158,65 @@ pub async fn sla_options(
     layout: layout::Layout,
     now: DateTime<Utc>,
 ) -> sla::Options {
-    let want_logo = layout.show_logo;
-    if let Some(client) = client
-        && let Ok(found) = clients::refs(&state.pool, Some(std::slice::from_ref(&client))).await
-        && let Some(found) = found.into_iter().next()
-    {
-        let stored = if found.has_logo && want_logo {
-            clients::logo(&state.pool, client).await.ok().flatten()
-        } else {
-            None
-        };
-        let logo = stored.and_then(|(_, bytes)| logo::for_pdf(&bytes));
-        return sla::Options { brand: found.name, objective, generated: now, logo, layout };
-    }
+    use layout::LogoSource;
+    let found = match client {
+        Some(client) => {
+            let only = std::slice::from_ref(&client);
+            clients::refs(&state.pool, Some(only)).await.ok().and_then(|f| f.into_iter().next())
+        }
+        None => None,
+    };
+    // Hors mode MSP (ou client introuvable), la page de statut habille le
+    // rapport ; avec un client, la page ne sert qu'à son logo, sur demande.
     let page = match page_id {
         Some(id) => db::status_pages::get_page(&state.pool, id).await.ok().flatten(),
         None => None,
     };
-    let mut logo = None;
-    if want_logo
-        && let Some(page) = &page
-        && page.logo_type.is_some()
-    {
-        let path = crate::api::status_pages::branding::logo_path(state, page.id);
-        if let Ok(bytes) = tokio::fs::read(&path).await {
-            logo = logo::for_pdf(&bytes);
-        }
-    }
-    let brand = page.map_or_else(|| "DumbMonit".to_string(), |page| page.title);
-    sla::Options { brand, objective, generated: now, logo, layout }
+    let chosen = match layout.logo_source() {
+        LogoSource::Hidden => None,
+        LogoSource::Client => client_logo(state, found.as_ref()).await,
+        LogoSource::Page => page_logo(state, page.as_ref()).await,
+        LogoSource::Custom => custom_logo(state).await,
+        LogoSource::Auto if found.is_some() => client_logo(state, found.as_ref()).await,
+        LogoSource::Auto => page_logo(state, page.as_ref()).await,
+    };
+    let (logo, logo_url) = match chosen {
+        Some((image, url)) => (Some(image), Some(url)),
+        None => (None, None),
+    };
+    let brand = match (found, page) {
+        (Some(found), _) => found.name,
+        (None, Some(page)) => page.title,
+        (None, None) => "DumbMonit".to_string(),
+    };
+    sla::Options { brand, objective, generated: now, logo, logo_url, layout }
+}
+
+/// Logo du client, prêt pour le PDF, et son adresse pour l'aperçu.
+async fn client_logo(
+    state: &AppState,
+    found: Option<&clients::ClientRef>,
+) -> Option<(pdf::Image, String)> {
+    let found = found.filter(|found| found.has_logo)?;
+    let (_, bytes) = clients::logo(&state.pool, found.id).await.ok().flatten()?;
+    Some((logo::for_pdf(&bytes)?, format!("/clients/{}/logo", found.id)))
+}
+
+/// Logo téléversé pour les rapports, prêt pour le PDF, et son adresse.
+async fn custom_logo(state: &AppState) -> Option<(pdf::Image, String)> {
+    let (_, bytes) = logo::stored(&state.pool).await.ok().flatten()?;
+    Some((logo::for_pdf(&bytes)?, "/reports/logo".to_string()))
+}
+
+/// Logo de la page de statut, prêt pour le PDF, et son adresse pour l'aperçu.
+async fn page_logo(
+    state: &AppState,
+    page: Option<&db::status_pages::StatusPage>,
+) -> Option<(pdf::Image, String)> {
+    let page = page.filter(|page| page.logo_type.is_some())?;
+    let path = crate::api::status_pages::branding::logo_path(state, page.id);
+    let bytes = tokio::fs::read(&path).await.ok()?;
+    Some((logo::for_pdf(&bytes)?, format!("/status-pages/{}/logo", page.id)))
 }
 
 /// Les fichiers d'un rapport SLA : (nom, type MIME, octets).
