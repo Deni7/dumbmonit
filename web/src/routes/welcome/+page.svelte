@@ -195,7 +195,7 @@
 			<div class="lg:hidden">
 				<p class="text-[0.8125rem] text-ink-2">{m.wizard_step_of({ current: index + 1, total: steps.length })}</p>
 				<div class="mt-2 h-1 overflow-hidden rounded-full bg-line" aria-hidden="true">
-					<div class="h-full rounded-full bg-ink transition-[width] duration-500 ease-out-expo" style={`width: ${((index + 1) / steps.length) * 100}%`}></div>
+					<div class="progress-ink h-full rounded-full bg-ink transition-[width] duration-500 ease-out-expo" style={`width: ${((index + 1) / steps.length) * 100}%`}></div>
 				</div>
 			</div>
 

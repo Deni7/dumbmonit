@@ -10,6 +10,7 @@
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import { instanceStore } from '#lib/stores/instance.svelte.js';
 	import { Button, ErrorNotice, Panel, Plate, Skeleton, Toggle } from '#lib/ui/index.js';
+	import AccentPicker from '#lib/components/settings/AccentPicker.svelte';
 	import InstanceFields from '#lib/components/modes/InstanceFields.svelte';
 
 	let loaded = $state<InstanceSettings | null>(null);
@@ -103,6 +104,14 @@
 		<Skeleton class="h-32" />
 	{/if}
 </Panel>
+
+{#if !readOnly}
+	<div class="mt-6 max-sm:mt-3">
+		<Panel id="accent" title={m.settings_accent_label()} description={m.settings_accent_hint()}>
+			<AccentPicker />
+		</Panel>
+	</div>
+{/if}
 
 {#if loaded}
 	<div class="mt-6 max-sm:mt-3">

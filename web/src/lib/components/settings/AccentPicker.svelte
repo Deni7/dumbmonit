@@ -1,6 +1,6 @@
 <script lang="ts">
 	/**
-	 * The instance's accent colour, in Settings › Appearance (administrators):
+	 * The instance's accent colour, in Settings › System (administrators):
 	 * a few preset hues and a custom one. It colours the solid buttons and the
 	 * focus ring for everyone; the status colours never change. The page wears
 	 * the pick at once and the choice is saved on its own, like the theme.
@@ -61,12 +61,8 @@
 	}
 </script>
 
-<div class="grid gap-3 border-t border-line pt-4">
-	<div>
-		<span id="settings-accent-label" class="text-sm font-semibold text-ink">{m.settings_accent_label()}</span>
-		<p class="mt-0.5 text-[0.8125rem] text-ink-2">{m.settings_accent_hint()}</p>
-	</div>
-	<div role="radiogroup" aria-labelledby="settings-accent-label" class="flex flex-wrap items-center gap-2">
+<div class="grid gap-3">
+	<div role="radiogroup" aria-label={m.settings_accent_label()} class="flex flex-wrap items-center gap-2">
 		{#each ACCENT_PALETTE as swatch (swatch.id)}
 			{@const checked = swatch.hex === current}
 			<label

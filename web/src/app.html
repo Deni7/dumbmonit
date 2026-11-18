@@ -59,6 +59,8 @@
 					rs.setProperty('--accent-light-on', accent.lightOn);
 					rs.setProperty('--accent-dark', accent.darkFill);
 					rs.setProperty('--accent-dark-on', accent.darkOn);
+					rs.setProperty('--accent-light-ink', accent.lightInk || accent.lightFill);
+					rs.setProperty('--accent-dark-ink', accent.darkInk || accent.darkFill);
 					document.documentElement.setAttribute('data-accent', '');
 				}
 			} catch (e) {

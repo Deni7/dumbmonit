@@ -163,7 +163,7 @@
 				</button>
 			{/each}
 			<span
-				class="pointer-events-none absolute bottom-0 left-0 h-0.5 rounded-full bg-ink"
+				class="tabs-ink pointer-events-none absolute bottom-0 left-0 h-0.5 rounded-full bg-ink"
 				class:tabs-bar-animated={bar.animated}
 				style:width={`${bar.w}px`}
 				style:transform={`translateX(${bar.x}px)`}

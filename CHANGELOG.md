@@ -7,9 +7,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- **Accent colour.** Administrators pick the accent of the whole interface in Settings › My account ›
-  Appearance: eight preset hues or any custom colour, shown straight away. It colours the solid
-  buttons and the focus rings for everyone; the hue is adjusted for the light and the dark console so
+- **Accent colour.** Administrators pick the accent of the whole interface in Settings ›
+  System: eight preset hues or any custom colour, shown straight away. It colours the solid
+  buttons, focus rings, the active side bar item and tab underline, active filter chips, links,
+  switches, checkboxes, selected alert rows, the setup progress bar and the first chart series; the hue is adjusted for the light and the dark console so
   the text on it keeps a 4.5:1 contrast and the fill stands out from the surface. Status colours
   (red, amber, green) never change. Stored on the instance (`accent` in `/api/instance/settings`)
   and included in the backup.

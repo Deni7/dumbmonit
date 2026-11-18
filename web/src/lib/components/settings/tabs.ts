@@ -20,6 +20,7 @@ export const SECTION_TAB: Record<string, SettingsTab> = {
 	'setup-wizard': 'system',
 	'oncall-schedules': 'system',
 	appearance: 'account',
+	accent: 'system',
 	security: 'account',
 	push: 'account',
 	users: 'team',

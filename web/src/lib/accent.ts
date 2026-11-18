@@ -10,6 +10,8 @@
  *   toward black or white so the hue stays;
  * - the ink on the fill is the near-black or the near-white that reads
  *   ≥ 4.5:1 on it (one of the two always does).
+ * - the accent as text (active navigation item, links, tab labels) keeps
+ *   ≥ 5:1 against the raised surface in its light.
  * Status colours (red, amber, green) are never touched.
  *
  * Applied by `applyAccent` as CSS variables on `<html>` (app.css reads them
@@ -24,6 +26,9 @@ export const ACCENT_KEY = 'dumbmonit-accent';
 /** Surfaces the fill must stand out from, in each light (app.css `--c-surface`). */
 const SURFACE_LIGHT = '#ffffff';
 const SURFACE_DARK = '#0b0d10';
+/** The tinted rows text sits on: the console's `--c-surface-2` in each light. */
+const RAISED_LIGHT = '#efeff1';
+const RAISED_DARK = '#111419';
 const INK_DARK = '#07080a';
 const INK_LIGHT = '#ffffff';
 
@@ -47,6 +52,9 @@ export interface DerivedAccent {
 	lightOn: string;
 	darkFill: string;
 	darkOn: string;
+	/** The accent as text on the light and dark console. */
+	lightInk: string;
+	darkInk: string;
 }
 
 /** `#rrggbb` in lower case, or `''` for anything else (including the empty default). */
@@ -104,7 +112,14 @@ export function deriveAccent(raw: string): DerivedAccent | null {
 	if (!hex) return null;
 	const lightFill = holdContrast(hex, SURFACE_LIGHT, 3, [0, 0, 0]);
 	const darkFill = holdContrast(hex, SURFACE_DARK, 3, [255, 255, 255]);
-	return { lightFill, lightOn: inkOn(lightFill), darkFill, darkOn: inkOn(darkFill) };
+	return {
+		lightFill,
+		lightOn: inkOn(lightFill),
+		darkFill,
+		darkOn: inkOn(darkFill),
+		lightInk: holdContrast(hex, RAISED_LIGHT, 5, [0, 0, 0]),
+		darkInk: holdContrast(hex, RAISED_DARK, 5, [255, 255, 255])
+	};
 }
 
 /** Puts the accent on `<html>` and remembers it for the next first paint. `''` restores the default look. */
@@ -112,7 +127,7 @@ export function applyAccent(raw: string): void {
 	if (typeof document === 'undefined') return;
 	const root = document.documentElement;
 	const derived = deriveAccent(raw);
-	const names = ['--accent-light', '--accent-light-on', '--accent-dark', '--accent-dark-on'];
+	const names = ['--accent-light', '--accent-light-on', '--accent-dark', '--accent-dark-on', '--accent-light-ink', '--accent-dark-ink'];
 	if (!derived) {
 		root.removeAttribute('data-accent');
 		for (const name of names) root.style.removeProperty(name);
@@ -122,6 +137,8 @@ export function applyAccent(raw: string): void {
 		root.style.setProperty(names[1], derived.lightOn);
 		root.style.setProperty(names[2], derived.darkFill);
 		root.style.setProperty(names[3], derived.darkOn);
+		root.style.setProperty(names[4], derived.lightInk);
+		root.style.setProperty(names[5], derived.darkInk);
 	}
 	try {
 		if (derived) localStorage.setItem(ACCENT_KEY, JSON.stringify(derived));

@@ -26,6 +26,8 @@ test('every palette hue and a sweep of colours keep 4.5:1 ink and 3:1 fill', () 
 		assert.ok(contrast(d.darkFill, d.darkOn) >= 4.5, `dark ink on ${hex}`);
 		assert.ok(contrast(d.lightFill, '#ffffff') >= 3, `light fill ${hex}`);
 		assert.ok(contrast(d.darkFill, '#0b0d10') >= 3, `dark fill ${hex}`);
+		assert.ok(contrast(d.lightInk, '#efeff1') >= 5, `light text ${hex}`);
+		assert.ok(contrast(d.darkInk, '#111419') >= 5, `dark text ${hex}`);
 	}
 });
 

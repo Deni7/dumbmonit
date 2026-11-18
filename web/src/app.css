@@ -378,11 +378,62 @@ html[data-accent] {
 	--c-primary: var(--accent-dark);
 	--c-on-primary: var(--accent-dark-on);
 	--c-focus: var(--accent-dark);
+	--c-brand: var(--accent-dark);
+	--c-brand-on: var(--accent-dark-on);
+	--c-brand-ink: var(--accent-dark-ink);
+	--c-brand-soft: color-mix(in srgb, var(--accent-dark) 16%, transparent);
+	/* The first series of a chart without a status meaning. */
+	--c-series: var(--accent-dark);
 }
 html.console-light[data-accent] {
 	--c-primary: var(--accent-light);
 	--c-on-primary: var(--accent-light-on);
 	--c-focus: var(--accent-light);
+	--c-brand: var(--accent-light);
+	--c-brand-on: var(--accent-light-on);
+	--c-brand-ink: var(--accent-light-ink);
+	--c-brand-soft: color-mix(in srgb, var(--accent-light) 14%, transparent);
+	--c-series: var(--accent-light);
+}
+
+/* Where the accent shows beyond the button: the active item of the side bar, the
+   tab underline and active filter chips, links in running text, switches, boxes
+   and radios, selected rows, the wizard's progress. Only under `data-accent`:
+   with the default look none of this applies and the console is unchanged.
+   Hooks: `.rail-item[aria-current]`, `.tabs-ink`, `.chip-on`, `.progress-ink`,
+   `.row-selected`. */
+html[data-accent] {
+	accent-color: var(--c-brand);
+}
+html[data-accent] body {
+	accent-color: var(--c-brand);
+	caret-color: var(--c-brand);
+}
+html[data-accent] .rail-item[aria-current='page'] {
+	background: var(--c-brand-soft);
+	color: var(--c-brand-ink);
+}
+html[data-accent] .tabs-ink,
+html[data-accent] .progress-ink {
+	background: var(--c-brand);
+}
+html[data-accent] .chip-on {
+	border-color: var(--c-brand);
+	background: var(--c-brand-soft);
+	color: var(--c-brand-ink);
+}
+html[data-accent] .row-selected {
+	background: var(--c-brand-soft);
+}
+html[data-accent] button[role='switch'][aria-checked='true'] {
+	border-color: var(--c-brand);
+	background: var(--c-brand);
+}
+html[data-accent] main a:not([class]) {
+	color: var(--c-brand-ink);
+}
+html[data-accent] .accent-link {
+	color: var(--c-brand-ink);
 }
 
 @theme inline {
