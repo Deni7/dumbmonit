@@ -197,7 +197,6 @@
 			>
 				<Logo class="size-8 shrink-0" />
 				<span class="rail-label min-w-0 truncate text-sm font-semibold text-ink" aria-hidden="true">{instanceStore.displayName}</span>
-				<SwissCross class="ml-auto size-[17px]" />
 			</a>
 			<button
 				bind:this={closeButton}
@@ -228,7 +227,6 @@
 				<span class="brand-glyph text-ink"><PanelLeftOpen class="size-5" strokeWidth={1.75} aria-hidden="true" /></span>
 				<span class="rail-tip" aria-hidden="true">{m.shell_nav_expand()}<kbd class="ml-2 rounded border border-line-strong px-1 font-mono text-[0.6875rem] text-ink-2">{toggleHint}</kbd></span>
 			</button>
-			<SwissCross class="mx-auto -mt-1.5 mb-3 size-4" />
 		{/if}
 		<!-- On a very short window only this list scrolls (the foot below stays in reach). -->
 		<ul class="m-0 flex min-h-0 list-none flex-col gap-1 p-0 [@media(max-height:30rem)]:overflow-y-auto [@media(max-height:30rem)]:[scrollbar-width:none]">
@@ -260,6 +258,10 @@
 					<span class={labelClass}>GitHub<span class="sr-only"> {m.shell_new_tab()}</span></span>
 				</a>
 			</li>
+			<li class="rail-item relative flex h-10 w-full min-w-0 items-center gap-3 px-2.5 text-sm font-medium text-ink-2">
+				<SwissCross class="size-5" />
+				<span class={labelClass}>{m.brand_swiss_made()}</span>
+			</li>
 			<li><UserMenu placement="rail" wide={expanded} /></li>
 		</ul>
 	</nav>
@@ -268,8 +270,6 @@
 		{@render banner?.()}
 		<header class="vt-nav-top sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-line bg-canvas/95 px-4 backdrop-blur sm:gap-3 sm:px-5">
 			<PigeonStatus />
-			<!-- Always in sight, on every page and at every width (the phone has no rail). -->
-			<SwissCross class="size-4" />
 			<nav aria-label={m.console_breadcrumb()} class="flex min-w-0 items-center gap-2 text-sm text-ink-2">
 				<span class="truncate max-sm:hidden">{instanceStore.displayName}</span>
 				{#if current || offRail}
