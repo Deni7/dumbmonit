@@ -18,14 +18,8 @@
 	 * The history route has no per-device filter, so a generous window is read
 	 * and filtered here; the rules are read for their names and units.
 	 */
-	import type { Alert, AlertHistoryEntry, AlertPhase, AlertRule, RuleOverride, Silence, Target } from '#lib/api/index.js';
-	import {
-		deleteRuleOverride,
-		listAlertHistory,
-		listAlertRules,
-		listRuleOverrides,
-		listSilences
-	} from '#lib/api/index.js';
+	import type { Alert, AlertHistoryEntry, AlertPhase, AlertRule, Silence, Target } from '#lib/api/index.js';
+	import { listAlertHistory, listAlertRules, listSilences } from '#lib/api/index.js';
 	import type { Tone } from '#lib/ui/index.js';
 	import { Button, ErrorNotice, Plate, Skeleton } from '#lib/ui/index.js';
 	import { formatDateTime, formatRelative } from '#lib/format.js';
@@ -58,36 +52,6 @@
 			silences = await listSilences(signal);
 		} catch {
 			// The control still works without it; only the "time left" is missing.
-		}
-	}
-
-	/** Rules ignored on this device ("don't alert me about this again"), with a
-	 *  way back: reversible here, or from the rule itself in Alerts → Rules. */
-	let overrides = $state<RuleOverride[]>([]);
-	async function loadOverrides(signal?: AbortSignal) {
-		try {
-			overrides = await listRuleOverrides(targetId, signal);
-		} catch {
-			// Best effort: the list just stays empty, nothing else depends on it.
-		}
-	}
-	const ignoredRules = $derived(
-		overrides
-			.filter((o) => o.enabled === false)
-			.map((o) => ({ override: o, rule: rules.get(o.rule_uid) }))
-	);
-	let unignoringUid = $state<string | null>(null);
-	async function unignore(ruleUid: string) {
-		const rule = rules.get(ruleUid);
-		if (!rule) return;
-		unignoringUid = ruleUid;
-		try {
-			await deleteRuleOverride(rule.id, targetId);
-			overrides = overrides.filter((o) => o.rule_uid !== ruleUid);
-		} catch {
-			// The row stays; the admin can try again.
-		} finally {
-			unignoringUid = null;
 		}
 	}
 
@@ -166,7 +130,6 @@
 		const controller = new AbortController();
 		void load(controller.signal);
 		void loadSilences(controller.signal);
-		void loadOverrides(controller.signal);
 		return () => controller.abort();
 	});
 
@@ -313,36 +276,13 @@
 	}
 
 	const isEmpty = $derived(
-		!loading && !error && alerts.length === 0 && history.length === 0 && ignoredRules.length === 0
+		!loading && !error && alerts.length === 0 && history.length === 0
 	);
 	// The page hides the whole section (heading included) when there is nothing to tell.
 	$effect(() => {
 		empty = isEmpty;
 	});
 </script>
-
-{#if ignoredRules.length > 0}
-	<div class="mb-4 rounded-[var(--radius-card)] border border-line bg-surface-2 px-4 py-2.5">
-		<p class="text-[0.8125rem] font-semibold text-ink-2">
-			{m.devices_timeline_ignored()}
-		</p>
-		<ul class="mt-1.5 grid gap-1" role="list">
-			{#each ignoredRules as { override, rule } (override.rule_uid)}
-				<li class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-					<span class="font-medium text-ink">{rule?.name ?? override.rule_uid}</span>
-					<Button
-						size="sm"
-						variant="ghost"
-						loading={unignoringUid === override.rule_uid}
-						onclick={() => void unignore(override.rule_uid)}
-					>
-						{m.devices_timeline_stop_ignoring()}
-					</Button>
-				</li>
-			{/each}
-		</ul>
-	</div>
-{/if}
 
 {#snippet controls(alert: Alert, extra: Alert[] = [], menu = true)}
 	<AlertActions {alert} {extra} {target} rule={rules.get(alert.rule_uid)} {silences} {menu} onchanged={onackchange} />

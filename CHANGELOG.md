@@ -7,6 +7,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **Calmer monitor header.** The monitor page header is a flat surface with one main action (Probe now) and Settings; silencing, logs, the on/off switch and Delete sit in a quiet strip below, replacing the row of icon buttons and the "..." menu. Rules ignored on a monitor are no longer listed under its alerts.
 - **Clearer, more detailed Alerts panel.** Each alert row now unfolds with what used to need a trip
   to the monitor: how long it has lasted, the monitor and its address, the rule, the current value
   against its limit, the last check and last data received, the probe error, notifications sent and
