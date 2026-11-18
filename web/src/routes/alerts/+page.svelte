@@ -40,6 +40,7 @@
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import { dismissals } from '#lib/stores/dismissals.svelte.js';
 	import { readSky } from '#lib/components/overview/sky.js';
+	import UpdatedAgo from '#lib/components/alerts/UpdatedAgo.svelte';
 	import AlertList from '#lib/components/alerts/AlertList.svelte';
 	import DismissedList from '#lib/components/alerts/DismissedList.svelte';
 	import ScheduleForm from '#lib/components/alerts/ScheduleForm.svelte';
@@ -276,6 +277,38 @@
 		{ id: 'oncall', label: m.oncall_tab() }
 	]);
 
+	/** The refresh button: the shared lists and this page's own (history, windows). */
+	async function refreshNow() {
+		await Promise.all([alertsStore.refresh(), refreshSilences(), refreshHistory()]);
+	}
+
+	async function refreshHistory(signal?: AbortSignal) {
+		try {
+			history = await listAlertHistory({ limit: 200 }, signal);
+		} catch {
+			// Kept as is: the mini history of a row just stays a little behind.
+		}
+	}
+
+	// The live list is the point of this tab: while it is open and visible it
+	// refreshes on a short clock (the app-wide poll stays at 30 s). It only
+	// replaces data — expanded rows, groups and the selection live in the list
+	// and are keyed, so nothing the reader set is lost.
+	const LIVE_MS = 10_000;
+	$effect(() => {
+		if (tab !== 'now') return;
+		const controller = new AbortController();
+		const timer = setInterval(() => {
+			if (document.visibilityState === 'hidden') return;
+			void alertsStore.refresh(controller.signal);
+			void refreshHistory(controller.signal);
+		}, LIVE_MS);
+		return () => {
+			controller.abort();
+			clearInterval(timer);
+		};
+	});
+
 	$effect(() => {
 		const controller = new AbortController();
 		void loadAll(controller.signal);
@@ -374,8 +407,9 @@
 					/>
 				</Disclosure>
 			{/if}
-			{#if dismissed.length > 0}
-				<div class="mb-3 flex justify-end">
+			<div class="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+				<UpdatedAgo updatedAt={alertsStore.updatedAt} onrefresh={refreshNow} />
+				{#if dismissed.length > 0}
 					<Segmented
 						options={nowViews}
 						value={nowView}
@@ -383,12 +417,12 @@
 						label={m.alerts_dismiss_view_label()}
 						size="sm"
 					/>
-				</div>
-			{/if}
+				{/if}
+			</div>
 			{#if nowView === 'dismissed'}
 				<DismissedList alerts={dismissed} targets={targetsMap} rules={rulesMap} />
 			{:else}
-				<AlertList {sky} {silences} onchanged={() => void onNeedsYouChanged()} />
+				<AlertList {sky} {silences} {history} {probes} onchanged={() => void onNeedsYouChanged()} />
 			{/if}
 		{/if}
 	{/snippet}

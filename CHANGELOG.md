@@ -5,6 +5,15 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Changed
+
+- **Clearer, more detailed Alerts panel.** Each alert row now unfolds with what used to need a trip
+  to the monitor: how long it has lasted, the monitor and its address, the rule, the current value
+  against its limit, the last check and last data received, the probe error, notifications sent and
+  the latest state changes. The list refreshes every 10 seconds while the tab is open without
+  losing the open row, groups or selection, with a discreet "Updated … ago" and a refresh button.
+  The acknowledged group no longer shows a count.
+
 ## 0.18.0 — 2026-11-17
 
 ### Added

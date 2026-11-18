@@ -30,6 +30,8 @@ class AlertsStore {
 	available = $state(true);
 	/** The cause of the last failed refresh; `null` once one succeeds. */
 	lastError = $state<unknown>(null);
+	/** When the last refresh succeeded (ms since epoch); `null` before the first. */
+	updatedAt = $state<number | null>(null);
 	#subscribers = 0;
 
 	/**
@@ -73,6 +75,7 @@ class AlertsStore {
 			this.probes = probes;
 			this.available = true;
 			this.lastError = null;
+			this.updatedAt = Date.now();
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			// The badge must not pollute the interface with a stale count; the

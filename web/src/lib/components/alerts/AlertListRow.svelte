@@ -13,12 +13,20 @@
 	 *
 	 * In selection mode a click on the row picks it instead of unfolding it.
 	 */
-	import type { Alert, Silence } from '#lib/api/index.js';
+	import type { Alert, AlertHistoryEntry, AlertPhase, Silence } from '#lib/api/index.js';
 	import type { Tone } from '#lib/ui/index.js';
 	import { Button, Plate } from '#lib/ui/index.js';
-	import { formatDateTime, formatRelative } from '#lib/format.js';
-	import { alertDetail, coveringSilence } from './helpers';
-	import type { Folded } from './list';
+	import {
+		formatDateTime,
+		formatDuration,
+		formatFailureReason,
+		formatRelative,
+		parseServerDate,
+		type ProbeStatus
+	} from '#lib/format.js';
+	import { alertDetail, coveringSilence, formatAlertValue } from './helpers';
+	import { operatorSymbol, recentTransitions, secondsSince } from './facts';
+	import { fingerprintsOf, type Folded } from './list';
 	import { m } from '#lib/paraglide/messages.js';
 	import {
 		AlertTriangle,
@@ -46,6 +54,10 @@
 		silences?: Silence[];
 		/** The pending or firing alert of an unreachable device, when one exists: gives the row a real acknowledgement. */
 		deviceAlert?: Alert;
+		/** Recent phase transitions (already loaded by the page): the mini history in the details. */
+		history?: AlertHistoryEntry[];
+		/** The device's last probe verdict, when it has one. */
+		probe?: ProbeStatus;
 		expanded?: boolean;
 		ontoggle?: () => void;
 		selecting?: boolean;
@@ -60,6 +72,8 @@
 		showOpen = true,
 		silences = [],
 		deviceAlert,
+		history = [],
+		probe,
 		expanded = false,
 		ontoggle,
 		selecting = false,
@@ -122,8 +136,42 @@
 		if (row.kind === 'device') return row.detail;
 		if (details.length === 0) return '';
 		const more = folded.extra.length;
-		return more > 0 ? m.alerts_list_and_more({ first: details[0], count: more }) : details[0];
+		if (more > 0) return m.alerts_list_and_more({ first: details[0], count: more });
+		// One series: the measured value reads next to the line it crossed.
+		return limit && alert?.value !== null && alert?.value !== undefined ? `${details[0]} (${m.alerts_row_limit({ limit })})` : details[0];
 	});
+	/** The rule's line, "> 90%": what the value is compared with. */
+	const limit = $derived(
+		row.kind === 'alert' && row.rule
+			? `${operatorSymbol(row.rule.operator)} ${formatAlertValue(row.rule.threshold, row.rule.unit)}`
+			: ''
+	);
+	const forText = $derived(
+		row.kind === 'alert' && row.rule && row.rule.for_secs > 0 ? formatDuration(row.rule.for_secs) : ''
+	);
+	/** How long the problem has lasted, from the moment it started. */
+	const lasting = $derived.by(() => {
+		const secs = secondsSince(parseServerDate(row.since), Date.now());
+		return secs === null ? '' : formatDuration(secs);
+	});
+	/** The last verdict of the probe: the server's error, else the probe's failure reason. */
+	const probeError = $derived.by(() => {
+		if (row.kind !== 'alert' || !target) return '';
+		if (target.last_error) {
+			return target.error_kind === 'config'
+				? m.alerts_detail_probe_config({ error: target.last_error })
+				: target.last_error;
+		}
+		return probe && !probe.up ? formatFailureReason(probe.reason) : '';
+	});
+	const lastData = $derived(target?.last_probe_at ?? null);
+	const recent = $derived(recentTransitions(history, fingerprintsOf(folded)));
+	const PHASE_WORD: Record<AlertPhase, () => string> = {
+		ok: () => m.alerts_history_phase_ok(),
+		pending: () => m.alerts_history_phase_pending(),
+		firing: () => m.alerts_history_phase_firing(),
+		resolved: () => m.alerts_history_phase_resolved()
+	};
 
 	const ICON: Record<Tone, typeof AlertTriangle> = {
 		warning: AlertTriangle,
@@ -297,6 +345,56 @@
 					<dt class="text-ink-3">{m.alerts_list_detail_last_report()}</dt>
 					<dd class="text-ink">{m.alerts_device_never_reported()}</dd>
 				{/if}
+				{#if alert && row.kind === 'alert'}
+					{#if lasting}
+						<dt class="text-ink-3">{m.alerts_detail_lasting()}</dt>
+						<dd class="tnum text-ink">{lasting}</dd>
+					{/if}
+					{#if target}
+						<dt class="text-ink-3">{m.alerts_detail_monitor()}</dt>
+						<dd class="break-words text-ink">
+							<a
+								href={withBase(`/targets/${target.id}`)}
+								class="font-medium underline decoration-line-strong underline-offset-2 hover:decoration-ink"
+								>{target.name}</a
+							>
+							<span class="text-ink-2"> · {target.address}</span>
+						</dd>
+					{/if}
+					<dt class="text-ink-3">{m.alerts_detail_rule()}</dt>
+					<dd class="break-words text-ink">{title}</dd>
+					{#if alert.value !== null && Number.isFinite(alert.value)}
+						<dt class="text-ink-3">{m.alerts_detail_value()}</dt>
+						<dd class="tnum text-ink">
+							{formatAlertValue(alert.value, row.rule?.unit)}{#if limit}<span class="text-ink-2">
+									· {forText ? m.alerts_detail_limit_for({ limit, duration: forText }) : m.alerts_row_limit({ limit })}</span
+								>{/if}
+						</dd>
+					{:else if limit}
+						<dt class="text-ink-3">{m.alerts_detail_limit()}</dt>
+						<dd class="tnum text-ink">{forText ? m.alerts_detail_limit_for({ limit, duration: forText }) : limit}</dd>
+					{/if}
+					{#if alert.last_eval_at}
+						<dt class="text-ink-3">{m.alerts_detail_checked()}</dt>
+						<dd class="tnum text-ink">{formatRelative(alert.last_eval_at)}</dd>
+					{/if}
+					{#if lastData}
+						<dt class="text-ink-3">{m.alerts_detail_last_data()}</dt>
+						<dd class="tnum text-ink">{formatRelative(lastData)}</dd>
+					{/if}
+					{#if probeError}
+						<dt class="text-ink-3">{m.alerts_detail_probe_error()}</dt>
+						<dd class="break-words text-warning-ink">{probeError}</dd>
+					{/if}
+					<dt class="text-ink-3">{m.alerts_detail_notified()}</dt>
+					<dd class="text-ink">
+						{#if alert.notify_count > 0 && alert.last_notified_at}
+							{m.alerts_detail_notified_value({ count: alert.notify_count, when: formatRelative(alert.last_notified_at) })}
+						{:else}
+							{m.alerts_detail_notified_none()}
+						{/if}
+					</dd>
+				{/if}
 				{#if row.kind === 'device'}
 					<dt class="text-ink-3">{m.alerts_list_detail_address()}</dt>
 					<dd class="break-all text-ink">{row.target.address}</dd>
@@ -316,6 +414,34 @@
 					</dd>
 				{/if}
 			</dl>
+
+			{#if row.kind === 'alert'}
+				<div class="mt-3">
+					<p class="text-ink-3">{m.alerts_detail_recent()}</p>
+					{#if recent.length === 0}
+						<p class="mt-0.5 text-ink-2">{m.alerts_detail_recent_none()}</p>
+					{:else}
+						<ol class="mt-1 space-y-1 border-l border-line pl-3">
+							{#each recent as entry (entry.id)}
+								<li class="flex flex-wrap items-baseline gap-x-2 text-ink">
+									<span class="font-medium">
+										{m.alerts_detail_recent_move({
+											before: PHASE_WORD[entry.from_phase](),
+											after: PHASE_WORD[entry.to_phase]()
+										})}
+									</span>
+									{#if entry.value !== null && Number.isFinite(entry.value)}
+										<span class="tnum text-ink-2">{formatAlertValue(entry.value, row.rule?.unit)}</span>
+									{/if}
+									<time class="tnum text-ink-3" datetime={entry.at} title={formatDateTime(entry.at)}>
+										{formatRelative(entry.at)}
+									</time>
+								</li>
+							{/each}
+						</ol>
+					{/if}
+				</div>
+			{/if}
 
 			{#if alert?.learning}
 				<p class="mt-2 text-ink-2">

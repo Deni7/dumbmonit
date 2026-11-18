@@ -13,7 +13,15 @@
 	 * and a floating action bar (acknowledge, unacknowledge, ignore for the
 	 * device), so nothing on the page moves when it turns on. Escape leaves it.
 	 */
-	import { ackAlert, putRuleOverride, unackAlert, type Silence } from '#lib/api/index.js';
+	import {
+		ackAlert,
+		putRuleOverride,
+		unackAlert,
+		type AlertHistoryEntry,
+		type Silence,
+		type TargetId
+	} from '#lib/api/index.js';
+	import type { ProbeStatus } from '#lib/format.js';
 	import type { Sky } from '#lib/components/overview/sky.js';
 	import { Button, Confirm, EmptyState, Plate, SelectionBar } from '#lib/ui/index.js';
 	import type { Tone } from '#lib/ui/index.js';
@@ -60,11 +68,15 @@
 	interface Props {
 		sky: Sky;
 		silences?: Silence[];
+		/** Recent phase transitions, for the mini history in each row's details. */
+		history?: AlertHistoryEntry[];
+		/** Probe verdicts by device, for the "probe error" line of a row's details. */
+		probes?: Map<TargetId, ProbeStatus>;
 		/** An acknowledgement, a snooze or an ignore was made or lifted: refresh the alerts. */
 		onchanged?: () => void;
 	}
 
-	let { sky, silences = [], onchanged }: Props = $props();
+	let { sky, silences = [], history = [], probes = new Map(), onchanged }: Props = $props();
 
 	type GroupBy = 'severity' | 'device';
 	const GROUP_KEY = 'dumbmonit-alerts-group-by';
@@ -360,7 +372,10 @@
 						<h3 id={`${group.key}-label`} class={`truncate text-[0.9375rem] font-semibold ${group.quiet ? 'text-ink-2' : 'text-ink'}`}>
 							{group.label}
 						</h3>
-						<span class="tnum shrink-0 text-[0.8125rem] text-ink-3">{group.items.reduce((n, item) => n + 1 + item.extra.length, 0)}</span>
+						<!-- No figure on the acknowledged group: known problems are not a score to worry about. -->
+						{#if group.bucket !== 'acked'}
+							<span class="tnum shrink-0 text-[0.8125rem] text-ink-3">{group.items.reduce((n, item) => n + 1 + item.extra.length, 0)}</span>
+						{/if}
 						{#if group.plate && !group.bucket}
 							<Plate tone={group.plate.tone} label={group.plate.label} class="ml-1 shrink-0 max-sm:hidden" />
 						{/if}
@@ -384,6 +399,8 @@
 								showOpen={groupBy === 'severity'}
 								{silences}
 								deviceAlert={deviceAlertOf(item)}
+								{history}
+								probe={item.row.target ? probes.get(item.row.target.id) : undefined}
 								{onchanged}
 								{selecting}
 								selected={selected.has(item.row.key)}
