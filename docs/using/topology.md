@@ -36,7 +36,12 @@ before deduced. Each box hangs from one link; the others are drawn lighter.
 
 ## Reading the map
 
-- Upstream on the left, what depends on it to the right; one section per folder.
+- Upstream on top, what depends on it underneath, joined by square lines. A
+  device with many dependants gets them in a grid of up to eight per row.
+  Each site has its own frame, sized to what it holds, and the frames sit side
+  by side; a link between two sites joins the edges of their frames.
+- **Legend**, in the toolbar above the map, explains the circles, the state
+  badges, the frames and the kinds of link the map draws.
 - Every box shows the type icon, the name and its state in words. A monitor
   that is **down** gets a thick outline and a `!` badge; what sits behind it
   (through a parent, a relay or a hypervisor) is marked **Impacted**, with a

@@ -94,6 +94,17 @@ All notable changes to this project are documented here. The format follows
 - **SLA report forms line up with the rest of the settings.** Same field heights, labels, grid and
   spacing as the other forms; the template, kind and frequency choices are 40px segmented controls;
   the layout options no longer sit in a box inside a box. The printable page is now the SLA page.
+
+- **A tidier map.** Monitors › Map is laid out as a clean tree: a device with many dependants
+  gets them in a compact grid of up to eight per row, joined by square lines (one bus, short drops)
+  instead of a fan of long diagonals. Each site frame is as big as its content and the sites sit side
+  by side, so a small site no longer leaves a hole beside a big one; a site without links is a small
+  grid. A device placed by a link to another site sits under the device it is cabled to in its own
+  site rather than alone at the bottom. Links between sites are a single curve between the facing
+  edges of the two frames, without the junction circles.
+- **The map legend behind a button.** The legend under the map is replaced by a "Legend" button in
+  the map's toolbar. Its panel explains the circles, the state badges, the site frames and only the
+  kinds of link the map actually draws (plus the load scale with the weathermap on).
 - **On-call schedules are optional.** The On-call tab of Alerts, the "DumbMonit on-call" channel type
   and the on-call step of the setup wizard are hidden until you turn on **On-call schedules** in
   Settings › System (for teams that take turns handling alerts at night and on weekends). Turned off,

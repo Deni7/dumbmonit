@@ -340,6 +340,8 @@
 	const rules = $derived(topology?.rules ?? []);
 	const suggestions = $derived(topology?.suggestions ?? []);
 	const corrected = $derived(edges.some((e) => e.origin !== 'deduced'));
+	/** The kinds of link the map draws: the legend lists only those. */
+	const linkSources = $derived(new Set(graph.edges.map((e) => e.source)));
 	const sites = $derived([...new Set(allNodes.map((n) => n.site).filter((s): s is string => !!s))].sort((a, b) => a.localeCompare(b)));
 	const groups = $derived([...new Set(allNodes.map((n) => n.group).filter(Boolean))].sort((a, b) => a.localeCompare(b)));
 	const allById = $derived(new Map(allNodes.map((n) => [n.id, n])));
@@ -502,6 +504,9 @@
 			</p>
 			<Segmented options={VIEWS} value={view} onchange={setView} label={m.topology_view_label()} />
 			<div class="flex flex-wrap items-center gap-2">
+				{#if view === 'map' && layout.nodes.length > 0}
+					<Legend sources={linkSources} wan={siteCount > 0} {corrected} traffic={weather} />
+				{/if}
 				{#if auth.isAdmin && view === 'map' && layout.nodes.length > 0}
 					<Button variant={editing ? 'primary' : 'secondary'} aria-pressed={editing} onclick={startEditing}>
 						<PencilRuler class="size-4" aria-hidden="true" />
@@ -579,7 +584,6 @@
 		{:else}
 			<TopologyList {sections} traffic={weather} />
 		{/if}
-		<Legend wan={siteCount > 0} {corrected} traffic={weather} class={`mt-3 ${weather && !editing && view === 'map' ? 'max-sm:hidden' : ''}`} />
 		{#if view === 'map' && editing}
 			<CorrectionsPanel
 				{corrections}
