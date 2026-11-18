@@ -549,6 +549,9 @@ pub struct BundleLocation {
     pub longitude: f64,
     #[serde(default)]
     pub site: String,
+    /// Code de la pastille (deux caractères) ; absent d'un ancien lot : celui du nom.
+    #[serde(default)]
+    pub code: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

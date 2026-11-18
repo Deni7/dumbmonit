@@ -1446,6 +1446,7 @@ mod tests {
             latitude: 0.0,
             longitude: 0.0,
             site: site.into(),
+            code: String::new(),
         };
         let locations = [loc(1, "Siège", ""), loc(2, "Crissier", "crissier")];
         let relay = row(1, "dm01", "dm01", "agent");

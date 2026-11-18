@@ -14017,10 +14017,11 @@ components:
           description: Devices no location gathers.
     Location:
       type: object
-      required: [id, name, address, latitude, longitude, site, members]
+      required: [id, name, address, latitude, longitude, site, code, members]
       properties:
         id: { type: integer, format: int64 }
         name: { type: string }
+        code: { type: string, maxLength: 2, description: "Two-character badge code, upper case (e.g. `CR`); never empty." }
         address: { type: string, description: Free text, shown only. }
         latitude: { type: number }
         longitude: { type: number }
@@ -14044,6 +14045,7 @@ components:
         latitude: { type: number, minimum: -90, maximum: 90 }
         longitude: { type: number, minimum: -180, maximum: 180 }
         site: { type: string, maxLength: 80 }
+        code: { type: string, maxLength: 2, description: "Badge code; normalised to at most two upper-case letters or digits, accents removed. Empty or omitted: the first two letters of the name." }
     Basemap:
       type: object
       required: [mode]

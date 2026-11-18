@@ -24,7 +24,7 @@
 		controls?: string;
 		/** `md` spells "Security" out and shows the score; `sm` keeps to the letter. */
 		size?: 'sm' | 'md';
-		/** Lists: a hairline plate in neutral ink, only the letter takes the tone. */
+		/** Lists: no plate, neutral ink; only the letter takes the tone. */
 		quiet?: boolean;
 		class?: string;
 	}
@@ -45,7 +45,7 @@
 		warning: 'text-warning-ink',
 		ghost: 'text-ink-3'
 	} as const;
-	const plateClass = $derived(quiet ? `border-line bg-transparent text-ink-3` : TONE_CLASS[tone]);
+	const plateClass = $derived(quiet ? `border-transparent bg-transparent text-ink-3` : TONE_CLASS[tone]);
 	const label = $derived(
 		grade !== null && score !== null ? m.devices_security_badge_aria({ grade, score }) : m.devices_security_badge_unrated_aria()
 	);

@@ -3103,6 +3103,8 @@ export interface LocationMember {
 export interface MapLocation {
 	id: LocationId;
 	name: string;
+	/** Two-character badge code, upper case; never empty. */
+	code: string;
 	/** Free text, shown only. */
 	address: string;
 	latitude: number;
@@ -3128,6 +3130,8 @@ export interface LocationPayload {
 	latitude: number;
 	longitude: number;
 	site: string;
+	/** Badge code; empty: the first two letters of the name. */
+	code?: string;
 }
 
 export type BasemapMode = 'offline' | 'osm' | 'custom';

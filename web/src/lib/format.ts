@@ -2,6 +2,7 @@
 import type { Target } from '#lib/api/index.js';
 import { m } from '#lib/paraglide/messages.js';
 import { getLocale } from '#lib/paraglide/runtime.js';
+import { ageParts } from '#lib/components/devices/age.js';
 
 /**
  * Converts a server timestamp into a `Date`.
@@ -57,6 +58,14 @@ export function formatRelative(value: string | Date | null | undefined): string 
 	if (days < 31) return m.misc_ago({ span: m.misc_dur_d({ n: days }) });
 
 	return formatDateTime(date);
+}
+
+/** Compact age for dense lists: "12s", "2min", "3h", "5d"; "–" when never seen. The full date is the title's job. */
+export function formatAge(value: string | Date | null | undefined): string {
+	const date = value instanceof Date ? value : parseServerDate(value);
+	if (!date) return '–';
+	const { n, unit } = ageParts((Date.now() - date.getTime()) / 1000);
+	return { s: m.misc_dur_s, min: m.misc_dur_min, h: m.misc_dur_h, d: m.misc_dur_d }[unit]({ n });
 }
 
 /** Readable duration from a number of seconds: "1 min", "2 h", "45 d". */

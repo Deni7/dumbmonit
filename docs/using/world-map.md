@@ -33,7 +33,8 @@ Locations too close to tell apart at the current zoom are drawn as one **group p
 ## Add your first location
 
 1. Open **Settings → Monitoring → Locations** (administrators).
-2. Click **Add a location** and give it a **name**.
+2. Click **Add a location** and give it a **name**. The **Badge code** (two letters, the
+   first two of the name by default) is what the Monitors list shows; change it if you like.
 3. Choose the spot: **Find a place** (type a city, click **Find**, then **Use**
    the answer), the **Latitude / Longitude**, or a click on the map.
 4. Click **Save location**. You should see the location in the list; open the

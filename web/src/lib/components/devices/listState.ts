@@ -104,6 +104,24 @@ export function tagCounts(
 	return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'en'));
 }
 
+/**
+ * The tags a picker offers: those in use plus any already chosen (a stale
+ * `?tag=` stays visible so it can be cleared), narrowed by what was typed
+ * (case-insensitive, any part of the tag). Each carries its device count.
+ */
+export function tagChoices(
+	counts: readonly [string, number][],
+	chosen: readonly string[],
+	query: string
+): [string, number][] {
+	const known = new Map(counts);
+	const all: [string, number][] = [...new Set([...chosen, ...counts.map(([tag]) => tag)])].map(
+		(tag) => [tag, known.get(tag) ?? 0]
+	);
+	const term = query.trim().toLowerCase();
+	return term ? all.filter(([tag]) => tag.toLowerCase().includes(term)) : all;
+}
+
 /** Whether a device passes the site filter (`''` all, `none` unplaced, else a location id). */
 export function matchesSite(locationId: number | null | undefined, site: string): boolean {
 	if (!site) return true;

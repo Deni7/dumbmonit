@@ -75,6 +75,8 @@ pub struct LocationRow {
     pub latitude: f64,
     pub longitude: f64,
     pub site: String,
+    /// Code court (deux caractères) de la pastille ; jamais vide à la lecture.
+    pub code: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -93,6 +95,8 @@ pub struct LocationView {
     pub longitude: f64,
     /// Site de la topologie dont l'emplacement tient lieu ; vide : aucun.
     pub site: String,
+    /// Code de la pastille : deux caractères, majuscules.
+    pub code: String,
     pub members: Vec<Member>,
 }
 
@@ -108,7 +112,7 @@ pub struct LocationsView {
 
 pub async fn load(pool: &SqlitePool) -> ApiResult<Vec<LocationRow>> {
     let rows = sqlx::query(
-        "SELECT id, name, address, latitude, longitude, site FROM locations
+        "SELECT id, name, address, latitude, longitude, site, code FROM locations
          ORDER BY name COLLATE NOCASE, id",
     )
     .fetch_all(pool)
@@ -116,13 +120,19 @@ pub async fn load(pool: &SqlitePool) -> ApiResult<Vec<LocationRow>> {
     .map_err(anyhow::Error::from)?;
     rows.iter()
         .map(|row| {
+            let name: String = row.try_get("name")?;
+            let stored: String = row.try_get("code")?;
+            // Un emplacement créé sans code (démo, ancienne sauvegarde) reçoit
+            // le code par défaut de son nom à la lecture.
+            let code = if stored.is_empty() { default_code(&name) } else { stored };
             Ok(LocationRow {
                 id: row.try_get("id")?,
-                name: row.try_get("name")?,
+                name,
                 address: row.try_get("address")?,
                 latitude: row.try_get("latitude")?,
                 longitude: row.try_get("longitude")?,
                 site: row.try_get("site")?,
+                code,
             })
         })
         .collect::<Result<Vec<_>, sqlx::Error>>()
@@ -256,6 +266,7 @@ async fn list(
             latitude: l.latitude,
             longitude: l.longitude,
             site: l.site,
+            code: l.code,
         })
         .collect();
     Ok(Json(LocationsView { locations, sites: known_sites, unplaced }))
@@ -272,6 +283,9 @@ pub struct LocationPayload {
     pub longitude: f64,
     #[serde(default)]
     pub site: String,
+    /// Code de la pastille, deux caractères ; vide : les deux premières lettres du nom.
+    #[serde(default)]
+    pub code: String,
     /// Ancien champ, ignoré : il n'y a plus de site principal.
     #[serde(default)]
     #[allow(dead_code)]
@@ -285,6 +299,41 @@ struct LocationInput {
     latitude: f64,
     longitude: f64,
     site: String,
+    code: String,
+}
+
+/// Retire l'accent d'une lettre latine courante ; les autres caractères restent.
+fn strip_accent(c: char) -> char {
+    match c {
+        'à' | 'á' | 'â' | 'ã' | 'ä' | 'å' | 'À' | 'Á' | 'Â' | 'Ã' | 'Ä' | 'Å' => 'a',
+        'ç' | 'Ç' | 'ć' | 'č' | 'Č' => 'c',
+        'è' | 'é' | 'ê' | 'ë' | 'È' | 'É' | 'Ê' | 'Ë' | 'ě' => 'e',
+        'ì' | 'í' | 'î' | 'ï' | 'Ì' | 'Í' | 'Î' | 'Ï' => 'i',
+        'ñ' | 'Ñ' | 'ń' => 'n',
+        'ò' | 'ó' | 'ô' | 'õ' | 'ö' | 'ø' | 'Ò' | 'Ó' | 'Ô' | 'Õ' | 'Ö' | 'Ø' => 'o',
+        'ù' | 'ú' | 'û' | 'ü' | 'Ù' | 'Ú' | 'Û' | 'Ü' => 'u',
+        'ý' | 'ÿ' | 'Ý' => 'y',
+        'š' | 'Š' | 'ś' => 's',
+        'ž' | 'Ž' | 'ź' | 'ż' => 'z',
+        other => other,
+    }
+}
+
+/// Code par défaut d'un nom : ses deux premiers caractères alphanumériques, sans
+/// accents, en majuscules (« Crissier » → « CR », « Éclair » → « EC »).
+pub fn default_code(name: &str) -> String {
+    name.chars()
+        .map(strip_accent)
+        .filter(|c| c.is_ascii_alphanumeric())
+        .take(2)
+        .map(|c| c.to_ascii_uppercase())
+        .collect()
+}
+
+/// Normalise un code saisi : deux caractères alphanumériques au plus, sans
+/// accents, en majuscules. Vide si rien d'utilisable.
+fn normalize_code(raw: &str) -> String {
+    default_code(raw.trim())
 }
 
 fn validate(payload: LocationPayload) -> ApiResult<LocationInput> {
@@ -317,12 +366,17 @@ fn validate(payload: LocationPayload) -> ApiResult<LocationInput> {
     }
     // Six décimales : une dizaine de centimètres, bien assez pour une pastille.
     let round = |v: f64| (v * 1e6).round() / 1e6;
+    let code = match normalize_code(&payload.code) {
+        code if code.is_empty() => default_code(&name),
+        code => code,
+    };
     Ok(LocationInput {
         name,
         address,
         latitude: round(payload.latitude),
         longitude: round(payload.longitude),
         site,
+        code,
     })
 }
 
@@ -346,13 +400,14 @@ async fn save(
         Some(id) => {
             let done = sqlx::query(
                 "UPDATE locations SET name = ?, address = ?, latitude = ?, longitude = ?,
-                     site = ? WHERE id = ?",
+                     site = ?, code = ? WHERE id = ?",
             )
             .bind(&input.name)
             .bind(&input.address)
             .bind(input.latitude)
             .bind(input.longitude)
             .bind(&input.site)
+            .bind(&input.code)
             .bind(id)
             .execute(&mut *tx)
             .await
@@ -363,14 +418,15 @@ async fn save(
             id
         }
         None => sqlx::query_scalar::<_, LocationId>(
-            "INSERT INTO locations (name, address, latitude, longitude, site)
-             VALUES (?, ?, ?, ?, ?) RETURNING id",
+            "INSERT INTO locations (name, address, latitude, longitude, site, code)
+             VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
         )
         .bind(&input.name)
         .bind(&input.address)
         .bind(input.latitude)
         .bind(input.longitude)
         .bind(&input.site)
+        .bind(&input.code)
         .fetch_one(&mut *tx)
         .await
         .map_err(name_conflict)?,
@@ -392,6 +448,7 @@ async fn view(pool: &SqlitePool, id: LocationId) -> ApiResult<LocationView> {
         latitude: row.latitude,
         longitude: row.longitude,
         site: row.site,
+        code: row.code,
         members: Vec::new(),
     })
 }
@@ -654,6 +711,7 @@ mod tests {
             latitude: 46.5,
             longitude: 6.6,
             site: site.into(),
+            code: default_code(name),
         }
     }
 
@@ -695,10 +753,12 @@ mod tests {
             latitude: lat,
             longitude: lon,
             site: String::new(),
+            code: String::new(),
             main_site: false,
         };
         let Ok(ok) = validate(payload(46.516_012_345, 6.632_8)) else { panic!("valide") };
         assert_eq!(ok.name, "Siège");
+        assert_eq!(ok.code, "SI", "code par défaut : deux premières lettres du nom");
         assert_eq!(ok.latitude, 46.516_012);
         assert!(validate(payload(91.0, 0.0)).is_err());
         assert!(validate(payload(0.0, -180.5)).is_err());
@@ -706,6 +766,17 @@ mod tests {
         let mut empty = payload(0.0, 0.0);
         empty.name = "  ".into();
         assert!(validate(empty).is_err());
+    }
+
+    #[test]
+    fn le_code_par_defaut_vient_du_nom_et_la_saisie_est_normalisee() {
+        assert_eq!(default_code("Crissier"), "CR");
+        assert_eq!(default_code("Éclair"), "EC");
+        assert_eq!(default_code("  Zürich"), "ZU");
+        assert_eq!(default_code("A"), "A");
+        assert_eq!(default_code("--"), "");
+        assert_eq!(normalize_code(" lausanne "), "LA");
+        assert_eq!(normalize_code("é7x"), "E7");
     }
 
     #[test]
