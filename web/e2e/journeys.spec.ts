@@ -51,6 +51,11 @@ test('1. first run: the setup creates the admin account and opens the wizard', a
 
 	// Signed in as soon as the account exists, and the setup wizard takes over.
 	await expect(page).toHaveURL(/\/welcome/);
+	await expect(page.getByRole('heading', { level: 1 })).toContainText('Your first alert');
+	await expectNoHorizontalOverflow(page);
+
+	// The step lives in the URL: the next one is "Name this instance".
+	await page.goto('/welcome?step=instance');
 	await expect(page.getByRole('heading', { level: 1 })).toContainText('Name this instance');
 	await expectNoHorizontalOverflow(page);
 

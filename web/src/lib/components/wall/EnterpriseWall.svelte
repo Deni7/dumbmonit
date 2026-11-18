@@ -42,7 +42,7 @@
 	import { parseMusicLink } from '#lib/wall/music.js';
 	import { cardVisible, displaySpeakerName, pickPlaying, progressAt } from '#lib/wall/spotify.js';
 	import { WallSpeaker } from '#lib/wall/speaker.svelte.js';
-	import { countAlertsByTarget, countsAsProblem } from '#lib/alerts-attention.js';
+	import { countAlertsByTarget, countsAsProblem, visibleOnWall } from '#lib/alerts-attention.js';
 	import { readSky } from '#lib/components/overview/sky.js';
 	import { fleetStore } from '#lib/components/enterprise/fleet.svelte.js';
 	import { mean } from '#lib/components/enterprise/fleet.js';
@@ -157,7 +157,9 @@
 	const targets = $derived(alertsStore.targets);
 	const probes = $derived(alertsStore.probes);
 	const firstLoad = $derived(alertsStore.loading && targets.length === 0);
-	const sky = $derived(readSky({ targets, probes, alerts: alertsStore.alerts, rules }));
+	// Building-up and acknowledged alerts stay off the wall: not listed, not counted, no mood.
+	const wallAlerts = $derived(visibleOnWall(alertsStore.alerts));
+	const sky = $derived(readSky({ targets, probes, alerts: wallAlerts, rules }));
 	const verdict = $derived.by(() => {
 		if (sky.counts.devices === 0) return { tone: 'ghost' as const, text: m.wall_status_empty() };
 		if (sky.attention > 0) {
@@ -191,7 +193,7 @@
 	});
 
 	// --- The figures ------------------------------------------------------
-	const alertCounts = $derived(countAlertsByTarget(alertsStore.alerts));
+	const alertCounts = $derived(countAlertsByTarget(wallAlerts));
 	const statuses = $derived(
 		targets.map((target) => ({
 			target,
@@ -202,7 +204,7 @@
 	const up = $derived(statuses.filter((r) => r.status === 'up' || r.status === 'degraded').length);
 	const down = $derived(statuses.filter((r) => r.status === 'down').length);
 	const paused = $derived(statuses.filter((r) => r.status === 'paused').length);
-	const firing = $derived(alertsStore.alerts.filter(countsAsProblem));
+	const firing = $derived(wallAlerts.filter(countsAsProblem));
 	const critical = $derived(firing.filter((a) => a.severity === 'critical').length);
 	const availability = $derived(mean(fleetStore.figures.uptime30.values()));
 

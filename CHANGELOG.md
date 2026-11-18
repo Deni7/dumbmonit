@@ -5,6 +5,15 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Fixed
+
+- **Wall: no more "building up" or acknowledged alerts.** Alerts that have not triggered yet and
+  alerts someone has acknowledged are no longer listed on the wall, and no longer count in its
+  headline, weather or pigeons.
+- **No more blocked font or 401 on first launch.** Fonts are never inlined as `data:` URIs (the
+  Content Security Policy only allows files from the server), and the update check is only asked
+  once signed in.
+
 ## 0.18.0 — 2026-11-17
 
 ### Added

@@ -11,6 +11,7 @@
 	 * health endpoint behind it is public.
 	 */
 	import { getHealth } from '#lib/api/index.js';
+	import { auth } from '#lib/stores/auth.svelte.js';
 	import UpdatePill from '#lib/components/UpdatePill.svelte';
 
 	let { inline = false }: { inline?: boolean } = $props();
@@ -33,4 +34,5 @@
 	>
 {/if}
 
-{#if !inline}<UpdatePill />{/if}
+<!-- The update check needs a session: asking before sign-in only logs a 401. -->
+{#if !inline && auth.canUseApi}<UpdatePill />{/if}
