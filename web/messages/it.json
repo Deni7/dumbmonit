@@ -1622,7 +1622,7 @@
 			}
 		}
 	],
-	"devices_alertbell_detail": "{firing} in corso, {acked} confermati, {suppressed} nascosti da un genitore offline",
+	"devices_alertbell_detail": "{firing} in corso, {suppressed} nascosti da un genitore offline",
 	"devices_appliance_attention": "Richiede attenzione",
 	"devices_appliance_err_title": "Impossibile caricare: {name}",
 	"devices_appliance_healthy": "Integro",
@@ -5622,21 +5622,6 @@
 	],
 	"overview_river_show": "Mostra",
 	"overview_sky_clear": "Cielo sereno",
-	"overview_sky_n_acked": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} confermato",
-				"countPlural=other": "{count} confermati"
-			}
-		}
-	],
 	"overview_sky_n_advisories": [
 		{
 			"declarations": [

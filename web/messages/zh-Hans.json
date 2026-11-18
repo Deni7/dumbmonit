@@ -1590,7 +1590,7 @@
 			}
 		}
 	],
-	"devices_alertbell_detail": "{firing} 条触发中，{acked} 条已确认，{suppressed} 条因父设备离线而被屏蔽",
+	"devices_alertbell_detail": "{firing} 条触发中，{suppressed} 条因父设备离线而被屏蔽",
 	"devices_appliance_attention": "需要关注",
 	"devices_appliance_err_title": "无法加载：{name}",
 	"devices_appliance_healthy": "正常",
@@ -5564,20 +5564,6 @@
 	],
 	"overview_river_show": "显示",
 	"overview_sky_clear": "晴空万里",
-	"overview_sky_n_acked": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "{count} 个已确认"
-			}
-		}
-	],
 	"overview_sky_n_advisories": [
 		{
 			"declarations": [

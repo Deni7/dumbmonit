@@ -1622,7 +1622,7 @@
 			}
 		}
 	],
-	"devices_alertbell_detail": "{firing} em curso, {acked} reconhecidos, {suppressed} ocultos por um pai offline",
+	"devices_alertbell_detail": "{firing} em curso, {suppressed} ocultos por um pai offline",
 	"devices_appliance_attention": "Requer atenção",
 	"devices_appliance_err_title": "Não foi possível carregar: {name}",
 	"devices_appliance_healthy": "Saudável",
@@ -5622,21 +5622,6 @@
 	],
 	"overview_river_show": "Mostrar",
 	"overview_sky_clear": "Céu limpo",
-	"overview_sky_n_acked": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} reconhecido",
-				"countPlural=other": "{count} reconhecidos"
-			}
-		}
-	],
 	"overview_sky_n_advisories": [
 		{
 			"declarations": [

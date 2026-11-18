@@ -23,7 +23,7 @@
 	const label = $derived(counts ? m.devices_alertbell_aria({ count: counts.total }) : '');
 	const title = $derived(
 		counts && counts.firing !== counts.total
-			? `${label}: ${m.devices_alertbell_detail({ firing: counts.firing, acked: counts.acked, suppressed: counts.suppressed })}`
+			? `${label}: ${m.devices_alertbell_detail({ firing: counts.firing, suppressed: counts.suppressed })}`
 			: label
 	);
 	const plateClass = $derived(

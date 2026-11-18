@@ -102,7 +102,7 @@
 	// This page's own fetch (rules/silences/history) takes precedence; absent
 	// that, a failure on the shared store is this page's problem too — "Now"
 	// needs both devices and alerts.
-	const pageError = $derived(error ?? (!alertsStore.available ? alertsStore.lastError : null));
+	const pageError = $derived(error ?? (!alertsStore.available && alertsStore.updatedAt === null ? alertsStore.lastError : null));
 	const firstLoad = $derived(loading || (alertsStore.loading && targets.length === 0));
 
 	// The last row leaving "Now" while the reader watches is the moment the

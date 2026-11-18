@@ -91,7 +91,6 @@
 		const counts = quietCounts(quiet);
 		const parts: string[] = [];
 		if (counts.snoozed > 0) parts.push(m.overview_sky_n_snoozed({ count: counts.snoozed }));
-		if (counts.acked > 0) parts.push(m.overview_sky_n_acked({ count: counts.acked }));
 		return parts.join(' · ');
 	});
 	const compact = $derived(level >= 3);

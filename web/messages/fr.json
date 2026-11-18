@@ -1622,7 +1622,7 @@
 			}
 		}
 	],
-	"devices_alertbell_detail": "{firing} en cours, {acked} acquittée(s), {suppressed} masquée(s) par un parent hors ligne",
+	"devices_alertbell_detail": "{firing} en cours, {suppressed} masquée(s) par un parent hors ligne",
 	"devices_appliance_attention": "À surveiller",
 	"devices_appliance_err_title": "Impossible de charger : {name}",
 	"devices_appliance_healthy": "En bon état",
@@ -5622,21 +5622,6 @@
 	],
 	"overview_river_show": "Afficher",
 	"overview_sky_clear": "Ciel dégagé",
-	"overview_sky_n_acked": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} acquittée",
-				"countPlural=other": "{count} acquittées"
-			}
-		}
-	],
 	"overview_sky_n_advisories": [
 		{
 			"declarations": [

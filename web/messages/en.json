@@ -1622,7 +1622,7 @@
 			}
 		}
 	],
-	"devices_alertbell_detail": "{firing} firing, {acked} acknowledged, {suppressed} masked by an offline parent",
+	"devices_alertbell_detail": "{firing} firing, {suppressed} masked by an offline parent",
 	"devices_appliance_attention": "Needs attention",
 	"devices_appliance_err_title": "Could not load the {name}",
 	"devices_appliance_healthy": "Healthy",
@@ -5622,21 +5622,6 @@
 	],
 	"overview_river_show": "Show",
 	"overview_sky_clear": "Clear skies",
-	"overview_sky_n_acked": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} acknowledged",
-				"countPlural=other": "{count} acknowledged"
-			}
-		}
-	],
 	"overview_sky_n_advisories": [
 		{
 			"declarations": [

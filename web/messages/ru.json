@@ -1644,7 +1644,7 @@
 			}
 		}
 	],
-	"devices_alertbell_detail": "{firing} активных, {acked} подтверждённых, {suppressed} скрыто недоступным родителем",
+	"devices_alertbell_detail": "{firing} активных, {suppressed} скрыто недоступным родителем",
 	"devices_appliance_attention": "Требует внимания",
 	"devices_appliance_err_title": "Не удалось загрузить: {name}",
 	"devices_appliance_healthy": "В порядке",
@@ -5710,23 +5710,6 @@
 	],
 	"overview_river_show": "Показать",
 	"overview_sky_clear": "Ясное небо",
-	"overview_sky_n_acked": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} подтверждено",
-				"countPlural=few": "{count} подтверждено",
-				"countPlural=many": "{count} подтверждено",
-				"countPlural=other": "{count} подтверждено"
-			}
-		}
-	],
 	"overview_sky_n_advisories": [
 		{
 			"declarations": [
