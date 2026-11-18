@@ -731,6 +731,8 @@
 	"backup_matrix_summary_today": "今天已备份 {ok}/{total}",
 	"backup_matrix_summary_today_failing": "今天已备份 {ok}/{total}，{failing} 个失败",
 	"backup_matrix_today": "今天",
+	"brand_swiss_made": "瑞士制造",
+	"brand_tagline": "瑞士精度的监控",
 	"cloudregions_count": [
 		{
 			"declarations": [
@@ -916,12 +918,6 @@
 	"console_panel_oncall_unknown": "某人",
 	"console_paused": "已暂停",
 	"console_range": "时间范围",
-	"console_river_empty": "此时间范围内暂无测量数据。",
-	"console_river_hint": "每个监控项，每格 {slot}，最近 {range}",
-	"console_river_legend": "图例",
-	"console_river_no_data": "无数据",
-	"console_river_now": "现在",
-	"console_river_title": "健康河流图",
 	"console_search_placeholder": "搜索或运行命令",
 	"console_status_config": "配置",
 	"console_status_degraded": "降级",
@@ -5490,6 +5486,27 @@
 	"overview_first_test_text": "在渠道里发送一条测试。消息真正发出后，此步骤会变绿。",
 	"overview_first_test_title": "确认能收到消息",
 	"overview_first_title": "最初的五分钟",
+	"overview_fleet_availability": "24 小时 {percent} %",
+	"overview_fleet_bar_label": "过去 24 小时，最早的在左侧",
+	"overview_fleet_calm": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "一切正常 · {count} 个监控项"
+			}
+		}
+	],
+	"overview_fleet_down_for": "已中断 {duration}",
+	"overview_fleet_tile_title": "{name}: {status}",
+	"overview_fleet_tiles_label": "所有监控项，故障优先",
+	"overview_fleet_title": "整体健康",
+	"overview_fleet_wrong_title": "出问题的项目",
 	"overview_latency_empty": "此时间范围内尚未测得响应时间。",
 	"overview_latency_hint": "所有探测的 p95 和中位数，最近 {range}",
 	"overview_latency_median": "中位数",
@@ -5544,8 +5561,7 @@
 	"overview_page_or_agent": "在某台机器上安装代理",
 	"overview_page_or_relay": "监控远程站点",
 	"overview_page_title": "概览",
-	"overview_river_hide": "隐藏",
-	"overview_river_more": [
+	"overview_fleet_more": [
 		{
 			"declarations": [
 				"input count",
@@ -5559,7 +5575,6 @@
 			}
 		}
 	],
-	"overview_river_show": "显示",
 	"overview_sky_clear": "晴空万里",
 	"overview_sky_n_advisories": [
 		{

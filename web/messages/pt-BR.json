@@ -751,6 +751,8 @@
 	"backup_matrix_summary_today": "{ok} de {total} com backup hoje",
 	"backup_matrix_summary_today_failing": "{ok} de {total} com backup hoje, {failing} com falha",
 	"backup_matrix_today": "hoje",
+	"brand_swiss_made": "Feito na Suíça",
+	"brand_tagline": "Monitoramento com precisão suíça",
 	"cloudregions_count": [
 		{
 			"declarations": [
@@ -947,12 +949,6 @@
 	"console_panel_oncall_unknown": "Alguém",
 	"console_paused": "PAUSADO",
 	"console_range": "Intervalo de tempo",
-	"console_river_empty": "Ainda não há medições neste intervalo.",
-	"console_river_hint": "Cada monitor, uma célula por {slot}, últimas {range}",
-	"console_river_legend": "Legenda",
-	"console_river_no_data": "Sem dados",
-	"console_river_now": "agora",
-	"console_river_title": "Rio de saúde",
 	"console_search_placeholder": "Pesquisar ou executar um comando",
 	"console_status_config": "Config",
 	"console_status_degraded": "Degradado",
@@ -5545,6 +5541,28 @@
 	"overview_first_test_text": "Envie um teste a partir do canal. Esta etapa fica verde quando uma mensagem realmente sai.",
 	"overview_first_test_title": "Verifique se uma mensagem chega",
 	"overview_first_title": "Seus primeiros cinco minutos",
+	"overview_fleet_availability": "{percent} % em 24 h",
+	"overview_fleet_bar_label": "Últimas 24 horas, a mais antiga à esquerda",
+	"overview_fleet_calm": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Tudo funcionando · {count} monitor",
+				"countPlural=other": "Tudo funcionando · {count} monitores"
+			}
+		}
+	],
+	"overview_fleet_down_for": "Fora do ar há {duration}",
+	"overview_fleet_tile_title": "{name}: {status}",
+	"overview_fleet_tiles_label": "Todos os monitores, os piores primeiro",
+	"overview_fleet_title": "Saúde da frota",
+	"overview_fleet_wrong_title": "O que está errado",
 	"overview_latency_empty": "Nenhum tempo de resposta medido neste período ainda.",
 	"overview_latency_hint": "p95 e mediana de todas as sondas, últimas {range}",
 	"overview_latency_median": "Mediana",
@@ -5601,8 +5619,7 @@
 	"overview_page_or_agent": "instalar o agente em uma máquina",
 	"overview_page_or_relay": "monitorar um site remoto",
 	"overview_page_title": "Visão geral",
-	"overview_river_hide": "Ocultar",
-	"overview_river_more": [
+	"overview_fleet_more": [
 		{
 			"declarations": [
 				"input count",
@@ -5617,7 +5634,6 @@
 			}
 		}
 	],
-	"overview_river_show": "Mostrar",
 	"overview_sky_clear": "Céu limpo",
 	"overview_sky_n_advisories": [
 		{

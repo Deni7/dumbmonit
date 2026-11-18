@@ -749,6 +749,8 @@
 	"backup_matrix_summary_today": "Сегодня скопировано: {ok} из {total}",
 	"backup_matrix_summary_today_failing": "Сегодня скопировано: {ok} из {total}, сбоев: {failing}",
 	"backup_matrix_today": "сегодня",
+	"brand_swiss_made": "Сделано в Швейцарии",
+	"brand_tagline": "Мониторинг со швейцарской точностью",
 	"cloudregions_count": [
 		{
 			"declarations": [
@@ -967,12 +969,6 @@
 	"console_panel_oncall_unknown": "Кто-то",
 	"console_paused": "ПАУЗА",
 	"console_range": "Период",
-	"console_river_empty": "За этот период измерений пока нет.",
-	"console_river_hint": "Каждый монитор, ячейка на {slot}, за {range}",
-	"console_river_legend": "Легенда",
-	"console_river_no_data": "Нет данных",
-	"console_river_now": "сейчас",
-	"console_river_title": "Лента здоровья",
 	"console_search_placeholder": "Поиск или команда",
 	"console_status_config": "Настройка",
 	"console_status_degraded": "Проблемы",
@@ -5627,6 +5623,30 @@
 	"overview_first_test_text": "Отправьте тест из канала. Шаг станет зелёным, когда сообщение действительно уйдёт.",
 	"overview_first_test_title": "Проверьте, что сообщение доходит",
 	"overview_first_title": "Ваши первые пять минут",
+	"overview_fleet_availability": "{percent} % за 24 ч",
+	"overview_fleet_bar_label": "Последние 24 часа, старые слева",
+	"overview_fleet_calm": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Всё работает · {count} монитор",
+				"countPlural=few": "Всё работает · {count} монитора",
+				"countPlural=many": "Всё работает · {count} мониторов",
+				"countPlural=other": "Всё работает · {count} монитора"
+			}
+		}
+	],
+	"overview_fleet_down_for": "Не работает {duration}",
+	"overview_fleet_tile_title": "{name}: {status}",
+	"overview_fleet_tiles_label": "Все мониторы, сначала проблемные",
+	"overview_fleet_title": "Состояние парка",
+	"overview_fleet_wrong_title": "Что не так",
 	"overview_latency_empty": "За этот период время ответа ещё не измерялось.",
 	"overview_latency_hint": "p95 и медиана всех проверок за {range}",
 	"overview_latency_median": "Медиана",
@@ -5687,8 +5707,7 @@
 	"overview_page_or_agent": "установить агент на машине",
 	"overview_page_or_relay": "следить за удалённой площадкой",
 	"overview_page_title": "Обзор",
-	"overview_river_hide": "Скрыть",
-	"overview_river_more": [
+	"overview_fleet_more": [
 		{
 			"declarations": [
 				"input count",
@@ -5705,7 +5724,6 @@
 			}
 		}
 	],
-	"overview_river_show": "Показать",
 	"overview_sky_clear": "Ясное небо",
 	"overview_sky_n_advisories": [
 		{

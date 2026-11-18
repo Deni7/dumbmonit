@@ -2,13 +2,14 @@
 	import { withBase } from '#lib/paths.js';
 	/**
 	 * Overview: four figures, then what needs attention (only what is broken, with its
-	 * quick action, and the week ahead) beside the health river, then two
+	 * quick action, and the week ahead) beside the fleet health (a tile per
+	 * monitor, then what is wrong with its last 24 hours), then two
 	 * charts worth reading — the fleet's response time over the range, the
 	 * alerts of the last seven days. The whole fleet lives on Monitors. A fresh
 	 * instance gets the first-run guide (administrators) or a way in instead.
 	 *
 	 * Monitors, probes and alerts come from the app-wide store (polled every
-	 * 30 s); the river, p95, availability and the alert history from the fleet
+	 * 30 s); the 24 hour bars, p95, availability and the alert history from the fleet
 	 * store (one set of queries, refreshed every minute while LIVE is on).
 	 */
 	import { untrack } from 'svelte';
@@ -18,15 +19,15 @@
 	import { alertsStore } from '#lib/stores/alerts.svelte.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import { consoleState } from '#lib/stores/console.svelte.js';
-	import { Button, EmptyState, ErrorNotice, PHONE_QUERY, calmMotion } from '#lib/ui/index.js';
+	import { Button, EmptyState, ErrorNotice, calmMotion } from '#lib/ui/index.js';
 	import FirstRun from '#lib/components/overview/FirstRun.svelte';
 	import NeedsAttention from '#lib/components/overview/NeedsAttention.svelte';
 	import FleetLatency from '#lib/components/overview/FleetLatency.svelte';
 	import AlertTrend from '#lib/components/overview/AlertTrend.svelte';
 	import { fleetStore } from './fleet.svelte.js';
-	import { mean } from './fleet.js';
-	import HealthRiver from './HealthRiver.svelte';
-	import { STATUS_RANK, consoleStatus, type ConsoleStatus } from './status.js';
+	import { DAY_SECONDS, mean } from './fleet.js';
+	import FleetHealth from './FleetHealth.svelte';
+	import { consoleStatus, type ConsoleStatus } from './status.js';
 
 	// One subscription for the life of the view; the range is followed separately.
 	$effect(() => untrack(() => fleetStore.start()));
@@ -46,11 +47,12 @@
 		}))
 	);
 
-	const riverRows = $derived(
-		monitors
-			.filter((row) => fleetStore.river.has(row.id))
-			.sort((a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status] || a.name.localeCompare(b.name))
-			.map((row) => ({ id: row.id, name: row.name, cells: fleetStore.river.get(row.id) ?? [] }))
+	const healthRows = $derived(
+		alertsStore.targets.map((target) => ({
+			target,
+			status: consoleStatus(target, alertsStore.probes.get(target.id), alertCounts.get(target.id)),
+			reason: alertsStore.probes.get(target.id)?.reason ?? null
+		}))
 	);
 
 	// --- The four figures (MTTR lives in Status › Reports) -----------------------
@@ -102,17 +104,6 @@
 	/** Nothing read yet: the line waits rather than say "nothing to watch". */
 	const reading = $derived(alertsStore.loading && alertsStore.targets.length === 0);
 	const noMonitors = $derived(!reading && alertsStore.available && alertsStore.targets.length === 0);
-
-	// --- Phones: the river behind a tap ------------------------------------------
-	let phone = $state(false);
-	let riverOpen = $state(false);
-	$effect(() => {
-		const query = window.matchMedia(PHONE_QUERY);
-		phone = query.matches;
-		const onChange = (event: MediaQueryListEvent) => (phone = event.matches);
-		query.addEventListener('change', onChange);
-		return () => query.removeEventListener('change', onChange);
-	});
 
 	// --- First run -----------------------------------------------------------------
 	// The three-step guide, as the server keeps it. Decided once per visit and
@@ -199,25 +190,7 @@
 
 		<div class="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
 			<NeedsAttention />
-			<div class="flex min-w-0 flex-col gap-2">
-				{#if phone}
-					<button
-						type="button"
-						class="flex min-h-11 items-center justify-between rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-ink"
-						aria-expanded={riverOpen}
-						aria-controls="overview-river"
-						onclick={() => (riverOpen = !riverOpen)}
-					>
-						{m.console_river_title()}
-						<span class="text-xs font-medium text-ink-2">{riverOpen ? m.overview_river_hide() : m.overview_river_show()}</span>
-					</button>
-				{/if}
-				{#if !phone || riverOpen}
-					<div id="overview-river" class="min-w-0 flex-1 [&>section]:h-full">
-						<HealthRiver rows={riverRows} limit={14} moreHref="/targets" scan={false} fit />
-					</div>
-				{/if}
-			</div>
+			<FleetHealth rows={healthRows} day={fleetStore.river} daySeconds={DAY_SECONDS} />
 		</div>
 
 		<div class="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">

@@ -5,7 +5,18 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- **Swiss cross.** A small "Made in Switzerland" cross after the version number at the foot of the
+  page and beside the name on the sign-in page, and a tagline under it: "Monitoring with Swiss
+  precision" (translated in the nine languages).
+
 ### Changed
+
+- **A plainer overview health panel.** The "health river" gives way to a grid of small tiles, one
+  per monitor (state as a shape and a colour, problems first, shrinking from 10 to 500 monitors),
+  and, below, only what is wrong: each failing monitor with its last 24 hours, how long it has
+  been down and its last error. When all is well, one calm line.
 
 - **Calmer monitor header.** The monitor page header is a flat surface with one main action (Probe now) and Settings; silencing, logs, the on/off switch and Delete sit in a quiet strip below, replacing the row of icon buttons and the "..." menu. Rules ignored on a monitor are no longer listed under its alerts.
 - **Clearer, more detailed Alerts panel.** Each alert row now unfolds with what used to need a trip

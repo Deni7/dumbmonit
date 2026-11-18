@@ -751,6 +751,8 @@
 	"backup_matrix_summary_today": "{ok} of {total} backed up today",
 	"backup_matrix_summary_today_failing": "{ok} of {total} backed up today, {failing} failing",
 	"backup_matrix_today": "today",
+	"brand_swiss_made": "Made in Switzerland",
+	"brand_tagline": "Monitoring with Swiss precision",
 	"cloudregions_count": [
 		{
 			"declarations": [
@@ -947,12 +949,6 @@
 	"console_panel_oncall_unknown": "Someone",
 	"console_paused": "PAUSED",
 	"console_range": "Time range",
-	"console_river_empty": "No measurements in this range yet.",
-	"console_river_hint": "Every monitor, one cell per {slot}, last {range}",
-	"console_river_legend": "Legend",
-	"console_river_no_data": "No data",
-	"console_river_now": "now",
-	"console_river_title": "Health river",
 	"console_search_placeholder": "Search or run a command",
 	"console_status_config": "Config",
 	"console_status_degraded": "Degraded",
@@ -5545,6 +5541,28 @@
 	"overview_first_test_text": "Send a test from the channel. This step turns green once one really leaves.",
 	"overview_first_test_title": "Check a message arrives",
 	"overview_first_title": "Your first five minutes",
+	"overview_fleet_availability": "{percent} % in 24 h",
+	"overview_fleet_bar_label": "Last 24 hours, oldest on the left",
+	"overview_fleet_calm": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Everything is working · {count} monitor",
+				"countPlural=other": "Everything is working · {count} monitors"
+			}
+		}
+	],
+	"overview_fleet_down_for": "Down for {duration}",
+	"overview_fleet_tile_title": "{name}: {status}",
+	"overview_fleet_tiles_label": "Every monitor, worst first",
+	"overview_fleet_title": "Fleet health",
+	"overview_fleet_wrong_title": "What is wrong",
 	"overview_latency_empty": "No response time measured in this range yet.",
 	"overview_latency_hint": "p95 and median of every probe, last {range}",
 	"overview_latency_median": "Median",
@@ -5601,8 +5619,7 @@
 	"overview_page_or_agent": "install the agent on a machine",
 	"overview_page_or_relay": "watch a remote site",
 	"overview_page_title": "Overview",
-	"overview_river_hide": "Hide",
-	"overview_river_more": [
+	"overview_fleet_more": [
 		{
 			"declarations": [
 				"input count",
@@ -5617,7 +5634,6 @@
 			}
 		}
 	],
-	"overview_river_show": "Show",
 	"overview_sky_clear": "Clear skies",
 	"overview_sky_n_advisories": [
 		{

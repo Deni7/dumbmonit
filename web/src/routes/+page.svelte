@@ -1,7 +1,7 @@
 <script lang="ts">
 	/**
 	 * Overview: the night-sky banner with its pigeon and one line of status,
-	 * four figures, what needs attention, the health river and two charts.
+	 * four figures, what needs attention, the fleet health and two charts.
 	 * See EnterpriseOverview.
 	 */
 	import { m } from '#lib/paraglide/messages.js';

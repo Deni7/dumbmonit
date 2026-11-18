@@ -48,7 +48,7 @@
 	--c-on-primary: var(--c-on-signal);
 	--c-focus: var(--c-signal);
 
-	/* Health river cells (a strip per monitor over time). */
+	/* Availability bars (24 hours of a monitor, one cell per slot). */
 	--c-river-up: rgb(15 143 134 / 0.55);
 	--c-river-warn: #b7791f;
 	--c-river-down: #c8402f;
@@ -262,34 +262,12 @@ html.obsidian .font-sans {
 		stroke-dashoffset: 0;
 	}
 }
-@keyframes ob-cell {
-	from {
-		opacity: 0;
-	}
-	to {
-		opacity: 1;
-	}
-}
-@keyframes ob-scan {
-	from {
-		left: 0;
-	}
-	to {
-		left: 100%;
-	}
-}
 .ob-live {
 	animation: ob-live 1.4s ease-in-out infinite;
 }
 .ob-draw {
 	stroke-dasharray: 300;
 	animation: ob-draw 1.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-}
-.ob-cell {
-	animation: ob-cell 240ms var(--ease-standard) both;
-}
-.ob-scan {
-	animation: ob-scan 6s linear infinite;
 }
 
 /* Tailwind utilities read the live variables, so `bg-surface` follows the theme. */

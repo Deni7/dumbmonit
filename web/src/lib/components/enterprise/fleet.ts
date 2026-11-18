@@ -1,17 +1,19 @@
 /**
  * Fleet-wide figures for the Enterprise console, a handful of queries for the
- * whole estate rather than one per monitor: the health river (every monitor,
- * slotted over the range), latency sparklines, p95 and 30-day availability.
+ * whole estate rather than one per monitor: the last 24 hours of every monitor
+ * (the overview's bars, slotted like a river), latency sparklines, p95 and 30-day availability.
  *
  * Every series carries the `target` label (the target id); multi-location
  * monitors have one series per place, folded here with the worst value.
  */
 import { queryInstant, queryRange, type MetricSeries, type TargetId } from '#lib/api/index.js';
 
-/** One slot of the river: every check passed, some failed, all failed, nothing measured. */
+/** One slot of a monitor's bar: every check passed, some failed, all failed, nothing measured. */
 export type RiverCell = 'up' | 'warn' | 'down' | 'none';
 
 export const RIVER_SLOTS = 72;
+/** What the overview's 24 hour bars cover, whatever range the console is on. */
+export const DAY_SECONDS = 86400;
 export const SPARK_POINTS = 28;
 
 /** Probes publish `probe_success`; devices only `up`. Both are 1 when healthy. */
@@ -49,7 +51,7 @@ export function cellOf(value: number | undefined): RiverCell {
 	return 'warn';
 }
 
-/** Every monitor's health over the range, in `RIVER_SLOTS` equal slots, oldest first. */
+/** Every monitor's health over `rangeSeconds`, in `RIVER_SLOTS` equal slots, oldest first. */
 export async function loadRiver(rangeSeconds: number, signal?: AbortSignal): Promise<Map<TargetId, RiverCell[]>> {
 	const step = Math.max(15, Math.round(rangeSeconds / RIVER_SLOTS));
 	const end = Date.now();

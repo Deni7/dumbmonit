@@ -6,11 +6,12 @@
 import { browser } from '$app/env';
 import { listAlertHistory, type AlertHistoryEntry, type TargetId } from '#lib/api/index.js';
 import { consoleState } from '#lib/stores/console.svelte.js';
-import { loadFigures, loadLatency, loadRiver, type FleetFigures, type RiverCell } from './fleet.js';
+import { DAY_SECONDS, loadFigures, loadLatency, loadRiver, type FleetFigures, type RiverCell } from './fleet.js';
 
 const INTERVAL_MS = 60_000;
 
 class FleetStore {
+	/** The last 24 hours of each monitor, whatever the console's range. */
 	river = $state<Map<TargetId, RiverCell[]>>(new Map());
 	latency = $state<Map<TargetId, number[]>>(new Map());
 	figures = $state<FleetFigures>({ p95: new Map(), uptime30: new Map(), fleetP95: null });
@@ -33,7 +34,7 @@ class FleetStore {
 		const since = new Date(Date.now() - Math.max(seconds, 30 * 86400) * 1000).toISOString();
 		try {
 			const [river, latency, figures, history] = await Promise.all([
-				loadRiver(seconds, controller.signal),
+				loadRiver(DAY_SECONDS, controller.signal),
 				loadLatency(seconds, controller.signal),
 				loadFigures(seconds, controller.signal),
 				listAlertHistory({ since, limit: 1000 }, controller.signal).catch(() => [] as AlertHistoryEntry[])

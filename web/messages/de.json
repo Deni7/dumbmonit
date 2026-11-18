@@ -751,6 +751,8 @@
 	"backup_matrix_summary_today": "{ok} von {total} heute gesichert",
 	"backup_matrix_summary_today_failing": "{ok} von {total} heute gesichert, {failing} fehlerhaft",
 	"backup_matrix_today": "heute",
+	"brand_swiss_made": "Hergestellt in der Schweiz",
+	"brand_tagline": "Monitoring mit Schweizer Präzision",
 	"cloudregions_count": [
 		{
 			"declarations": [
@@ -947,12 +949,6 @@
 	"console_panel_oncall_unknown": "Jemand",
 	"console_paused": "PAUSIERT",
 	"console_range": "Zeitraum",
-	"console_river_empty": "Noch keine Messwerte in diesem Zeitraum.",
-	"console_river_hint": "Jeder Monitor, ein Feld pro {slot}, letzte {range}",
-	"console_river_legend": "Legende",
-	"console_river_no_data": "Keine Daten",
-	"console_river_now": "jetzt",
-	"console_river_title": "Gesundheitsverlauf",
 	"console_search_placeholder": "Suchen oder Befehl ausführen",
 	"console_status_config": "Konfig",
 	"console_status_degraded": "Beeinträchtigt",
@@ -5545,6 +5541,28 @@
 	"overview_first_test_text": "Senden Sie einen Test über den Kanal. Dieser Schritt wird grün, sobald wirklich eine Nachricht gesendet wird.",
 	"overview_first_test_title": "Prüfen, ob eine Nachricht ankommt",
 	"overview_first_title": "Ihre ersten fünf Minuten",
+	"overview_fleet_availability": "{percent} % in 24 Std.",
+	"overview_fleet_bar_label": "Letzte 24 Stunden, älteste links",
+	"overview_fleet_calm": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Alles funktioniert · {count} Monitor",
+				"countPlural=other": "Alles funktioniert · {count} Monitore"
+			}
+		}
+	],
+	"overview_fleet_down_for": "Seit {duration} ausgefallen",
+	"overview_fleet_tile_title": "{name}: {status}",
+	"overview_fleet_tiles_label": "Jeder Monitor, die schlechtesten zuerst",
+	"overview_fleet_title": "Zustand der Flotte",
+	"overview_fleet_wrong_title": "Was nicht stimmt",
 	"overview_latency_empty": "In diesem Zeitraum wurde noch keine Antwortzeit gemessen.",
 	"overview_latency_hint": "p95 und Median aller Prüfungen, letzte {range}",
 	"overview_latency_median": "Median",
@@ -5601,8 +5619,7 @@
 	"overview_page_or_agent": "den Agenten auf einem Rechner installieren",
 	"overview_page_or_relay": "einen entfernten Standort überwachen",
 	"overview_page_title": "Übersicht",
-	"overview_river_hide": "Ausblenden",
-	"overview_river_more": [
+	"overview_fleet_more": [
 		{
 			"declarations": [
 				"input count",
@@ -5617,7 +5634,6 @@
 			}
 		}
 	],
-	"overview_river_show": "Anzeigen",
 	"overview_sky_clear": "Klarer Himmel",
 	"overview_sky_n_advisories": [
 		{
