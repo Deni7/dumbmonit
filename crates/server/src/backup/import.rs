@@ -989,12 +989,11 @@ async fn restore_mail_server(
         return Ok(report);
     }
     let value = serde_json::to_vec(&server)?;
-    let existing: Option<Vec<u8>> =
-        sqlx::query_scalar("SELECT value FROM settings WHERE key = ?")
-            .bind(SETTINGS_KEY)
-            .fetch_optional(&mut **tx)
-            .await
-            .context("lecture du serveur de courriel")?;
+    let existing: Option<Vec<u8>> = sqlx::query_scalar("SELECT value FROM settings WHERE key = ?")
+        .bind(SETTINGS_KEY)
+        .fetch_optional(&mut **tx)
+        .await
+        .context("lecture du serveur de courriel")?;
     let sealed: Option<Vec<u8>> = sqlx::query_scalar("SELECT value FROM settings WHERE key = ?")
         .bind(PASSWORD_KEY)
         .fetch_optional(&mut **tx)

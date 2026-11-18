@@ -340,10 +340,8 @@ mod tests {
 
     #[test]
     fn un_serveur_d_envoi_se_passe_de_destinataire_fixe() {
-        let config = channel(
-            json!({"host": "smtp.exemple.org", "from": "status@exemple.org"}),
-            json!({}),
-        );
+        let config =
+            channel(json!({"host": "smtp.exemple.org", "from": "status@exemple.org"}), json!({}));
         let Ok(smtp) = Smtp::sender(&config) else { panic!("sender without recipient refused") };
         assert!(smtp.to.is_empty());
     }
