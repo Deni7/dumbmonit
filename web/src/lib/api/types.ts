@@ -2243,8 +2243,10 @@ export interface StatusPage {
 	homepage_url: string;
 	/** MIME type of the uploaded logo, `null` without one. */
 	logo_type: string | null;
-	/** SMTP channel mailing the subscribers; `null`: no email subscription. */
+	/** SMTP channel mailing the subscribers instead of the email server; `null`: the email server. */
 	subscribe_channel_id: number | null;
+	/** Visitors may subscribe by email. */
+	subscribe_email: boolean;
 	/** Public host name serving this page at `/` (`status.example.com`); `null`: none. */
 	domain: string | null;
 	seo: StatusPageSeo;
@@ -2278,8 +2280,10 @@ export interface StatusPagePayload {
 	show_latency?: boolean;
 	footer_text?: string;
 	homepage_url?: string;
-	/** `null` turns email subscription off. */
+	/** An SMTP channel sending the subscriber emails; `null`: the email server. Omitted: kept. */
 	subscribe_channel_id?: number | null;
+	/** Lets visitors subscribe by email. Omitted: kept. */
+	subscribe_email?: boolean;
 	/** Public host name; `null` or `''` removes it. Omitted: kept. */
 	domain?: string | null;
 	/** Omitted: kept. */
@@ -7049,4 +7053,43 @@ export interface WallWeather {
 		condition: WallWeatherCondition;
 		is_day: boolean;
 	} | null;
+}
+
+/** Encryption of the connection to the email server. */
+export type MailSecurity = 'starttls' | 'tls' | 'none';
+
+/** `GET /api/notify/mail-server` — the password never comes back. */
+export interface MailServer {
+	host: string;
+	/** `null`: the usual port of `security`. */
+	port: number | null;
+	/** `port`, or 587 / 465 / 25 after `security`. */
+	effective_port: number;
+	security: MailSecurity;
+	/** Empty: no authentication. */
+	username: string;
+	has_password: boolean;
+	from_address: string;
+	/** Display name of the sender; empty: the address alone. */
+	from_name: string;
+	/** A host and a sender are set. */
+	configured: boolean;
+	/** Set by the `DUMBMONIT_SMTP_*` environment variables: read-only. */
+	locked_by_env: boolean;
+}
+
+/** `PUT /api/notify/mail-server`. `secrets` omitted keeps the password, `{}` clears it. */
+export interface MailServerPayload {
+	host: string;
+	port: number | null;
+	security: MailSecurity;
+	username: string;
+	from_address: string;
+	from_name: string;
+	secrets?: { password?: string };
+}
+
+export interface MailServerTestReport {
+	ok: boolean;
+	message: string;
 }

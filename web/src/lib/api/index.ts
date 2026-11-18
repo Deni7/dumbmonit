@@ -96,6 +96,7 @@ export * from './oncall';
 export { onMutation } from './mutations';
 export * from './teams';
 export * from './clients';
+export * from './mail_server';
 export {
 	ApiError,
 	toApiError,

@@ -200,6 +200,14 @@ pub fn normalize(desired: &mut ConfigDoc, current: &ConfigDoc) {
         {
             page.hide_branding = old.hide_branding;
         }
+        // Interrupteur du courriel non déclaré (fichier d'avant 0246) : celui
+        // en place n'est pas un écart.
+        if let Some(old) = pages.get(page.slug.as_str())
+            && let (Some(wanted), Some(had)) = (page.subscriptions.as_mut(), &old.subscriptions)
+            && wanted.email.is_none()
+        {
+            wanted.email = had.email;
+        }
     }
 }
 

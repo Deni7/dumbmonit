@@ -5,6 +5,7 @@
 //! OpenSSL, pour rester compatible avec l'image finale construite depuis `scratch`.
 
 use async_trait::async_trait;
+use lettre::message::Mailbox;
 use lettre::message::header::ContentType;
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{AsyncSmtpTransport, AsyncTransport, Tokio1Executor};
@@ -50,6 +51,9 @@ pub struct Smtp {
     host: String,
     port: u16,
     from: String,
+    /// Nom d'affichage de l'expéditeur (réglage `from_name`), facultatif : il
+    /// remplace celui que porterait `from` (`Nom <adresse>`).
+    from_name: Option<String>,
     to: Vec<String>,
     /// Conservé pour l'expurgation : lettre peut citer les identifiants dans
     /// certaines erreurs de protocole.
@@ -57,7 +61,19 @@ pub struct Smtp {
 }
 
 impl Smtp {
+    /// Canal de notification : au moins un destinataire est exigé.
     pub fn new(channel: &ChannelConfig) -> Result<Self, NotifyError> {
+        Self::build(channel, true)
+    }
+
+    /// Serveur d'envoi seul, sans destinataire fixe : chaque message nomme le
+    /// sien ([`Smtp::send_to`], [`Smtp::send_html`]). C'est le montage du
+    /// serveur de courriel global ([`super::mail_server`]).
+    pub fn sender(channel: &ChannelConfig) -> Result<Self, NotifyError> {
+        Self::build(channel, false)
+    }
+
+    fn build(channel: &ChannelConfig, need_recipients: bool) -> Result<Self, NotifyError> {
         let host = channel.setting("host")?;
         let security = Security::parse(
             &channel.setting_opt("security").unwrap_or_else(|| "starttls".to_string()),
@@ -65,8 +81,9 @@ impl Smtp {
         let port = channel.setting_u16("port", security.default_port());
 
         let from = channel.setting("from")?;
+        let from_name = channel.setting_opt("from_name").map(|name| name.trim().to_string());
         let to = channel.setting_list("to");
-        if to.is_empty() {
+        if need_recipients && to.is_empty() {
             return Err(NotifyError::Config("no recipient configured".to_string()));
         }
 
@@ -90,11 +107,24 @@ impl Smtp {
                 builder.credentials(Credentials::new(username, password.expose().to_string()));
         }
 
-        Ok(Self { transport: builder.build(), host, port, from, to, password })
+        Ok(Self { transport: builder.build(), host, port, from, from_name, to, password })
     }
 
     fn secrets(&self) -> Vec<SecretString> {
         self.password.iter().cloned().collect()
+    }
+
+    /// Expéditeur des messages : `from`, avec le nom d'affichage réglé.
+    fn mailbox(&self) -> Result<Mailbox, NotifyError> {
+        let mailbox: Mailbox = self
+            .from
+            .trim()
+            .parse()
+            .map_err(|_| NotifyError::Config("invalid sender address".to_string()))?;
+        Ok(match self.from_name.as_deref().filter(|name| !name.is_empty()) {
+            Some(name) => Mailbox::new(Some(name.to_string()), mailbox.email),
+            None => mailbox,
+        })
     }
 
     /// Envoie un courriel à deux versions (texte et HTML) à un seul
@@ -112,11 +142,7 @@ impl Smtp {
         use lettre::message::MultiPart;
 
         let email = lettre::Message::builder()
-            .from(
-                self.from
-                    .parse()
-                    .map_err(|_| NotifyError::Config("invalid sender address".to_string()))?,
-            )
+            .from(self.mailbox()?)
             .to(recipient
                 .parse()
                 .map_err(|_| NotifyError::Config("invalid recipient address".to_string()))?)
@@ -155,11 +181,7 @@ impl Smtp {
             body = body.singlepart(Attachment::new(filename).body(bytes, content_type));
         }
         let email = lettre::Message::builder()
-            .from(
-                self.from
-                    .parse()
-                    .map_err(|_| NotifyError::Config("invalid sender address".to_string()))?,
-            )
+            .from(self.mailbox()?)
             .to(recipient
                 .parse()
                 .map_err(|_| NotifyError::Config("invalid recipient address".to_string()))?)
@@ -195,11 +217,7 @@ impl Smtp {
         use lettre::message::header::{HeaderName, HeaderValue};
 
         let mut builder = lettre::Message::builder()
-            .from(
-                self.from
-                    .parse()
-                    .map_err(|_| NotifyError::Config("invalid sender address".to_string()))?,
-            )
+            .from(self.mailbox()?)
             .to(recipient
                 .parse()
                 .map_err(|_| NotifyError::Config("invalid recipient address".to_string()))?)
@@ -236,11 +254,7 @@ impl Notifier for Smtp {
 
     async fn send(&self, message: &Message) -> Result<(), NotifyError> {
         let mut builder = lettre::Message::builder()
-            .from(
-                self.from
-                    .parse()
-                    .map_err(|_| NotifyError::Config("invalid sender address".to_string()))?,
-            )
+            .from(self.mailbox()?)
             .subject(format!("[DumbMonit] {}", message.title))
             .header(ContentType::TEXT_PLAIN);
 
@@ -322,6 +336,40 @@ mod tests {
         assert_eq!(smtp.kind(), "smtp");
         assert_eq!(smtp.to, vec!["admin@exemple.org"]);
         assert_eq!(smtp.secrets().len(), 1);
+    }
+
+    #[test]
+    fn un_serveur_d_envoi_se_passe_de_destinataire_fixe() {
+        let config = channel(
+            json!({"host": "smtp.exemple.org", "from": "status@exemple.org"}),
+            json!({}),
+        );
+        let Ok(smtp) = Smtp::sender(&config) else { panic!("sender without recipient refused") };
+        assert!(smtp.to.is_empty());
+    }
+
+    #[test]
+    fn le_nom_d_expediteur_remplace_celui_de_l_adresse() {
+        let config = channel(
+            json!({
+                "host": "smtp.exemple.org",
+                "from": "Ancien <status@exemple.org>",
+                "from_name": "Acme, status"
+            }),
+            json!({}),
+        );
+        let Ok(smtp) = Smtp::sender(&config) else { panic!("valid configuration rejected") };
+        let mailbox = smtp.mailbox().expect("sender");
+        assert_eq!(mailbox.name.as_deref(), Some("Acme, status"));
+        assert_eq!(mailbox.email.to_string(), "status@exemple.org");
+
+        let plain = channel(json!({"host": "h.org", "from": "a@b.org"}), json!({}));
+        let Ok(smtp) = Smtp::sender(&plain) else { panic!("valid configuration rejected") };
+        assert_eq!(smtp.mailbox().expect("sender").name, None);
+
+        let broken = channel(json!({"host": "h.org", "from": "pas une adresse"}), json!({}));
+        let Ok(smtp) = Smtp::sender(&broken) else { panic!("built before sending") };
+        assert!(matches!(smtp.mailbox(), Err(NotifyError::Config(_))));
     }
 
     #[test]

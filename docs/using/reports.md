@@ -2,9 +2,10 @@
 
 A report is a short email that tells your team how the infrastructure did over
 the last day, week or month, without anyone opening DumbMonit. It is weekly by
-default; daily and monthly are one click away. Reports reuse an **email (SMTP)
-notification channel**, so set one up first (see
-[Notification channels](../notifications.md)).
+default; daily and monthly are one click away. Reports go through an **email
+(SMTP) notification channel** (see [Notification channels](../notifications.md)),
+or, when none is enabled, through the [email server](../notifications.md#email-server)
+set in Settings.
 
 Open **Reports** (in the icon rail) to set them up. The page holds the availability (SLA) export of a period, the scheduled reports and the history of their sends; it used to be in Settings, and `/settings/reports` forwards to it. Everything here is admin-only,
 reading included, because the page lists the recipients' addresses.
@@ -33,7 +34,7 @@ version is sent along. Every monitor name and message is escaped.
 | **Day** | The weekday for weekly reports, the day of the month (1 to 28) for monthly ones. |
 | **Hour** and **Timezone** | When the report goes out, in an IANA timezone such as `Europe/Paris`. Daylight saving time is followed. |
 | **Recipients** | Up to 20 addresses, free-form: they do not have to be DumbMonit users. Each recipient gets their own email, so nobody sees the others. |
-| **Email channel** | Which SMTP channel sends it. By default, the first enabled one. Only the mail server of the channel is used: its own recipients are ignored. |
+| **Email channel** | Which SMTP channel sends it. By default, the first enabled one, or the email server of the instance when no channel is enabled. Only the mail server of the channel is used: its own recipients are ignored. |
 
 The period is a rolling window that ends when the report is sent: the last 24
 hours, 7 days or 30 days. The previous period is the window of the same length

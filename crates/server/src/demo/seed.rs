@@ -364,6 +364,7 @@ async fn seed_status_pages(
                 domain: None,
                 seo: Default::default(),
                 hide_branding: false,
+                subscribe_email: false,
                 groups: None,
                 group_labels: None,
             },

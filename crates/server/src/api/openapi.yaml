@@ -3733,6 +3733,76 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/notify/mail-server:
+    get:
+      operationId: getMailServer
+      tags: [Notifications]
+      summary: The email server (SMTP) of the instance
+      description: >-
+        Used by status page email subscriptions and by scheduled reports that have no email
+        channel of their own. The password is never returned (`has_password`). When
+        `DUMBMONIT_SMTP_HOST` is set, the `DUMBMONIT_SMTP_*` variables describe the server and
+        `locked_by_env` is true. Administrators only.
+      x-token-scope: read
+      responses:
+        "200":
+          description: The effective settings.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MailServer" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    put:
+      operationId: putMailServer
+      tags: [Notifications]
+      summary: Save the email server (SMTP) of the instance
+      description: >-
+        Omitted `secrets` keep the stored password, `"secrets": {}` clears it,
+        `"secrets": {"password": "…"}` replaces it. A stored password is only kept while the
+        host and username stay the same; otherwise it must be typed again (400). An empty host
+        and sender forget the server. 409 when the `DUMBMONIT_SMTP_*` variables set it.
+      x-token-scope: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MailServerUpdate" }
+      responses:
+        "200":
+          description: The new effective settings.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MailServer" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/notify/mail-server/test:
+    post:
+      operationId: testMailServer
+      tags: [Notifications]
+      summary: Send a test email through the email server
+      description: >-
+        Sends a short email to `to`, with the unsaved settings in `server` when given (same
+        password rules as `PUT`), otherwise with the effective ones. A failure answers 400 with
+        the SMTP error, the password redacted.
+      x-token-scope: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MailServerTest" }
+      responses:
+        "200":
+          description: The email left.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChannelTestReport" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /api/webpush:
     get:
       operationId: getWebPush
@@ -3932,7 +4002,8 @@ paths:
       description: >-
         A full replacement: `title` is required and every omitted field goes back
         to its default — except `accent`, `footer_text`, `homepage_url`,
-        `subscribe_channel_id`, `domain` and `hide_branding`, which keep their stored value when omitted.
+        `subscribe_channel_id`, `subscribe_email`, `domain` and `hide_branding`, which keep their
+        stored value when omitted.
       x-token-scope: write
       requestBody:
         required: true
@@ -4165,7 +4236,7 @@ paths:
       tags: [Status pages]
       summary: Open or close the SMS, webhook and Slack subscriptions of a page
       description: >-
-        Email is chosen with the page itself (`subscribe_channel_id`). SMS needs a Vonage, Telnyx
+        Email is opened with the page itself (`subscribe_email`). SMS needs a Vonage, Telnyx
         or ASPSMS notification channel; webhook and Slack need nothing, the visitor gives their URL.
       x-token-scope: write
       requestBody:
@@ -13245,6 +13316,40 @@ components:
       properties:
         ok: { type: boolean }
         message: { type: string }
+    MailServer:
+      type: object
+      required: [host, port, effective_port, security, username, has_password, from_address, from_name, configured, locked_by_env]
+      properties:
+        host: { type: string }
+        port: { type: [integer, "null"], minimum: 1, maximum: 65535, description: "`null`: the usual port of `security`." }
+        effective_port: { type: integer, description: "`port`, or 587 (STARTTLS), 465 (TLS), 25 (none)." }
+        security: { type: string, enum: [starttls, tls, none] }
+        username: { type: string, description: Empty for no authentication. }
+        has_password: { type: boolean, description: A password is stored (it is never returned). }
+        from_address: { type: string }
+        from_name: { type: string, description: Display name of the sender; empty for the address alone. }
+        configured: { type: boolean, description: A host and a sender are set. }
+        locked_by_env: { type: boolean, description: "Set by the `DUMBMONIT_SMTP_*` environment variables: read-only." }
+    MailServerUpdate:
+      type: object
+      properties:
+        host: { type: string, maxLength: 253, description: Host name or address, without scheme. }
+        port: { type: [integer, "null"], minimum: 1, maximum: 65535 }
+        security: { type: string, enum: [starttls, tls, none], default: starttls }
+        username: { type: string }
+        from_address: { type: string, format: email }
+        from_name: { type: string, maxLength: 120 }
+        secrets:
+          type: object
+          description: "Omitted: the stored password is kept. `{}`: cleared."
+          properties:
+            password: { type: string }
+    MailServerTest:
+      type: object
+      required: [to]
+      properties:
+        to: { type: string, format: email }
+        server: { $ref: "#/components/schemas/MailServerUpdate" }
     WebPushDevice:
       type: object
       required: [id, device, push_service, fingerprint, created_at, last_success_at, last_error]
@@ -13558,7 +13663,8 @@ components:
         show_calendar: { type: boolean }
         show_latency: { type: boolean }
         logo_type: { type: [string, "null"], enum: [image/png, image/jpeg, image/webp, null] }
-        subscribe_channel_id: { type: [integer, "null"], format: int64 }
+        subscribe_channel_id: { type: [integer, "null"], format: int64, description: "SMTP channel chosen for subscriber emails; `null`: the email server of the instance." }
+        subscribe_email: { type: boolean, description: Visitors may subscribe by email. }
         domain: { type: [string, "null"], description: "Public host name serving this page at `/`; `null` for none." }
         seo: { $ref: "#/components/schemas/StatusPageSeo" }
         access_mode: { type: string, enum: [public, password, users], description: "Who can read the page; set through `PUT /api/status-pages/{id}/access`." }
@@ -13638,7 +13744,8 @@ components:
         show_calendar: { type: boolean, default: false, description: Public 90-day calendar. Omitted keeps the saved value. }
         show_latency: { type: boolean, default: false, description: Public response-time graph per service. Omitted keeps the saved value. }
         hide_branding: { type: boolean, default: false, description: "White label: nothing of DumbMonit on the public page (tab title, icon, app name). The tab icon becomes the page logo, or none. Omitted keeps the saved value." }
-        subscribe_channel_id: { type: [integer, "null"], format: int64, description: "An `smtp` channel; `null` turns email subscription off." }
+        subscribe_email: { type: boolean, description: "Lets visitors subscribe by email. The emails go through `subscribe_channel_id` when set, otherwise through the email server of the instance (`/api/notify/mail-server`). Omitted keeps the saved value, unless `subscribe_channel_id` is given: a channel opens it, `null` closes it (as before this field)." }
+        subscribe_channel_id: { type: [integer, "null"], format: int64, description: "An `smtp` channel that sends the subscriber emails instead of the email server; `null`: the email server. Omitted keeps the saved channel." }
         seo:
           $ref: "#/components/schemas/StatusPageSeo"
         groups:

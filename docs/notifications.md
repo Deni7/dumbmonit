@@ -714,6 +714,25 @@ A few useful services:
 The `data` setting is merged **last**: it can therefore override the title or the
 message DumbMonit prepared.
 
+### Email server {#email-server}
+
+**Settings → Notifications → Email server** sets one SMTP server for the
+instance: host, port, encryption (STARTTLS, TLS or none), username, password
+and the sender's address and name. It sends what has no channel of its own:
+[status page subscribers](using/status-pages.md#email-subscribers), and
+[scheduled reports](using/reports.md) when no email channel is enabled.
+**Send a test email** tries the form as it is, before saving, and shows the
+SMTP server's answer when it fails.
+
+The password is stored encrypted and never shown again; leave the field empty
+to keep it. It is only kept while the host and username stay the same: change
+either and type it again. It travels in [backups](using/settings.md#backup)
+like the other secrets.
+
+The `DUMBMONIT_SMTP_*` variables describe the same server for a deployment
+from a compose file (see [Configuration](reference/configuration.md#email-server)).
+When `DUMBMONIT_SMTP_HOST` is set they win, and the setting is shown read-only.
+
 ### Email (SMTP)
 
 The only channel that depends on no third-party service.

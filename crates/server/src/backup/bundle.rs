@@ -226,6 +226,21 @@ pub struct Bundle {
     /// délai, seuil d'arrêt et pause (clé `agent.update_rollout` de `settings`).
     #[serde(default)]
     pub agent_update_rollout: Option<Value>,
+    /// Serveur de courriel de l'instance (clé `mail.server` de `settings`), son
+    /// mot de passe en clair dans le lot, lui-même chiffré par la phrase de
+    /// passe. Absent tant qu'aucun serveur n'est enregistré ; un serveur décrit
+    /// par `DUMBMONIT_SMTP_*` n'y est jamais.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mail_server: Option<BundleMailServer>,
+}
+
+/// Serveur de courriel enregistré et son mot de passe.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct BundleMailServer {
+    #[serde(flatten)]
+    pub server: crate::notify::mail_server::MailServer,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub password: Option<String>,
 }
 
 impl Bundle {
@@ -673,6 +688,10 @@ fn eight() -> u32 {
 /// de notification (courriel, SMS) sont désignés par leur nom.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BundleSubscriptions {
+    /// Abonnement par courriel ouvert (migration 0246). Absent d'une ancienne
+    /// sauvegarde : ouvert si un canal courriel est nommé.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub email: Option<bool>,
     #[serde(default)]
     pub email_channel: Option<String>,
     #[serde(default)]

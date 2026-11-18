@@ -110,7 +110,23 @@ pub async fn collect(pool: &SqlitePool, cipher: &Cipher, options: ExportOptions)
         agent_update_rollout: Some(serde_json::to_value(
             crate::collectors::agent::rollout::load(pool).await?,
         )?),
+        mail_server: mail_server(pool, cipher).await?,
     })
+}
+
+/// Serveur de courriel enregistré, mot de passe déchiffré : il repart chiffré
+/// par la phrase de passe. Un mot de passe illisible part vide, signalé.
+async fn mail_server(pool: &SqlitePool, cipher: &Cipher) -> Result<Option<BundleMailServer>> {
+    use crate::notify::mail_server;
+    let Some(server) = mail_server::load_stored(pool).await? else { return Ok(None) };
+    let password = match mail_server::load_password(pool, cipher).await {
+        Ok(password) => password,
+        Err(error) => {
+            tracing::warn!(%error, "mot de passe du serveur de courriel illisible, exporté vide");
+            None
+        }
+    };
+    Ok(Some(BundleMailServer { server, password }))
 }
 
 /// Changements de configuration fermés.
@@ -788,7 +804,8 @@ async fn status_pages(
         "SELECT id, slug, title, description, published, theme, show_uptime_days,
              accent, scenes, scene_rotation, simple, footer_text, homepage_url, domain, seo,
              access_mode, access_password_hash, subscribe_channel_id,
-             subscribe_sms_channel_id, subscribe_webhook, subscribe_slack, hide_branding
+             subscribe_sms_channel_id, subscribe_webhook, subscribe_slack, hide_branding,
+             subscribe_email
          FROM status_pages ORDER BY id",
     )
     .fetch_all(pool)
@@ -864,6 +881,7 @@ async fn status_pages(
             groups: groups.into_iter().map(|(name,)| name).collect(),
             group_labels,
             subscriptions: Some(BundleSubscriptions {
+                email: Some(row.try_get::<i64, _>("subscribe_email")? != 0),
                 email_channel: row
                     .try_get::<Option<i64>, _>("subscribe_channel_id")?
                     .and_then(|id| channel_names.get(&id).cloned()),

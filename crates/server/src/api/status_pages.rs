@@ -205,10 +205,16 @@ pub struct StatusPagePayload {
     pub footer_text: Option<String>,
     #[serde(default)]
     pub homepage_url: Option<String>,
-    /// Absent : inchangé ; `null` : abonnements coupés ; un nombre : le canal
-    /// SMTP qui envoie les courriels aux abonnés.
-    #[serde(default)]
+    /// Absent : inchangé ; `null` : pas de canal, les courriels partent par le
+    /// serveur de courriel de l'instance ; un nombre : le canal SMTP qui envoie
+    /// les courriels aux abonnés, prioritaire.
+    #[serde(default, deserialize_with = "present")]
     pub subscribe_channel_id: Option<Value>,
+    /// Abonnement par courriel ouvert aux visiteurs. Absent : la valeur
+    /// enregistrée est gardée — sauf si `subscribe_channel_id` est donné, qui
+    /// l'ouvre (un nombre) ou la ferme (`null`), comme avant la migration 0246.
+    #[serde(default)]
+    pub subscribe_email: Option<bool>,
     /// Absent : inchangé ; `null` ou `""` : pas de domaine ; sinon le nom
     /// d'hôte public de la page (`crate::status_host`).
     #[serde(default, deserialize_with = "present")]
@@ -334,6 +340,14 @@ impl StatusPagePayload {
             Some(url) => validate_homepage(url.trim())?,
             None => existing.map(|page| page.homepage_url.clone()).unwrap_or_default(),
         };
+        // Un client d'avant l'interrupteur ouvrait le courriel en choisissant
+        // un canal et le fermait avec `null`.
+        let subscribe_email = match (self.subscribe_email, &self.subscribe_channel_id) {
+            (Some(open), _) => open,
+            (None, Some(Value::Null)) => false,
+            (None, Some(_)) => true,
+            (None, None) => existing.is_some_and(|page| page.subscribe_email),
+        };
         let subscribe_channel_id = match self.subscribe_channel_id {
             None => existing.and_then(|page| page.subscribe_channel_id),
             Some(Value::Null) => None,
@@ -436,6 +450,7 @@ impl StatusPagePayload {
             domain,
             seo,
             hide_branding,
+            subscribe_email,
             groups,
             group_labels,
         })
@@ -1467,7 +1482,7 @@ static CACHE: LazyLock<Mutex<HashMap<String, CachedStatus>>> =
 
 /// Vide le cache public. Appelé après toute écriture d'administration, pour que
 /// l'annonce d'un incident soit visible sans attendre.
-fn invalidate_cache() {
+pub(crate) fn invalidate_cache() {
     CACHE.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clear();
     // Le domaine ou le slug d'une page a pu changer.
     crate::status_host::invalidate();

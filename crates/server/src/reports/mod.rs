@@ -120,7 +120,8 @@ pub fn next_run(stored: &StoredSchedule, now: DateTime<Utc>) -> Option<DateTime<
     calendar.next_slot(now.max(stored.armed_at))
 }
 
-/// Canal SMTP à utiliser : celui du calendrier, sinon le premier actif.
+/// Canal SMTP à utiliser : celui du calendrier, sinon le premier actif, sinon
+/// le serveur de courriel de l'instance.
 async fn resolve_channel(
     state: &AppState,
     stored: &StoredSchedule,
@@ -135,9 +136,15 @@ async fn resolve_channel(
     match found {
         Some(channel) if channel.kind == "smtp" && channel.enabled => Ok(channel),
         Some(_) => Err("The selected channel is not an enabled email (SMTP) channel.".to_string()),
-        None => Err("No enabled email (SMTP) notification channel is configured.".to_string()),
+        None => crate::notify::mail_server::channel(&state.pool, &state.cipher)
+            .await
+            .ok_or_else(|| NO_SENDER.to_string()),
     }
 }
+
+/// Ni canal courriel actif, ni serveur de courriel réglé.
+const NO_SENDER: &str = "No email server is set (Settings, Notifications) and no email (SMTP) \
+                         notification channel is enabled.";
 
 /// Habillage d'un rapport SLA : le client (mode MSP : son nom et son logo),
 /// sinon le nom et le logo de la page de statut choisie, à défaut
@@ -234,7 +241,7 @@ pub async fn deliver(
     }
     let calendar = schedule_of(stored).ok_or("The schedule is unreadable.".to_string())?;
     let channel = resolve_channel(state, stored).await?;
-    let smtp = Smtp::new(&channel).map_err(|error| error.to_string())?;
+    let smtp = Smtp::sender(&channel).map_err(|error| error.to_string())?;
     // Mode MSP : le calendrier d'un client ne rapporte que sur ce client.
     let client = clients::owner_of(&state.pool, clients::Kind::Report, stored.id)
         .await
@@ -492,7 +499,8 @@ pub async fn run_client_reports(state: &AppState, now: DateTime<Utc>) -> anyhow:
 type ClientReportRows = Vec<(i64, String, String, Option<f64>, String, Option<String>)>;
 
 /// Canal SMTP d'un client : le sien s'il en a un actif, sinon celui de
-/// l'instance. Jamais celui d'un autre client.
+/// l'instance, sinon le serveur de courriel de l'instance. Jamais celui d'un
+/// autre client.
 async fn client_channel(state: &AppState, client: i64) -> Result<ChannelConfig, String> {
     let channels = db::alerts::list_channels(&state.pool, &state.cipher)
         .await
@@ -501,13 +509,18 @@ async fn client_channel(state: &AppState, client: i64) -> Result<ChannelConfig, 
         .await
         .map_err(|_| "Cannot read the notification channels.".to_string())?;
     let usable = |c: &&ChannelConfig| c.enabled && c.kind == "smtp";
-    channels
+    let found = channels
         .iter()
         .filter(usable)
         .find(|c| owners.get(&c.id) == Some(&client))
         .or_else(|| channels.iter().filter(usable).find(|c| !owners.contains_key(&c.id)))
-        .cloned()
-        .ok_or_else(|| "No enabled email (SMTP) notification channel is configured.".to_string())
+        .cloned();
+    match found {
+        Some(channel) => Ok(channel),
+        None => crate::notify::mail_server::channel(&state.pool, &state.cipher)
+            .await
+            .ok_or_else(|| NO_SENDER.to_string()),
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -525,7 +538,7 @@ async fn send_client_report(
         return Err("Add at least one contact to this client.".to_string());
     }
     let channel = client_channel(state, client).await?;
-    let smtp = Smtp::new(&channel).map_err(|error| error.to_string())?;
+    let smtp = Smtp::sender(&channel).map_err(|error| error.to_string())?;
     let title = format!("{name} availability report");
     let scope = layout::Scope::default();
     let (data, mut rendered) =
