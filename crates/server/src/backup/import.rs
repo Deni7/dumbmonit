@@ -141,7 +141,7 @@ pub async fn restore(
     report.push(restore_instance(&mut tx, bundle).await?);
     report.push(restore_silences(&mut tx, bundle, &refs).await?);
     report.push(restore_status_pages(&mut tx, bundle, &refs).await?);
-    report.push(restore_report_schedules(&mut tx, bundle, &channels).await?);
+    report.push(restore_report_schedules(&mut tx, bundle, &channels, &refs).await?);
     report.push(restore_incidents(&mut tx, bundle).await?);
     report.push(restore_agent_tokens(&mut tx, bundle).await?);
     report.push(restore_api_tokens(&mut tx, bundle).await?);
@@ -1219,13 +1219,16 @@ async fn restore_report_schedules(
     tx: &mut Transaction<'_, Sqlite>,
     bundle: &Bundle,
     channels: &HashMap<String, i64>,
+    refs: &HashMap<String, i64>,
 ) -> Result<SectionReport> {
+    use crate::reports::layout::Scope;
     use crate::reports::schedule::{Frequency, parse_timezone};
 
     let mut report = SectionReport::new("report_schedules");
     for item in &bundle.report_schedules {
         // Une sauvegarde éditée à la main ne doit pas contourner les contrôles de l'API.
         let name = item.name.trim();
+        let kind = item.kind.trim();
         let valid = !name.is_empty()
             && name.chars().count() <= 80
             && !name.chars().any(char::is_control)
@@ -1233,9 +1236,12 @@ async fn restore_report_schedules(
             && item.weekday <= 6
             && (1..=28).contains(&item.day_of_month)
             && item.hour <= 23
-            && parse_timezone(&item.timezone).is_some();
+            && parse_timezone(&item.timezone).is_some()
+            && (kind == "digest" || (kind == "sla" && item.frequency == "monthly"))
+            && item.objective.is_none_or(|v| v.is_finite() && v > 0.0 && v <= 100.0);
         let recipients = crate::reports::normalise_recipients(&item.recipients);
-        let (true, Ok(recipients)) = (valid, recipients) else {
+        let layout = item.layout.clone().validate();
+        let (true, Ok(recipients), Ok(layout)) = (valid, recipients, layout) else {
             report.skipped += 1;
             report
                 .notes
@@ -1255,12 +1261,47 @@ async fn restore_report_schedules(
                 }
             },
         };
+        let page_id = match &item.page {
+            None => None,
+            Some(slug) => {
+                let found: Option<i64> =
+                    sqlx::query_scalar("SELECT id FROM status_pages WHERE slug = ?")
+                        .bind(slug)
+                        .fetch_optional(&mut **tx)
+                        .await
+                        .context("recherche de la page de statut du rapport")?;
+                if found.is_none() {
+                    report.notes.push(format!(
+                        "Report \"{name}\": the status page \"{slug}\" is not in this backup; \
+                         the report is headed by DumbMonit."
+                    ));
+                }
+                found
+            }
+        };
+        let mut targets = Vec::new();
+        for reference in &item.scope_targets {
+            match refs.get(reference) {
+                Some(id) => targets.push(*id),
+                None => report.notes.push(format!(
+                    "Report \"{name}\": the monitor \"{reference}\" of its scope is not in this \
+                     backup and was left out."
+                )),
+            }
+        }
+        let Ok(scope) = Scope { targets, groups: item.scope_groups.clone() }.validate() else {
+            report.skipped += 1;
+            report.notes.push(format!("Report \"{name}\" has an invalid scope and was skipped."));
+            continue;
+        };
         let recipients_json = serde_json::to_string(&recipients)?;
+        let layout_json = serde_json::to_string(&layout)?;
+        let scope_json = serde_json::to_string(&scope)?;
         let enabled = item.enabled && !recipients.is_empty();
 
         let existing = sqlx::query(
             "SELECT id, enabled, frequency, weekday, day_of_month, hour, timezone, recipients,
-                 channel_id
+                 channel_id, kind, attach_pdf, attach_csv, page_id, objective, layout, scope
              FROM report_schedules WHERE name = ?",
         )
         .bind(name)
@@ -1277,7 +1318,14 @@ async fn restore_report_schedules(
                     && row.try_get::<i64, _>("hour")? == i64::from(item.hour)
                     && row.try_get::<String, _>("timezone")? == item.timezone.trim()
                     && row.try_get::<String, _>("recipients")? == recipients_json
-                    && row.try_get::<Option<i64>, _>("channel_id")? == channel_id;
+                    && row.try_get::<Option<i64>, _>("channel_id")? == channel_id
+                    && row.try_get::<String, _>("kind")? == kind
+                    && (row.try_get::<i64, _>("attach_pdf")? != 0) == item.attach_pdf
+                    && (row.try_get::<i64, _>("attach_csv")? != 0) == item.attach_csv
+                    && row.try_get::<Option<i64>, _>("page_id")? == page_id
+                    && row.try_get::<Option<f64>, _>("objective")? == item.objective
+                    && row.try_get::<String, _>("layout")? == layout_json
+                    && row.try_get::<String, _>("scope")? == scope_json;
                 if same {
                     report.skipped += 1;
                     continue;
@@ -1286,7 +1334,8 @@ async fn restore_report_schedules(
                 sqlx::query(
                     "UPDATE report_schedules
                      SET enabled = ?, frequency = ?, weekday = ?, day_of_month = ?, hour = ?,
-                         timezone = ?, recipients = ?, channel_id = ?,
+                         timezone = ?, recipients = ?, channel_id = ?, kind = ?, attach_pdf = ?,
+                         attach_csv = ?, page_id = ?, objective = ?, layout = ?, scope = ?,
                          armed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
                      WHERE id = ?",
                 )
@@ -1298,6 +1347,13 @@ async fn restore_report_schedules(
                 .bind(item.timezone.trim())
                 .bind(&recipients_json)
                 .bind(channel_id)
+                .bind(kind)
+                .bind(i64::from(item.attach_pdf))
+                .bind(i64::from(item.attach_csv))
+                .bind(page_id)
+                .bind(item.objective)
+                .bind(&layout_json)
+                .bind(&scope_json)
                 .bind(row.try_get::<i64, _>("id")?)
                 .execute(&mut **tx)
                 .await
@@ -1308,8 +1364,10 @@ async fn restore_report_schedules(
                 sqlx::query(
                     "INSERT INTO report_schedules
                          (name, enabled, frequency, weekday, day_of_month, hour, timezone,
-                          recipients, channel_id, armed_at)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))",
+                          recipients, channel_id, kind, attach_pdf, attach_csv, page_id,
+                          objective, layout, scope, armed_at)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                             strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))",
                 )
                 .bind(name)
                 .bind(i64::from(enabled))
@@ -1320,6 +1378,13 @@ async fn restore_report_schedules(
                 .bind(item.timezone.trim())
                 .bind(&recipients_json)
                 .bind(channel_id)
+                .bind(kind)
+                .bind(i64::from(item.attach_pdf))
+                .bind(i64::from(item.attach_csv))
+                .bind(page_id)
+                .bind(item.objective)
+                .bind(&layout_json)
+                .bind(&scope_json)
                 .execute(&mut **tx)
                 .await
                 .context("création du rapport planifié")?;

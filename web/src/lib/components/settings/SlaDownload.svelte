@@ -3,15 +3,28 @@
 	 * Reports → "Availability report (SLA)": the report of a period
 	 * you choose, built on the spot and downloaded as a PDF or as CSV files.
 	 * Dates are inclusive and read in the chosen timezone; the default is the
-	 * previous calendar month.
+	 * previous calendar month. "Customize" holds the PDF layout (template,
+	 * sections, paper, title, notes, logo) and the monitors covered; the same
+	 * options open the printable page of the report.
 	 */
-	import { Download } from 'lucide-svelte';
+	import { Download, Printer } from 'lucide-svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { pad2 } from '#lib/format.js';
+	import { withBase } from '#lib/paths.js';
 	import { toApiError, type StatusPage } from '#lib/api/index.js';
-	import { downloadSlaReport, type SlaFormat } from '#lib/api/reports.js';
+	import {
+		defaultReportLayout,
+		downloadSlaReport,
+		emptyScope,
+		slaParams,
+		type ReportLayout,
+		type ReportScope,
+		type SlaFormat,
+		type SlaRequest
+	} from '#lib/api/reports.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
-	import { Button, ErrorNotice, Field } from '#lib/ui/index.js';
+	import { Button, Disclosure, ErrorNotice, Field } from '#lib/ui/index.js';
+	import ReportLayoutFields from '#lib/components/reports/ReportLayoutFields.svelte';
 
 	interface Props {
 		pages: StatusPage[];
@@ -44,6 +57,35 @@
 	const clientValue = $derived(clientId !== '' ? clientId : mspAdmin ? '' : String(clients[0]?.id ?? ''));
 	let busy = $state(false);
 	let error = $state<unknown>(null);
+	let layout = $state<ReportLayout>(defaultReportLayout());
+	let scope = $state<ReportScope>(emptyScope());
+	let customizing = $state(false);
+
+	const templateLabel = $derived(layout.template === 'summary' ? m.reports_layout_template_summary() : m.reports_layout_template_detailed());
+	const paperLabel = $derived(layout.paper === 'letter' ? m.reports_layout_paper_letter() : m.reports_layout_paper_a4());
+
+	/** What the form asks for, in the shape of the API. */
+	function requestOf(wanted: SlaFormat): SlaRequest {
+		const goal = Number(objective.replace(',', '.'));
+		return {
+			from,
+			to,
+			tz: timezone.trim() || undefined,
+			format: wanted,
+			objective: objective.trim() !== '' && goal > 0 ? goal : undefined,
+			page: pageId === '' ? undefined : Number(pageId),
+			client: clientValue === '' ? undefined : Number(clientValue),
+			layout,
+			scope
+		};
+	}
+
+	/** The printable page of the same report, in the app. */
+	const printHref = $derived.by(() => {
+		const params = slaParams(requestOf('json'));
+		params.delete('format');
+		return withBase(`/reports/sla?${params}`);
+	});
 
 	const FORMATS: { value: SlaFormat; label: string }[] = [
 		{ value: 'pdf', label: m.settings_sla_format_pdf() },
@@ -69,16 +111,7 @@
 		busy = true;
 		downloadedOk = false;
 		try {
-			const goal = Number(objective.replace(',', '.'));
-			const { blob, filename } = await downloadSlaReport({
-				from,
-				to,
-				tz: timezone.trim() || undefined,
-				format,
-				objective: objective.trim() !== '' && goal > 0 ? goal : undefined,
-				page: pageId === '' ? undefined : Number(pageId),
-				client: clientValue === '' ? undefined : Number(clientValue)
-			});
+			const { blob, filename } = await downloadSlaReport(requestOf(format));
 			const url = URL.createObjectURL(blob);
 			const link = document.createElement('a');
 			link.href = url;
@@ -138,10 +171,25 @@
 		</Field>
 	{/if}
 
-	<div class="sm:col-span-2">
+	<Disclosure
+		title={m.reports_layout_customize()}
+		summary={m.reports_layout_customize_summary({ template: templateLabel, paper: paperLabel })}
+		bind:open={customizing}
+		class="sm:col-span-2"
+	>
+		<div class="border-t border-line p-4">
+			<ReportLayoutFields bind:layout bind:scope idPrefix="sla" disabled={busy} />
+		</div>
+	</Disclosure>
+
+	<div class="flex flex-wrap items-center gap-2 sm:col-span-2">
 		<Button type="submit" variant="primary" loading={busy} success={downloadedOk} disabled={!from || !to}>
 			<Download class="size-4" aria-hidden="true" />
 			{m.settings_sla_download()}
+		</Button>
+		<Button variant="secondary" href={printHref} disabled={!from || !to}>
+			<Printer class="size-4" aria-hidden="true" />
+			{m.reports_sla_open_printable()}
 		</Button>
 	</div>
 </form>

@@ -64,8 +64,32 @@ Degraded, Poor) are used. The report is in English; the figures are the ones
 of the status pages.
 
 The PDF is written by DumbMonit itself, with the standard Helvetica fonts and no
-library: A4, text and tables, a footer with the generation date and the page
-number. The logo of a status page is not embedded; its name heads the report.
+library. It is made for paper: print margins, no background fills, table
+headers repeated on every page, the name and period at the top of each
+following page, and a footer with the generation date and the page number.
+Statuses are words (bad ones in bold), so the report reads in black and white.
+The logo of the client (MSP mode) or of the status page that brands the report
+heads it when it is a PNG or a JPEG.
+
+### Customize the report {#customize}
+
+**Customize the report**, both in a schedule and when you download a period,
+chooses:
+
+- the **template**: *Detailed* (every monitor, incident and maintenance window)
+  or *Summary* (one or two pages: overall availability against the objective,
+  availability by group, or by monitor when there are no groups, the five major
+  incidents and total downtime);
+- the **sections**: key figures, availability chart, monitors, incidents,
+  maintenance windows, response times, notes;
+- the **paper**: A4 or US Letter;
+- a **title** printed under the name (default: "Availability report"), free
+  **notes** (2,000 characters at most) and whether the **logo** is shown;
+- the **monitors covered**: groups, monitors, or both (a monitor is in the
+  report when it is picked or its group is). Nothing picked covers every
+  monitor. Incidents and maintenance windows follow the same scope.
+
+A schedule keeps these options, and so does a [backup](../install/backup.md).
 
 ### Download a period
 
@@ -74,6 +98,11 @@ demand, for any period of one year at most (both days included, in the timezone
 you choose, ending now if it has not ended). Choose the PDF, the monitors CSV or
 the incidents CSV. The default is the previous calendar month. In MSP mode,
 choose the client the report is about. Administrators only.
+
+**Open printable page** shows the same report, with the same options, in the
+browser. Printing it (or saving it as PDF from the print dialog) gives only the
+report, black on white, with table headers repeated on each page;
+**Download PDF** there gives the PDF built by the server.
 
 ### Sending history
 

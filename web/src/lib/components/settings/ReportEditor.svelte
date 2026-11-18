@@ -11,17 +11,22 @@
 	import { toApiError, type Channel, type StatusPage } from '#lib/api/index.js';
 	import {
 		MAX_REPORT_RECIPIENTS,
+		emptyScope,
+		normaliseLayout,
 		createReportSchedule,
 		deleteReportSchedule,
 		sendReportPreview,
 		updateReportSchedule,
 		type ReportFrequency,
 		type ReportKind,
+		type ReportLayout,
 		type ReportSchedule,
-		type ReportSchedulePayload
+		type ReportSchedulePayload,
+		type ReportScope
 	} from '#lib/api/reports.js';
+	import ReportLayoutFields from '#lib/components/reports/ReportLayoutFields.svelte';
 	import { formatDateTime, formatRelative } from '#lib/format.js';
-	import { Button, Confirm, ErrorNotice, Field, Plate, Toggle } from '#lib/ui/index.js';
+	import { Button, Confirm, Disclosure, ErrorNotice, Field, Plate, Toggle } from '#lib/ui/index.js';
 	import UnsavedBadge from './UnsavedBadge.svelte';
 	import { useUnsavedGuard } from '#lib/settings/unsaved.svelte.js';
 
@@ -73,6 +78,13 @@
 	let pageId = $state<string>(initial?.page_id === null || initial === null ? '' : String(initial.page_id));
 	let objectiveError = $state<string | null>(null);
 	let channelId = $state<string>(initial?.channel_id === null || initial === null ? '' : String(initial.channel_id));
+	let layout = $state<ReportLayout>(normaliseLayout(initial?.layout));
+	let scope = $state<ReportScope>(initial?.scope ? { targets: [...initial.scope.targets], groups: [...initial.scope.groups] } : emptyScope());
+	let customizing = $state(false);
+
+	/** Comparable form of the layout and scope, for the unsaved-changes check. */
+	const shape = (value: { layout: ReportLayout; scope: ReportScope }) =>
+		JSON.stringify({ layout: { ...value.layout, title: value.layout.title?.trim() || null, notes: value.layout.notes.trim() }, scope: value.scope });
 
 	let saving = $state(false);
 	let previewing = $state(false);
@@ -107,7 +119,9 @@
 			attach_pdf: attachPdf,
 			attach_csv: attachCsv,
 			page_id: kind === 'sla' && pageId !== '' ? Number(pageId) : null,
-			objective: kind === 'sla' && objective.trim() !== '' ? Number(objective.replace(',', '.')) : null
+			objective: kind === 'sla' && objective.trim() !== '' ? Number(objective.replace(',', '.')) : null,
+			layout: { ...layout, title: layout.title?.trim() || null, notes: layout.notes.trim() },
+			scope
 		};
 	}
 
@@ -186,6 +200,7 @@
 				dayOfMonth !== schedule.day_of_month ||
 				hour !== schedule.hour ||
 				timezone !== schedule.timezone ||
+				shape({ layout, scope }) !== shape({ layout: normaliseLayout(schedule.layout), scope: schedule.scope ?? emptyScope() }) ||
 				parsed.join(',') !== schedule.recipients.join(',') ||
 				channelId !== (schedule.channel_id === null ? '' : String(schedule.channel_id)))
 	);
@@ -236,6 +251,19 @@
 		<Field label={m.settings_report_attach_csv()} inline>
 			<Toggle bind:checked={attachCsv} label={m.settings_report_attach_csv()} disabled={saving} />
 		</Field>
+		<Disclosure
+			title={m.reports_layout_customize()}
+			summary={m.reports_layout_customize_summary({
+				template: layout.template === 'summary' ? m.reports_layout_template_summary() : m.reports_layout_template_detailed(),
+				paper: layout.paper === 'letter' ? m.reports_layout_paper_letter() : m.reports_layout_paper_a4()
+			})}
+			bind:open={customizing}
+			class="sm:col-span-2"
+		>
+			<div class="border-t border-line p-4">
+				<ReportLayoutFields bind:layout bind:scope {idPrefix} disabled={saving} />
+			</div>
+		</Disclosure>
 	{/if}
 
 	{#if kind === 'digest'}

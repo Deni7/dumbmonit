@@ -6,7 +6,7 @@
 //! Le calcul d'assemblage est pur ([`assemble`], [`build_incidents`]) : seule
 //! [`collect`] touche à la base et à VictoriaMetrics.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, SecondsFormat, TimeDelta, Utc};
@@ -17,6 +17,7 @@ use crate::api::status_pages::{
     PROBE_KINDS, first_up_query, instant_map, presence_slots, probe_uptime_query, rescale, selector,
 };
 use crate::db;
+use crate::reports::layout::Scope;
 use crate::reports::schedule::{Frequency, Period};
 use crate::state::AppState;
 
@@ -67,6 +68,18 @@ impl Incident {
     }
 }
 
+/// Une occurrence de fenêtre de maintenance dans la période.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MaintenanceWindow {
+    pub name: String,
+    /// Moniteur visé ; `None` : plusieurs moniteurs (étiquettes) ou l'instance.
+    pub monitor: Option<String>,
+    pub starts: DateTime<Utc>,
+    pub ends: DateTime<Utc>,
+    /// Occurrence d'une fenêtre hebdomadaire ou mensuelle.
+    pub recurring: bool,
+}
+
 #[derive(Debug, Clone)]
 pub struct ReportData {
     pub name: String,
@@ -83,6 +96,8 @@ pub struct ReportData {
     pub incidents: Vec<Incident>,
     pub previous_incident_count: usize,
     pub downtime_secs: i64,
+    /// Fenêtres de maintenance qui touchent la période (rapport SLA).
+    pub maintenance: Vec<MaintenanceWindow>,
 }
 
 impl ReportData {
@@ -318,7 +333,62 @@ pub fn assemble(input: Inputs<'_>) -> ReportData {
         incidents: listed,
         previous_incident_count,
         downtime_secs,
+        maintenance: Vec::new(),
     }
+}
+
+/// Plafond d'occurrences listées : une fenêtre quotidienne sur un an en
+/// ferait 366.
+pub const MAX_MAINTENANCE_WINDOWS: usize = 200;
+
+/// Occurrences des fenêtres de maintenance qui touchent `[from, to)`, triées
+/// par début. Pur : les silences sont déjà lus et filtrés.
+pub fn maintenance_windows(
+    silences: &[crate::alerting::Silence],
+    names: &HashMap<i64, String>,
+    from: DateTime<Utc>,
+    to: DateTime<Utc>,
+) -> Vec<MaintenanceWindow> {
+    use crate::alerting::Schedule;
+    let mut out = Vec::new();
+    for silence in silences.iter().filter(|s| s.enabled) {
+        let recurring = !matches!(silence.schedule, Schedule::Once { .. });
+        let monitor = silence.target_id.and_then(|id| names.get(&id).cloned());
+        let mut push = |(starts, ends): (DateTime<Utc>, DateTime<Utc>)| {
+            if starts < to && ends > from {
+                out.push(MaintenanceWindow {
+                    name: silence.name.clone(),
+                    monitor: monitor.clone(),
+                    starts,
+                    ends,
+                    recurring,
+                });
+            }
+        };
+        match &silence.schedule {
+            Schedule::Recovery { .. } => {}
+            Schedule::Once { starts_at, ends_at } => push((*starts_at, *ends_at)),
+            schedule => {
+                // L'occurrence ouverte au début de la période, puis les suivantes.
+                if let Some(window) = schedule.window_containing(from) {
+                    push(window);
+                }
+                let duration = schedule.duration();
+                let mut cursor = from;
+                for _ in 0..=MAX_MAINTENANCE_WINDOWS {
+                    let Some(start) = schedule.next_start(cursor) else { break };
+                    if start >= to {
+                        break;
+                    }
+                    push((start, start + duration));
+                    cursor = start;
+                }
+            }
+        }
+    }
+    out.sort_by(|a, b| a.starts.cmp(&b.starts).then(a.name.cmp(&b.name)));
+    out.truncate(MAX_MAINTENANCE_WINDOWS);
+    out
 }
 
 // --------------------------------------------------------------------------
@@ -511,6 +581,21 @@ pub async fn collect_period_for(
     now: DateTime<Utc>,
     client: Option<i64>,
 ) -> Result<ReportData> {
+    collect_scoped(state, name, frequency, period, now, client, &Scope::default()).await
+}
+
+/// Comme [`collect_period_for`], limité en plus au périmètre choisi (moniteurs
+/// et groupes) : les incidents et les maintenances des autres moniteurs n'y
+/// figurent pas.
+pub async fn collect_scoped(
+    state: &AppState,
+    name: &str,
+    frequency: Frequency,
+    period: Period,
+    now: DateTime<Utc>,
+    client: Option<i64>,
+    scope: &Scope,
+) -> Result<ReportData> {
     let owned = match client {
         Some(client) => Some(crate::auth::clients::targets_of(&state.pool, client).await?),
         None => None,
@@ -520,7 +605,14 @@ pub async fn collect_period_for(
         .into_iter()
         .filter(|target| target.enabled)
         .filter(|target| owned.as_ref().is_none_or(|owned| owned.contains(&target.id)))
+        .filter(|target| scope.keeps(target.id, &target.group_name))
         .collect();
+    // Rapport restreint (client ou périmètre) : seuls ses moniteurs comptent.
+    let restricted: Option<HashSet<i64>> = if owned.is_some() || !scope.is_empty() {
+        Some(targets.iter().map(|t| t.id).collect())
+    } else {
+        None
+    };
     let refs: Vec<&Target> = targets.iter().collect();
     let devices: Vec<DeviceInfo> = targets
         .iter()
@@ -536,10 +628,10 @@ pub async fn collect_period_for(
     // Un incident né avant la période mais encore ouvert doit apparaître : on
     // remonte une semaine plus tôt que la période précédente.
     let mut rows = history(state, period.previous_start - TimeDelta::days(7)).await?;
-    if let Some(owned) = &owned {
-        // Un incident sans équipement, ou d'un autre client, n'a rien à faire
-        // dans le rapport d'un client.
-        rows.retain(|row| row.target_id.is_some_and(|id| owned.contains(&id)));
+    if let Some(kept) = &restricted {
+        // Un incident sans équipement, ou d'un autre client, ou hors du
+        // périmètre, n'a rien à faire dans un rapport restreint.
+        rows.retain(|row| row.target_id.is_some_and(|id| kept.contains(&id)));
     }
     let incidents = build_incidents(&rows);
     let rules = rule_names(state).await?;
@@ -550,7 +642,7 @@ pub async fn collect_period_for(
         .and_then(|policy| policy.public_url(env_url.as_deref()))
         .filter(|url| url.starts_with("http://") || url.starts_with("https://"));
 
-    Ok(assemble(Inputs {
+    let mut data = assemble(Inputs {
         name,
         frequency,
         period,
@@ -562,7 +654,22 @@ pub async fn collect_period_for(
         availability_known: known,
         incidents: &incidents,
         latency: &latency,
-    }))
+    });
+
+    // Maintenances : meilleur effort, un silence illisible n'arrête pas le rapport.
+    match db::alerts::list_maintenance_silences(&state.pool).await {
+        Ok(mut silences) => {
+            if let Some(kept) = &restricted {
+                // Une fenêtre sans moniteur précis pourrait nommer un autre client.
+                silences.retain(|s| s.target_id.is_some_and(|id| kept.contains(&id)));
+            }
+            let names: HashMap<i64, String> =
+                targets.iter().map(|t| (t.id, t.name.clone())).collect();
+            data.maintenance = maintenance_windows(&silences, &names, period.start, period.end);
+        }
+        Err(error) => tracing::warn!(%error, "report: maintenance windows unavailable"),
+    }
+    Ok(data)
 }
 
 #[cfg(test)]
@@ -712,5 +819,70 @@ mod tests {
         assert_eq!(unstable.len(), 2);
         assert_eq!(unstable[0].name, "Router", "two incidents beat one");
         assert_eq!(unstable[1].name, "NAS");
+    }
+
+    fn silence(
+        name: &str,
+        target: Option<i64>,
+        schedule: crate::alerting::Schedule,
+    ) -> crate::alerting::Silence {
+        crate::alerting::Silence {
+            id: 1,
+            name: name.to_string(),
+            comment: String::new(),
+            target_id: target,
+            matchers: std::collections::BTreeMap::new(),
+            schedule,
+            enabled: true,
+        }
+    }
+
+    #[test]
+    fn les_fenetres_de_maintenance_de_la_periode_sont_listees() {
+        use crate::alerting::Schedule;
+        let from = at("2026-10-01T00:00:00Z");
+        let to = at("2026-11-01T00:00:00Z");
+        let names = HashMap::from([(1, "NAS".to_string())]);
+        let once = silence(
+            "Firmware",
+            Some(1),
+            Schedule::Once {
+                starts_at: at("2026-10-10T02:00:00Z"),
+                ends_at: at("2026-10-10T04:00:00Z"),
+            },
+        );
+        let outside = silence(
+            "Last year",
+            Some(1),
+            Schedule::Once {
+                starts_at: at("2025-10-10T02:00:00Z"),
+                ends_at: at("2025-10-10T04:00:00Z"),
+            },
+        );
+        // Chaque dimanche de 2 h à 4 h UTC : quatre dimanches en octobre 2026.
+        let weekly = silence(
+            "Backups",
+            None,
+            Schedule::Weekly {
+                days: vec![6],
+                start_minute: 120,
+                end_minute: 240,
+                utc_offset_minutes: 0,
+                timezone: Some("UTC".to_string()),
+            },
+        );
+        let mut disabled = once.clone();
+        disabled.enabled = false;
+        let windows = maintenance_windows(&[once, outside, weekly, disabled], &names, from, to);
+        assert_eq!(windows.len(), 5, "{windows:?}");
+        let firmware = windows.iter().find(|w| w.name == "Firmware").expect("one-off window");
+        assert_eq!(firmware.monitor.as_deref(), Some("NAS"));
+        assert!(!firmware.recurring);
+        let sundays: Vec<_> = windows.iter().filter(|w| w.name == "Backups").collect();
+        assert_eq!(sundays.len(), 4);
+        assert!(sundays.iter().all(|w| w.recurring && w.monitor.is_none()));
+        assert_eq!(sundays[0].starts, at("2026-10-04T02:00:00Z"));
+        assert_eq!(sundays[0].ends, at("2026-10-04T04:00:00Z"));
+        assert!(windows.windows(2).all(|pair| pair[0].starts <= pair[1].starts), "sorted");
     }
 }

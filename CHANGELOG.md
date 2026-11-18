@@ -10,8 +10,22 @@ All notable changes to this project are documented here. The format follows
 - **Swiss cross.** A small "Made in Switzerland" cross after the version number at the foot of the
   page and beside the name on the sign-in page, and a tagline under it: "Monitoring with Swiss
   precision" (translated in the nine languages).
+- **SLA reports you can shape.** When you download an availability report, or in a monthly SLA
+  schedule, "Customize the report" chooses the template (Detailed, or a one-to-two-page Summary:
+  overall availability against the objective, availability by group or monitor, major incidents,
+  total downtime), the paper (A4 or US Letter), the sections (key figures, availability chart,
+  monitors, incidents, maintenance windows, response times, notes), a title, free notes, whether the
+  logo is shown, and which monitors or groups are covered. Scheduled reports keep these options, and
+  so do backups. The report also lists the maintenance windows of the period.
+- **Printable report page.** "Open printable page" shows the same report in the browser; printing it
+  gives only the report, black on white, with table headers repeated on each page.
 
 ### Changed
+
+- **SLA PDF made for paper.** Wider print margins, no background fills (outlines and rules only),
+  table headers repeated on every page, the name and period at the top of each following page, a
+  bar chart of availability with the objective marked, and statuses that read in black and white
+  (bad ones in bold). A status page used to brand the report now brings its logo too.
 
 - **A plainer overview health panel.** The "health river" gives way to a grid of small tiles, one
   per monitor (state as a shape and a colour, problems first, shrinking from 10 to 500 monitors),

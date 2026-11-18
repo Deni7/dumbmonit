@@ -15,7 +15,7 @@
 
 use std::fmt::Write as _;
 
-/// Page A4 en points (1/72 de pouce).
+/// Page A4 en points (1/72 de pouce) : le format par défaut d'un document.
 pub const PAGE_W: f64 = 595.0;
 pub const PAGE_H: f64 = 842.0;
 
@@ -167,6 +167,34 @@ impl Page {
         let _ = writeln!(self.ops, "{} rg {x:.2} {y:.2} {w:.2} {h:.2} re f", color.ops());
     }
 
+    /// Contour d'un rectangle : reste visible quand l'imprimante ignore les fonds.
+    pub fn rect_stroke(&mut self, x: f64, y: f64, w: f64, h: f64, width: f64, color: Rgb) {
+        let _ = writeln!(
+            self.ops,
+            "{} RG {width:.2} w {x:.2} {y:.2} {w:.2} {h:.2} re S",
+            color.ops()
+        );
+    }
+
+    /// Filet en pointillés (`dash` points tracés, autant d'espace).
+    #[allow(clippy::too_many_arguments)]
+    pub fn dashed_line(
+        &mut self,
+        x1: f64,
+        y1: f64,
+        x2: f64,
+        y2: f64,
+        width: f64,
+        dash: f64,
+        color: Rgb,
+    ) {
+        let _ = writeln!(
+            self.ops,
+            "{} RG {width:.2} w [{dash:.1} {dash:.1}] 0 d {x1:.2} {y1:.2} m {x2:.2} {y2:.2} l S [] 0 d",
+            color.ops()
+        );
+    }
+
     pub fn line(&mut self, x1: f64, y1: f64, x2: f64, y2: f64, width: f64, color: Rgb) {
         let _ = writeln!(
             self.ops,
@@ -213,13 +241,27 @@ pub struct Document {
     pages: Vec<Page>,
     images: Vec<Image>,
     title: String,
+    /// Largeur et hauteur des pages, en points.
+    size: (f64, f64),
     /// `D:AAAAMMJJHHMMSSZ`, écrit tel quel dans les métadonnées.
     created: Option<String>,
 }
 
 impl Document {
     pub fn new(title: &str, created: Option<String>) -> Self {
-        Self { pages: Vec::new(), images: Vec::new(), title: title.to_string(), created }
+        Self {
+            pages: Vec::new(),
+            images: Vec::new(),
+            title: title.to_string(),
+            size: (PAGE_W, PAGE_H),
+            created,
+        }
+    }
+
+    /// Change le format des pages (A4 par défaut).
+    pub fn with_size(mut self, width: f64, height: f64) -> Self {
+        self.size = (width, height);
+        self
     }
 
     /// Ajoute une image ; rend l'index à passer à [`Page::image`].
@@ -287,10 +329,11 @@ impl Document {
                 .collect();
             format!(" /XObject << {} >>", refs.join(" "))
         };
+        let (width, height) = self.size;
         for (i, page) in pages.iter().enumerate() {
             let stream = first_page + 2 * i + 1;
             objects.push(format!(
-                "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {PAGE_W} {PAGE_H}] \
+                "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {width} {height}] \
                  /Resources << /Font << /F1 3 0 R /F2 4 0 R >>{xobjects} >> \
                  /Contents {stream} 0 R >>"
             ));
