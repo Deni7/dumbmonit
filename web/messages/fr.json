@@ -9394,5 +9394,17 @@
 	"status_form_subscribe_channel_disabled": "Le canal « {name} » est désactivé : les e-mails passent par le serveur d’e-mail.",
 	"status_form_subscribe_send_with": "Envoyer avec",
 	"status_form_subscribe_send_with_help": "Le serveur d’e-mail de l’instance, ou l’un de vos canaux e-mail.",
-	"status_form_subscribe_send_with_server": "Serveur d’e-mail (Réglages)"
+	"status_form_subscribe_send_with_server": "Serveur d’e-mail (Réglages)",
+	"settings_accent_label": "Couleur d’accent",
+	"settings_accent_hint": "Colore les boutons pleins et les anneaux de focus pour tout le monde sur cette instance. Les couleurs de statut ne changent pas.",
+	"settings_accent_custom": "Couleur personnalisée",
+	"settings_accent_name_default": "Par défaut",
+	"settings_accent_name_blue": "Bleu",
+	"settings_accent_name_sky": "Ciel",
+	"settings_accent_name_teal": "Sarcelle",
+	"settings_accent_name_indigo": "Indigo",
+	"settings_accent_name_violet": "Violet",
+	"settings_accent_name_pink": "Rose",
+	"settings_accent_name_orange": "Orange",
+	"settings_accent_name_slate": "Ardoise"
 }

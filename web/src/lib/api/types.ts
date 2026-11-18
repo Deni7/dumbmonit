@@ -4122,6 +4122,8 @@ export interface InstanceSettings {
 	timezone: string;
 	/** On-call schedules are turned on. Off by default; schedules are kept while off. */
 	oncall_enabled?: boolean;
+	/** Accent colour of the interface as `#rrggbb`; empty or missing is the default look. */
+	accent?: string;
 }
 
 /** `PUT /api/instance/settings`: an omitted field keeps its value. */
@@ -4131,6 +4133,8 @@ export interface InstancePatch {
 	language?: string;
 	timezone?: string;
 	oncall_enabled?: boolean;
+	/** `#rrggbb`, or empty for the default look. */
+	accent?: string;
 }
 
 // --- Backup and restore -----------------------------------------------------

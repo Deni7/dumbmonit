@@ -49,6 +49,21 @@
 				/* localStorage unavailable: each look follows its default. */
 			}
 			if (dark) document.documentElement.classList.add('dark');
+			// The instance's accent, cached by src/lib/accent.ts (same key and variable
+			// names): the solid button and the focus ring, never on a public status page.
+			try {
+				var accent = !statusPage && JSON.parse(localStorage.getItem('dumbmonit-accent') || 'null');
+				if (accent) {
+					var rs = document.documentElement.style;
+					rs.setProperty('--accent-light', accent.lightFill);
+					rs.setProperty('--accent-light-on', accent.lightOn);
+					rs.setProperty('--accent-dark', accent.darkFill);
+					rs.setProperty('--accent-dark-on', accent.darkOn);
+					document.documentElement.setAttribute('data-accent', '');
+				}
+			} catch (e) {
+				/* no cached accent: the console keeps its own ink. */
+			}
 			if (!dark) {
 				var tint = document.querySelector('meta[name="theme-color"]');
 				if (tint) tint.setAttribute('content', '#f6f6f7');

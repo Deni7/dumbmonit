@@ -9394,5 +9394,17 @@
 	"status_form_subscribe_channel_disabled": "The channel “{name}” is disabled: emails go through the email server instead.",
 	"status_form_subscribe_send_with": "Send with",
 	"status_form_subscribe_send_with_help": "The email server of the instance, or one of your email channels.",
-	"status_form_subscribe_send_with_server": "Email server (Settings)"
+	"status_form_subscribe_send_with_server": "Email server (Settings)",
+	"settings_accent_label": "Accent colour",
+	"settings_accent_hint": "Colours the solid buttons and the focus rings for everyone on this instance. Status colours do not change.",
+	"settings_accent_custom": "Custom colour",
+	"settings_accent_name_default": "Default",
+	"settings_accent_name_blue": "Blue",
+	"settings_accent_name_sky": "Sky",
+	"settings_accent_name_teal": "Teal",
+	"settings_accent_name_indigo": "Indigo",
+	"settings_accent_name_violet": "Violet",
+	"settings_accent_name_pink": "Pink",
+	"settings_accent_name_orange": "Orange",
+	"settings_accent_name_slate": "Slate"
 }

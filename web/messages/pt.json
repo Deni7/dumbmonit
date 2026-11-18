@@ -9394,5 +9394,17 @@
 	"status_form_subscribe_channel_disabled": "O canal «{name}» está desativado: os e-mails passam pelo servidor de e-mail.",
 	"status_form_subscribe_send_with": "Enviar com",
 	"status_form_subscribe_send_with_help": "O servidor de e-mail da instância ou um dos seus canais de e-mail.",
-	"status_form_subscribe_send_with_server": "Servidor de e-mail (Definições)"
+	"status_form_subscribe_send_with_server": "Servidor de e-mail (Definições)",
+	"settings_accent_label": "Cor de destaque",
+	"settings_accent_hint": "Colore os botões sólidos e os anéis de foco para todos nesta instância. As cores de estado não mudam.",
+	"settings_accent_custom": "Cor personalizada",
+	"settings_accent_name_default": "Predefinida",
+	"settings_accent_name_blue": "Azul",
+	"settings_accent_name_sky": "Céu",
+	"settings_accent_name_teal": "Azul-petróleo",
+	"settings_accent_name_indigo": "Índigo",
+	"settings_accent_name_violet": "Violeta",
+	"settings_accent_name_pink": "Rosa",
+	"settings_accent_name_orange": "Laranja",
+	"settings_accent_name_slate": "Ardósia"
 }

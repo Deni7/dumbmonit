@@ -9570,5 +9570,17 @@
 	"status_form_subscribe_channel_disabled": "Канал «{name}» отключён: письма идут через почтовый сервер.",
 	"status_form_subscribe_send_with": "Отправлять через",
 	"status_form_subscribe_send_with_help": "Почтовый сервер экземпляра или один из ваших почтовых каналов.",
-	"status_form_subscribe_send_with_server": "Почтовый сервер (Настройки)"
+	"status_form_subscribe_send_with_server": "Почтовый сервер (Настройки)",
+	"settings_accent_label": "Акцентный цвет",
+	"settings_accent_hint": "Окрашивает кнопки с заливкой и кольца фокуса для всех на этом экземпляре. Цвета статусов не меняются.",
+	"settings_accent_custom": "Свой цвет",
+	"settings_accent_name_default": "По умолчанию",
+	"settings_accent_name_blue": "Синий",
+	"settings_accent_name_sky": "Небесный",
+	"settings_accent_name_teal": "Бирюзовый",
+	"settings_accent_name_indigo": "Индиго",
+	"settings_accent_name_violet": "Фиолетовый",
+	"settings_accent_name_pink": "Розовый",
+	"settings_accent_name_orange": "Оранжевый",
+	"settings_accent_name_slate": "Сланцевый"
 }

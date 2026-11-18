@@ -51,6 +51,18 @@ pub struct InstanceSettings {
     /// plus par elles et l'interface les masque.
     #[serde(default)]
     pub oncall_enabled: bool,
+    /// Couleur d'accent de l'interface (bouton plein, anneau de focus) :
+    /// `#rrggbb` en minuscules, vide pour l'aspect par défaut. Les couleurs de
+    /// statut ne suivent jamais ce réglage ; le contraste est calculé côté
+    /// interface pour le clair et le sombre.
+    #[serde(default)]
+    pub accent: String,
+}
+
+/// Une couleur d'accent valide : `#rrggbb`, chiffres hexadécimaux.
+pub fn is_valid_accent(value: &str) -> bool {
+    let digits = value.strip_prefix('#').unwrap_or("");
+    digits.len() == 6 && digits.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 /// Lit les réglages. Un réglage absent ou illisible rend les valeurs par
@@ -94,6 +106,17 @@ mod tests {
         assert!(!old.oncall_enabled);
         let on: InstanceSettings = serde_json::from_str(r#"{"oncall_enabled":true}"#).unwrap();
         assert!(on.oncall_enabled);
+    }
+
+    #[test]
+    fn the_accent_is_empty_by_default_and_checked() {
+        assert!(InstanceSettings::default().accent.is_empty());
+        let old: InstanceSettings = serde_json::from_str(r#"{"setup_completed":true}"#).unwrap();
+        assert!(old.accent.is_empty());
+        assert!(is_valid_accent("#2563eb") && is_valid_accent("#ABCDEF"));
+        for bad in ["", "2563eb", "#fff", "#12345g", "#2563eb0", "blue"] {
+            assert!(!is_valid_accent(bad), "{bad}");
+        }
     }
 
     #[test]

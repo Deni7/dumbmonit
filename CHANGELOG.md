@@ -7,6 +7,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Accent colour.** Administrators pick the accent of the whole interface in Settings › My account ›
+  Appearance: eight preset hues or any custom colour, shown straight away. It colours the solid
+  buttons and the focus rings for everyone; the hue is adjusted for the light and the dark console so
+  the text on it keeps a 4.5:1 contrast and the fill stands out from the surface. Status colours
+  (red, amber, green) never change. Stored on the instance (`accent` in `/api/instance/settings`)
+  and included in the backup.
 - **Email server in Settings.** Settings › Notifications › Email server takes one SMTP server for the
   instance (host, port, STARTTLS / TLS / none, username, password, sender address and name), with
   "Send a test email" that shows the server's own error when it fails. The password is stored
@@ -36,6 +42,9 @@ All notable changes to this project are documented here. The format follows
   percent, or days since the last success); without the parameter the answer is unchanged.
 
 ### Changed
+
+- **No icon in page titles.** The access screen of a protected status page no longer puts a padlock
+  or a sign-in icon before its title, like every other page title.
 
 - **On-call schedules are optional.** The On-call tab of Alerts, the "DumbMonit on-call" channel type
   and the on-call step of the setup wizard are hidden until you turn on **On-call schedules** in

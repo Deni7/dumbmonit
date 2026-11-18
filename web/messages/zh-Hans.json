@@ -9299,5 +9299,17 @@
 	"status_form_subscribe_channel_disabled": "渠道“{name}”已停用：邮件改由邮件服务器发送。",
 	"status_form_subscribe_send_with": "发送方式",
 	"status_form_subscribe_send_with_help": "实例的邮件服务器，或你的某个邮件渠道。",
-	"status_form_subscribe_send_with_server": "邮件服务器（设置）"
+	"status_form_subscribe_send_with_server": "邮件服务器（设置）",
+	"settings_accent_label": "强调色",
+	"settings_accent_hint": "为此实例上所有人的实心按钮和焦点环着色。状态颜色不会改变。",
+	"settings_accent_custom": "自定义颜色",
+	"settings_accent_name_default": "默认",
+	"settings_accent_name_blue": "蓝色",
+	"settings_accent_name_sky": "天蓝",
+	"settings_accent_name_teal": "青色",
+	"settings_accent_name_indigo": "靛蓝",
+	"settings_accent_name_violet": "紫色",
+	"settings_accent_name_pink": "粉色",
+	"settings_accent_name_orange": "橙色",
+	"settings_accent_name_slate": "石板灰"
 }

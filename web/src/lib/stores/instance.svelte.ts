@@ -6,6 +6,7 @@
  */
 import { browser } from '$app/env';
 import { getInstance, getInstanceSettings } from '#lib/api/instance.js';
+import { applyAccent, parseAccent } from '#lib/accent.js';
 
 /** Key of the former Homelab / Enterprise choice, cleared once on load. */
 const LEGACY_MODE_KEY = 'dumbmonit-mode';
@@ -22,6 +23,8 @@ class InstanceStore {
 	 * settings are read: the feature stays hidden rather than flashing.
 	 */
 	oncallEnabled = $state(false);
+	/** Accent colour (`#rrggbb`), empty for the default look; applied to the page as it is read. */
+	accent = $state('');
 	/** True once the settings were read, so a page can tell "off" from "not known yet". */
 	settingsLoaded = $state(false);
 	#settingsRead = false;
@@ -56,10 +59,17 @@ class InstanceStore {
 			this.name = settings.name;
 			this.oncallEnabled = settings.oncall_enabled === true;
 			this.setupCompleted = settings.setup_completed;
+			this.setAccent(settings.accent);
 			this.settingsLoaded = true;
 		} catch {
 			this.#settingsRead = false;
 		}
+	}
+
+	/** Wears (and remembers for the next first paint) the instance's accent. */
+	setAccent(raw: string | null | undefined): void {
+		this.accent = parseAccent(raw);
+		applyAccent(this.accent);
 	}
 
 	/** Display name of the instance. */

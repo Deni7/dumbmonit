@@ -1175,6 +1175,10 @@ async fn restore_instance(
     };
 
     let mut next = incoming.clone();
+    // Un lot ne fait pas entrer une couleur qui n'en est pas une.
+    if !crate::instance::is_valid_accent(&next.accent) {
+        next.accent.clear();
+    }
     if let Some(current) = &current
         && current.setup_completed
         && !next.setup_completed

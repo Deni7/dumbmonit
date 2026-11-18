@@ -9394,5 +9394,17 @@
 	"status_form_subscribe_channel_disabled": "Der Kanal „{name}“ ist deaktiviert: E-Mails gehen stattdessen über den E-Mail-Server.",
 	"status_form_subscribe_send_with": "Senden mit",
 	"status_form_subscribe_send_with_help": "Der E-Mail-Server der Instanz oder einer Ihrer E-Mail-Kanäle.",
-	"status_form_subscribe_send_with_server": "E-Mail-Server (Einstellungen)"
+	"status_form_subscribe_send_with_server": "E-Mail-Server (Einstellungen)",
+	"settings_accent_label": "Akzentfarbe",
+	"settings_accent_hint": "Färbt die ausgefüllten Schaltflächen und die Fokusrahmen für alle auf dieser Instanz. Statusfarben bleiben unverändert.",
+	"settings_accent_custom": "Eigene Farbe",
+	"settings_accent_name_default": "Standard",
+	"settings_accent_name_blue": "Blau",
+	"settings_accent_name_sky": "Himmelblau",
+	"settings_accent_name_teal": "Petrol",
+	"settings_accent_name_indigo": "Indigo",
+	"settings_accent_name_violet": "Violett",
+	"settings_accent_name_pink": "Pink",
+	"settings_accent_name_orange": "Orange",
+	"settings_accent_name_slate": "Schiefer"
 }

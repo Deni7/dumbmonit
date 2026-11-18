@@ -3,12 +3,15 @@
 	 * Settings → My account → Appearance: the theme and the language, both
 	 * kept in this browser. The console is deep black by default; light is an
 	 * option, and "System" follows the device. The wall stays dark.
+	 * Administrators also pick the instance's accent colour here.
 	 */
 	import { Moon, Sun, SunMoon } from 'lucide-svelte';
 	import { Panel } from '#lib/ui/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { theme, type ConsoleTheme } from '#lib/stores/theme.svelte.js';
 	import LanguageSelect from '#lib/components/LanguageSelect.svelte';
+	import AccentPicker from '#lib/components/settings/AccentPicker.svelte';
+	import { auth } from '#lib/stores/auth.svelte.js';
 
 	const CHOICES: { value: ConsoleTheme; label: () => string; icon: typeof Moon }[] = [
 		{ value: 'dark', label: () => m.settings_appearance_theme_dark(), icon: Moon },
@@ -45,5 +48,6 @@
 			<label for="settings-language" class="text-sm font-semibold text-ink">{m['settings.appearance.language_label']()}</label>
 			<LanguageSelect id="settings-language" class="w-full max-sm:w-auto max-sm:min-w-0 max-sm:flex-1 sm:w-auto sm:min-w-56" />
 		</div>
+		{#if auth.isAdmin}<AccentPicker />{/if}
 	</div>
 </Panel>

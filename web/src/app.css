@@ -366,6 +366,25 @@ html .sp-preview-dark .sp-accent-violet { --c-accent: #c3a8ff; }
 html .sp-preview-dark .sp-accent-rose { --c-accent: #ff8fae; }
 html .sp-preview-dark .sp-accent-amber { --c-accent: #ffc864; }
 
+/* ---------------------------------------------------------------------------
+   The instance's accent (Settings › Appearance). `applyAccent` (src/lib/accent.ts)
+   and the bootstrap script in app.html set the four `--accent-*` values, already
+   held to contrast for each light, and `data-accent` on <html>; absent, the
+   console keeps its own ink. Only the solid button and the focus ring follow it:
+   the status hues never do. Not on the public status pages, which have their own
+   accent above.
+   --------------------------------------------------------------------------- */
+html[data-accent] {
+	--c-primary: var(--accent-dark);
+	--c-on-primary: var(--accent-dark-on);
+	--c-focus: var(--accent-dark);
+}
+html.console-light[data-accent] {
+	--c-primary: var(--accent-light);
+	--c-on-primary: var(--accent-light-on);
+	--c-focus: var(--accent-light);
+}
+
 @theme inline {
 	--color-accent: var(--c-accent);
 	--color-on-accent: var(--c-on-accent);

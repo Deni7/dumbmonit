@@ -9394,5 +9394,17 @@
 	"status_form_subscribe_channel_disabled": "El canal «{name}» está desactivado: los correos pasan por el servidor de correo.",
 	"status_form_subscribe_send_with": "Enviar con",
 	"status_form_subscribe_send_with_help": "El servidor de correo de la instancia o uno de sus canales de correo.",
-	"status_form_subscribe_send_with_server": "Servidor de correo (Ajustes)"
+	"status_form_subscribe_send_with_server": "Servidor de correo (Ajustes)",
+	"settings_accent_label": "Color de acento",
+	"settings_accent_hint": "Colorea los botones sólidos y los anillos de foco para todos en esta instancia. Los colores de estado no cambian.",
+	"settings_accent_custom": "Color personalizado",
+	"settings_accent_name_default": "Predeterminado",
+	"settings_accent_name_blue": "Azul",
+	"settings_accent_name_sky": "Cielo",
+	"settings_accent_name_teal": "Turquesa",
+	"settings_accent_name_indigo": "Índigo",
+	"settings_accent_name_violet": "Violeta",
+	"settings_accent_name_pink": "Rosa",
+	"settings_accent_name_orange": "Naranja",
+	"settings_accent_name_slate": "Pizarra"
 }
