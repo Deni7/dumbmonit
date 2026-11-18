@@ -57,6 +57,11 @@ export default defineConfig({
 			outputStructure: 'locale-modules'
 		})
 	],
+	build: {
+		// The CSP allows fonts from 'self' only: a font small enough for Vite to inline
+		// as a data: URI would be blocked. Keep every font a separate file.
+		assetsInlineLimit: (file) => (/\.(woff2?|ttf|otf|eot)$/i.test(file) ? false : undefined)
+	},
 	resolve: {
 		alias: [
 			// `m` vient de `src/lib/i18n/messages.ts` : mêmes appels, mais seule la langue
