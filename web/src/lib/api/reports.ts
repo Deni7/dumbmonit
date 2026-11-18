@@ -131,3 +131,17 @@ export async function downloadSlaReport(request_: SlaRequest): Promise<{ blob: B
 	const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? `availability.${request_.format === 'pdf' ? 'pdf' : 'csv'}`;
 	return { blob: await response.blob(), filename };
 }
+
+/** Logo uploaded for SLA reports (layouts set to `custom`): PNG or JPEG, as a base64 or `data:` URL. */
+export function uploadReportLogo(data: string): Promise<void> {
+	return request<void>('/reports/logo', { method: 'PUT', body: { data } });
+}
+
+export function deleteReportLogo(): Promise<void> {
+	return request<void>('/reports/logo', { method: 'DELETE' });
+}
+
+/** Image URL of the report logo; `version` busts the browser cache after a change. */
+export function reportLogoUrl(version = ''): string {
+	return `/api/reports/logo${version ? `?v=${encodeURIComponent(version)}` : ''}`;
+}

@@ -11,12 +11,13 @@ use axum::{Json, Router};
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 
+use crate::api::status_pages::branding;
 use crate::api::{ApiError, ApiResult};
 use crate::auth::clients;
 use crate::auth::middleware::{AdminIdentity, Identity};
 use crate::auth::teams::TeamAccess;
 use crate::db;
-use crate::reports::layout::{Layout, Paper, Scope, Sections, Template};
+use crate::reports::layout::{Layout, LogoSource, Paper, Scope, Sections, Template};
 use crate::reports::schedule::{self, Frequency, Period, parse_timezone};
 use crate::reports::store::{self, ScheduleInput, StoredSchedule};
 use crate::reports::{self, MAX_SCHEDULES};
@@ -28,6 +29,10 @@ pub fn routes() -> Router<AppState> {
         .route("/reports/schedules/{id}", get(get_one).put(update).delete(remove))
         .route("/reports/schedules/{id}/send-test", post(send_test))
         .route("/reports/sla", get(download_sla))
+        .route(
+            "/reports/logo",
+            get(report_logo).put(upload_report_logo).delete(delete_report_logo),
+        )
 }
 
 #[derive(Debug, Serialize)]
@@ -334,6 +339,53 @@ pub async fn send_test(
     }
 }
 
+/// `GET /api/reports/logo` : le logo téléversé pour les rapports SLA. Lisible
+/// par tout compte connecté, comme l'aperçu du rapport qui l'affiche.
+pub async fn report_logo(State(state): State<AppState>, _who: Identity) -> ApiResult<Response> {
+    let not_found = || ApiError::NotFound("No logo has been uploaded for reports.".into());
+    let (kind, bytes) = reports::logo::stored(&state.pool).await?.ok_or_else(not_found)?;
+    branding::serve_bytes(bytes, &kind, "private, no-cache")
+}
+
+/// `PUT /api/reports/logo` : même dépôt que le logo d'une page de statut
+/// (base64 ou `data:`, 256 Kio au plus, type reconnu à sa signature), limité
+/// aux images que le PDF sait incorporer : PNG 8 bits non entrelacé ou JPEG.
+pub async fn upload_report_logo(
+    State(state): State<AppState>,
+    _admin: AdminIdentity,
+    Json(payload): Json<branding::LogoPayload>,
+) -> ApiResult<StatusCode> {
+    let bytes = branding::decode(&payload.data)?;
+    if bytes.is_empty() {
+        return Err(ApiError::BadRequest("The logo file is empty.".into()));
+    }
+    if bytes.len() > branding::MAX_LOGO_BYTES {
+        return Err(ApiError::BadRequest(format!(
+            "The logo is limited to {} KiB.",
+            branding::MAX_LOGO_BYTES / 1024
+        )));
+    }
+    // `for_pdf` ne lit que le PNG et le JPEG : le WebP est refusé ici.
+    let embeddable = reports::logo::for_pdf(&bytes).is_some();
+    let Some(kind) = branding::sniff(&bytes).filter(|_| embeddable) else {
+        return Err(ApiError::BadRequest(
+            "The report logo must be a PNG (8-bit, not interlaced) or a JPEG image.".into(),
+        ));
+    };
+    reports::logo::set_stored(&state.pool, Some((kind, bytes.as_slice()))).await?;
+    tracing::info!(kind, size = bytes.len(), "report logo stored");
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// `DELETE /api/reports/logo`
+pub async fn delete_report_logo(
+    State(state): State<AppState>,
+    _admin: AdminIdentity,
+) -> ApiResult<StatusCode> {
+    reports::logo::set_stored(&state.pool, None).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 /// Paramètres de `GET /api/reports/sla`.
 #[derive(Debug, Deserialize)]
 pub struct SlaQuery {
@@ -362,8 +414,9 @@ pub struct SlaQuery {
     pub sections: Option<String>,
     /// Notes libres, imprimées dans la section « Notes ».
     pub notes: Option<String>,
-    /// `false` : pas de logo en tête.
-    pub logo: Option<bool>,
+    /// Origine du logo : `auto` (défaut), `client`, `page`, `custom` ou
+    /// `none` ; `true` et `false` (anciennes adresses) valent `auto` et `none`.
+    pub logo: Option<String>,
     /// Périmètre en JSON : `{"targets":[1,2],"groups":["Edge"]}`.
     pub scope: Option<String>,
 }
@@ -385,13 +438,19 @@ impl SlaQuery {
         };
         let sections = Sections::parse_list(self.sections.as_deref().unwrap_or(""))
             .map_err(ApiError::BadRequest)?;
+        let logo = LogoSource::parse(self.logo.as_deref().unwrap_or("")).ok_or_else(|| {
+            ApiError::BadRequest(
+                "The logo must be \"auto\", \"client\", \"page\", \"custom\" or \"none\".".into(),
+            )
+        })?;
         let layout = Layout {
             template,
             paper,
             sections,
             title: title.map(str::to_string),
             notes: self.notes.clone().unwrap_or_default(),
-            show_logo: self.logo.unwrap_or(true),
+            show_logo: true,
+            logo,
         }
         .validate()
         .map_err(ApiError::BadRequest)?;
@@ -571,6 +630,8 @@ pub struct SlaReportView {
     pub generated_at: String,
     pub objective: Option<f64>,
     pub layout: Layout,
+    /// Adresse du logo en tête (relative à `/api`), `None` sans logo.
+    pub logo_url: Option<String>,
     pub availability_known: bool,
     pub fleet_uptime: Option<f64>,
     pub fleet_previous_uptime: Option<f64>,
@@ -652,6 +713,7 @@ fn sla_view(
         generated_at: iso(options.generated),
         objective,
         layout: options.layout.clone(),
+        logo_url: options.logo_url.clone(),
         availability_known: data.availability_known,
         fleet_uptime: data.fleet_uptime,
         fleet_previous_uptime: data.fleet_previous_uptime,

@@ -20,7 +20,7 @@
 		type StatusPage
 	} from '#lib/api/index.js';
 	import { formatDateTime, formatRelative, parseServerDate } from '#lib/format.js';
-	import { Button, Confirm, EmptyState, ErrorNotice, Field, Plate } from '#lib/ui/index.js';
+	import { Button, Confirm, DateTimeField, EmptyState, ErrorNotice, Field, Plate } from '#lib/ui/index.js';
 	import { INCIDENT_STATUS, KIND_LABEL, STATUSES_FOR, isClosed } from './words';
 	import { dateToLocal, localToIso, updatesPayload, validateDates, validateHistory, type DraftUpdate, type HistoryError } from './incident-history';
 
@@ -312,11 +312,11 @@
 			{@const hasEnd = incident.kind === 'maintenance' || closed}
 			<form class="mt-3 grid gap-3 rounded-lg border border-line bg-surface p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-start" onsubmit={(event) => saveDates(event, incident)} novalidate>
 				<Field label={incident.kind === 'maintenance' ? m.status_incidents_starts() : m.status_incidents_started()} for="inc-{incident.id}-start" required>
-					<input id="inc-{incident.id}-start" type="datetime-local" class="input tnum" bind:value={editStart} oninput={() => (editError = null)} max={incident.kind === 'incident' ? nowLocal : undefined} disabled={savingDates} />
+					<DateTimeField id="inc-{incident.id}-start" bind:value={editStart} onchange={() => (editError = null)} max={incident.kind === 'incident' ? nowLocal : undefined} disabled={savingDates} label={incident.kind === 'maintenance' ? m.status_incidents_starts() : m.status_incidents_started()} />
 				</Field>
 				{#if hasEnd}
 					<Field label={incident.kind === 'maintenance' ? m.status_incidents_ends() : m.status_incidents_resolved_on()} for="inc-{incident.id}-end" required>
-						<input id="inc-{incident.id}-end" type="datetime-local" class="input tnum" bind:value={editEnd} oninput={() => (editError = null)} min={editStart || undefined} max={incident.kind === 'incident' ? nowLocal : undefined} disabled={savingDates} />
+						<DateTimeField id="inc-{incident.id}-end" bind:value={editEnd} onchange={() => (editError = null)} min={editStart || undefined} max={incident.kind === 'incident' ? nowLocal : undefined} disabled={savingDates} label={incident.kind === 'maintenance' ? m.status_incidents_ends() : m.status_incidents_resolved_on()} />
 					</Field>
 				{:else}
 					<span></span>
@@ -349,7 +349,7 @@
 				</Button>
 				<div class="sm:col-span-3 sm:max-w-xs">
 					<Field label={m.status_incidents_update_when()} for="inc-{incident.id}-at" help={m.status_incidents_update_when_help()}>
-						<input id="inc-{incident.id}-at" type="datetime-local" class="input tnum" bind:value={updateAt} min={dateToLocal(new Date(incident.starts_at.endsWith('Z') ? incident.starts_at : `${incident.starts_at}Z`))} max={nowLocal} disabled={posting} />
+						<DateTimeField id="inc-{incident.id}-at" bind:value={updateAt} min={dateToLocal(new Date(incident.starts_at.endsWith('Z') ? incident.starts_at : `${incident.starts_at}Z`))} max={nowLocal} disabled={posting} label={m.status_incidents_update_when()} />
 					</Field>
 				</div>
 				{#if updateError}
@@ -397,17 +397,17 @@
 						</select>
 					</Field>
 					<Field label={m.status_incidents_started()} for="inc-new-started" help={m.status_incidents_started_help()}>
-						<input id="inc-new-started" type="datetime-local" class="input tnum" bind:value={startsAt} oninput={() => (historyError = null)} max={nowLocal} disabled={saving} />
+						<DateTimeField id="inc-new-started" bind:value={startsAt} onchange={() => (historyError = null)} max={nowLocal} disabled={saving} label={m.status_incidents_started()} />
 					</Field>
 					<Field label={m.status_incidents_resolved_at()} for="inc-new-resolved" help={m.status_incidents_resolved_help()}>
-						<input id="inc-new-resolved" type="datetime-local" class="input tnum" bind:value={endsAt} oninput={() => (historyError = null)} max={nowLocal} min={startsAt || undefined} disabled={saving} />
+						<DateTimeField id="inc-new-resolved" bind:value={endsAt} onchange={() => (historyError = null)} max={nowLocal} min={startsAt || undefined} disabled={saving} label={m.status_incidents_resolved_at()} clearable />
 					</Field>
 				{:else}
 					<Field label={m.status_incidents_starts()} for="inc-new-starts" error={windowError} required>
-						<input id="inc-new-starts" type="datetime-local" class="input tnum" bind:value={startsAt} oninput={() => (windowError = null)} disabled={saving} />
+						<DateTimeField id="inc-new-starts" bind:value={startsAt} onchange={() => (windowError = null)} disabled={saving} label={m.status_incidents_starts()} />
 					</Field>
 					<Field label={m.status_incidents_ends()} for="inc-new-ends" required>
-						<input id="inc-new-ends" type="datetime-local" class="input tnum" bind:value={endsAt} oninput={() => (windowError = null)} disabled={saving} />
+						<DateTimeField id="inc-new-ends" bind:value={endsAt} onchange={() => (windowError = null)} disabled={saving} label={m.status_incidents_ends()} />
 					</Field>
 				{/if}
 				<Field label={m.status_incidents_shown_on()} for="inc-new-page">
@@ -463,7 +463,7 @@
 								</select>
 							</Field>
 							<Field label={m.status_incidents_update_date()} for="inc-new-h{index}-at">
-								<input id="inc-new-h{index}-at" type="datetime-local" class="input tnum" bind:value={row.at} oninput={() => (historyError = null)} max={nowLocal} disabled={saving} />
+								<DateTimeField id="inc-new-h{index}-at" bind:value={row.at} onchange={() => (historyError = null)} max={nowLocal} disabled={saving} label={m.status_incidents_update_date()} clearable />
 							</Field>
 							<Field label={m.status_incidents_message()} for="inc-new-h{index}-body">
 								<textarea id="inc-new-h{index}-body" class="input min-h-10" rows="2" bind:value={row.body} oninput={() => (historyError = null)} maxlength="4000" disabled={saving}></textarea>

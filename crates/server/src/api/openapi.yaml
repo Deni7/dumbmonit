@@ -4354,7 +4354,7 @@ paths:
           schema: { type: string, example: "summary,chart,monitors,incidents" }
           description: "Comma-separated sections to include, among `summary`, `chart`, `monitors`, `incidents`, `maintenance`, `response_times`, `notes`. Omitted: all of them."
         - { name: notes, in: query, schema: { type: string, maxLength: 2000 }, description: Free text printed in the Notes section. }
-        - { name: logo, in: query, schema: { type: boolean, default: true }, description: "`false` leaves out the logo of the client or status page." }
+        - { name: logo, in: query, schema: { type: string, enum: [auto, client, page, custom, none], default: auto }, description: "Logo at the top: `auto` (the client's, else the status page's), `client`, `page`, `custom` (the logo uploaded for reports, `/api/reports/logo`) or `none`. `true` and `false` are read as `auto` and `none`." }
         - name: scope
           in: query
           schema: { type: string, example: '{"targets":[1,2],"groups":["Edge"]}' }
@@ -4367,6 +4367,53 @@ paths:
             text/csv: { schema: { type: string } }
             application/json: { schema: { $ref: "#/components/schemas/SlaReport" } }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/reports/logo:
+    get:
+      operationId: getReportLogo
+      tags: [Reports]
+      summary: Logo uploaded for SLA reports
+      description: Shown at the top of an SLA report whose layout picks `custom`. Readable by any signed-in account, like the report preview that shows it.
+      x-token-scope: read
+      responses:
+        "200":
+          description: The image.
+          content:
+            image/png: { schema: { type: string, format: binary } }
+            image/jpeg: { schema: { type: string, format: binary } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      operationId: uploadReportLogo
+      tags: [Reports]
+      summary: Set the logo of SLA reports
+      description: Administrators only. A PNG (8-bit, not interlaced) or a JPEG, 256 KiB at most, the images the PDF can embed.
+      x-token-scope: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data: { type: string, description: "The file in base64, with or without a `data:` prefix." }
+      responses:
+        "204": { description: Logo stored. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    delete:
+      operationId: deleteReportLogo
+      tags: [Reports]
+      summary: Remove the logo of SLA reports
+      description: Administrators only. Reports set to `custom` then have no logo.
+      x-token-scope: write
+      responses:
+        "204": { description: Logo removed. }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
@@ -13440,7 +13487,8 @@ components:
             notes: { type: boolean, default: true }
         title: { type: [string, "null"], maxLength: 120, description: Heading under the brand; null is "Availability report". }
         notes: { type: string, maxLength: 2000, default: "" }
-        show_logo: { type: boolean, default: true }
+        show_logo: { type: boolean, default: true, description: "Kept for layouts saved before `logo`; always `logo != none` once saved. `false` wins over `logo`." }
+        logo: { type: string, enum: [auto, client, page, custom, none], default: auto, description: "Where the logo comes from: `auto` (the client's, else the status page's), `client`, `page`, `custom` (`/api/reports/logo`) or `none`." }
     ReportScope:
       type: object
       description: The monitors listed and those of the groups listed (union). Empty is every monitor the report can see.
@@ -13460,6 +13508,7 @@ components:
         generated_at: { type: string, format: date-time }
         objective: { type: [number, "null"] }
         layout: { $ref: "#/components/schemas/ReportLayout" }
+        logo_url: { type: [string, "null"], description: "Address of the logo at the top, relative to `/api`; null without a logo." }
         availability_known: { type: boolean }
         fleet_uptime: { type: [number, "null"] }
         fleet_previous_uptime: { type: [number, "null"] }

@@ -263,3 +263,68 @@ async fn a_schedule_keeps_its_layout_and_scope() {
         .await;
     assert_eq!(too_long.status, StatusCode::BAD_REQUEST);
 }
+
+/// Un JPEG minimal : SOI, APP0, SOF0 (8 bits, 3×2, 3 composantes), EOI.
+fn tiny_jpeg() -> Vec<u8> {
+    let mut bytes = vec![0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x04, 0x00, 0x00];
+    bytes.extend_from_slice(&[0xFF, 0xC0, 0x00, 0x11, 8, 0, 2, 0, 3, 3]);
+    bytes.extend_from_slice(&[1, 0x11, 0, 2, 0x11, 1, 3, 0x11, 1]);
+    bytes.extend_from_slice(&[0xFF, 0xD9]);
+    bytes
+}
+
+#[tokio::test]
+async fn the_report_logo_is_uploaded_and_chosen_by_the_layout() {
+    use base64::Engine as _;
+    let app = TestApp::configured().await;
+    let admin = app.admin_cookie().await;
+    let base = "/api/reports/sla?from=2024-10-01&to=2024-10-31&format=json";
+
+    // Rien de téléversé : `custom` n'a pas de logo, et l'adresse répond 404.
+    let none = app.get(&format!("{base}&logo=custom"), Some(&admin)).await;
+    assert_eq!(none.status, StatusCode::OK, "{}", none.body);
+    assert!(none.body["logo_url"].is_null());
+    assert_eq!(none.body["layout"]["logo"], "custom");
+    let missing = get(&app, "/api/reports/logo", Some(&admin)).await;
+    assert_eq!(missing.status, StatusCode::NOT_FOUND);
+
+    // Le WebP ne s'incorpore pas au PDF : refusé dès le dépôt.
+    let webp = base64::engine::general_purpose::STANDARD.encode(b"RIFF\0\0\0\0WEBPVP8 ");
+    let refused = app.put("/api/reports/logo", json!({ "data": webp }), Some(&admin)).await;
+    assert_eq!(refused.status, StatusCode::BAD_REQUEST, "{}", refused.body);
+
+    let data = format!(
+        "data:image/jpeg;base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(tiny_jpeg())
+    );
+    let viewer = app.viewer_cookie(&admin).await;
+    let denied = app.put("/api/reports/logo", json!({ "data": data }), Some(&viewer)).await;
+    assert_eq!(denied.status, StatusCode::FORBIDDEN, "{}", denied.body);
+    let stored = app.put("/api/reports/logo", json!({ "data": data }), Some(&admin)).await;
+    assert_eq!(stored.status, StatusCode::NO_CONTENT, "{}", stored.body);
+
+    let image = get(&app, "/api/reports/logo", Some(&admin)).await;
+    assert_eq!(image.status, StatusCode::OK);
+    assert_eq!(image.headers[header::CONTENT_TYPE], "image/jpeg");
+    assert_eq!(image.bytes, tiny_jpeg());
+
+    let custom = format!("{base}&logo=custom");
+    let chosen = app.get(&custom, Some(&admin)).await;
+    assert_eq!(chosen.body["logo_url"], "/reports/logo");
+    let pdf_uri = "/api/reports/sla?from=2024-10-01&to=2024-10-31&logo=custom";
+    let pdf = get(&app, pdf_uri, Some(&admin)).await;
+    assert!(String::from_utf8_lossy(&pdf.bytes).contains("/XObject"), "the PDF carries it");
+    // `auto` sans client ni page : pas de logo ; `false` (ancienne adresse) non plus.
+    let automatic = app.get(base, Some(&admin)).await;
+    assert!(automatic.body["logo_url"].is_null());
+    let hidden = app.get(&format!("{base}&logo=false"), Some(&admin)).await;
+    assert_eq!(hidden.body["layout"]["logo"], "none");
+    assert_eq!(hidden.body["layout"]["show_logo"], false);
+    let unknown = app.get(&format!("{base}&logo=svg"), Some(&admin)).await;
+    assert_eq!(unknown.status, StatusCode::BAD_REQUEST);
+
+    let removed = app.delete("/api/reports/logo", Some(&admin)).await;
+    assert_eq!(removed.status, StatusCode::NO_CONTENT);
+    let gone = app.get(&custom, Some(&admin)).await;
+    assert!(gone.body["logo_url"].is_null());
+}

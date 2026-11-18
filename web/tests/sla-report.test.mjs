@@ -8,6 +8,8 @@ import {
 	chartShare,
 	defaultReportLayout,
 	normaliseLayout,
+	scopeIds,
+	scopeOf,
 	sectionsFor,
 	slaParams,
 	slaRequestFrom
@@ -30,7 +32,12 @@ test('an old schedule without a layout reads as the detailed report', () => {
 	assert.equal(partial.sections.chart, false);
 	assert.equal(partial.sections.notes, true);
 	assert.equal(partial.show_logo, true);
+	assert.equal(partial.logo, 'auto');
 	assert.equal(normaliseLayout({ paper: 'tabloid' }).paper, 'a4');
+	// A layout saved before the logo choice: `show_logo: false` means no logo.
+	assert.equal(normaliseLayout({ show_logo: false, logo: 'custom' }).logo, 'none');
+	assert.equal(normaliseLayout({ logo: 'custom' }).logo, 'custom');
+	assert.equal(normaliseLayout({ logo: 'svg' }).logo, 'auto');
 });
 
 test('the layout and the scope travel in the query string', () => {
@@ -53,7 +60,7 @@ test('the layout and the scope travel in the query string', () => {
 	assert.equal(params.get('sections'), 'summary,monitors,incidents,notes');
 	assert.equal(params.get('title'), 'Board pack');
 	assert.equal(params.get('notes'), 'Quiet.');
-	assert.equal(params.get('logo'), 'false');
+	assert.equal(params.get('logo'), 'none');
 	assert.deepEqual(JSON.parse(params.get('scope')), { targets: [3, 7], groups: ['Edge, core'] });
 
 	const back = slaRequestFrom(params);
@@ -67,6 +74,12 @@ test('the layout and the scope travel in the query string', () => {
 	assert.equal(back.layout.sections.maintenance, false);
 	assert.equal(back.layout.title, 'Board pack');
 	assert.equal(back.layout.show_logo, false);
+	assert.equal(back.layout.logo, 'none');
+	// Old addresses said `logo=false`; a chosen source travels by name.
+	assert.equal(slaRequestFrom(new URLSearchParams('logo=false')).layout.logo, 'none');
+	const custom = slaParams({ format: 'pdf', layout: { ...defaultReportLayout(), logo: 'custom' } });
+	assert.equal(custom.get('logo'), 'custom');
+	assert.equal(slaRequestFrom(custom).layout.logo, 'custom');
 	assert.deepEqual(back.scope, { targets: [3, 7], groups: ['Edge, core'] });
 });
 
@@ -96,4 +109,21 @@ test('the chart scale starts below the lowest value and the objective', () => {
 	assert.equal(chartShare(100, 98), 1);
 	assert.equal(chartShare(99, 98), 0.5);
 	assert.equal(chartShare(90, 98), 0, 'below the floor sits on the axis');
+});
+
+test('ticked monitors become the shortest scope', () => {
+	const monitors = [
+		{ id: 1, group: 'Edge' },
+		{ id: 2, group: 'Edge' },
+		{ id: 3, group: 'Core' },
+		{ id: 4, group: 'Ungrouped' }
+	];
+	assert.deepEqual(scopeOf(new Set([1, 2, 3, 4]), monitors), { targets: [], groups: [] }, 'everything is the empty scope');
+	assert.deepEqual(scopeOf(new Set([1, 2, 4]), monitors), { targets: [], groups: ['Edge', 'Ungrouped'] });
+	assert.deepEqual(scopeOf(new Set([2, 3]), monitors), { targets: [2], groups: ['Core'] });
+	assert.equal(scopeOf(new Set(), monitors), null, 'nothing ticked is no scope at all');
+	// And back: a group keeps its monitors, the empty scope keeps them all.
+	assert.deepEqual([...scopeIds({ targets: [2], groups: ['Core'] }, monitors)].sort(), [2, 3]);
+	assert.equal(scopeIds({ targets: [], groups: [] }, monitors).size, 4);
+	assert.equal(scopeIds({ targets: [99], groups: [] }, monitors).size, 0, 'a deleted monitor is not counted');
 });

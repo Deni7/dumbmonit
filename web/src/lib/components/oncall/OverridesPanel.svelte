@@ -14,7 +14,7 @@
 	} from '#lib/api/index.js';
 	import { formatDateTime } from '#lib/format.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
-	import { Button, Confirm, EmptyState, ErrorNotice, Field, Panel, Plate, Skeleton } from '#lib/ui/index.js';
+	import { Button, Confirm, DateTimeField, EmptyState, ErrorNotice, Field, Panel, Plate, Skeleton } from '#lib/ui/index.js';
 	import { fromLocalInput, personName, toLocalInput } from './helpers';
 	import { m } from '#lib/paraglide/messages.js';
 
@@ -158,10 +158,10 @@
 							</select>
 						</Field>
 						<Field label={m.oncall_override_from()} for="ov-from" required>
-							<input id="ov-from" type="datetime-local" class="input tnum" bind:value={starts} />
+							<DateTimeField id="ov-from" bind:value={starts} label={m.oncall_override_from()} />
 						</Field>
 						<Field label={m.oncall_override_to()} for="ov-to" required>
-							<input id="ov-to" type="datetime-local" class="input tnum" bind:value={ends} />
+							<DateTimeField id="ov-to" bind:value={ends} min={starts || null} label={m.oncall_override_to()} />
 						</Field>
 					</div>
 					<Field label={m.oncall_override_note()} for="ov-note">

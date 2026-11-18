@@ -110,6 +110,9 @@ pub async fn collect(pool: &SqlitePool, cipher: &Cipher, options: ExportOptions)
         agent_update_rollout: Some(serde_json::to_value(
             crate::collectors::agent::rollout::load(pool).await?,
         )?),
+        report_logo: crate::reports::logo::stored(pool)
+            .await?
+            .map(|(logo_type, bytes)| BundleReportLogo { logo_type, data: BASE64.encode(bytes) }),
     })
 }
 

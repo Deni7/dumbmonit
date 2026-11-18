@@ -142,6 +142,7 @@ pub async fn restore(
     report.push(restore_silences(&mut tx, bundle, &refs).await?);
     report.push(restore_status_pages(&mut tx, bundle, &refs).await?);
     report.push(restore_report_schedules(&mut tx, bundle, &channels, &refs).await?);
+    report.push(restore_report_logo(&mut tx, bundle).await?);
     report.push(restore_incidents(&mut tx, bundle).await?);
     report.push(restore_agent_tokens(&mut tx, bundle).await?);
     report.push(restore_api_tokens(&mut tx, bundle).await?);
@@ -1212,6 +1213,52 @@ async fn restore_silences(
             }
         }
     }
+    Ok(report)
+}
+
+/// Logo des rapports : remplacé par celui du lot s'il se lit et s'incorpore au
+/// PDF (mêmes contrôles que l'API). Un lot sans logo ne touche à rien.
+async fn restore_report_logo(
+    tx: &mut Transaction<'_, Sqlite>,
+    bundle: &Bundle,
+) -> Result<SectionReport> {
+    use crate::api::status_pages::branding::{MAX_LOGO_BYTES, sniff};
+    let mut report = SectionReport::new("report_logo");
+    let Some(item) = &bundle.report_logo else { return Ok(report) };
+    let decoded = BASE64
+        .decode(item.data.trim())
+        .ok()
+        .filter(|bytes| !bytes.is_empty() && bytes.len() <= MAX_LOGO_BYTES)
+        .filter(|bytes| crate::reports::logo::for_pdf(bytes).is_some())
+        .and_then(|bytes| sniff(&bytes).map(|kind| (kind, bytes)));
+    let Some((kind, bytes)) = decoded else {
+        report.skipped += 1;
+        report.notes.push("The report logo of the backup is not a usable PNG or JPEG".into());
+        return Ok(report);
+    };
+    let existing: Option<(String, Vec<u8>)> =
+        sqlx::query_as("SELECT logo_type, logo FROM report_logo WHERE id = 1")
+            .fetch_optional(&mut **tx)
+            .await
+            .context("lecture du logo des rapports")?;
+    match existing {
+        Some((stored_kind, stored)) if stored_kind == kind && stored == bytes => {
+            report.skipped += 1;
+            return Ok(report);
+        }
+        Some(_) => report.count(RestoreOutcome::Updated),
+        None => report.count(RestoreOutcome::Created),
+    }
+    sqlx::query(
+        "INSERT INTO report_logo (id, logo_type, logo) VALUES (1, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET logo_type = excluded.logo_type, logo = excluded.logo,
+             updated_at = strftime('%Y-%m-%d %H:%M:%S', 'now')",
+    )
+    .bind(kind)
+    .bind(bytes.as_slice())
+    .execute(&mut **tx)
+    .await
+    .context("écriture du logo des rapports")?;
     Ok(report)
 }
 
