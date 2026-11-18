@@ -7,9 +7,9 @@ Settings holds what is administrative: the instance itself, your account, who ca
 | My account | `/settings/account` | Appearance (language), Account & security (change password, sign out, two-factor, passkeys, security log), Push notifications |
 | Team & access | `/settings/team` | Users, Teams, Clients, Single sign-on, SAML, SCIM, LDAP |
 | Monitoring | `/settings/monitoring` | Agents, Integration packs, [Security score](security-score.md), Locations |
-| Notifications | `/settings/notifications` | Channels, Notification policy, quiet hours ([Notification channels](../notifications.md)). On-call schedules are on the Alerts page: [On-call](../alerting/oncall.md) |
+| Notifications | `/settings/notifications` | Channels, Notification policy, quiet hours ([Notification channels](../notifications.md)). Optional on-call schedules (turned on in System) have their tab on the Alerts page: [On-call](../alerting/oncall.md) |
 | Wall display | `/settings/wall` | Wall mode: what it shows, and the way in ([Wall mode](wall.md)) |
-| System | `/settings/system` | Instance name and time zone, the setup wizard ([Interface and setup wizard](product-modes.md)), Backup, Configuration files, DumbMonit itself, HTTPS and encryption, Network ports, Data & retention, Logs, API & assistants, About |
+| System | `/settings/system` | Instance name and time zone, On-call schedules (on/off), the setup wizard ([Interface and setup wizard](product-modes.md)), Backup, Configuration files, DumbMonit itself, HTTPS and encryption, Network ports, Data & retention, Logs, API & assistants, About |
 
 Each section keeps its own anchor: `/settings#agents` forwards to `/settings/monitoring#agents`. The old links (`/alerts#notifications`) forward to the new place too. `/settings/general` forwards to the System tab. Status pages and reports are not in Settings any more: they live on the **Status** page (`/status`), whose **Reports** tab holds the reports; `/reports`, `/settings/status` and `/settings/reports` forward there. The wall's news and widgets are gone: their old links (`#news`, `#widgets`) open the Wall display tab, where **Wall music** (`#music`) is.
 

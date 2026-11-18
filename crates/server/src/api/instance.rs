@@ -46,6 +46,8 @@ pub struct InstancePatch {
     pub language: Option<String>,
     #[serde(default)]
     pub timezone: Option<String>,
+    #[serde(default)]
+    pub oncall_enabled: Option<bool>,
 }
 
 /// La démonstration publique n'a pas d'assistant : son parc est déjà là.
@@ -110,6 +112,9 @@ fn apply(value: &mut InstanceSettings, patch: InstancePatch) -> ApiResult<()> {
             )));
         }
         value.timezone = timezone.to_string();
+    }
+    if let Some(on) = patch.oncall_enabled {
+        value.oncall_enabled = on;
     }
     if let Some(done) = patch.setup_completed {
         // L'assistant peut être relancé depuis les réglages : remettre à faux

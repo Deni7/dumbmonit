@@ -175,6 +175,18 @@ async fn run(state: AppState, config: AlertingConfig) {
     }
 }
 
+/// Écarte les canaux d'astreinte quand la fonction est coupée dans les réglages
+/// d'instance : ils ne reçoivent aucune alerte et n'ouvrent aucune escalade.
+fn retain_active_channels(
+    channels: Vec<notify::ChannelConfig>,
+    oncall_enabled: bool,
+) -> Vec<notify::ChannelConfig> {
+    channels
+        .into_iter()
+        .filter(|channel| oncall_enabled || channel.kind != crate::oncall::CHANNEL_KIND)
+        .collect()
+}
+
 /// Purges périodiques.
 async fn maintenance(pool: &SqlitePool, config: &AlertingConfig, now: DateTime<Utc>) -> Result<()> {
     let history_cutoff = now - TimeDelta::from_std(config.history_retention).unwrap_or_default();
@@ -396,7 +408,12 @@ pub async fn evaluate_once(
     // Politique de notification : ce qui a le droit de parler passe encore par
     // les filtres de canal, les heures calmes, la fenêtre de regroupement et le
     // plafond horaire avant de partir (voir `notify_policy`).
-    let channels = db::alerts::list_channels(pool, cipher).await?;
+    // Astreinte coupée dans les réglages : les canaux d'astreinte ne reçoivent
+    // plus rien, les notifications partent par les autres canaux comme sans elle.
+    // Plannings, politiques et canaux restent en base, simplement inactifs.
+    let oncall_on = crate::instance::load(pool).await.oncall_enabled;
+    let channels =
+        retain_active_channels(db::alerts::list_channels(pool, cipher).await?, oncall_on);
     let channel_clients = clients::owners(pool, clients::Kind::Channel).await?;
     let channel_policies = policy_store::load_channel_policies(pool).await?;
     let lookback = policy_store::lookback(&global, &channel_policies);
@@ -444,7 +461,7 @@ pub async fn evaluate_once(
         public_url: public_url.as_deref(),
         action_key: action_key.as_ref(),
     };
-    if let Err(error) = crate::oncall::runner::tick(&oncall, now).await {
+    if oncall_on && let Err(error) = crate::oncall::runner::tick(&oncall, now).await {
         warn!(?error, "on-call pass failed");
     }
 
@@ -667,6 +684,25 @@ mod tests {
     use super::*;
     use crate::alerting::model::RULE_HOST_DOWN;
     use crate::alerting::source::SeriesPoint;
+
+    #[test]
+    fn on_call_channels_are_left_out_while_the_feature_is_off() {
+        let channel = |id: i64, kind: &str| notify::ChannelConfig {
+            id,
+            name: format!("channel {id}"),
+            kind: kind.to_string(),
+            enabled: true,
+            settings: serde_json::json!({}),
+            secrets: serde_json::json!({}),
+        };
+        let all = || vec![channel(1, "ntfy"), channel(2, crate::oncall::CHANNEL_KIND)];
+
+        let off: Vec<i64> = retain_active_channels(all(), false).iter().map(|c| c.id).collect();
+        assert_eq!(off, vec![1], "the on-call channel must not be planned");
+
+        let on: Vec<i64> = retain_active_channels(all(), true).iter().map(|c| c.id).collect();
+        assert_eq!(on, vec![1, 2]);
+    }
 
     /// Source de métriques déterministe : le cycle complet — SQL compris — se teste
     /// donc sans VictoriaMetrics ni le moindre accès réseau.

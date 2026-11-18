@@ -6,7 +6,7 @@
 	 * Five tabs (the shared `Tabs`, `?tab=` in the URL), the daily ones first:
 	 * Now (the live list, by severity or by monitor, with the maintenance
 	 * windows folded under it), History, Rules, Automation (remediation log,
-	 * runbooks, actions, policies) and On-call. Notification channels and their
+	 * runbooks, actions, policies) and On-call (only while turned on in Settings → System). Notification channels and their
 	 * policy live in Settings → Notifications; the old `#notifications…` links
 	 * forward there, and so do the old `#scheduled`, `#oncall`, `#history` and
 	 * `#rules` anchors, to their tab. Active alerts, monitors and probe states
@@ -36,6 +36,7 @@
 		type CollectorInfo
 	} from '#lib/api/index.js';
 	import { alertsStore } from '#lib/stores/alerts.svelte.js';
+	import { instanceStore } from '#lib/stores/instance.svelte.js';
 	import { PageHeader, Button, Disclosure, ErrorNotice, Plate, Skeleton, Tabs, confetti, type TabItem } from '#lib/ui/index.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import { dismissals } from '#lib/stores/dismissals.svelte.js';
@@ -269,13 +270,23 @@
 	]);
 	const activeWindows = $derived(silences.filter((silence) => silence.active_now).length);
 
+	// On-call schedules are optional (Settings → System): the tab only exists while they are on.
+	const oncallOn = $derived(instanceStore.oncallEnabled);
 	const tabs: TabItem[] = $derived([
 		{ id: 'now', label: m.alerts_page_tab_now(), badge: sky.attention, attention: true },
 		{ id: 'history', label: m.alerts_page_tab_history() },
 		{ id: 'rules', label: m.alerts_page_tab_rules() },
 		{ id: 'automation', label: m.alerts_tab_automation() },
-		{ id: 'oncall', label: m.oncall_tab() }
+		...(oncallOn ? [{ id: 'oncall', label: m.oncall_tab() }] : [])
 	]);
+	// An old link to the tab, once the settings say the feature is off: back to "Now".
+	$effect(() => {
+		if (tab !== 'oncall' || !instanceStore.settingsLoaded || oncallOn) return;
+		void goto(tabUrl('/alerts', 'now', { searchParams: untrack(() => page.url.searchParams) }, {}, 'now'), {
+			replace: true,
+			reset: false
+		});
+	});
 
 	/** The refresh button: the shared lists and this page's own (history, windows). */
 	async function refreshNow() {
@@ -359,7 +370,7 @@
 		{#if id === 'automation'}
 			<AutomationTab />
 		{:else if id === 'oncall'}
-			<OnCallSection />
+			{#if oncallOn}<OnCallSection />{/if}
 		{:else if pageError}
 			<ErrorNotice
 				error={pageError}

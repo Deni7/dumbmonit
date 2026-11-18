@@ -44,6 +44,13 @@ pub struct InstanceSettings {
     /// Fuseau IANA de l'instance (`Europe/Paris`). Vide : UTC.
     #[serde(default)]
     pub timezone: String,
+    /// Astreinte (plannings, qui est de garde, escalades) : fonction activable.
+    /// Coupée par défaut ; la migration 0245 l'active sur une instance qui a
+    /// déjà un planning, une politique d'escalade ou un canal d'astreinte.
+    /// Coupée, les données restent en base mais le moteur d'alerting ne passe
+    /// plus par elles et l'interface les masque.
+    #[serde(default)]
+    pub oncall_enabled: bool,
 }
 
 /// Lit les réglages. Un réglage absent ou illisible rend les valeurs par
@@ -78,6 +85,15 @@ mod tests {
         let value = InstanceSettings::default();
         assert!(!value.setup_completed);
         assert!(value.name.is_empty());
+    }
+
+    #[test]
+    fn on_call_is_off_unless_the_record_says_otherwise() {
+        assert!(!InstanceSettings::default().oncall_enabled);
+        let old: InstanceSettings = serde_json::from_str(r#"{"setup_completed":true}"#).unwrap();
+        assert!(!old.oncall_enabled);
+        let on: InstanceSettings = serde_json::from_str(r#"{"oncall_enabled":true}"#).unwrap();
+        assert!(on.oncall_enabled);
     }
 
     #[test]

@@ -15,6 +15,8 @@
 		type NotificationPolicy
 	} from '#lib/api/index.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
+	import { withoutOnCall } from '#lib/components/oncall/gate.js';
+	import { instanceStore } from '#lib/stores/instance.svelte.js';
 	import { Button, ClickSpark, DocLink, ErrorNotice, Field, Panel, Plate, Skeleton, Toggle } from '#lib/ui/index.js';
 	import { matcherIsEmpty, matcherSentence } from '#lib/components/alerts/helpers.js';
 	import { pad2 } from '#lib/format.js';
@@ -22,7 +24,9 @@
 	import { getLocale } from '#lib/paraglide/runtime.js';
 
 	let policy = $state<NotificationPolicy | null>(null);
-	let channels = $state<Channel[]>([]);
+	let allChannels = $state<Channel[]>([]);
+	// Channels of the on-call kind only show while on-call schedules are on.
+	const channels = $derived(withoutOnCall(allChannels, instanceStore.oncallEnabled));
 	let loading = $state(true);
 	let error = $state<unknown>(null);
 
@@ -32,7 +36,7 @@
 		try {
 			const [current, list] = await Promise.all([getNotificationPolicy(signal), listChannels(signal)]);
 			policy = current;
-			channels = Array.isArray(list) ? list : [];
+			allChannels = Array.isArray(list) ? list : [];
 			batchWindow = current.batch_window_secs;
 			maxPerHour = current.max_per_hour === 0 ? '' : String(current.max_per_hour);
 			flapOn = current.flap_events > 0;

@@ -1,5 +1,12 @@
 # On-call
 
+!!! note "Turn it on first"
+    On-call schedules are optional and off on a new instance. Turn on **On-call schedules** in
+    **Settings → System** to get the On-call tab on the Alerts page and the "DumbMonit on-call"
+    channel type. Turned off again, your schedules, policies and channels are kept but inactive:
+    alerts go out as they would without on-call. An instance that already had a schedule when it
+    was upgraded has the setting turned on.
+
 On-call answers one question: when a critical alert fires at 3 a.m., who gets
 paged, and who is paged next if that person does not react? It is built in,
 free, and needs no extra service. You describe **who** (contacts), **when**

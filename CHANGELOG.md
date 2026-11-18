@@ -17,6 +17,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **On-call schedules are optional.** The On-call tab of Alerts, the "DumbMonit on-call" channel type
+  and the on-call step of the setup wizard are hidden until you turn on **On-call schedules** in
+  Settings › System (for teams that take turns handling alerts at night and on weekends). Turned off,
+  alerts no longer open escalations through on-call channels and go out as they would without
+  on-call; schedules, policies and channels are kept, just inactive. An instance that already has a
+  schedule, an escalation policy or an on-call channel is upgraded with the setting turned on. The
+  setting is part of the backup (`instance` section) and of `GET`/`PUT /api/instance/settings`
+  (`oncall_enabled`).
 - **A plainer overview.** The "health river" gives way to a grid of small tiles, one per monitor
   (state as a shape and a colour, problems first, shrinking from 10 to 500 monitors); what is wrong
   is listed once, under "Needs attention", no longer again beside the tiles. The p95 figure and the

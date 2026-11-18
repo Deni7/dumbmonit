@@ -29,6 +29,7 @@ async fn les_reglages_d_instance_sont_restaures() {
         name: "Acme NOC".into(),
         language: "fr".into(),
         timezone: "Europe/Zurich".into(),
+        oncall_enabled: true,
     };
     instance::save(&source, &chosen).await.unwrap();
 
@@ -43,6 +44,7 @@ async fn les_reglages_d_instance_sont_restaures() {
     let report = restore(&pool, &cipher, &lot, true).await.expect("restauration");
     assert_eq!(counts(&report, "instance"), (1, 0, 0), "{report:#?}");
     assert_eq!(instance::load(&pool).await, chosen);
+    assert!(instance::load(&pool).await.oncall_enabled, "le réglage d'astreinte voyage aussi");
 
     let again = restore(&pool, &cipher, &lot, true).await.expect("seconde restauration");
     assert_eq!(counts(&again, "instance"), (0, 0, 1), "rien ne bouge : {again:#?}");

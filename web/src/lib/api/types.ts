@@ -4116,6 +4116,8 @@ export interface InstanceSettings {
 	language: string;
 	/** IANA time zone; empty means UTC. */
 	timezone: string;
+	/** On-call schedules are turned on. Off by default; schedules are kept while off. */
+	oncall_enabled?: boolean;
 }
 
 /** `PUT /api/instance/settings`: an omitted field keeps its value. */
@@ -4124,6 +4126,7 @@ export interface InstancePatch {
 	name?: string;
 	language?: string;
 	timezone?: string;
+	oncall_enabled?: boolean;
 }
 
 // --- Backup and restore -----------------------------------------------------

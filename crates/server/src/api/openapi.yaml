@@ -12522,6 +12522,7 @@ components:
         name: { type: string, maxLength: 80, description: Empty shows "DumbMonit". }
         language: { type: string, description: "Default interface language (`en`, `fr`, `de`, `es`, `it`, `pt`, `pt-BR`, `ru`, `zh-Hans`); empty follows the browser." }
         timezone: { type: string, description: IANA time zone; empty means UTC. }
+        oncall_enabled: { type: boolean, description: "On-call schedules are turned on. Off by default (`false` also when the field is missing); turned on at upgrade for an instance that already has a schedule, an escalation policy or an on-call channel. Off, the schedules, policies and channels are kept but inactive: the alerting engine no longer starts escalations through on-call channels and the interface hides the feature." }
     InstancePatch:
       type: object
       properties:
@@ -12529,6 +12530,7 @@ components:
         name: { type: string, maxLength: 80 }
         language: { type: string }
         timezone: { type: string }
+        oncall_enabled: { type: boolean }
 
     # ---------------------------------------------------------- équipements
     Target:

@@ -159,6 +159,10 @@ pub async fn run(
     seed_locations(pool).await?;
     seed_silences(pool, targets.as_slice()).await?;
     seed_oncall(pool, &people, &channels, office).await?;
+    // Les plannings de la démonstration doivent se voir : la fonction est activée.
+    let mut instance = crate::instance::load(pool).await;
+    instance.oncall_enabled = true;
+    crate::instance::save(pool, &instance).await?;
     seed_runbooks(pool, office).await?;
     seed_reports(pool, &channels, office).await?;
     seed_vulnerabilities(pool, targets.as_slice()).await?;
