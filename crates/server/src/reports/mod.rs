@@ -6,12 +6,15 @@
 //!   rattrapage rétroactif) — pur.
 //! - [`collect`] : chiffres, depuis VictoriaMetrics et l'historique des alertes.
 //! - [`render`] : courriel HTML et texte.
+//! - [`sla`], [`pdf`], [`layout`] : rapport SLA en PDF (gabarits détaillé et
+//!   synthèse, sections au choix) et en CSV.
 //! - [`store`] : table `report_schedules`.
 //!
 //! Le courriel part par un canal SMTP existant : les réglages du serveur de
 //! messagerie restent ceux des notifications, sans second endroit à tenir.
 
 pub mod collect;
+pub mod layout;
 pub mod logo;
 pub mod pdf;
 pub mod render;
@@ -137,32 +140,42 @@ async fn resolve_channel(
 }
 
 /// Habillage d'un rapport SLA : le client (mode MSP : son nom et son logo),
-/// sinon le nom de la page de statut choisie, à défaut « DumbMonit ».
+/// sinon le nom et le logo de la page de statut choisie, à défaut
+/// « DumbMonit ». Le logo n'est pas lu quand la mise en page l'écarte.
 pub async fn sla_options(
     state: &AppState,
     page_id: Option<i64>,
     client: Option<i64>,
     objective: Option<f64>,
+    layout: layout::Layout,
     now: DateTime<Utc>,
 ) -> sla::Options {
+    let want_logo = layout.show_logo;
     if let Some(client) = client
         && let Ok(found) = clients::refs(&state.pool, Some(std::slice::from_ref(&client))).await
         && let Some(found) = found.into_iter().next()
     {
-        let stored = if found.has_logo {
+        let stored = if found.has_logo && want_logo {
             clients::logo(&state.pool, client).await.ok().flatten()
         } else {
             None
         };
         let logo = stored.and_then(|(_, bytes)| logo::for_pdf(&bytes));
-        return sla::Options { brand: found.name, objective, generated: now, logo };
+        return sla::Options { brand: found.name, objective, generated: now, logo, layout };
     }
-    let brand = match page_id {
+    let page = match page_id {
         Some(id) => db::status_pages::get_page(&state.pool, id).await.ok().flatten(),
         None => None,
+    };
+    let mut logo = None;
+    if want_logo && let Some(page) = &page && page.logo_type.is_some() {
+        let path = crate::api::status_pages::branding::logo_path(state, page.id);
+        if let Ok(bytes) = tokio::fs::read(&path).await {
+            logo = logo::for_pdf(&bytes);
+        }
     }
-    .map_or_else(|| "DumbMonit".to_string(), |page| page.title);
-    sla::Options { brand, objective, generated: now, logo: None }
+    let brand = page.map_or_else(|| "DumbMonit".to_string(), |page| page.title);
+    sla::Options { brand, objective, generated: now, logo, layout }
 }
 
 /// Les fichiers d'un rapport SLA : (nom, type MIME, octets).
@@ -230,7 +243,8 @@ pub async fn deliver(
         // Le mois civil entier qui précède l'envoi, dans le fuseau du calendrier.
         let period = schedule::Period::previous_calendar_month(now, calendar.tz)
             .ok_or("Cannot work out the month to report.".to_string())?;
-        sla_email(state, &stored.name, period, calendar.tz, client, preview, now).await?
+        sla_email(state, &stored.name, period, calendar.tz, client, &stored.scope, preview, now)
+            .await?
     } else {
         let period = schedule::Period::ending_at(now, calendar.frequency);
         let data = collect::collect_period_for(
@@ -252,7 +266,15 @@ pub async fn deliver(
     rendered.subject = rendered.subject.replace(['\r', '\n'], " ");
 
     let attachments = if sla {
-        let options = sla_options(state, stored.page_id, client, stored.objective, now).await;
+        let options = sla_options(
+            state,
+            stored.page_id,
+            client,
+            stored.objective,
+            stored.layout.clone(),
+            now,
+        )
+        .await;
         sla_attachments(&data, calendar.tz, &options, stored.attach_pdf, stored.attach_csv)
     } else {
         Vec::new()
@@ -261,22 +283,24 @@ pub async fn deliver(
 }
 
 /// Données et courriel d'un rapport SLA mensuel (un client, ou toute
-/// l'instance).
+/// l'instance, dans le périmètre choisi).
+#[allow(clippy::too_many_arguments)]
 async fn sla_email(
     state: &AppState,
     name: &str,
     period: schedule::Period,
     tz: chrono_tz::Tz,
     client: Option<i64>,
+    scope: &layout::Scope,
     preview: bool,
     now: DateTime<Utc>,
 ) -> Result<(collect::ReportData, render::Rendered), String> {
-    let data = collect::collect_period_for(state, name, Frequency::Monthly, period, now, client)
-        .await
-        .map_err(|error| {
-            warn!(%error, "report: data collection failed");
-            "Cannot gather the report data.".to_string()
-        })?;
+    let collected =
+        collect::collect_scoped(state, name, Frequency::Monthly, period, now, client, scope).await;
+    let data = collected.map_err(|error| {
+        warn!(%error, "report: data collection failed");
+        "Cannot gather the report data.".to_string()
+    })?;
     let mut rendered = render::render(&data, tz, preview);
     let count = data.incidents.len();
     rendered.subject = format!(
@@ -500,10 +524,12 @@ async fn send_client_report(
     let channel = client_channel(state, client).await?;
     let smtp = Smtp::new(&channel).map_err(|error| error.to_string())?;
     let title = format!("{name} availability report");
+    let scope = layout::Scope::default();
     let (data, mut rendered) =
-        sla_email(state, &title, period, tz, Some(client), false, now).await?;
+        sla_email(state, &title, period, tz, Some(client), &scope, false, now).await?;
     rendered.subject = rendered.subject.replace(['\r', '\n'], " ");
-    let options = sla_options(state, None, Some(client), objective, now).await;
+    let options =
+        sla_options(state, None, Some(client), objective, layout::Layout::default(), now).await;
     let attachments = sla_attachments(&data, tz, &options, true, true);
     send_all(&smtp, contacts, &rendered, &attachments).await
 }
@@ -588,6 +614,8 @@ mod tests {
             attach_csv: true,
             page_id: None,
             objective: None,
+            layout: layout::Layout::default(),
+            scope: layout::Scope::default(),
         }
     }
 

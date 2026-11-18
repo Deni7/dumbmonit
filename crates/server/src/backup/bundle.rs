@@ -631,6 +631,34 @@ pub struct BundleReportSchedule {
     pub recipients: Vec<String>,
     #[serde(default)]
     pub channel: Option<String>,
+    /// `digest` ou `sla` ; absent (lot ancien) : `digest`.
+    #[serde(default = "digest")]
+    pub kind: String,
+    #[serde(default = "yes")]
+    pub attach_pdf: bool,
+    #[serde(default = "yes")]
+    pub attach_csv: bool,
+    /// Page de statut qui habille le rapport SLA, par son adresse (`slug`).
+    #[serde(default)]
+    pub page: Option<String>,
+    #[serde(default)]
+    pub objective: Option<f64>,
+    /// Mise en page du PDF SLA ; absente : le rapport détaillé en A4.
+    #[serde(default)]
+    pub layout: crate::reports::layout::Layout,
+    /// Moniteurs du périmètre, par référence (`kind|address`), comme ailleurs.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scope_targets: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scope_groups: Vec<String>,
+}
+
+fn digest() -> String {
+    "digest".to_string()
+}
+
+fn yes() -> bool {
+    true
 }
 
 fn one() -> u32 {

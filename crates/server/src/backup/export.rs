@@ -65,7 +65,7 @@ pub async fn collect(pool: &SqlitePool, cipher: &Cipher, options: ExportOptions)
         .await?,
         silences: silences(pool, &refs).await?,
         status_pages: status_pages(pool, &refs, &channel_names).await?,
-        report_schedules: report_schedules(pool, &channel_names).await?,
+        report_schedules: report_schedules(pool, &channel_names, &refs).await?,
         incidents: incidents(pool).await?,
         users: users(pool, cipher, options).await?,
         agent_tokens: agent_tokens(pool).await?,
@@ -739,7 +739,15 @@ async fn silences(pool: &SqlitePool, refs: &HashMap<i64, String>) -> Result<Vec<
 async fn report_schedules(
     pool: &SqlitePool,
     channel_names: &HashMap<i64, String>,
+    refs: &HashMap<i64, String>,
 ) -> Result<Vec<BundleReportSchedule>> {
+    let slugs: HashMap<i64, String> =
+        sqlx::query_as::<_, (i64, String)>("SELECT id, slug FROM status_pages")
+            .fetch_all(pool)
+            .await
+            .context("lecture des pages de statut")?
+            .into_iter()
+            .collect();
     Ok(crate::reports::store::list(pool)
         .await?
         .into_iter()
@@ -753,6 +761,20 @@ async fn report_schedules(
             timezone: row.timezone,
             recipients: row.recipients,
             channel: row.channel_id.and_then(|id| channel_names.get(&id).cloned()),
+            kind: row.kind,
+            attach_pdf: row.attach_pdf,
+            attach_csv: row.attach_csv,
+            page: row.page_id.and_then(|id| slugs.get(&id).cloned()),
+            objective: row.objective,
+            layout: row.layout,
+            // Un moniteur supprimé depuis n'a pas de référence : il est oublié.
+            scope_targets: row
+                .scope
+                .targets
+                .iter()
+                .filter_map(|id| refs.get(id).cloned())
+                .collect(),
+            scope_groups: row.scope.groups,
         })
         .collect())
 }
