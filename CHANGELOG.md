@@ -10,10 +10,20 @@ All notable changes to this project are documented here. The format follows
 - **Swiss cross.** A "Made in Switzerland" cross in the side bar next to the name, and one beside the
   name on the sign-in page with a tagline under it: "Monitoring with Swiss precision" (translated in
   the nine languages).
-- **Incidents of the week, first on the overview.** A block above everything else shows how many
-  incidents the last seven days had (an incident starts when an alert fires and ends when it
-  resolves), how long they stayed open, the figures of the week before, one bar per day and the
-  monitor behind the most of them. It replaces the "Alerts, last 7 days" chart.
+- **Incidents of the week, on the overview.** A compact block in the right-hand column, beside
+  "Needs attention", shows how many incidents the last seven days had (an incident starts when an
+  alert fires and ends when it resolves), how long they stayed open, the figures of the week before,
+  one bar per day and the monitor behind the most of them. It replaces the "Alerts, last 7 days"
+  chart.
+- **Coming up, on the overview.** Under the incidents, what is about to become a problem, most
+  urgent first (up to six rows, then "See all"): certificates, domains, secrets, licences and keys
+  that expire, disks the forecast says will be full ("~11 days"), backups that are late or about to
+  be (Proxmox, Proxmox Backup Server, Veeam, Kopia, Duplicati, Synology, TrueNAS, Hetzner, Immich,
+  Plakar, restic and Borg repositories), critical vulnerabilities (one row per monitor, when the CVE
+  feature is on) and a DumbMonit update when one is published. Each row names what and where, one
+  line of context and the date as words ("in 6 days", "3 days ago"). Nothing due: one calm sentence.
+  `GET /api/deadlines?upcoming=true` adds the `disk` and `backup` kinds (and a `value` field: used
+  percent, or days since the last success); without the parameter the answer is unchanged.
 
 ### Changed
 
@@ -25,11 +35,10 @@ All notable changes to this project are documented here. The format follows
   schedule, an escalation policy or an on-call channel is upgraded with the setting turned on. The
   setting is part of the backup (`instance` section) and of `GET`/`PUT /api/instance/settings`
   (`oncall_enabled`).
-- **A plainer overview.** The "health river" gives way to a grid of small tiles, one per monitor
-  (state as a shape and a colour, problems first, shrinking from 10 to 500 monitors); what is wrong
-  is listed once, under "Needs attention", no longer again beside the tiles. The p95 figure and the
-  "Week ahead" line are gone from the overview (the p95 still has its chart; expiry dates stay on
-  Status › Reports and on each monitor).
+- **A plainer overview.** The "health river" and the grid of monitor tiles give way to "Coming up";
+  what is wrong is listed once, under "Needs attention". The p95 figure and the "Week ahead" line are
+  gone from the overview (the p95 still has its chart; expiry dates stay on Status › Reports and on
+  each monitor).
 - **Calmer monitor header.** The monitor page header is a flat surface with one main action (Probe
   now) and a Settings gear. The gear opens a menu: enable or disable, snooze with its durations,
   logs, Delete (apart, in the danger tone) and, at the foot, Settings. This replaces the row of icon

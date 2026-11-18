@@ -917,12 +917,6 @@
 	"console_paused": "已暂停",
 	"console_range": "时间范围",
 	"console_search_placeholder": "搜索或运行命令",
-	"console_status_config": "配置",
-	"console_status_degraded": "降级",
-	"console_status_down": "宕机",
-	"console_status_paused": "已暂停",
-	"console_status_up": "正常",
-	"console_status_waiting": "等待中",
 	"dash_query_hint": "输入时自动补全名称（Ctrl+空格列出）。Ctrl+Enter 运行查询。",
 	"dash_query_suggestions": "建议",
 	"dash_range": "时间范围",
@@ -5478,9 +5472,6 @@
 	"overview_first_test_text": "在渠道里发送一条测试。消息真正发出后，此步骤会变绿。",
 	"overview_first_test_title": "确认能收到消息",
 	"overview_first_title": "最初的五分钟",
-	"overview_fleet_tile_title": "{name}: {status}",
-	"overview_fleet_tiles_label": "所有监控项，故障优先",
-	"overview_fleet_title": "整体健康",
 	"overview_latency_empty": "此时间范围内尚未测得响应时间。",
 	"overview_latency_hint": "所有探测的 p95 和中位数，最近 {range}",
 	"overview_latency_median": "中位数",
@@ -5535,7 +5526,22 @@
 	"overview_page_or_agent": "在某台机器上安装代理",
 	"overview_page_or_relay": "监控远程站点",
 	"overview_page_title": "概览",
-	"overview_fleet_more": [
+	"overview_upcoming_title": "即将到来",
+	"overview_upcoming_empty": "未来 {days} 天内没有到期事项。",
+	"overview_upcoming_error": "无法读取即将到来的事项。",
+	"overview_upcoming_see_all": "查看全部",
+	"overview_upcoming_list_label": "即将到来，最紧急的在前",
+	"overview_upcoming_kind_disk": "磁盘",
+	"overview_upcoming_kind_backup": "备份",
+	"overview_upcoming_kind_vulnerability": "漏洞",
+	"overview_upcoming_kind_update": "更新",
+	"overview_upcoming_t_expires": "{what} 即将到期",
+	"overview_upcoming_t_expired": "{what} 已到期",
+	"overview_upcoming_t_disk": "{what} 将被占满",
+	"overview_upcoming_t_disk_full": "{what} 已满",
+	"overview_upcoming_t_backup": "{what} 的备份将会延迟",
+	"overview_upcoming_t_backup_late": "{what} 的备份已延迟",
+	"overview_upcoming_t_vuln": [
 		{
 			"declarations": [
 				"input count",
@@ -5545,10 +5551,76 @@
 				"countPlural"
 			],
 			"match": {
-				"countPlural=other": "另有 {count} 个监控项"
+				"countPlural=other": "{count} 个严重漏洞"
 			}
 		}
 	],
+	"overview_upcoming_t_update": "DumbMonit {version} 可用",
+	"overview_upcoming_c_expires": "{date} 到期，位于 {monitor}",
+	"overview_upcoming_c_expired": "{date} 已到期，位于 {monitor}",
+	"overview_upcoming_c_disk": "{monitor} 已用 {percent}%",
+	"overview_upcoming_c_backup": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{monitor} 上次成功在 {count} 天前"
+			}
+		}
+	],
+	"overview_upcoming_c_vuln": "位于 {monitor}",
+	"overview_upcoming_c_vuln_exploited": "位于 {monitor}，至少一个正被利用",
+	"overview_upcoming_c_update": "当前运行 {current}",
+	"overview_upcoming_due_in": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 天后"
+			}
+		}
+	],
+	"overview_upcoming_due_about": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "约 {count} 天"
+			}
+		}
+	],
+	"overview_upcoming_due_ago": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 天前"
+			}
+		}
+	],
+	"overview_upcoming_due_today": "今天",
+	"overview_upcoming_due_now": "现在",
+	"overview_upcoming_due_available": "可用",
 	"overview_sky_clear": "晴空万里",
 	"overview_sky_n_advisories": [
 		{

@@ -968,12 +968,6 @@
 	"console_paused": "ПАУЗА",
 	"console_range": "Период",
 	"console_search_placeholder": "Поиск или команда",
-	"console_status_config": "Настройка",
-	"console_status_degraded": "Проблемы",
-	"console_status_down": "Недоступен",
-	"console_status_paused": "Пауза",
-	"console_status_up": "В норме",
-	"console_status_waiting": "Ожидание",
 	"dash_query_hint": "Имена дополняются при вводе (Ctrl+Пробел показывает список). Ctrl+Enter выполняет запрос.",
 	"dash_query_suggestions": "Подсказки",
 	"dash_range": "Период",
@@ -5615,9 +5609,6 @@
 	"overview_first_test_text": "Отправьте тест из канала. Шаг станет зелёным, когда сообщение действительно уйдёт.",
 	"overview_first_test_title": "Проверьте, что сообщение доходит",
 	"overview_first_title": "Ваши первые пять минут",
-	"overview_fleet_tile_title": "{name}: {status}",
-	"overview_fleet_tiles_label": "Все мониторы, сначала проблемные",
-	"overview_fleet_title": "Состояние парка",
 	"overview_latency_empty": "За этот период время ответа ещё не измерялось.",
 	"overview_latency_hint": "p95 и медиана всех проверок за {range}",
 	"overview_latency_median": "Медиана",
@@ -5678,7 +5669,22 @@
 	"overview_page_or_agent": "установить агент на машине",
 	"overview_page_or_relay": "следить за удалённой площадкой",
 	"overview_page_title": "Обзор",
-	"overview_fleet_more": [
+	"overview_upcoming_title": "Скоро",
+	"overview_upcoming_empty": "В ближайшие {days} дн. ничего не наступает.",
+	"overview_upcoming_error": "Не удалось прочитать, что скоро наступит.",
+	"overview_upcoming_see_all": "Показать все",
+	"overview_upcoming_list_label": "Скоро, самое срочное первым",
+	"overview_upcoming_kind_disk": "Диск",
+	"overview_upcoming_kind_backup": "Резервная копия",
+	"overview_upcoming_kind_vulnerability": "Уязвимость",
+	"overview_upcoming_kind_update": "Обновление",
+	"overview_upcoming_t_expires": "{what}: срок истекает",
+	"overview_upcoming_t_expired": "{what}: срок истёк",
+	"overview_upcoming_t_disk": "{what} заполнится",
+	"overview_upcoming_t_disk_full": "{what} заполнен",
+	"overview_upcoming_t_backup": "Копия {what} запоздает",
+	"overview_upcoming_t_backup_late": "Копия {what} запаздывает",
+	"overview_upcoming_t_vuln": [
 		{
 			"declarations": [
 				"input count",
@@ -5688,13 +5694,91 @@
 				"countPlural"
 			],
 			"match": {
-				"countPlural=one": "Ещё {count} монитор",
-				"countPlural=few": "Ещё {count} монитора",
-				"countPlural=many": "Ещё {count} мониторов",
-				"countPlural=other": "Ещё {count} монитора"
+				"countPlural=one": "{count} критическая уязвимость",
+				"countPlural=few": "{count} критические уязвимости",
+				"countPlural=many": "{count} критических уязвимостей",
+				"countPlural=other": "{count} критической уязвимости"
 			}
 		}
 	],
+	"overview_upcoming_t_update": "Доступен DumbMonit {version}",
+	"overview_upcoming_c_expires": "Истекает {date}, монитор {monitor}",
+	"overview_upcoming_c_expired": "Истёк {date}, монитор {monitor}",
+	"overview_upcoming_c_disk": "Занято {percent} %, монитор {monitor}",
+	"overview_upcoming_c_backup": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Последний успех {count} день назад, монитор {monitor}",
+				"countPlural=few": "Последний успех {count} дня назад, монитор {monitor}",
+				"countPlural=many": "Последний успех {count} дней назад, монитор {monitor}",
+				"countPlural=other": "Последний успех {count} дня назад, монитор {monitor}"
+			}
+		}
+	],
+	"overview_upcoming_c_vuln": "Монитор {monitor}",
+	"overview_upcoming_c_vuln_exploited": "Монитор {monitor}, хотя бы одна уже используется злоумышленниками",
+	"overview_upcoming_c_update": "Сейчас установлена {current}",
+	"overview_upcoming_due_in": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "через {count} день",
+				"countPlural=few": "через {count} дня",
+				"countPlural=many": "через {count} дней",
+				"countPlural=other": "через {count} дня"
+			}
+		}
+	],
+	"overview_upcoming_due_about": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "~{count} день",
+				"countPlural=few": "~{count} дня",
+				"countPlural=many": "~{count} дней",
+				"countPlural=other": "~{count} дня"
+			}
+		}
+	],
+	"overview_upcoming_due_ago": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} день назад",
+				"countPlural=few": "{count} дня назад",
+				"countPlural=many": "{count} дней назад",
+				"countPlural=other": "{count} дня назад"
+			}
+		}
+	],
+	"overview_upcoming_due_today": "сегодня",
+	"overview_upcoming_due_now": "сейчас",
+	"overview_upcoming_due_available": "доступно",
 	"overview_sky_clear": "Ясное небо",
 	"overview_sky_n_advisories": [
 		{

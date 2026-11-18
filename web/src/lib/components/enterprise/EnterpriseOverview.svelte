@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { withBase } from '#lib/paths.js';
 	/**
-	 * Overview: the incidents of the week, three figures, then what needs attention
-	 * (only what is broken, with its quick action) beside the fleet health (a tile
-	 * per monitor), then the fleet's response time over the range. The whole fleet
-	 * lives on Monitors. A fresh instance gets the first-run guide (administrators)
+	 * Overview: three figures, then what needs attention (only what is broken, with
+	 * its quick action) beside the incidents of the week and what is coming up
+	 * (expiries, disks, backups, vulnerabilities, update), then the fleet's
+	 * response time over the range. The whole fleet lives on Monitors. A fresh instance gets the first-run guide (administrators)
 	 * or a way in instead.
 	 *
 	 * Monitors, probes and alerts come from the app-wide store (polled every
@@ -23,9 +23,9 @@
 	import NeedsAttention from '#lib/components/overview/NeedsAttention.svelte';
 	import FleetLatency from '#lib/components/overview/FleetLatency.svelte';
 	import AlertTrend from '#lib/components/overview/AlertTrend.svelte';
+	import ComingUp from '#lib/components/overview/ComingUp.svelte';
 	import { fleetStore } from './fleet.svelte.js';
 	import { mean } from './fleet.js';
-	import FleetHealth from './FleetHealth.svelte';
 	import { consoleStatus, type ConsoleStatus } from './status.js';
 
 	// One subscription for the life of the view; the range is followed separately.
@@ -42,13 +42,6 @@
 		alertsStore.targets.map((target) => ({
 			id: target.id,
 			name: target.name,
-			status: consoleStatus(target, alertsStore.probes.get(target.id), alertCounts.get(target.id))
-		}))
-	);
-
-	const healthRows = $derived(
-		alertsStore.targets.map((target) => ({
-			target,
 			status: consoleStatus(target, alertsStore.probes.get(target.id), alertCounts.get(target.id))
 		}))
 	);
@@ -159,8 +152,6 @@
 			{/snippet}
 		</EmptyState>
 	{:else}
-		<AlertTrend />
-
 		<div class="grid grid-cols-2 gap-3 lg:grid-cols-3">
 			{#each kpis as kpi, i (kpi.id)}
 				<div class={`min-w-0 rounded-xl border border-line bg-surface px-4 py-3.5 max-lg:last:col-span-2 sm:px-[18px] sm:py-4 ${animate ? 'rise-in' : ''}`} style={`--rise-delay: ${i * 40}ms`}>
@@ -182,7 +173,10 @@
 
 		<div class="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
 			<NeedsAttention />
-			<FleetHealth rows={healthRows} />
+			<div class="flex min-w-0 flex-col gap-4">
+				<AlertTrend />
+				<ComingUp />
+			</div>
 		</div>
 
 		<FleetLatency />

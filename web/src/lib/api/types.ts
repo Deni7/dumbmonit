@@ -6963,7 +6963,17 @@ export interface TargetRemediation {
 // Expiry dates collected across the instance: domains, certificates,
 // application secrets, products, device keys, licences.
 
-export type DeadlineKind = 'domain' | 'certificate' | 'credential' | 'product' | 'key' | 'license';
+export type DeadlineKind =
+	| 'domain'
+	| 'certificate'
+	| 'credential'
+	| 'product'
+	| 'key'
+	| 'license'
+	/** Only with `upcoming`: full on that date. */
+	| 'disk'
+	/** Only with `upcoming`: late on that date. */
+	| 'backup';
 
 export interface Deadline {
 	target: TargetId;
@@ -6977,6 +6987,8 @@ export interface Deadline {
 	expires_at: string;
 	/** Negative once expired. */
 	days_left: number;
+	/** `disk`: used, in percent; `backup`: age of the last success, in days. */
+	value?: number;
 }
 
 // --- Sentinel mode of an agent (`/api/targets/{id}/agent/sentinel`) ------------

@@ -948,12 +948,6 @@
 	"console_paused": "PAUSED",
 	"console_range": "Time range",
 	"console_search_placeholder": "Search or run a command",
-	"console_status_config": "Config",
-	"console_status_degraded": "Degraded",
-	"console_status_down": "Down",
-	"console_status_paused": "Paused",
-	"console_status_up": "Up",
-	"console_status_waiting": "Waiting",
 	"dash_query_hint": "Names complete as you type (Ctrl+Space to list them). Ctrl+Enter runs the query.",
 	"dash_query_suggestions": "Suggestions",
 	"dash_range": "Time range",
@@ -5533,9 +5527,6 @@
 	"overview_first_test_text": "Send a test from the channel. This step turns green once one really leaves.",
 	"overview_first_test_title": "Check a message arrives",
 	"overview_first_title": "Your first five minutes",
-	"overview_fleet_tile_title": "{name}: {status}",
-	"overview_fleet_tiles_label": "Every monitor, worst first",
-	"overview_fleet_title": "Fleet health",
 	"overview_latency_empty": "No response time measured in this range yet.",
 	"overview_latency_hint": "p95 and median of every probe, last {range}",
 	"overview_latency_median": "Median",
@@ -5592,7 +5583,22 @@
 	"overview_page_or_agent": "install the agent on a machine",
 	"overview_page_or_relay": "watch a remote site",
 	"overview_page_title": "Overview",
-	"overview_fleet_more": [
+	"overview_upcoming_title": "Coming up",
+	"overview_upcoming_empty": "Nothing due in the next {days} days.",
+	"overview_upcoming_error": "Could not read what is coming up.",
+	"overview_upcoming_see_all": "See all",
+	"overview_upcoming_list_label": "Coming up, most urgent first",
+	"overview_upcoming_kind_disk": "Disk",
+	"overview_upcoming_kind_backup": "Backup",
+	"overview_upcoming_kind_vulnerability": "Vulnerability",
+	"overview_upcoming_kind_update": "Update",
+	"overview_upcoming_t_expires": "{what} expires",
+	"overview_upcoming_t_expired": "{what} has expired",
+	"overview_upcoming_t_disk": "{what} will be full",
+	"overview_upcoming_t_disk_full": "{what} is full",
+	"overview_upcoming_t_backup": "{what} backup will be late",
+	"overview_upcoming_t_backup_late": "{what} backup is late",
+	"overview_upcoming_t_vuln": [
 		{
 			"declarations": [
 				"input count",
@@ -5602,11 +5608,81 @@
 				"countPlural"
 			],
 			"match": {
-				"countPlural=one": "{count} more monitor",
-				"countPlural=other": "{count} more monitors"
+				"countPlural=one": "{count} critical vulnerability",
+				"countPlural=other": "{count} critical vulnerabilities"
 			}
 		}
 	],
+	"overview_upcoming_t_update": "DumbMonit {version} is available",
+	"overview_upcoming_c_expires": "Expires {date} on {monitor}",
+	"overview_upcoming_c_expired": "Expired {date} on {monitor}",
+	"overview_upcoming_c_disk": "{percent}% used on {monitor}",
+	"overview_upcoming_c_backup": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Last success {count} day ago on {monitor}",
+				"countPlural=other": "Last success {count} days ago on {monitor}"
+			}
+		}
+	],
+	"overview_upcoming_c_vuln": "On {monitor}",
+	"overview_upcoming_c_vuln_exploited": "On {monitor}, at least one is being exploited",
+	"overview_upcoming_c_update": "You are running {current}",
+	"overview_upcoming_due_in": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "in {count} day",
+				"countPlural=other": "in {count} days"
+			}
+		}
+	],
+	"overview_upcoming_due_about": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "~{count} day",
+				"countPlural=other": "~{count} days"
+			}
+		}
+	],
+	"overview_upcoming_due_ago": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} day ago",
+				"countPlural=other": "{count} days ago"
+			}
+		}
+	],
+	"overview_upcoming_due_today": "today",
+	"overview_upcoming_due_now": "now",
+	"overview_upcoming_due_available": "available",
 	"overview_sky_clear": "Clear skies",
 	"overview_sky_n_advisories": [
 		{

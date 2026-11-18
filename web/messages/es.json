@@ -948,12 +948,6 @@
 	"console_paused": "EN PAUSA",
 	"console_range": "Intervalo de tiempo",
 	"console_search_placeholder": "Buscar o ejecutar un comando",
-	"console_status_config": "Config",
-	"console_status_degraded": "Degradado",
-	"console_status_down": "Caído",
-	"console_status_paused": "En pausa",
-	"console_status_up": "Activo",
-	"console_status_waiting": "En espera",
 	"dash_query_hint": "Los nombres se completan al escribir (Ctrl+Espacio los lista). Ctrl+Intro ejecuta la consulta.",
 	"dash_query_suggestions": "Sugerencias",
 	"dash_range": "Intervalo de tiempo",
@@ -5533,9 +5527,6 @@
 	"overview_first_test_text": "Envía una prueba desde el canal. Este paso se pone en verde cuando sale un mensaje de verdad.",
 	"overview_first_test_title": "Comprueba que llega un mensaje",
 	"overview_first_title": "Tus primeros cinco minutos",
-	"overview_fleet_tile_title": "{name}: {status}",
-	"overview_fleet_tiles_label": "Todos los monitores, los peores primero",
-	"overview_fleet_title": "Salud de la flota",
 	"overview_latency_empty": "Aún no se midió ningún tiempo de respuesta en este periodo.",
 	"overview_latency_hint": "p95 y mediana de todas las sondas, últimas {range}",
 	"overview_latency_median": "Mediana",
@@ -5592,7 +5583,22 @@
 	"overview_page_or_agent": "instalar el agente en una máquina",
 	"overview_page_or_relay": "vigilar un sitio remoto",
 	"overview_page_title": "Resumen",
-	"overview_fleet_more": [
+	"overview_upcoming_title": "Próximamente",
+	"overview_upcoming_empty": "Nada vence en los próximos {days} días.",
+	"overview_upcoming_error": "No se pudo leer lo que se acerca.",
+	"overview_upcoming_see_all": "Ver todo",
+	"overview_upcoming_list_label": "Próximamente, lo más urgente primero",
+	"overview_upcoming_kind_disk": "Disco",
+	"overview_upcoming_kind_backup": "Copia de seguridad",
+	"overview_upcoming_kind_vulnerability": "Vulnerabilidad",
+	"overview_upcoming_kind_update": "Actualización",
+	"overview_upcoming_t_expires": "{what} caduca",
+	"overview_upcoming_t_expired": "{what} ha caducado",
+	"overview_upcoming_t_disk": "{what} se llenará",
+	"overview_upcoming_t_disk_full": "{what} está lleno",
+	"overview_upcoming_t_backup": "La copia {what} se retrasará",
+	"overview_upcoming_t_backup_late": "La copia {what} está retrasada",
+	"overview_upcoming_t_vuln": [
 		{
 			"declarations": [
 				"input count",
@@ -5602,11 +5608,81 @@
 				"countPlural"
 			],
 			"match": {
-				"countPlural=one": "{count} monitor más",
-				"countPlural=other": "{count} monitores más"
+				"countPlural=one": "{count} vulnerabilidad crítica",
+				"countPlural=other": "{count} vulnerabilidades críticas"
 			}
 		}
 	],
+	"overview_upcoming_t_update": "DumbMonit {version} está disponible",
+	"overview_upcoming_c_expires": "Caduca el {date} en {monitor}",
+	"overview_upcoming_c_expired": "Caducó el {date} en {monitor}",
+	"overview_upcoming_c_disk": "{percent} % usado en {monitor}",
+	"overview_upcoming_c_backup": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Último éxito hace {count} día en {monitor}",
+				"countPlural=other": "Último éxito hace {count} días en {monitor}"
+			}
+		}
+	],
+	"overview_upcoming_c_vuln": "En {monitor}",
+	"overview_upcoming_c_vuln_exploited": "En {monitor}, al menos una se está explotando",
+	"overview_upcoming_c_update": "Estás usando {current}",
+	"overview_upcoming_due_in": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "en {count} día",
+				"countPlural=other": "en {count} días"
+			}
+		}
+	],
+	"overview_upcoming_due_about": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "~{count} día",
+				"countPlural=other": "~{count} días"
+			}
+		}
+	],
+	"overview_upcoming_due_ago": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "hace {count} día",
+				"countPlural=other": "hace {count} días"
+			}
+		}
+	],
+	"overview_upcoming_due_today": "hoy",
+	"overview_upcoming_due_now": "ahora",
+	"overview_upcoming_due_available": "disponible",
 	"overview_sky_clear": "Cielo despejado",
 	"overview_sky_n_advisories": [
 		{

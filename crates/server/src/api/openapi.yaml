@@ -8459,7 +8459,10 @@ paths:
         Domains, certificates, application secrets (Entra), products
         (Infomaniak), device keys (Tailscale) and licences, read from the last
         point of each collected expiry series. Already expired items stay for
-        thirty days.
+        thirty days. With `upcoming=true` the list also holds what is about to
+        become a problem without being an expiry date: disks the forecast says
+        will be full within the horizon, and backups that are late or will be
+        within a day (age of the last success past the limit of the integration).
       x-token-scope: read
       parameters:
         - name: target
@@ -8472,6 +8475,11 @@ paths:
           required: false
           description: Horizon in days (default 366, at most 3650).
           schema: { type: number }
+        - name: upcoming
+          in: query
+          required: false
+          description: Add disks that are filling up and late backups (`disk` and `backup` kinds).
+          schema: { type: boolean }
       responses:
         "200":
           description: The deadlines of the monitors the caller can see.
@@ -15433,10 +15441,18 @@ components:
         target_kind: { type: string }
         kind:
           type: string
-          description: "`domain`, `certificate`, `credential`, `product`, `key` or `license`."
+          description: >
+            `domain`, `certificate`, `credential`, `product`, `key` or `license`;
+            with `upcoming=true` also `disk` (full on that date) and `backup`
+            (late on that date).
         what: { type: string, description: The object that expires (host, application, device…). }
         expires_at: { type: string, description: UTC, no suffix. }
         days_left: { type: number, description: Negative once expired. }
+        value:
+          type: number
+          description: >
+            Context of a `disk` (used, in percent) or a `backup` (age of the last
+            success, in days). Absent from the other kinds.
     BlacklistOverview:
       type: object
       additionalProperties: true
