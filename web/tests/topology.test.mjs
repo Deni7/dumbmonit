@@ -172,7 +172,7 @@ test('remote sites become framed islands joined to the main site by a WAN link',
 	);
 	const wan = layout.edges.filter((e) => e.source === 'wan');
 	assert.equal(wan.length, 2);
-	assert.equal(layout.ports.length, 4);
+	assert.equal(layout.ports, undefined, 'no junction circles on the frames');
 	const frames = new Map(layout.frames.map((f) => [f.label, f]));
 	for (const p of layout.nodes) {
 		const frame = frames.get(p.node.site);
@@ -336,15 +336,142 @@ test('by subnet and by folder are separate groupings', () => {
 	assert.equal(layoutMap(buildGraph(nodes, []), { bySubnet: true }).frames.length, 1);
 });
 
-test('a link between two sites runs through the frames edges, not across the nodes', () => {
+test('a link between two sites joins the facing edges of their frames, in one curve', () => {
 	const nodes = [node('t1'), node('t2'), node('t3', { site: 'Cave', kind: 'agent' }), node('t4', { site: 'Cave' })];
 	const layout = layoutMap(buildGraph(nodes, [{ from: 't3', to: 't4', source: 'relay' }, { from: 't1', to: 't4', source: 'backup' }]));
 	const edge = layout.edges.find((e) => e.key === 't1>t4');
 	assert.ok(edge.wan);
-	assert.equal((edge.path.match(/C/g) ?? []).length, 3, 'three smooth curves, through two ports');
+	assert.equal((edge.path.match(/C/g) ?? []).length, 1, 'one smooth curve');
+	const numbers = edge.path.match(/-?\d+(\.\d+)?/g).map(Number);
+	const start = { x: numbers[0], y: numbers[1] };
+	const end = { x: numbers[numbers.length - 2], y: numbers[numbers.length - 1] };
 	const main = layout.frames.find((f) => f.kind === 'main');
 	const cave = layout.frames.find((f) => f.label === 'Cave');
-	const near = (port, x) => Math.abs(port.x - x) < 0.01 || Math.abs(port.y - x) < 0.01;
-	assert.ok(layout.ports.some((p) => near(p, main.x + main.width) || near(p, main.y + main.height)));
-	assert.ok(layout.ports.some((p) => near(p, cave.x) || near(p, cave.y)));
+	const onEdge = (p, f) =>
+		(near(p.x, f.x) || near(p.x, f.x + f.width) || near(p.y, f.y) || near(p.y, f.y + f.height)) &&
+		p.x >= f.x - 0.1 && p.x <= f.x + f.width + 0.1 && p.y >= f.y - 0.1 && p.y <= f.y + f.height + 0.1;
+	assert.ok(onEdge(start, main), 'starts on the edge of the main site');
+	assert.ok(onEdge(end, cave), 'ends on the edge of the remote site');
+	assert.equal(layout.edges.filter((e) => e.source === 'wan').length, 0, 'the real link stands for the WAN link');
+});
+
+function near(a, b) {
+	return Math.abs(a - b) < 0.11;
+}
+
+/** Every straight stretch of a path is horizontal or vertical (curves only at the rounded corners). */
+function orthogonal(path) {
+	let at = null;
+	for (const [, cmd, args] of path.matchAll(/([MLQC])([^MLQC]*)/g)) {
+		const n = args.trim().split(/[ ,]+/).map(Number);
+		const end = { x: n[n.length - 2], y: n[n.length - 1] };
+		if (cmd === 'L' && at && !near(at.x, end.x) && !near(at.y, end.y)) return false;
+		at = end;
+	}
+	return true;
+}
+
+/** Each node inside the frame of its site, under the header. */
+function outsideTheirSite(layout) {
+	const frames = new Map(layout.frames.filter((f) => f.kind === 'main' || f.kind === 'site').map((f) => [f.kind === 'main' ? '' : f.label, f]));
+	if (frames.size === 0) return [];
+	return layout.nodes
+		.filter((p) => {
+			const f = frames.get(p.node.site ?? '');
+			return !(f && p.x - p.r > f.x && p.x + p.r < f.x + f.width && p.y - p.r > f.y + 40 && p.y + p.r < f.y + f.height);
+		})
+		.map((p) => p.node.id);
+}
+
+/** The estate of the screenshot: a site of loose checks, a site with a relay and 16 devices, a small third site. */
+function estate() {
+	const nodes = [];
+	const edges = [];
+	for (let i = 1; i <= 8; i++) nodes.push(node(`t${i}`, { kind: 'http', name: `check-${i}` }));
+	nodes.push(node('t20', { kind: 'opnsense', name: 'fw01', site: 'Crissier' }), node('t21', { kind: 'agent', name: 'dm01', site: 'Crissier' }));
+	edges.push({ from: 't20', to: 't21', source: 'parent' });
+	for (let i = 0; i < 16; i++) {
+		nodes.push(node(`t${30 + i}`, { name: `dev-${String(i).padStart(2, '0')}`, site: 'Crissier' }));
+		edges.push({ from: 't21', to: `t${30 + i}`, source: 'relay' });
+	}
+	// adr03: placed by a link to another site, cabled to a device of its own.
+	nodes.push(node('t50', { name: 'adr03', site: 'Crissier' }), node('t60', { kind: 'opnsense', name: 'fw03', site: 'Uvrier' }), node('t61', { name: 'nas70', site: 'Uvrier' }));
+	edges.push({ from: 't60', to: 't50', source: 'parent' }, { from: 't35', to: 't50', source: 'lldp' }, { from: 't60', to: 't61', source: 'firewall' }, { from: 't20', to: 't60', source: 'lldp' });
+	return { nodes, edges };
+}
+
+test('a hub with 16 children: a compact grid under it, fed by orthogonal buses', () => {
+	const { nodes, edges } = estate();
+	const layout = layoutMap(buildGraph(nodes, edges));
+	const at = new Map(layout.nodes.map((p) => [p.node.id, p]));
+	const hub = at.get('t21');
+	const kids = Array.from({ length: 16 }, (_, i) => at.get(`t${30 + i}`));
+	const rows = new Set(kids.map((k) => k.y));
+	assert.equal(rows.size, 2, 'two rows of eight');
+	assert.ok(kids.every((k) => k.y > hub.y));
+	const xs = kids.map((k) => k.x);
+	// Eight columns of leaves, plus dev-05 beside them: adr03 hangs under it.
+	assert.ok(Math.max(...xs) - Math.min(...xs) < 1000, `${Math.max(...xs) - Math.min(...xs)} wide`);
+	assert.ok(Math.abs(hub.x - (Math.max(...xs) + Math.min(...xs)) / 2) < 61, 'the hub stands over the middle of its children');
+	const crissier = layout.frames.find((f) => f.label === 'Crissier');
+	assert.ok(crissier.width < 1250 && crissier.height < 600, `${crissier.width} x ${crissier.height}`);
+	for (const e of layout.edges.filter((e) => e.from === 't21')) assert.ok(orthogonal(e.path), `${e.key} has a diagonal: ${e.path}`);
+	assert.deepEqual(overlaps(layout), []);
+	assert.deepEqual(outsideTheirSite(layout), []);
+});
+
+test('a node placed from another site hangs under its neighbour in its own site, not alone at the bottom', () => {
+	const { nodes, edges } = estate();
+	const layout = layoutMap(buildGraph(nodes, edges));
+	const at = new Map(layout.nodes.map((p) => [p.node.id, p]));
+	const adr = at.get('t50');
+	const neighbour = at.get('t35');
+	assert.ok(adr.y > neighbour.y && Math.abs(adr.x - neighbour.x) < 1, 'right under the device it is cabled to');
+	assert.ok(orthogonal(layout.edges.find((e) => e.key === 't35>t50').path));
+	const wan = layout.edges.filter((e) => e.wan);
+	assert.ok(wan.length >= 2 && wan.every((e) => (e.path.match(/C/g) ?? []).length === 1));
+});
+
+test('sites flow side by side: no big hole beside a small site', () => {
+	const { nodes, edges } = estate();
+	const layout = layoutMap(buildGraph(nodes, edges));
+	const sites = layout.frames.filter((f) => f.kind === 'main' || f.kind === 'site');
+	assert.equal(sites.length, 3);
+	const used = sites.reduce((sum, f) => sum + f.width * f.height, 0);
+	assert.ok(used / (layout.width * layout.height) > 0.6, `${Math.round((100 * used) / (layout.width * layout.height))} % of the map is sites`);
+	const main = sites.find((f) => f.kind === 'main');
+	// Eight loose checks: a small grid, not one long row.
+	assert.ok(main.width < 600 && main.height < 400, `${main.width} x ${main.height}`);
+	for (let a = 0; a < sites.length; a++)
+		for (let b = a + 1; b < sites.length; b++) {
+			const [p, q] = [sites[a], sites[b]];
+			const apart = p.x + p.width <= q.x || q.x + q.width <= p.x || p.y + p.height <= q.y || q.y + q.height <= p.y;
+			assert.ok(apart, `${p.label} overlaps ${q.label}`);
+		}
+});
+
+test('the layout is deterministic, whatever order the nodes come in', () => {
+	const { nodes, edges } = estate();
+	const positions = (list) =>
+		Object.fromEntries(
+			layoutMap(buildGraph(list, edges), {})
+				.nodes.map((p) => [p.node.id, `${p.x},${p.y}`])
+				.sort(([a], [b]) => a.localeCompare(b))
+		);
+	const once = positions(nodes);
+	assert.deepEqual(positions(nodes), once);
+	assert.deepEqual(positions([...nodes].reverse()), once);
+	const paths = (list) => layoutMap(buildGraph(list, edges)).edges.map((e) => `${e.key} ${e.path}`).sort();
+	assert.deepEqual(paths([...nodes].reverse()), paths(nodes));
+});
+
+test('tree links never cut diagonally, by folder and by subnet too', () => {
+	const { nodes, edges } = estate();
+	for (const options of [{}, { byGroup: true }, { bySubnet: true }]) {
+		const graph = buildGraph(nodes, edges);
+		const layout = layoutMap(graph, options);
+		assert.deepEqual(overlaps(layout), [], JSON.stringify(options));
+		assert.deepEqual(outsideTheirSite(layout), [], JSON.stringify(options));
+		for (const e of layout.edges) if (!e.wan && graph.parent.get(e.to) === e.from && e.path.includes('Q')) assert.ok(orthogonal(e.path), e.key);
+	}
 });
