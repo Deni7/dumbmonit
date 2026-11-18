@@ -39,9 +39,11 @@
 		/** Public names of the monitors listed on the page. */
 		services: string[];
 		disabled?: boolean;
+		/** Without its own panel, in one column: inside a narrow settings column (the page editor). */
+		bare?: boolean;
 	}
 
-	let { idPrefix, seo = $bindable(), name, description, url, logo, services, disabled = false }: Props = $props();
+	let { idPrefix, seo = $bindable(), name, description, url, logo, services, disabled = false, bare = false }: Props = $props();
 
 	const defaults = $derived(seoDefaults({ name, description, url, logo }));
 	const shown = $derived(effectiveSeo(seo, defaults));
@@ -155,7 +157,7 @@
 	const COUNT_OVER = 'text-[0.75rem] tnum text-warning';
 </script>
 
-<Panel title={m.status_seo_section()} description={m.status_seo_section_help()}>
+{#snippet body()}
 	<div class="grid gap-5">
 		<div class="flex items-start justify-between gap-4 rounded-lg border border-line px-4 py-3">
 			<div class="min-w-0">
@@ -165,7 +167,7 @@
 			<Toggle id="{idPrefix}-seo-index" bind:checked={seo.index} {disabled} label={m.status_seo_index()} />
 		</div>
 
-		<div class="grid items-start gap-x-8 gap-y-5 lg:grid-cols-2">
+		<div class={`grid items-start gap-x-8 gap-y-5 ${bare ? '' : 'lg:grid-cols-2'}`}>
 			<div class="grid content-start gap-4">
 				<Field label={m.status_seo_title_label()} for="{idPrefix}-seo-title">
 					<input id="{idPrefix}-seo-title" type="text" class="input" bind:value={seo.title} placeholder={defaults.title} maxlength="120" {disabled} />
@@ -260,4 +262,12 @@
 			</div>
 		</div>
 	</div>
-</Panel>
+{/snippet}
+
+{#if bare}
+	{@render body()}
+{:else}
+	<Panel title={m.status_seo_section()} description={m.status_seo_section_help()}>
+		{@render body()}
+	</Panel>
+{/if}

@@ -2,10 +2,10 @@
 	/**
 	 * Status pages → one page: create it (`/status/new`) or
 	 * edit it (`/status/<id>`).
-	 * One column of full-width sections: the form (page, services, appearance,
-	 * subscribers and domain, with a sticky Save bar), then the ways to show the
-	 * page elsewhere and the subscriber list. This route only loads what they
-	 * need and goes back to the list once saved.
+	 * The editor first (settings on the left, live preview on the right, a
+	 * sticky Save bar), then the ways to show the page elsewhere, maintenance
+	 * and the subscriber list. This route only loads what they need and goes
+	 * back to the list once saved.
 	 */
 	import { m } from '#lib/paraglide/messages.js';
 	import { goto } from '#lib/navigation.js';
@@ -14,7 +14,7 @@
 	import { getStatusPage, listChannels, listTargets, type Channel, type StatusPage, type Target } from '#lib/api/index.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import { Button, ErrorNotice, PageHeader, Plate, Skeleton } from '#lib/ui/index.js';
-	import PageForm from '#lib/components/status/PageForm.svelte';
+	import StatusPageEditor from '#lib/components/status/StatusPageEditor.svelte';
 	import MaintenanceCalendar from '#lib/components/status/MaintenanceCalendar.svelte';
 	import ShareSection from '#lib/components/status/ShareSection.svelte';
 	import SubscribersPanel from '#lib/components/status/SubscribersPanel.svelte';
@@ -99,10 +99,10 @@
 		<Skeleton class="h-48 w-full" />
 	</div>
 {:else}
-	<!-- Full width of the page, one section per idea, top to bottom. -->
+	<!-- The editor, then one section per idea, top to bottom. -->
 	<div class="rise-in grid gap-4">
 		{#key id}
-			<PageForm page={current} {targets} {channels} {onsaved} {oncancel} />
+			<StatusPageEditor page={current} {targets} {channels} {onsaved} {oncancel} />
 		{/key}
 		{#if current}
 			<ShareSection page={current} />

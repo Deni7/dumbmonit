@@ -899,6 +899,11 @@ export function getStatusPage(id: number, signal?: AbortSignal): Promise<StatusP
 	return request<StatusPage>(`/status-pages/${id}`, { signal });
 }
 
+/** The saved page as visitors would read it, published or not, with each service's monitor id (editor preview). */
+export function previewStatusPage(id: number, signal?: AbortSignal): Promise<PublicStatus> {
+	return request<PublicStatus>(`/status-pages/${id}/preview`, { signal });
+}
+
 export function createStatusPage(payload: StatusPagePayload): Promise<StatusPage> {
 	return request<StatusPage>('/status-pages', { method: 'POST', body: payload });
 }
