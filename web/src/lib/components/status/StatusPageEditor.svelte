@@ -21,6 +21,7 @@
 	import {
 		createStatusPage,
 		deleteStatusPageLogo,
+		getMailServer,
 		previewStatusPage,
 		setStatusPageAccess,
 		setStatusPageItems,
@@ -29,6 +30,7 @@
 		updateStatusPage,
 		uploadStatusPageLogo,
 		type Channel,
+		type MailServer,
 		type PublicStatus,
 		type StatusPage,
 		type StatusPageAccess,
@@ -49,6 +51,7 @@
 	import { effectiveSeo, pageUrl, seoDefaults } from './seo';
 	import { PERIOD_CHOICES } from './period';
 	import { buildPreview } from './preview';
+	import { emailSubscription } from '../settings/mailServer';
 	import {
 		addGroup,
 		addItem,
@@ -73,7 +76,7 @@
 		/** `null` creates a page. */
 		page: StatusPage | null;
 		targets: Target[];
-		/** Notification channels; the SMTP ones can mail subscribers. */
+		/** Notification channels; an SMTP one can mail subscribers instead of the email server. */
 		channels?: Channel[];
 		onsaved: (page: StatusPage) => void;
 		oncancel: () => void;
@@ -104,6 +107,9 @@
 	let hideBranding = $state(initial?.hide_branding ?? false);
 	let footerText = $state(initial?.footer_text ?? '');
 	let homepageUrl = $state(initial?.homepage_url ?? '');
+	// Email subscriptions: a switch; the emails go through the email server of
+	// the instance, or through an SMTP channel when one is chosen.
+	let subscribeEmail = $state(initial?.subscribe_email ?? (initial?.subscribe_channel_id ?? null) !== null);
 	let subscribeChannel = $state<number | null>(initial?.subscribe_channel_id ?? null);
 	let domain = $state(initial?.domain ?? '');
 	let seo = $state<StatusPageSeo>({
@@ -127,6 +133,18 @@
 		Object.fromEntries((initial?.group_labels ?? []).map((entry) => [entry.target_id, entry.label]))
 	);
 	const smtpChannels = $derived(channels.filter((channel) => channel.kind === 'smtp'));
+	const chosenChannel = $derived(smtpChannels.find((channel) => channel.id === subscribeChannel) ?? null);
+
+	// Whether the email server is set, to say so under the switch. Unreadable: say nothing.
+	let mailServer = $state<MailServer | null>(null);
+	$effect(() => {
+		const controller = new AbortController();
+		getMailServer(controller.signal)
+			.then((loaded) => (mailServer = loaded))
+			.catch(() => (mailServer = null));
+		return () => controller.abort();
+	});
+	const emailState = $derived(emailSubscription(subscribeEmail, subscribeChannel, mailServer));
 
 	// Logo: what is stored, and what Save will do to it.
 	const MAX_LOGO_BYTES = 256 * 1024;
@@ -357,7 +375,7 @@
 				footerText,
 				homepageUrl: /^https?:\/\/[^\s/]+/i.test(homepageUrl.trim()) ? homepageUrl : '',
 				logoUrl: previewLogo,
-				subscribeEmail: subscribeChannel !== null,
+				subscribeEmail: emailState !== 'off' && emailState !== 'missing',
 				hideBranding,
 				groups: structure,
 				folders,
@@ -394,6 +412,7 @@
 			hideBranding,
 			footerText,
 			homepageUrl,
+			subscribeEmail,
 			subscribeChannel,
 			domain,
 			seo,
@@ -501,6 +520,7 @@
 				hide_branding: hideBranding,
 				footer_text: footerText.trim(),
 				homepage_url: homepageUrl.trim(),
+				subscribe_email: subscribeEmail,
 				subscribe_channel_id: subscribeChannel,
 				domain: host === '' ? null : host,
 				seo,
@@ -923,24 +943,46 @@
 			<Disclosure title={m.status_form_section_connect()} bind:open={openConnect}>
 				<fieldset class="grid gap-4" disabled={saving}>
 					<legend class="sr-only">{m.status_form_section_connect()}</legend>
-					<Field
-						label={m.status_form_subscribers()}
-						for="{idPrefix}-subscribe"
-						help={smtpChannels.length === 0 ? m.status_form_subscribers_no_channel() : m.status_form_subscribers_help()}
-					>
-						<select
-							id="{idPrefix}-subscribe"
-							class="input"
-							value={subscribeChannel === null ? '' : String(subscribeChannel)}
-							onchange={(event) => (subscribeChannel = event.currentTarget.value === '' ? null : Number(event.currentTarget.value))}
-							disabled={smtpChannels.length === 0 && subscribeChannel === null}
-						>
-							<option value="">{m.status_form_subscribers_off()}</option>
-							{#each smtpChannels as channel (channel.id)}
-								<option value={String(channel.id)}>{channel.enabled ? m.status_form_subscribers_via({ name: channel.name }) : m.status_form_subscribers_via_disabled({ name: channel.name })}</option>
-							{/each}
-						</select>
-					</Field>
+					<div class="grid gap-3">
+						<div class="flex min-h-12 items-start justify-between gap-4">
+							<div class="min-w-0">
+								<label for="{idPrefix}-subscribe" class="block text-sm text-ink">{m.status_form_subscribe_email()}</label>
+								<p class={HELP}>{m.status_form_subscribers_help()}</p>
+							</div>
+							<Toggle id="{idPrefix}-subscribe" bind:checked={subscribeEmail} disabled={saving} label={m.status_form_subscribe_email()} />
+						</div>
+						{#if emailState === 'missing'}
+							<div class="flex flex-wrap items-start gap-2 rounded-[var(--radius-card)] border border-warning/35 bg-surface p-3 text-sm text-ink-2" role="note">
+								<Plate tone="warning" label={m.status_form_subscribe_no_server_plate()} />
+								<p class="min-w-0 flex-1">
+									{m.status_form_subscribe_no_server()}
+									<a class="inline-flex min-h-10 items-center font-semibold text-ink underline decoration-line underline-offset-4 hover:decoration-ink" href={withBase('/settings/notifications#email-server')}>{m.status_form_subscribe_server_link_setup()}</a>
+								</p>
+							</div>
+						{:else if emailState === 'server' && mailServer}
+							<p class={HELP}>
+								{m.status_form_subscribe_via_server({ from: mailServer.from_address })}
+								<a class="inline-flex min-h-10 items-center font-semibold text-ink underline decoration-line underline-offset-4 hover:decoration-ink" href={withBase('/settings/notifications#email-server')}>{m.status_form_subscribe_server_link()}</a>
+							</p>
+						{:else if emailState === 'channel' && chosenChannel && !chosenChannel.enabled}
+							<p class="text-[0.8125rem] text-warning-ink">{m.status_form_subscribe_channel_disabled({ name: chosenChannel.name })}</p>
+						{/if}
+						{#if subscribeEmail && (smtpChannels.length > 0 || subscribeChannel !== null)}
+							<Field label={m.status_form_subscribe_send_with()} for="{idPrefix}-subscribe-channel" help={m.status_form_subscribe_send_with_help()}>
+								<select
+									id="{idPrefix}-subscribe-channel"
+									class="input"
+									value={subscribeChannel === null ? '' : String(subscribeChannel)}
+									onchange={(event) => (subscribeChannel = event.currentTarget.value === '' ? null : Number(event.currentTarget.value))}
+								>
+									<option value="">{m.status_form_subscribe_send_with_server()}</option>
+									{#each smtpChannels as channel (channel.id)}
+										<option value={String(channel.id)}>{channel.enabled ? m.status_form_subscribers_via({ name: channel.name }) : m.status_form_subscribers_via_disabled({ name: channel.name })}</option>
+									{/each}
+								</select>
+							</Field>
+						{/if}
+					</div>
 					<DomainField
 						id="{idPrefix}-domain"
 						bind:value={domain}
