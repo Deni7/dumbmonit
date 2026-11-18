@@ -1,7 +1,6 @@
 <script lang="ts">
 	/**
-	 * Status › Reports: the availability (SLA) export of a period, the
-	 * scheduled reports and the history of their sends in one place.
+	 * Status › Reports: the scheduled reports and the history of their sends in one place.
 	 * Administrators only (the API refuses everyone else, reading included).
 	 * The deadlines timeline below is readable by everyone.
 	 */

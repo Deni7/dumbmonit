@@ -22,7 +22,7 @@
 	import { attentionRows } from './attention.js';
 
 	/** Rows shown on a larger screen; phones stop at five (CSS). */
-	const LIMIT = 8;
+	const LIMIT = 6;
 	const PHONE_LIMIT = 5;
 
 	let rules = $state<AlertRule[]>([]);

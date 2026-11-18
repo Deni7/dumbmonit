@@ -8,7 +8,7 @@
 	 * Each row: the kind, what and where, one line of context, when. The date
 	 * is a word ("in 6 days", "3 days ago"); its colour only backs it up.
 	 */
-	import { ArrowRight } from 'lucide-svelte';
+	import { ArrowRight, CalendarCheck } from 'lucide-svelte';
 	import { listCves } from '#lib/api/cves.js';
 	import { listDeadlines } from '#lib/api/deadlines.js';
 	import { getUpdate } from '#lib/api/update.js';
@@ -143,6 +143,20 @@
 	};
 </script>
 
+{#if deadlines === null && !failed}
+	<!-- Reading: a line the height of the quiet state, so nothing jumps. -->
+	<section class="flex h-6 min-w-0 items-center px-1" aria-labelledby="upcoming-title">
+		<h2 id="upcoming-title" class="sr-only">{m.overview_upcoming_title()}</h2>
+		<Skeleton class="h-4 w-56 max-w-full" />
+	</section>
+{:else if !failed && rows.length === 0}
+	<!-- Nothing due: one quiet line, no card, so the room goes to the incidents. -->
+	<section class="state-in flex min-w-0 items-center gap-2 px-1 text-sm text-ink-2" aria-labelledby="upcoming-title">
+		<CalendarCheck class="size-4 shrink-0 text-ink-3" aria-hidden="true" />
+		<h2 id="upcoming-title" class="m-0 shrink-0 text-sm font-medium text-ink">{m.overview_upcoming_title()}</h2>
+		<p class="m-0 min-w-0 truncate">{m.overview_upcoming_empty({ days: HORIZON_DAYS })}</p>
+	</section>
+{:else}
 <section class="flex min-w-0 flex-col overflow-hidden rounded-xl border border-line bg-surface" aria-labelledby="upcoming-title">
 	<div class="flex items-baseline gap-x-2.5 px-4 pt-3.5 pb-3">
 		<h2 id="upcoming-title" class="m-0 text-base font-semibold text-ink">{m.overview_upcoming_title()}</h2>
@@ -155,10 +169,6 @@
 
 	{#if failed}
 		<p class="m-0 border-t border-line px-4 py-3 text-sm text-ink-2" role="alert">{m.overview_upcoming_error()}</p>
-	{:else if deadlines === null}
-		<div class="border-t border-line px-4 py-3"><Skeleton class="h-16 w-full" /></div>
-	{:else if rows.length === 0}
-		<p class="state-in m-0 border-t border-line px-4 py-4 text-sm text-ink-2">{m.overview_upcoming_empty({ days: HORIZON_DAYS })}</p>
 	{:else}
 		<ul class="m-0 list-none p-0" aria-label={m.overview_upcoming_list_label()}>
 			{#each shown as row (row.key)}
@@ -176,3 +186,4 @@
 		</ul>
 	{/if}
 </section>
+{/if}

@@ -25,8 +25,9 @@ All notable changes to this project are documented here. The format follows
   subscriptions are unchanged. Scheduled reports also fall back on the email server when no email
   channel is enabled.
 
-- **A page for the availability (SLA) report.** Status › Reports › Open the report leads to
-  `/reports/sla`: the period, the monitors, the template (Summary or Detailed) and the options on the
+- **A page for the availability (SLA) report.** **SLA** has its own entry in the main navigation
+  (administrators), at `/sla` (`/reports/sla` forwards, query included), and left Status › Reports,
+  which keeps only the scheduled reports (the SLA ones too) and their history: the period, the monitors, the template (Summary or Detailed) and the options on the
   left, the report itself on the right, rebuilt a moment after each change, and Print, Download PDF,
   CSV and Schedule at the top. The options stay in the address, so a report can be linked; Schedule
   opens a new scheduled SLA report prefilled with them. Also in the command palette.
@@ -46,21 +47,22 @@ All notable changes to this project are documented here. The format follows
   Home/End, Escape), month and day names in the interface language, the week starting where the
   language says, 40px targets. The SLA period has shortcuts: last 7 or 30 days, this month, last
   month, last quarter. Values sent to the API are unchanged.
-- **Swiss cross.** A "Made in Switzerland" cross in the side bar next to the name, and one beside the
-  name on the sign-in page with a tagline under it: "Monitoring with Swiss precision" (translated in
+- **Swiss cross.** A "Made in Switzerland" cross always in sight: in the top bar of every page (phones
+  included), in the side bar folded or unfolded, and beside the name on the sign-in page with a tagline under it: "Monitoring with Swiss precision" (translated in
   the nine languages).
 - **Incidents of the week, on the overview.** A compact block in the right-hand column, beside
   "Needs attention", shows how many incidents the last seven days had (an incident starts when an
   alert fires and ends when it resolves), how long they stayed open, the figures of the week before,
-  one bar per day and the monitor behind the most of them. It replaces the "Alerts, last 7 days"
-  chart.
+  one bar per day (heights relative to a floor of four, so one incident is not a huge bar) and the
+  monitor behind the most of them; long durations read "32 d 7 h". It fills the height of
+  "Needs attention" (six rows, then "See all"). It replaces the "Alerts, last 7 days" chart.
 - **Coming up, on the overview.** Under the incidents, what is about to become a problem, most
   urgent first (up to six rows, then "See all"): certificates, domains, secrets, licences and keys
   that expire, disks the forecast says will be full ("~11 days"), backups that are late or about to
   be (Proxmox, Proxmox Backup Server, Veeam, Kopia, Duplicati, Synology, TrueNAS, Hetzner, Immich,
   Plakar, restic and Borg repositories), critical vulnerabilities (one row per monitor, when the CVE
   feature is on) and a DumbMonit update when one is published. Each row names what and where, one
-  line of context and the date as words ("in 6 days", "3 days ago"). Nothing due: one calm sentence.
+  line of context and the date as words ("in 6 days", "3 days ago"). Nothing due: one quiet line, no card.
   `GET /api/deadlines?upcoming=true` adds the `disk` and `backup` kinds (and a `value` field: used
   percent, or days since the last success); without the parameter the answer is unchanged.
 
@@ -118,8 +120,8 @@ All notable changes to this project are documented here. The format follows
   gone from the overview (the p95 still has its chart; expiry dates stay on Status › Reports and on
   each monitor).
 - **Calmer monitor header.** The monitor page header is a flat surface with one main action (Probe
-  now) and a Settings gear. The gear opens a menu: enable or disable, snooze with its durations,
-  logs, Delete (apart, in the danger tone) and, at the foot, Settings. This replaces the row of icon
+  now) and a Settings gear. The gear opens a menu, every entry with an icon: snooze with its durations,
+  enable or disable, logs, then Settings, then Delete (apart, in the danger tone). This replaces the row of icon
   buttons, the "..." menu and the strip under the name. The security badge no longer shows in grey
   when a monitor has no security grade. Rules ignored on a monitor are no longer listed under its
   alerts.

@@ -171,10 +171,10 @@
 			<ErrorNotice error={fleetStore.error} />
 		{/if}
 
-		<div class="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+		<div class="grid items-stretch gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
 			<NeedsAttention />
-			<div class="flex min-w-0 flex-col gap-4">
-				<AlertTrend />
+			<div class="flex min-w-0 flex-col gap-3">
+				<div class="flex min-h-0 flex-1 flex-col [&>section]:flex-1"><AlertTrend /></div>
 				<ComingUp />
 			</div>
 		</div>

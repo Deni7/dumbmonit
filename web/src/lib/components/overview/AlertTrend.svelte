@@ -18,7 +18,18 @@
 	const DAYS = 7;
 
 	const week = $derived(incidentWeek(fleetStore.history, Date.now(), DAYS));
-	const peak = $derived(Math.max(1, ...week.days.map((day) => day.count)));
+	// A floor of four: a day with one incident stays a short bar instead of filling the chart.
+	const peak = $derived(Math.max(4, ...week.days.map((day) => day.count)));
+
+	/** "32 d 7 h" from two days up; shorter spans keep the usual one-figure form. */
+	function span(seconds: number): string {
+		if (seconds < 2 * 86400) return formatDuration(seconds);
+		const days = Math.floor(seconds / 86400);
+		const hours = Math.round((seconds - days * 86400) / 3600);
+		return hours === 0 || hours === 24
+			? m.misc_dur_d({ n: hours === 24 ? days + 1 : days })
+			: `${m.misc_dur_d({ n: days })} ${m.misc_dur_h({ n: hours })}`;
+	}
 	const noisiest = $derived(
 		week.noisiest && week.noisiest.count >= 2
 			? { ...week.noisiest, name: alertsStore.targets.find((t) => t.id === week.noisiest?.target)?.name ?? null }
@@ -27,25 +38,25 @@
 	const weekday = (day: number) => new Date(day * 1000).toLocaleDateString(undefined, { weekday: 'short' });
 </script>
 
-<section class="min-w-0 rounded-xl border border-line bg-surface px-4 pt-3.5 pb-4" aria-labelledby="incidents-title">
+<section class="flex min-w-0 flex-col rounded-xl border border-line bg-surface px-4 pt-3.5 pb-4" aria-labelledby="incidents-title">
 	<h2 id="incidents-title" class="m-0 text-base font-semibold text-ink">{m.overview_incidents_title({ days: DAYS })}</h2>
 	<p class="m-0 mt-0.5 text-sm text-ink-2">{m.overview_incidents_explain()}</p>
 
 	{#if fleetStore.loading && fleetStore.history.length === 0}
-		<Skeleton class="mt-3 h-24 w-full" />
+		<Skeleton class="mt-3 h-28 w-full" />
 	{:else if week.count === 0}
 		<p class="m-0 mt-3 text-sm font-medium text-signal-ink">{m.overview_incidents_none({ days: DAYS })}</p>
 	{:else}
-		<dl class="m-0 mt-3 grid grid-cols-2 gap-x-6 gap-y-3">
+		<dl class="m-0 mt-3 grid grid-cols-2 gap-x-6 gap-y-2.5">
 			<div class="min-w-0">
 				<dt class="text-sm text-ink-2">{m.overview_incidents_count_label()}</dt>
-				<dd class="m-0 mt-1 font-mono text-2xl leading-none font-medium tracking-[-0.03em] text-ink tabular-nums">{week.count}</dd>
+				<dd class="m-0 mt-1 font-mono text-xl leading-none font-medium tracking-[-0.03em] text-ink tabular-nums">{week.count}</dd>
 				<dd class="m-0 mt-1 text-xs text-ink-2">{m.overview_incidents_before({ value: String(week.previousCount) })}</dd>
 			</div>
 			<div class="min-w-0">
 				<dt class="text-sm text-ink-2">{m.overview_incidents_open_label()}</dt>
-				<dd class="m-0 mt-1 font-mono text-2xl leading-none font-medium tracking-[-0.03em] text-ink tabular-nums">{formatDuration(week.seconds)}</dd>
-				<dd class="m-0 mt-1 text-xs text-ink-2">{m.overview_incidents_before({ value: formatDuration(week.previousSeconds) })}</dd>
+				<dd class="m-0 mt-1 font-mono text-xl leading-none font-medium tracking-[-0.03em] text-ink tabular-nums">{span(week.seconds)}</dd>
+				<dd class="m-0 mt-1 text-xs text-ink-2">{m.overview_incidents_before({ value: span(week.previousSeconds) })}</dd>
 			</div>
 			{#if noisiest?.name}
 				<div class="col-span-2 min-w-0">
@@ -58,15 +69,15 @@
 			{/if}
 		</dl>
 
-		<ul class="m-0 mt-3 grid h-24 min-w-0 list-none grid-cols-7 gap-1.5 p-0 sm:gap-2" aria-label={m.overview_incidents_bars_label()}>
+		<ul class="m-0 mt-3 grid h-28 min-h-28 max-h-64 min-w-0 flex-1 list-none grid-cols-7 gap-1.5 p-0 sm:gap-2" aria-label={m.overview_incidents_bars_label()}>
 			{#each week.days as day, i (day.day)}
-				{@const title = m.overview_incidents_day_title({ day: weekday(day.day), count: day.count, duration: formatDuration(day.seconds) })}
+				{@const title = m.overview_incidents_day_title({ day: weekday(day.day), count: day.count, duration: span(day.seconds) })}
 				<li class="flex min-w-0 flex-col items-center justify-end gap-1" {title} aria-label={title}>
 					<span class="font-mono text-xs text-ink-2 tabular-nums" aria-hidden="true">{day.count}</span>
 					<span class="flex min-h-0 w-full flex-1 items-end" aria-hidden="true">
 						<span
 							class={`block w-full rounded-sm ${day.count === 0 ? 'bg-line-strong' : i === week.days.length - 1 ? 'bg-warning' : 'bg-warning/55'}`}
-							style={`height: ${day.count === 0 ? 2 : Math.max(6, Math.round((day.count / peak) * 100))}%`}
+							style={`height: ${day.count === 0 ? 2 : Math.max(8, Math.round((day.count / peak) * 100))}%`}
 						></span>
 					</span>
 					<span class={`text-xs ${i === week.days.length - 1 ? 'font-semibold text-ink' : 'text-ink-2'}`} aria-hidden="true">{weekday(day.day)}</span>

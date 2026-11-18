@@ -1,5 +1,5 @@
 /**
- * The destinations of the shell: five, the same on the rail and on the
+ * The destinations of the shell: five (six for an administrator, with SLA), the same on the rail and on the
  * phone's tab bar (the rail sets the `foot` ones apart, in its bottom group;
  * the tab bar keeps the order below). What used to be a page of its own now
  * lives in a tab of one of them (Map, Logs, Security under Monitors;
@@ -8,7 +8,7 @@
  * is one line here.
  */
 import type { Icon as LucideIcon } from 'lucide-svelte';
-import { Activity, Bell, Building2, Globe, House, Settings } from 'lucide-svelte';
+import { Activity, Bell, Building2, FileCheck, Globe, House, Settings } from 'lucide-svelte';
 import { m } from '#lib/paraglide/messages.js';
 import { auth } from '#lib/stores/auth.svelte.js';
 
@@ -39,6 +39,7 @@ export const NAV: NavEntry[] = [
 	{ href: '/targets', label: () => m.misc_nav_devices(), icon: Activity, also: ['/map', '/logs', '/security'], tour: 'nav-devices' },
 	{ href: '/alerts', label: () => m.misc_nav_alerts(), icon: Bell, badge: true, also: ['/actions', '/runbooks'], tour: 'nav-alerts' },
 	{ href: '/status', label: () => m.shell_nav_status(), icon: Globe, also: ['/reports'] },
+	{ href: '/sla', label: () => m.shell_nav_sla(), icon: FileCheck, admin: true, unscoped: true },
 	{ href: '/settings', label: () => m.misc_nav_settings(), icon: Settings, tour: 'nav-settings', foot: true }
 ];
 

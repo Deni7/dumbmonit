@@ -1,11 +1,10 @@
 <script lang="ts">
 	import { withBase } from '#lib/paths.js';
 	/**
-	 * The Reports page: the way to the availability (SLA) report page, the
-	 * scheduled reports (periodic emails for the team — mostly one, weekly by
+	 * The Reports page: the scheduled reports (periodic emails for the team — mostly one, weekly by
 	 * default, though a few may coexist, for instance a daily one for the
 	 * on-call and a monthly one for management) and the history of their
-	 * sends. Settings used to hold the last two; `/settings/reports` forwards
+	 * sends (the SLA ones included: the report itself is the SLA page, `/sla`). Settings used to hold the last two; `/settings/reports` forwards
 	 * here. `?schedule=sla&…` (the SLA page's "Schedule") opens a new SLA
 	 * report prefilled with the options in the address.
 	 */
@@ -13,7 +12,7 @@
 	import { page } from '$app/state';
 	import ClientAssign from '#lib/components/ClientAssign.svelte';
 	import { m } from '#lib/paraglide/messages.js';
-	import { FileText, Info, Mail, Plus } from 'lucide-svelte';
+	import { Info, Mail, Plus } from 'lucide-svelte';
 	import { listChannels, listStatusPages, type Channel, type StatusPage } from '#lib/api/index.js';
 	import { listReportSchedules, slaRequestFrom, type ReportSchedule, type ReportSchedulePayload } from '#lib/api/reports.js';
 	import { Button, EmptyState, ErrorNotice, Panel, Plate, Skeleton } from '#lib/ui/index.js';
@@ -104,16 +103,6 @@
 </script>
 
 <div class="grid gap-6 [&_section[id]]:scroll-mt-20">
-<Panel id="reports-sla" title={m.settings_sla_title()} description={m.settings_sla_description()}>
-	{#snippet aside()}
-		<Button variant="primary" href="/reports/sla">
-			<FileText class="size-4" aria-hidden="true" />
-			{m.reports_sla_open()}
-		</Button>
-	{/snippet}
-	<p class="text-sm text-ink-2">{m.reports_sla_open_help()}</p>
-</Panel>
-
 <Panel
 	id="reports"
 	title={m.settings_reports_title()}

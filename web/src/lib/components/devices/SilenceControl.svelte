@@ -9,7 +9,7 @@
 	import type { Silence, Target } from '#lib/api/index.js';
 	import { createSilence, deleteSilence, listSilences } from '#lib/api/index.js';
 	import { Button, Confirm, DateTimeField, Menu } from '#lib/ui/index.js';
-	import { BellOff } from 'lucide-svelte';
+	import { BellOff, BellRing, CalendarClock } from 'lucide-svelte';
 	import { formatDateTime } from '#lib/format.js';
 	import { datetimeLocalIn, quickSilencePayload, scheduleLabel } from '#lib/components/alerts/helpers.js';
 
@@ -118,23 +118,39 @@
 		}
 	}
 
+	/** One look for the entries of the monitor menu (inline): icon, label, 40 px row. */
+	const itemClass =
+		'flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-semibold text-ink hover:bg-surface hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-signal disabled:opacity-50';
+
 	const triggerLabel = $derived(own ? m.devices_silence_silenced({ until: untilLabel(own) }) : m.devices_silence_menu());
 </script>
 
 {#snippet options()}
-	<div class="flex w-64 max-w-full flex-col items-stretch gap-1">
+	<div class={`flex max-w-full flex-col items-stretch ${inline ? 'gap-0.5' : 'w-64 gap-1'}`}>
 		{#if own}
 			<p class="px-2 py-1 text-sm font-semibold text-advisory-ink">{m.devices_silence_silenced({ until: untilLabel(own) })}</p>
-			<Confirm size="md" variant="secondary" class="w-full justify-start" confirmLabel={m.devices_silence_lift_confirm()} loading={busy} onconfirm={() => lift(own)}>{m.devices_silence_lift()}</Confirm>
+			<Confirm size="md" variant="secondary" class={`w-full justify-start ${inline ? 'min-h-10 gap-2 px-2' : ''}`} confirmLabel={m.devices_silence_lift_confirm()} loading={busy} onconfirm={() => lift(own)}>{#if inline}<BellRing class="size-4 shrink-0" aria-hidden="true" />{/if}{m.devices_silence_lift()}</Confirm>
 		{:else}
 			{#if global}
 				<p class="px-2 py-1 text-sm text-advisory-ink">{m.devices_silence_all({ until: untilLabel(global) })}</p>
 			{/if}
-			<Button variant="ghost" class="w-full justify-start" onclick={silenceOneHour} loading={busy && !picking} disabled={picking}>
-				{m.devices_silence_one_hour()}
-			</Button>
+			{#if inline}
+				<button type="button" role="menuitem" class={itemClass} onclick={silenceOneHour} disabled={busy || picking}>
+					<BellOff class="size-4 shrink-0 text-ink-2" aria-hidden="true" />{m.devices_silence_one_hour()}
+				</button>
+			{:else}
+				<Button variant="ghost" class="w-full justify-start" onclick={silenceOneHour} loading={busy && !picking} disabled={picking}>
+					{m.devices_silence_one_hour()}
+				</Button>
+			{/if}
 			{#if !picking}
-				<Button variant="ghost" class="w-full justify-start" onclick={openPicker} disabled={busy}>{m.devices_silence_pick_until()}</Button>
+				{#if inline}
+					<button type="button" role="menuitem" class={itemClass} onclick={openPicker} disabled={busy}>
+						<CalendarClock class="size-4 shrink-0 text-ink-2" aria-hidden="true" />{m.devices_silence_pick_until()}
+					</button>
+				{:else}
+					<Button variant="ghost" class="w-full justify-start" onclick={openPicker} disabled={busy}>{m.devices_silence_pick_until()}</Button>
+				{/if}
 			{:else}
 				<form class="grid gap-2 px-1 pb-1" onsubmit={submitPicker} aria-label={m.devices_silence_until_label()}>
 					<label for="silence-until" class="text-sm font-semibold text-ink">{m.devices_silence_until_label()}</label>

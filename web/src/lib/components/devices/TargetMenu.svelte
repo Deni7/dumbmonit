@@ -2,12 +2,13 @@
 	import { withBase } from '#lib/paths.js';
 	/**
 	 * The monitor page's Settings button: a gear that opens the day-to-day
-	 * controls (enable or disable, snooze with its durations, logs), then Delete
-	 * apart and in the danger tone, then the real Settings page at the foot.
+	 * controls (snooze with its durations, enable or disable, logs), then the real
+	 * Settings page, then Delete apart and in the danger tone. Every entry has an
+	 * icon and the same 40 px row. Probe now stays the primary button beside the gear.
 	 * The gear is tinted while a snooze window covers the monitor, so the state
 	 * is still visible with the menu closed.
 	 */
-	import { Power, PowerOff, ScrollText, Settings } from 'lucide-svelte';
+	import { Power, PowerOff, ScrollText, Settings, Trash2 } from 'lucide-svelte';
 	import type { Silence, Target } from '#lib/api/index.js';
 	import { listSilences } from '#lib/api/index.js';
 	import SilenceControl from '#lib/components/devices/SilenceControl.svelte';
@@ -62,40 +63,35 @@
 	{/snippet}
 	{#snippet children({ close })}
 		<div class="flex w-64 max-w-full flex-col items-stretch gap-0.5">
+			{#if target.enabled}
+				<SilenceControl {target} {refreshKey} inline />
+			{/if}
+
 			<button type="button" role="menuitem" class={item} disabled={savingEnabled} onclick={() => { onsetenabled(!target.enabled); close(); }}>
 				{#if target.enabled}
-					<PowerOff class="size-4 text-ink-2" aria-hidden="true" />{m.devices_target_disable()}
+					<PowerOff class="size-4 shrink-0 text-ink-2" aria-hidden="true" />{m.devices_target_disable()}
 				{:else}
-					<Power class="size-4 text-ink-2" aria-hidden="true" />{m.devices_target_enable()}
+					<Power class="size-4 shrink-0 text-ink-2" aria-hidden="true" />{m.devices_target_enable()}
 				{/if}
 			</button>
 
-			{#if target.enabled}
-				<div class="mt-1 border-t border-line pt-1">
-					<p class="m-0 px-2 py-1 text-sm font-semibold text-ink-2">{m.devices_silence_menu()}</p>
-					<SilenceControl {target} {refreshKey} inline />
-				</div>
+			<a href={withBase(`/targets?tab=logs&target=${target.id}`)} role="menuitem" class={item}>
+				<ScrollText class="size-4 shrink-0 text-ink-2" aria-hidden="true" />{m.devices_target_logs()}
+			</a>
+
+			<div class="my-1 border-t border-line" role="separator"></div>
+
+			<a href={withBase(`/targets/${target.id}/edit`)} role="menuitem" class={item}>
+				<Settings class="size-4 shrink-0 text-ink-2" aria-hidden="true" />{m.devices_target_settings()}
+			</a>
+
+			<div class="my-1 border-t border-line" role="separator"></div>
+
+			{#if target.kind === 'agent'}
+				<Button variant="danger" size="md" class="min-h-10 w-full justify-start gap-2 !px-2" onclick={() => { onasktoremove(); close(); }}><Trash2 class="size-4 shrink-0" aria-hidden="true" />{m.devices_target_delete()}</Button>
+			{:else}
+				<Confirm size="md" variant="danger" class="min-h-10 w-full justify-start gap-2 !px-2" confirmLabel={m.devices_target_delete_confirm()} onconfirm={ondelete} loading={deleting}><Trash2 class="size-4 shrink-0" aria-hidden="true" />{m.devices_target_delete()}</Confirm>
 			{/if}
-
-			<div class="mt-1 border-t border-line pt-1">
-				<a href={withBase(`/targets?tab=logs&target=${target.id}`)} role="menuitem" class={item}>
-					<ScrollText class="size-4 text-ink-2" aria-hidden="true" />{m.devices_target_logs()}
-				</a>
-			</div>
-
-			<div class="mt-1 border-t border-line pt-1">
-				{#if target.kind === 'agent'}
-					<Button variant="danger" size="md" class="w-full justify-start" onclick={() => { onasktoremove(); close(); }}>{m.devices_target_delete()}</Button>
-				{:else}
-					<Confirm size="md" variant="danger" class="w-full justify-start" confirmLabel={m.devices_target_delete_confirm()} onconfirm={ondelete} loading={deleting}>{m.devices_target_delete()}</Confirm>
-				{/if}
-			</div>
-
-			<div class="mt-1 border-t border-line pt-1">
-				<a href={withBase(`/targets/${target.id}/edit`)} role="menuitem" class={item}>
-					<Settings class="size-4 text-ink-2" aria-hidden="true" />{m.devices_target_settings()}
-				</a>
-			</div>
 		</div>
 	{/snippet}
 </Menu>
