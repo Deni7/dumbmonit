@@ -34,7 +34,7 @@
 </script>
 
 <!-- Phones keep the help out of the way until the field is in use: it shows on focus. -->
-<div bind:this={root} class={`group/field ${inline ? 'flex items-center justify-between gap-4' : 'grid gap-1.5'} ${className}`}>
+<div bind:this={root} class={`group/field ${inline ? 'flex items-center justify-between gap-4' : 'grid content-start gap-1.5'} ${className}`}>
 	<div class={inline ? 'min-w-0' : ''}>
 		<label for={htmlFor} class="block text-sm font-semibold text-ink">
 			{label}{#if required}<span class="ml-0.5 text-warning" aria-hidden="true">*</span>{/if}

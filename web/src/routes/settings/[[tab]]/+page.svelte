@@ -229,7 +229,7 @@
 		{#each tabs as id (id)}
 			<li class="min-w-0">
 				<a
-					href={withBase('/settings/{id}')}
+					href={withBase(`/settings/${id}`)}
 					data-tab={id}
 					class={`inline-flex h-10 items-center rounded-full border px-3.5 text-[0.8125rem] font-semibold transition-colors ${tab === id ? 'border-line-strong bg-surface-2 text-ink' : 'border-line text-ink-2 hover:text-ink'}`}
 					aria-current={tab === id ? 'page' : undefined}
@@ -251,7 +251,7 @@
 						{@const Icon = ICONS[id]}
 						<li>
 							<a
-								href={withBase('/settings/{id}')}
+								href={withBase(`/settings/${id}`)}
 								class={`flex h-10 items-center gap-2.5 rounded-md px-2.5 transition-colors hover:bg-surface-2 hover:text-ink ${tab === id ? 'bg-surface-2 font-semibold text-ink' : 'text-ink-2'}`}
 								aria-current={tab === id ? 'page' : undefined}
 							>
