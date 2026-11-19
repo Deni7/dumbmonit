@@ -4,8 +4,8 @@
 	 * The Reports page: the scheduled reports (periodic emails for the team — mostly one, weekly by
 	 * default, though a few may coexist, for instance a daily one for the
 	 * on-call and a monthly one for management) and the history of their
-	 * sends (the SLA ones included: the report itself is the SLA page, `/sla`). Settings used to hold the last two; `/settings/reports` forwards
-	 * here. `?schedule=sla&…` (the SLA page's "Schedule") opens a new SLA
+	 * sends (the SLA ones included: the report itself is the SLA tab of Status). Settings used to hold the last two; `/settings/reports` forwards
+	 * here. `?schedule=sla&…` (the SLA tab's "Schedule") opens a new SLA
 	 * report prefilled with the options in the address.
 	 */
 	import { untrack } from 'svelte';

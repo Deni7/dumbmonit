@@ -1,8 +1,8 @@
 <script lang="ts">
 	/**
 	 * Monitors: the estate seen four ways, as tabs of one destination. List
-	 * (folders, order, filters, bulk actions), Map (topology and world),
-	 * Logs (administrators) and Security (threat map and CVEs). The old
+	 * (folders, order, filters, bulk actions), Logs (administrators),
+	 * Security (threat map and CVEs) and Map (topology and world), last. The old
 	 * `/map`, `/logs` and `/security` pages forward here.
 	 */
 	import { List, Network, ScrollText, ShieldAlert } from 'lucide-svelte';
@@ -16,9 +16,9 @@
 
 	const tabs: TabItem[] = $derived([
 		{ id: 'list', label: m.topology_view_list(), icon: List },
-		{ id: 'map', label: m.topology_title(), icon: Network },
 		{ id: 'logs', label: m.logsearch_title(), icon: ScrollText, hidden: !auth.isAdmin },
-		{ id: 'security', label: m.security_page_title(), icon: ShieldAlert }
+		{ id: 'security', label: m.security_page_title(), icon: ShieldAlert },
+		{ id: 'map', label: m.topology_title(), icon: Network }
 	]);
 </script>
 

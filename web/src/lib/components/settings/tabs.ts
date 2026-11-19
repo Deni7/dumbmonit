@@ -56,15 +56,15 @@ export const SECTION_TAB: Record<string, SettingsTab> = {
 
 /**
  * Sections that used to live in Settings, and where they went: status pages
- * and announcements to `/status`, the SLA export and the scheduled reports to
- * `/reports`. An old `/settings/...#anchor` link follows them.
+ * and announcements to `/status`, the SLA export to its tab of `/status` and the
+ * scheduled reports to `/status?tab=reports`. An old `/settings/...#anchor` link follows them.
  */
 export const MOVED: Record<string, string> = {
 	status: '/status',
 	'status-pages': '/status',
 	incidents: '/status#incidents',
 	reports: '/status?tab=reports',
-	'reports-sla': '/sla'
+	'reports-sla': '/status?tab=sla'
 };
 
 export function isTab(value: string | undefined): value is SettingsTab {

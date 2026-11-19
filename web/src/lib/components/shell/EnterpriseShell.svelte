@@ -34,7 +34,6 @@
 	import UserMenu from '#lib/components/UserMenu.svelte';
 	import GithubMark from '#lib/components/GithubMark.svelte';
 	import Logo from '#lib/components/Logo.svelte';
-	import SwissCross from '#lib/components/SwissCross.svelte';
 	import ClientSwitcher from '#lib/components/ClientSwitcher.svelte';
 	import VersionTag from '#lib/components/VersionTag.svelte';
 	import { isTypingTarget } from '#lib/palette/logic.js';
@@ -257,10 +256,6 @@
 					<GithubMark class="size-5 shrink-0" />
 					<span class={labelClass}>GitHub<span class="sr-only"> {m.shell_new_tab()}</span></span>
 				</a>
-			</li>
-			<li class="rail-item relative flex h-10 w-full min-w-0 items-center gap-3 px-2.5 text-sm font-medium text-ink-2">
-				<SwissCross class="size-5" />
-				<span class={labelClass}>{m.brand_swiss_made()}</span>
 			</li>
 			<li><UserMenu placement="rail" wide={expanded} /></li>
 		</ul>

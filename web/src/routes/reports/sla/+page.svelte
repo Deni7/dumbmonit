@@ -1,9 +1,10 @@
 <script lang="ts">
-	/** Moved: the availability report is the "SLA" page. Old links (query included) land there. */
+	/** Moved: the availability report is the "SLA" tab of Status. Old links (query included) land there. */
 	import { goto } from '#lib/navigation.js';
 	import { page } from '$app/state';
+	import { tabUrl } from '#lib/tab-url.js';
 
 	$effect(() => {
-		void goto(`/sla${page.url.search}`, { replace: true });
+		void goto(tabUrl('/status', 'sla', page.url), { replace: true });
 	});
 </script>

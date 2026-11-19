@@ -25,12 +25,13 @@ All notable changes to this project are documented here. The format follows
   subscriptions are unchanged. Scheduled reports also fall back on the email server when no email
   channel is enabled.
 
-- **A page for the availability (SLA) report.** **SLA** has its own entry in the main navigation
-  (administrators), at `/sla` (`/reports/sla` forwards, query included), and left Status › Reports,
-  which keeps only the scheduled reports (the SLA ones too) and their history: the period, the monitors, the template (Summary or Detailed) and the options on the
-  left, the report itself on the right, rebuilt a moment after each change, and Print, Download PDF,
-  CSV and Schedule at the top. The options stay in the address, so a report can be linked; Schedule
-  opens a new scheduled SLA report prefilled with them. Also in the command palette.
+- **An SLA tab in Status.** The availability report is the **SLA** tab of Status, next to Reports
+  (administrators; `/sla` and `/reports/sla` forward there, query included). Status › Reports keeps
+  only the scheduled reports (the SLA ones too) and their history. Set the period, the monitors, the
+  template (Summary or Detailed) and the options, press **Generate**, and the report appears below or beside
+  the form, with Print, Download PDF, CSV and Schedule. Nothing is built while you set the options; changing one
+  hides the report until you generate it again. The options stay in the address, so a setup can be
+  linked; Schedule opens a new scheduled SLA report prefilled with them. Also in the command palette.
 - **Monitor picker for SLA reports.** Search, groups with a checkbox each (half-checked when only some
   of their monitors are in), All and None, and one line saying how many monitors are covered. A whole
   group is kept as the group, so monitors added to it later are covered too.
@@ -47,9 +48,9 @@ All notable changes to this project are documented here. The format follows
   Home/End, Escape), month and day names in the interface language, the week starting where the
   language says, 40px targets. The SLA period has shortcuts: last 7 or 30 days, this month, last
   month, last quarter. Values sent to the API are unchanged.
-- **Swiss cross.** A "Made in Switzerland" cross always in sight: in the top bar of every page (phones
-  included), in the side bar folded or unfolded, and beside the name on the sign-in page with a tagline under it: "Monitoring with Swiss precision" (translated in
-  the nine languages).
+- **Swiss cross.** A "Made in Switzerland" cross beside the name on the sign-in page, with a tagline
+  under it: "Monitoring with Swiss precision" (translated in the nine languages). It is not shown
+  inside the app.
 - **Incidents of the week, on the overview.** A compact block in the right-hand column, beside
   "Needs attention", shows how many incidents the last seven days had (an incident starts when an
   alert fires and ends when it resolves), how long they stayed open, the figures of the week before,
@@ -62,7 +63,8 @@ All notable changes to this project are documented here. The format follows
   be (Proxmox, Proxmox Backup Server, Veeam, Kopia, Duplicati, Synology, TrueNAS, Hetzner, Immich,
   Plakar, restic and Borg repositories), critical vulnerabilities (one row per monitor, when the CVE
   feature is on) and a DumbMonit update when one is published. Each row names what and where, one
-  line of context and the date as words ("in 6 days", "3 days ago"). Nothing due: one quiet line, no card.
+  line of context and the date as words ("in 6 days", "3 days ago"). Nothing due: the same card, with "Nothing due in the next 30 days" and a line on what is watched
+  (certificates, domains, disks, backups, vulnerabilities).
   `GET /api/deadlines?upcoming=true` adds the `disk` and `backup` kinds (and a `value` field: used
   percent, or days since the last success); without the parameter the answer is unchanged.
 
@@ -73,6 +75,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **A plainer sign-in page.** A wrong password shows only "Wrong username or password."; the
+  "lost password" note is gone, and the footer reads "Open source, MIT" (the name is already at the
+  top). Monitors: the Map tab comes last.
 - **No icon in page titles.** The access screen of a protected status page no longer puts a padlock
   or a sign-in icon before its title, like every other page title.
 
@@ -95,7 +100,7 @@ All notable changes to this project are documented here. The format follows
 
 - **SLA report forms line up with the rest of the settings.** Same field heights, labels, grid and
   spacing as the other forms; the template, kind and frequency choices are 40px segmented controls;
-  the layout options no longer sit in a box inside a box. The printable page is now the SLA page.
+  the layout options no longer sit in a box inside a box. The printable page is now the SLA tab of Status.
 
 - **A tidier map.** Monitors › Map is laid out as a clean tree: a device with many dependants
   gets them in a compact grid of up to eight per row, joined by square lines (one bus, short drops)

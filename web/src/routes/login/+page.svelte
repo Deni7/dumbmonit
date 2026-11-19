@@ -41,7 +41,7 @@
 	let code = $state('');
 	let codeError = $state<string | null>(null);
 	let usernameError = $state<string | null>(null);
-	let failure = $state<{ title: string; error: unknown } | null>(null);
+	let failure = $state<{ title: string; error: unknown; compact?: boolean } | null>(null);
 	let localError = $state<string | null>(null);
 
 	// A refused sign-in shakes the gate once, and the pigeon's eyes cross
@@ -133,7 +133,9 @@
 			if (cause instanceof ApiError && cause.status === 401) {
 				failure = {
 					title: m.auth_login_wrong_title(),
-					error: new ApiError(m.auth_login_wrong_detail(), 400)
+					error: new ApiError(m.auth_login_wrong_title(), 400),
+					// Just the sentence: no hint, no repeated message.
+					compact: true
 				};
 			} else if (cause instanceof ApiError && cause.status === 429) {
 				const seconds = retryDelay(cause.message);
@@ -367,7 +369,7 @@
 				</Field>
 
 				{#if failure}
-					<ErrorNotice title={failure.title} error={failure.error} />
+					<ErrorNotice title={failure.title} error={failure.error} compact={failure.compact} />
 				{/if}
 
 				<ClickSpark class="w-full">
@@ -380,14 +382,10 @@
 					</Button>
 				</ClickSpark>
 			</form>
-
-			<p class="mt-5 text-[0.8125rem] text-ink-2">
-				{m.auth_login_lost()}
-			</p>
 			{/if}
 		</section>
 
-		<p class="mt-6 text-[0.8125rem] text-ink-2">{m.auth_footer()}</p>
+		<p class="mt-6 text-[0.8125rem] text-ink-2">{m.auth_login_footer()}</p>
 	</main>
 </div>
 

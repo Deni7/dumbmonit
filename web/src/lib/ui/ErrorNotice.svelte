@@ -17,11 +17,13 @@
 		hint?: string;
 		/** A failure of the page itself (nothing was sent to the server): no network or server advice. */
 		local?: boolean;
+		/** Only the heading: for a failure whose title already says everything (wrong password). */
+		compact?: boolean;
 		children?: Snippet;
 		class?: string;
 	}
 
-	let { error, title, onretry, hint, local = false, children, class: className = '' }: Props = $props();
+	let { error, title, onretry, hint, local = false, compact = false, children, class: className = '' }: Props = $props();
 	const api = $derived(toApiError(error));
 	/** Contextual next step, derived from the failure type. */
 	const help = $derived.by(() => {
@@ -38,10 +40,12 @@
 	<AlertTriangle class="mt-0.5 size-5 shrink-0 text-warning" aria-hidden="true" />
 	<div class="min-w-0 flex-1">
 		<p class="font-semibold text-warning-ink">{heading}</p>
-		<p class="mt-0.5 text-sm text-ink">{api.message}</p>
-		<p class="mt-1 text-sm text-ink-2">{api.demo || !hint ? api.hint : hint}</p>
-		{#if help}<p class="mt-1 text-sm font-medium text-ink">{help}</p>{/if}
-		{#if api.status === 401 && !api.demo}
+		{#if !compact}
+			<p class="mt-0.5 text-sm text-ink">{api.message}</p>
+			<p class="mt-1 text-sm text-ink-2">{api.demo || !hint ? api.hint : hint}</p>
+			{#if help}<p class="mt-1 text-sm font-medium text-ink">{help}</p>{/if}
+		{/if}
+		{#if !compact && api.status === 401 && !api.demo}
 			<Button size="sm" variant="secondary" href="/login" class="mt-2">{m.ui_error_notice_signin()}</Button>
 		{/if}
 		{#if children}<div class="mt-2">{@render children()}</div>{/if}

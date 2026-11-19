@@ -144,17 +144,29 @@
 </script>
 
 {#if deadlines === null && !failed}
-	<!-- Reading: a line the height of the quiet state, so nothing jumps. -->
-	<section class="flex h-6 min-w-0 items-center px-1" aria-labelledby="upcoming-title">
-		<h2 id="upcoming-title" class="sr-only">{m.overview_upcoming_title()}</h2>
-		<Skeleton class="h-4 w-56 max-w-full" />
+	<!-- Reading: the card of the quiet state, so nothing jumps when the answer comes. -->
+	<section class="flex min-w-0 flex-col overflow-hidden rounded-xl border border-line bg-surface" aria-labelledby="upcoming-title">
+		<div class="flex items-baseline gap-x-2.5 px-4 pt-3.5 pb-3">
+			<h2 id="upcoming-title" class="m-0 text-base font-semibold text-ink">{m.overview_upcoming_title()}</h2>
+		</div>
+		<div class="flex flex-col gap-2 border-t border-line px-4 py-5">
+			<Skeleton class="h-4 w-56 max-w-full" />
+			<Skeleton class="h-3.5 w-72 max-w-full" />
+		</div>
 	</section>
 {:else if !failed && rows.length === 0}
-	<!-- Nothing due: one quiet line, no card, so the room goes to the incidents. -->
-	<section class="state-in flex min-w-0 items-center gap-2 px-1 text-sm text-ink-2" aria-labelledby="upcoming-title">
-		<CalendarCheck class="size-4 shrink-0 text-ink-3" aria-hidden="true" />
-		<h2 id="upcoming-title" class="m-0 shrink-0 text-sm font-medium text-ink">{m.overview_upcoming_title()}</h2>
-		<p class="m-0 min-w-0 truncate">{m.overview_upcoming_empty({ days: HORIZON_DAYS })}</p>
+	<!-- Nothing due: still a card like the others, with a sentence on what is watched. -->
+	<section class="state-in flex min-w-0 flex-col overflow-hidden rounded-xl border border-line bg-surface" aria-labelledby="upcoming-title">
+		<div class="flex items-baseline gap-x-2.5 px-4 pt-3.5 pb-3">
+			<h2 id="upcoming-title" class="m-0 text-base font-semibold text-ink">{m.overview_upcoming_title()}</h2>
+		</div>
+		<div class="flex flex-col gap-1.5 border-t border-line px-4 py-5">
+			<p class="m-0 flex items-center gap-2 text-sm font-medium text-ink">
+				<CalendarCheck class="size-4 shrink-0 text-ink-3" aria-hidden="true" />
+				{m.overview_upcoming_empty({ days: HORIZON_DAYS })}
+			</p>
+			<p class="m-0 text-xs text-ink-2">{m.overview_upcoming_scope()}</p>
+		</div>
 	</section>
 {:else}
 <section class="flex min-w-0 flex-col overflow-hidden rounded-xl border border-line bg-surface" aria-labelledby="upcoming-title">
