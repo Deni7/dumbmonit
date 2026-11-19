@@ -9464,12 +9464,10 @@
 	"reports_scope_none_shown_aria": "Clear the monitors shown",
 	"reports_scope_some_selected": "{count} of {total} monitors",
 	"reports_sla_csv": "CSV",
-	"reports_sla_generate": "Generate",
-	"reports_sla_generate_hint": "Set the period and the monitors, then press Generate to build the report.",
 	"reports_sla_layout_title": "Layout",
 	"reports_sla_monitors_title": "Monitors",
 	"reports_sla_more_formats": "Other formats",
-	"reports_sla_page_description": "Choose a period and the monitors, press Generate, then print, download or schedule the report.",
+	"reports_sla_page_description": "Choose a period and the monitors, then download the report as a PDF, print it or schedule it.",
 	"reports_sla_page_title": "Availability report",
 	"reports_sla_palette_detail": "Period, monitors, report, PDF and CSV",
 	"reports_sla_period": "Days covered",
@@ -9477,6 +9475,5 @@
 	"reports_sla_period_missing": "Choose the first and the last day.",
 	"reports_sla_period_title": "Period",
 	"reports_sla_period_too_long": "A report covers {max} days at most.",
-	"reports_sla_report": "Report",
 	"reports_sla_schedule": "Schedule"
 }

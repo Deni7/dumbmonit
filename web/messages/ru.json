@@ -9640,12 +9640,10 @@
 	"reports_scope_none_shown_aria": "Снять выбор с показанных мониторов",
 	"reports_scope_some_selected": "Мониторов: {count} из {total}",
 	"reports_sla_csv": "CSV",
-	"reports_sla_generate": "Сформировать",
-	"reports_sla_generate_hint": "Задайте период и мониторы, затем нажмите «Сформировать», чтобы получить отчёт.",
 	"reports_sla_layout_title": "Оформление",
 	"reports_sla_monitors_title": "Мониторы",
 	"reports_sla_more_formats": "Другие форматы",
-	"reports_sla_page_description": "Выберите период и мониторы, нажмите «Сформировать», затем распечатайте, скачайте или запланируйте отчёт.",
+	"reports_sla_page_description": "Выберите период и мониторы, затем скачайте отчёт в PDF, распечатайте его или запланируйте.",
 	"reports_sla_page_title": "Отчёт о доступности",
 	"reports_sla_palette_detail": "Период, мониторы, отчёт, PDF и CSV",
 	"reports_sla_period": "Охватываемые дни",
@@ -9653,6 +9651,5 @@
 	"reports_sla_period_missing": "Выберите первый и последний день.",
 	"reports_sla_period_title": "Период",
 	"reports_sla_period_too_long": "Отчёт охватывает не более {max} дней.",
-	"reports_sla_report": "Отчёт",
 	"reports_sla_schedule": "Запланировать"
 }

@@ -9464,12 +9464,10 @@
 	"reports_scope_none_shown_aria": "Désélectionner les moniteurs affichés",
 	"reports_scope_some_selected": "{count} moniteurs sur {total}",
 	"reports_sla_csv": "CSV",
-	"reports_sla_generate": "Générer",
-	"reports_sla_generate_hint": "Réglez la période et les moniteurs, puis appuyez sur Générer pour produire le rapport.",
 	"reports_sla_layout_title": "Mise en page",
 	"reports_sla_monitors_title": "Moniteurs",
 	"reports_sla_more_formats": "Autres formats",
-	"reports_sla_page_description": "Choisissez une période et les moniteurs, appuyez sur Générer, puis imprimez, téléchargez ou planifiez le rapport.",
+	"reports_sla_page_description": "Choisissez une période et les moniteurs, puis téléchargez le rapport en PDF, imprimez-le ou planifiez-le.",
 	"reports_sla_page_title": "Rapport de disponibilité",
 	"reports_sla_palette_detail": "Période, moniteurs, rapport, PDF et CSV",
 	"reports_sla_period": "Jours couverts",
@@ -9477,6 +9475,5 @@
 	"reports_sla_period_missing": "Choisissez le premier et le dernier jour.",
 	"reports_sla_period_title": "Période",
 	"reports_sla_period_too_long": "Un rapport couvre {max} jours au plus.",
-	"reports_sla_report": "Rapport",
 	"reports_sla_schedule": "Planifier"
 }

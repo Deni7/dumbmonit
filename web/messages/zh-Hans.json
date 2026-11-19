@@ -9369,12 +9369,10 @@
 	"reports_scope_none_shown_aria": "取消选择所显示的监控项",
 	"reports_scope_some_selected": "{total} 个监控项中的 {count} 个",
 	"reports_sla_csv": "CSV",
-	"reports_sla_generate": "生成",
-	"reports_sla_generate_hint": "设置时间段和监控项，然后点击“生成”以创建报告。",
 	"reports_sla_layout_title": "版式",
 	"reports_sla_monitors_title": "监控项",
 	"reports_sla_more_formats": "其他格式",
-	"reports_sla_page_description": "选择时间段和监控项，点击“生成”，然后打印、下载或定时发送报告。",
+	"reports_sla_page_description": "选择时间段和监控项，然后将报告下载为 PDF、打印或设为定期发送。",
 	"reports_sla_page_title": "可用性报告",
 	"reports_sla_palette_detail": "时间段、监控项、报告、PDF 和 CSV",
 	"reports_sla_period": "涵盖的日期",
@@ -9382,6 +9380,5 @@
 	"reports_sla_period_missing": "请选择第一天和最后一天。",
 	"reports_sla_period_title": "时间段",
 	"reports_sla_period_too_long": "一份报告最多涵盖 {max} 天。",
-	"reports_sla_report": "报告",
 	"reports_sla_schedule": "定期发送"
 }

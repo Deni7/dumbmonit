@@ -28,9 +28,9 @@ All notable changes to this project are documented here. The format follows
 - **An SLA tab in Status.** The availability report is the **SLA** tab of Status, next to Reports
   (administrators; `/sla` and `/reports/sla` forward there, query included). Status › Reports keeps
   only the scheduled reports (the SLA ones too) and their history. Set the period, the monitors, the
-  template (Summary or Detailed) and the options, press **Generate**, and the report appears below or beside
-  the form, with Print, Download PDF, CSV and Schedule. Nothing is built while you set the options; changing one
-  hides the report until you generate it again. The options stay in the address, so a setup can be
+  template (Summary or Detailed) and the options in a form that uses the whole page, then take the
+  report out directly: **Download PDF**, **Print** (a printable sheet opens in a new tab and starts
+  the print dialog), CSV or Schedule. There is no on-screen preview of the report. The options stay in the address, so a setup can be
   linked; Schedule opens a new scheduled SLA report prefilled with them. Also in the command palette.
 - **Monitor picker for SLA reports.** Search, groups with a checkbox each (half-checked when only some
   of their monitors are in), All and None, and one line saying how many monitors are covered. A whole

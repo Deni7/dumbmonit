@@ -9464,12 +9464,10 @@
 	"reports_scope_none_shown_aria": "Desmarcar os monitores mostrados",
 	"reports_scope_some_selected": "{count} de {total} monitores",
 	"reports_sla_csv": "CSV",
-	"reports_sla_generate": "Gerar",
-	"reports_sla_generate_hint": "Defina o período e os monitores e carregue em Gerar para criar o relatório.",
 	"reports_sla_layout_title": "Paginação",
 	"reports_sla_monitors_title": "Monitores",
 	"reports_sla_more_formats": "Outros formatos",
-	"reports_sla_page_description": "Escolha um período e os monitores, carregue em Gerar e depois imprima, transfira ou agende o relatório.",
+	"reports_sla_page_description": "Escolha um período e os monitores e depois transfira o relatório em PDF, imprima-o ou agende-o.",
 	"reports_sla_page_title": "Relatório de disponibilidade",
 	"reports_sla_palette_detail": "Período, monitores, relatório, PDF e CSV",
 	"reports_sla_period": "Dias abrangidos",
@@ -9477,6 +9475,5 @@
 	"reports_sla_period_missing": "Escolha o primeiro e o último dia.",
 	"reports_sla_period_title": "Período",
 	"reports_sla_period_too_long": "Um relatório abrange no máximo {max} dias.",
-	"reports_sla_report": "Relatório",
 	"reports_sla_schedule": "Agendar"
 }

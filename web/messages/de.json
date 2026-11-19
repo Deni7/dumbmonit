@@ -9464,12 +9464,10 @@
 	"reports_scope_none_shown_aria": "Angezeigte Monitore abwählen",
 	"reports_scope_some_selected": "{count} von {total} Monitoren",
 	"reports_sla_csv": "CSV",
-	"reports_sla_generate": "Erstellen",
-	"reports_sla_generate_hint": "Zeitraum und Monitore festlegen, dann auf Erstellen klicken, um den Bericht zu erzeugen.",
 	"reports_sla_layout_title": "Layout",
 	"reports_sla_monitors_title": "Monitore",
 	"reports_sla_more_formats": "Weitere Formate",
-	"reports_sla_page_description": "Wählen Sie Zeitraum und Monitore, klicken Sie auf Erstellen und drucken, laden Sie den Bericht herunter oder planen Sie ihn.",
+	"reports_sla_page_description": "Wählen Sie Zeitraum und Monitore und laden Sie den Bericht dann als PDF herunter, drucken Sie ihn oder planen Sie ihn.",
 	"reports_sla_page_title": "Verfügbarkeitsbericht",
 	"reports_sla_palette_detail": "Zeitraum, Monitore, Bericht, PDF und CSV",
 	"reports_sla_period": "Abgedeckte Tage",
@@ -9477,6 +9475,5 @@
 	"reports_sla_period_missing": "Wählen Sie den ersten und den letzten Tag.",
 	"reports_sla_period_title": "Zeitraum",
 	"reports_sla_period_too_long": "Ein Bericht umfasst höchstens {max} Tage.",
-	"reports_sla_report": "Bericht",
 	"reports_sla_schedule": "Planen"
 }
