@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## Unreleased
+## 0.19.0 — 2026-11-19
 
 ### Added
 
@@ -82,14 +82,14 @@ All notable changes to this project are documented here. The format follows
   or a sign-in icon before its title, like every other page title.
 
 
-- **Monitors list, a real table.** The list has a header line and fixed columns, the same width on
-  every row: Status (the light and its word), Name over the kind of monitor, Address (monospace),
-  Site, Last 24 h (24 hourly segments: green all good, orange some checks failed, red down, grey no
-  data), Response, Checked (compact age, the full date on hover) and the alerts, with the security
-  grade before Checked. The columns fold with the width of the list (Address first, then Response and
-  the security grade, then Last 24 h); on a phone only Status, Name, Checked and the alerts remain.
-  The whole row opens the monitor. The hourly bars come from the same VictoriaMetrics health series
-  as the Enterprise overview, one query for all monitors.
+- **Monitors list, a real table.** The list has a header line and fixed columns that line up on
+  every row: a status mark whose shape tells the state (filled circle online, square offline,
+  triangle misconfigured, diamond pending, hollow ring disabled; the name of the state and the last
+  error on hover), the name over the kind of monitor and its address, Site, Last 24 h (24 hourly
+  segments: green all good, orange some checks failed, red down, grey no data), Response, the
+  security grade, Checked (compact age, the full date on hover) and the alerts. The columns fold with
+  the width of the list, header and rows together; on a phone only the status, the name, Checked
+  and the alerts remain.
 - **Tiles, plainer.** Tiles are bordered cards like the rest of the app: no shadow, light that
   follows the pointer, lift or staggered entrance.
 - **Selection and folders.** "Select" and "Create folder" are labelled buttons. The selection bar
@@ -144,8 +144,6 @@ All notable changes to this project are documented here. The format follows
 - **Printable report page.** "Open printable page" shows the same report in the browser; printing it
   gives only the report, black on white, with table headers repeated on each page.
 
-### Changed
-
 - **SLA PDF made for paper.** Wider print margins, no background fills (outlines and rules only),
   table headers repeated on every page, the name and period at the top of each following page, a
   bar chart of availability with the objective marked, and statuses that read in black and white
@@ -156,8 +154,6 @@ All notable changes to this project are documented here. The format follows
   page then names nothing of DumbMonit, not even in the browser tab (title and icon), the phone
   shortcut name or the page served before the app loads. The tab icon becomes the page's logo, or
   no icon. Saved in backups and GitOps files (`hide_branding`).
-
-### Changed
 
 - **A two-pane status page editor.** Settings on the left, a live preview on the right drawn
   exactly like the public page, from what is not saved yet (title, colours, logo, groups,
@@ -179,6 +175,9 @@ All notable changes to this project are documented here. The format follows
   The acknowledged group no longer shows a count.
 
 ### Fixed
+
+- **Settings tabs open again.** The tabs of Settings pointed to `/settings/{id}` literally, so
+  only the first one could be reached; the wall's device chips had the same broken link.
 
 - **Wall: no more "building up" or acknowledged alerts.** Alerts that have not triggered yet and
   alerts someone has acknowledged are no longer listed on the wall, and no longer count in its
