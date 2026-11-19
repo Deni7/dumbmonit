@@ -9,7 +9,8 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import { instanceStore } from '#lib/stores/instance.svelte.js';
-	import { Button, ErrorNotice, Panel, Plate, Skeleton } from '#lib/ui/index.js';
+	import { Button, ErrorNotice, Panel, Plate, Skeleton, Toggle } from '#lib/ui/index.js';
+	import AccentPicker from '#lib/components/settings/AccentPicker.svelte';
 	import InstanceFields from '#lib/components/modes/InstanceFields.svelte';
 
 	let loaded = $state<InstanceSettings | null>(null);
@@ -38,6 +39,30 @@
 			});
 		return () => controller.abort();
 	});
+
+	// On-call schedules: a switch that saves on its own, apart from the name form.
+	let oncallBusy = $state(false);
+	let oncallError = $state<unknown>(null);
+	let oncallSaved = $state(false);
+
+	async function setOnCall(enabled: boolean) {
+		if (oncallBusy || readOnly) return;
+		oncallBusy = true;
+		oncallError = null;
+		oncallSaved = false;
+		try {
+			const settings = await updateInstanceSettings({ oncall_enabled: enabled });
+			if (loaded) loaded = { ...loaded, oncall_enabled: settings.oncall_enabled };
+			instanceStore.oncallEnabled = settings.oncall_enabled === true;
+			oncallSaved = true;
+		} catch (cause) {
+			oncallError = cause;
+			// Put the switch back where the server has it.
+			if (loaded) loaded = { ...loaded };
+		} finally {
+			oncallBusy = false;
+		}
+	}
 
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
@@ -79,6 +104,33 @@
 		<Skeleton class="h-32" />
 	{/if}
 </Panel>
+
+{#if !readOnly}
+	<div class="mt-6 max-sm:mt-3">
+		<Panel id="accent" title={m.settings_accent_label()} description={m.settings_accent_hint()}>
+			<AccentPicker />
+		</Panel>
+	</div>
+{/if}
+
+{#if loaded}
+	<div class="mt-6 max-sm:mt-3">
+		<Panel id="oncall-schedules" title={m.settings_oncall_title()} description={m.settings_oncall_text()}>
+			<div class="flex flex-wrap items-center gap-3">
+				<Toggle
+					id="settings-oncall-enabled"
+					checked={loaded.oncall_enabled === true}
+					disabled={readOnly || oncallBusy}
+					label={m.settings_oncall_toggle()}
+					onchange={(value) => void setOnCall(value)}
+				/>
+				<label for="settings-oncall-enabled" class="text-sm font-semibold text-ink">{m.settings_oncall_toggle()}</label>
+				{#if oncallSaved}<Plate tone="signal" draw>{m.settings_general_saved()}</Plate>{/if}
+			</div>
+			{#if oncallError}<div class="mt-3"><ErrorNotice error={oncallError} /></div>{/if}
+		</Panel>
+	</div>
+{/if}
 
 {#if auth.isAdmin}
 	<div class="mt-6 max-sm:mt-3">

@@ -18,7 +18,7 @@
 	import { datetimeLocalIn, quickSilencePayload, recoverySilencePayload } from '#lib/components/alerts/helpers.js';
 	import { formatDateTime } from '#lib/format.js';
 	import { m } from '#lib/paraglide/messages.js';
-	import { Button, Menu, Plate } from '#lib/ui/index.js';
+	import { Button, DateTimeField, Menu, Plate } from '#lib/ui/index.js';
 	import { MUTE_HOURS, checkUntil, endAfterHours, muteEnd } from './mute.js';
 
 	interface Props {
@@ -44,7 +44,8 @@
 	let problem = $state<string | null>(null);
 	let busy = $state(false);
 	let list = $state<HTMLDivElement | null>(null);
-	let pickInput = $state<HTMLInputElement | null>(null);
+	/** The day button of the "until" field, focused when the picker opens. */
+	const pickerField = () => document.getElementById(`mute-until-${target.id}`);
 	/** Set by Escape and Cancel: the menu closes, the focus goes back to the cross. */
 	let restoreFocus = false;
 	let wasOpen = false;
@@ -52,7 +53,7 @@
 	const items = () => [...(list?.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled)') ?? [])];
 
 	function focusFirst() {
-		const first = picking ? pickInput : items()[0];
+		const first = picking ? pickerField() : items()[0];
 		first?.focus({ preventScroll: true });
 	}
 
@@ -100,7 +101,7 @@
 		until = datetimeLocalIn();
 		problem = null;
 		picking = true;
-		void tick().then(() => pickInput?.focus({ preventScroll: true }));
+		void tick().then(() => pickerField()?.focus({ preventScroll: true }));
 	}
 
 	function closeFromCancel() {
@@ -215,7 +216,7 @@
 				{#if picking}
 					<form class="grid gap-2 p-1" onsubmit={submitUntil} aria-label={m.overview_mute_until_label()}>
 						<label for={`mute-until-${target.id}`} class="text-sm font-semibold text-ink">{m.overview_mute_until_label()}</label>
-						<input id={`mute-until-${target.id}`} type="datetime-local" class="input tnum" bind:value={until} bind:this={pickInput} required />
+						<DateTimeField id={`mute-until-${target.id}`} bind:value={until} label={m.overview_mute_until_label()} class="w-[17rem] max-w-full" />
 						{#if problem}<p class="m-0 text-[0.8125rem] font-medium text-warning-ink" role="alert">{problem}</p>{/if}
 						<div class="flex gap-2">
 							<Button type="submit" variant="secondary" loading={busy}>{m.overview_mute_submit()}</Button>

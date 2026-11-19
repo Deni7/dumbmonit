@@ -48,7 +48,7 @@
 	--c-on-primary: var(--c-on-signal);
 	--c-focus: var(--c-signal);
 
-	/* Health river cells (a strip per monitor over time). */
+	/* Availability bars (24 hours of a monitor, one cell per slot). */
 	--c-river-up: rgb(15 143 134 / 0.55);
 	--c-river-warn: #b7791f;
 	--c-river-down: #c8402f;
@@ -120,7 +120,8 @@ html.dark,
    status pages keep the two lights above. Same token names, so every page and
    component follows unchanged.
    --------------------------------------------------------------------------- */
-html.obsidian {
+html.obsidian,
+html.obsidian .sp-preview-dark {
 	color-scheme: dark;
 
 	--c-canvas: #07080a;
@@ -175,7 +176,8 @@ html.obsidian {
    control borders ≥ 3:1. Status hues without `-ink` are for marks and fills,
    never for text. The Overview banner keeps its night sky.
    --------------------------------------------------------------------------- */
-html.obsidian.console-light {
+html.obsidian.console-light,
+html.obsidian .sp-preview-light {
 	color-scheme: light;
 
 	--c-canvas: #f6f6f7;
@@ -262,34 +264,12 @@ html.obsidian .font-sans {
 		stroke-dashoffset: 0;
 	}
 }
-@keyframes ob-cell {
-	from {
-		opacity: 0;
-	}
-	to {
-		opacity: 1;
-	}
-}
-@keyframes ob-scan {
-	from {
-		left: 0;
-	}
-	to {
-		left: 100%;
-	}
-}
 .ob-live {
 	animation: ob-live 1.4s ease-in-out infinite;
 }
 .ob-draw {
 	stroke-dasharray: 300;
 	animation: ob-draw 1.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-}
-.ob-cell {
-	animation: ob-cell 240ms var(--ease-standard) both;
-}
-.ob-scan {
-	animation: ob-scan 6s linear infinite;
 }
 
 /* Tailwind utilities read the live variables, so `bg-surface` follows the theme. */
@@ -357,7 +337,9 @@ html.obsidian .font-sans {
    hue is an ink: ≥ 4.5:1 against the surface in its light, and `on-accent`
    text is ≥ 4.5:1 on it. `default` is the page's own ink.
    --------------------------------------------------------------------------- */
-:root {
+:root,
+.sp-preview-dark,
+.sp-preview-light {
 	--c-accent: var(--c-ink);
 	--c-on-accent: var(--c-surface);
 }
@@ -371,6 +353,88 @@ html.dark .sp-accent-teal { --c-accent: #5fe0d4; }
 html.dark .sp-accent-violet { --c-accent: #c3a8ff; }
 html.dark .sp-accent-rose { --c-accent: #ff8fae; }
 html.dark .sp-accent-amber { --c-accent: #ffc864; }
+/* The status page editor's preview wears the page's own light whatever the
+   console's (`.sp-preview-dark` / `.sp-preview-light` carry the tokens above). */
+html .sp-preview-light .sp-accent-blue { --c-accent: #1f5fae; }
+html .sp-preview-light .sp-accent-teal { --c-accent: #0b6d66; }
+html .sp-preview-light .sp-accent-violet { --c-accent: #6a3fb5; }
+html .sp-preview-light .sp-accent-rose { --c-accent: #b0284f; }
+html .sp-preview-light .sp-accent-amber { --c-accent: #8f5d12; }
+html .sp-preview-dark .sp-accent-blue { --c-accent: #8fbaff; }
+html .sp-preview-dark .sp-accent-teal { --c-accent: #5fe0d4; }
+html .sp-preview-dark .sp-accent-violet { --c-accent: #c3a8ff; }
+html .sp-preview-dark .sp-accent-rose { --c-accent: #ff8fae; }
+html .sp-preview-dark .sp-accent-amber { --c-accent: #ffc864; }
+
+/* ---------------------------------------------------------------------------
+   The instance's accent (Settings › Appearance). `applyAccent` (src/lib/accent.ts)
+   and the bootstrap script in app.html set the four `--accent-*` values, already
+   held to contrast for each light, and `data-accent` on <html>; absent, the
+   console keeps its own ink. Only the solid button and the focus ring follow it:
+   the status hues never do. Not on the public status pages, which have their own
+   accent above.
+   --------------------------------------------------------------------------- */
+html[data-accent] {
+	--c-primary: var(--accent-dark);
+	--c-on-primary: var(--accent-dark-on);
+	--c-focus: var(--accent-dark);
+	--c-brand: var(--accent-dark);
+	--c-brand-on: var(--accent-dark-on);
+	--c-brand-ink: var(--accent-dark-ink);
+	--c-brand-soft: color-mix(in srgb, var(--accent-dark) 16%, transparent);
+	/* The first series of a chart without a status meaning. */
+	--c-series: var(--accent-dark);
+}
+html.console-light[data-accent] {
+	--c-primary: var(--accent-light);
+	--c-on-primary: var(--accent-light-on);
+	--c-focus: var(--accent-light);
+	--c-brand: var(--accent-light);
+	--c-brand-on: var(--accent-light-on);
+	--c-brand-ink: var(--accent-light-ink);
+	--c-brand-soft: color-mix(in srgb, var(--accent-light) 14%, transparent);
+	--c-series: var(--accent-light);
+}
+
+/* Where the accent shows beyond the button: the active item of the side bar, the
+   tab underline and active filter chips, links in running text, switches, boxes
+   and radios, selected rows, the wizard's progress. Only under `data-accent`:
+   with the default look none of this applies and the console is unchanged.
+   Hooks: `.rail-item[aria-current]`, `.tabs-ink`, `.chip-on`, `.progress-ink`,
+   `.row-selected`. */
+html[data-accent] {
+	accent-color: var(--c-brand);
+}
+html[data-accent] body {
+	accent-color: var(--c-brand);
+	caret-color: var(--c-brand);
+}
+html[data-accent] .rail-item[aria-current='page'] {
+	background: var(--c-brand-soft);
+	color: var(--c-brand-ink);
+}
+html[data-accent] .tabs-ink,
+html[data-accent] .progress-ink {
+	background: var(--c-brand);
+}
+html[data-accent] .chip-on {
+	border-color: var(--c-brand);
+	background: var(--c-brand-soft);
+	color: var(--c-brand-ink);
+}
+html[data-accent] .row-selected {
+	background: var(--c-brand-soft);
+}
+html[data-accent] button[role='switch'][aria-checked='true'] {
+	border-color: var(--c-brand);
+	background: var(--c-brand);
+}
+html[data-accent] main a:not([class]) {
+	color: var(--c-brand-ink);
+}
+html[data-accent] .accent-link {
+	color: var(--c-brand-ink);
+}
 
 @theme inline {
 	--color-accent: var(--c-accent);

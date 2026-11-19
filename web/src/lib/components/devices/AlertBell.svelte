@@ -15,19 +15,27 @@
 	interface Props {
 		targetId: number;
 		counts: TargetAlertCounts | undefined;
+		/** Lists: no plate, just the icon and the count; the tone only inks them. */
+		quiet?: boolean;
 		class?: string;
 	}
 
-	let { targetId, counts, class: className = '' }: Props = $props();
+	let { targetId, counts, quiet = false, class: className = '' }: Props = $props();
 
 	const label = $derived(counts ? m.devices_alertbell_aria({ count: counts.total }) : '');
 	const title = $derived(
 		counts && counts.firing !== counts.total
-			? `${label}: ${m.devices_alertbell_detail({ firing: counts.firing, acked: counts.acked, suppressed: counts.suppressed })}`
+			? `${label}: ${m.devices_alertbell_detail({ firing: counts.firing, suppressed: counts.suppressed })}`
 			: label
 	);
 	const plateClass = $derived(
-		counts && counts.firing > 0
+		quiet
+			? counts && counts.firing > 0
+				? 'border-transparent text-warning-ink'
+				: counts && counts.acked > 0
+					? 'border-transparent text-ink-2'
+					: 'border-transparent text-ink-3'
+			: counts && counts.firing > 0
 			? 'border-warning/35 bg-warning-soft text-warning-ink'
 			: counts && counts.acked > 0
 				? 'border-line bg-transparent text-ink-2'

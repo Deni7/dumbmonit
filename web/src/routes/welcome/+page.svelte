@@ -55,7 +55,8 @@
 		{ id: 'retention', title: () => m.wizard_retention_title(), text: () => m.wizard_retention_text(), say: () => m.wizard_pigeon_retention(), optional: true }
 	];
 
-	const steps = STEPS;
+	// On-call schedules are optional (Settings → System): their step only shows while they are on.
+	const steps = $derived(STEPS.filter((s) => s.id !== 'oncall' || instanceStore.oncallEnabled));
 	// `channel` was the notification step before it joined "Your first alert".
 	const asked = $derived(page.url.searchParams.get('step') === 'channel' ? 'start' : page.url.searchParams.get('step'));
 	const index = $derived(Math.max(0, steps.findIndex((s) => s.id === asked)));
@@ -81,6 +82,10 @@
 			.catch(() => {
 				timezone = browserTimeZone();
 			});
+	});
+
+	$effect(() => {
+		void instanceStore.loadSettings();
 	});
 
 	// Only administrators set the instance up.
@@ -190,7 +195,7 @@
 			<div class="lg:hidden">
 				<p class="text-[0.8125rem] text-ink-2">{m.wizard_step_of({ current: index + 1, total: steps.length })}</p>
 				<div class="mt-2 h-1 overflow-hidden rounded-full bg-line" aria-hidden="true">
-					<div class="h-full rounded-full bg-ink transition-[width] duration-500 ease-out-expo" style={`width: ${((index + 1) / steps.length) * 100}%`}></div>
+					<div class="progress-ink h-full rounded-full bg-ink transition-[width] duration-500 ease-out-expo" style={`width: ${((index + 1) / steps.length) * 100}%`}></div>
 				</div>
 			</div>
 

@@ -93,8 +93,8 @@
 		if (statusHost) return;
 		void instanceStore.init();
 	});
-	// The setup wizard owns the whole screen, outside the shell.
-	const onWelcome = $derived(routePath(page.url).startsWith('/welcome'));
+	// The setup wizard and the printable SLA sheet own the whole screen, outside the shell.
+	const onWelcome = $derived(routePath(page.url).startsWith('/welcome') || routePath(page.url) === '/sla/print');
 	// First sign-in of an administrator on a fresh instance: the setup wizard.
 	// Asked once per page load; "Skip" or the last step marks it done on the server.
 	let wizardOffered = false;

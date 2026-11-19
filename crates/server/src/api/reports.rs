@@ -11,11 +11,13 @@ use axum::{Json, Router};
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 
+use crate::api::status_pages::branding;
 use crate::api::{ApiError, ApiResult};
 use crate::auth::clients;
 use crate::auth::middleware::{AdminIdentity, Identity};
 use crate::auth::teams::TeamAccess;
 use crate::db;
+use crate::reports::layout::{Layout, LogoSource, Paper, Scope, Sections, Template};
 use crate::reports::schedule::{self, Frequency, Period, parse_timezone};
 use crate::reports::store::{self, ScheduleInput, StoredSchedule};
 use crate::reports::{self, MAX_SCHEDULES};
@@ -27,6 +29,7 @@ pub fn routes() -> Router<AppState> {
         .route("/reports/schedules/{id}", get(get_one).put(update).delete(remove))
         .route("/reports/schedules/{id}/send-test", post(send_test))
         .route("/reports/sla", get(download_sla))
+        .route("/reports/logo", get(report_logo).put(upload_report_logo).delete(delete_report_logo))
 }
 
 #[derive(Debug, Serialize)]
@@ -51,6 +54,10 @@ pub struct ScheduleView {
     pub attach_csv: bool,
     pub page_id: Option<i64>,
     pub objective: Option<f64>,
+    /// Mise en page du PDF SLA.
+    pub layout: Layout,
+    /// Périmètre du rapport SLA.
+    pub scope: Scope,
 }
 
 fn iso(at: DateTime<Utc>) -> String {
@@ -77,6 +84,8 @@ fn view(stored: &StoredSchedule, now: DateTime<Utc>) -> ScheduleView {
         attach_csv: stored.attach_csv,
         page_id: stored.page_id,
         objective: stored.objective,
+        layout: stored.layout.clone(),
+        scope: stored.scope.clone(),
     }
 }
 
@@ -100,6 +109,10 @@ pub struct SchedulePayload {
     pub attach_csv: bool,
     pub page_id: Option<i64>,
     pub objective: Option<f64>,
+    /// Mise en page du PDF SLA ; absente, le rapport détaillé en A4.
+    pub layout: Layout,
+    /// Périmètre ; absent, toute l'instance (ou tout le client).
+    pub scope: Scope,
 }
 
 impl Default for SchedulePayload {
@@ -119,6 +132,8 @@ impl Default for SchedulePayload {
             attach_csv: true,
             page_id: None,
             objective: None,
+            layout: Layout::default(),
+            scope: Scope::default(),
         }
     }
 }
@@ -194,6 +209,8 @@ impl SchedulePayload {
             return Err(ApiError::BadRequest("The status page does not exist.".into()));
         }
         let objective = valid_objective(self.objective)?;
+        let layout = self.layout.validate().map_err(ApiError::BadRequest)?;
+        let scope = self.scope.validate().map_err(ApiError::BadRequest)?;
         Ok(ScheduleInput {
             name,
             enabled: self.enabled,
@@ -209,6 +226,8 @@ impl SchedulePayload {
             attach_csv: self.attach_csv,
             page_id: self.page_id,
             objective,
+            layout,
+            scope,
         })
     }
 }
@@ -317,6 +336,53 @@ pub async fn send_test(
     }
 }
 
+/// `GET /api/reports/logo` : le logo téléversé pour les rapports SLA. Lisible
+/// par tout compte connecté, comme l'aperçu du rapport qui l'affiche.
+pub async fn report_logo(State(state): State<AppState>, _who: Identity) -> ApiResult<Response> {
+    let not_found = || ApiError::NotFound("No logo has been uploaded for reports.".into());
+    let (kind, bytes) = reports::logo::stored(&state.pool).await?.ok_or_else(not_found)?;
+    branding::serve_bytes(bytes, &kind, "private, no-cache")
+}
+
+/// `PUT /api/reports/logo` : même dépôt que le logo d'une page de statut
+/// (base64 ou `data:`, 256 Kio au plus, type reconnu à sa signature), limité
+/// aux images que le PDF sait incorporer : PNG 8 bits non entrelacé ou JPEG.
+pub async fn upload_report_logo(
+    State(state): State<AppState>,
+    _admin: AdminIdentity,
+    Json(payload): Json<branding::LogoPayload>,
+) -> ApiResult<StatusCode> {
+    let bytes = branding::decode(&payload.data)?;
+    if bytes.is_empty() {
+        return Err(ApiError::BadRequest("The logo file is empty.".into()));
+    }
+    if bytes.len() > branding::MAX_LOGO_BYTES {
+        return Err(ApiError::BadRequest(format!(
+            "The logo is limited to {} KiB.",
+            branding::MAX_LOGO_BYTES / 1024
+        )));
+    }
+    // `for_pdf` ne lit que le PNG et le JPEG : le WebP est refusé ici.
+    let embeddable = reports::logo::for_pdf(&bytes).is_some();
+    let Some(kind) = branding::sniff(&bytes).filter(|_| embeddable) else {
+        return Err(ApiError::BadRequest(
+            "The report logo must be a PNG (8-bit, not interlaced) or a JPEG image.".into(),
+        ));
+    };
+    reports::logo::set_stored(&state.pool, Some((kind, bytes.as_slice()))).await?;
+    tracing::info!(kind, size = bytes.len(), "report logo stored");
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// `DELETE /api/reports/logo`
+pub async fn delete_report_logo(
+    State(state): State<AppState>,
+    _admin: AdminIdentity,
+) -> ApiResult<StatusCode> {
+    reports::logo::set_stored(&state.pool, None).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 /// Paramètres de `GET /api/reports/sla`.
 #[derive(Debug, Deserialize)]
 pub struct SlaQuery {
@@ -337,6 +403,66 @@ pub struct SlaQuery {
     /// Mode MSP : le client dont on veut le rapport (ses équipements seuls, son
     /// nom et son logo). Obligatoire pour un membre de plusieurs clients.
     pub client: Option<i64>,
+    /// `detailed` (défaut) ou `summary`.
+    pub template: Option<String>,
+    /// `a4` (défaut) ou `letter`.
+    pub paper: Option<String>,
+    /// Sections incluses, séparées par des virgules ; absent : toutes.
+    pub sections: Option<String>,
+    /// Notes libres, imprimées dans la section « Notes ».
+    pub notes: Option<String>,
+    /// Origine du logo : `auto` (défaut), `client`, `page`, `custom` ou
+    /// `none` ; `true` et `false` (anciennes adresses) valent `auto` et `none`.
+    pub logo: Option<String>,
+    /// Périmètre en JSON : `{"targets":[1,2],"groups":["Edge"]}`.
+    pub scope: Option<String>,
+}
+
+impl SlaQuery {
+    /// Mise en page et périmètre demandés, validés.
+    fn layout(&self, title: Option<&str>) -> ApiResult<(Layout, Scope)> {
+        let template = match self.template.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+            None => Template::default(),
+            Some(raw) => Template::parse(raw).ok_or_else(|| {
+                ApiError::BadRequest("The template must be \"detailed\" or \"summary\".".into())
+            })?,
+        };
+        let paper = match self.paper.as_deref().map(str::trim).filter(|p| !p.is_empty()) {
+            None => Paper::default(),
+            Some(raw) => Paper::parse(raw).ok_or_else(|| {
+                ApiError::BadRequest("The paper must be \"a4\" or \"letter\".".into())
+            })?,
+        };
+        let sections = Sections::parse_list(self.sections.as_deref().unwrap_or(""))
+            .map_err(ApiError::BadRequest)?;
+        let logo = LogoSource::parse(self.logo.as_deref().unwrap_or("")).ok_or_else(|| {
+            ApiError::BadRequest(
+                "The logo must be \"auto\", \"client\", \"page\", \"custom\" or \"none\".".into(),
+            )
+        })?;
+        let layout = Layout {
+            template,
+            paper,
+            sections,
+            title: title.map(str::to_string),
+            notes: self.notes.clone().unwrap_or_default(),
+            show_logo: true,
+            logo,
+        }
+        .validate()
+        .map_err(ApiError::BadRequest)?;
+        let scope = match self.scope.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            None => Scope::default(),
+            Some(raw) => serde_json::from_str::<Scope>(raw).map_err(|_| {
+                ApiError::BadRequest(
+                    "The scope must be JSON like {\"targets\":[1],\"groups\":[\"Edge\"]}.".into(),
+                )
+            })?,
+        }
+        .validate()
+        .map_err(ApiError::BadRequest)?;
+        Ok((layout, scope))
+    }
 }
 
 /// Plus longue période demandable : une année (bissextile comprise).
@@ -442,14 +568,25 @@ pub async fn download_sla(
     {
         return Err(ApiError::BadRequest("The status page does not exist.".into()));
     }
+    let (layout, scope) = query.layout(title)?;
+    let format = query.format.as_deref().unwrap_or("pdf");
+    if !["pdf", "csv", "incidents_csv", "json"].contains(&format) {
+        return Err(ApiError::BadRequest(format!(
+            "Unknown format \"{}\" (expected: pdf, csv, incidents_csv, json).",
+            format.chars().filter(|c| !c.is_control()).take(40).collect::<String>()
+        )));
+    }
 
-    let data = collect::collect_period_for(&state, name, Frequency::Monthly, period, now, client)
-        .await
-        .map_err(|error| ApiError::Internal(error.context("collecte du rapport SLA")))?;
-    let options = reports::sla_options(&state, query.page, client, objective, now).await;
+    let data =
+        collect::collect_scoped(&state, name, Frequency::Monthly, period, now, client, &scope)
+            .await
+            .map_err(|error| ApiError::Internal(error.context("collecte du rapport SLA")))?;
+    let options = reports::sla_options(&state, query.page, client, objective, layout, now).await;
+    if format == "json" {
+        return Ok(Json(sla_view(&data, tz, tz_name, &options)).into_response());
+    }
     let stem = sla::file_stem(&data, tz);
-    let (body, content_type, filename) = match query.format.as_deref().unwrap_or("pdf") {
-        "pdf" => (sla::pdf(&data, tz, &options), "application/pdf", format!("{stem}.pdf")),
+    let (body, content_type, filename) = match format {
         "csv" => (
             sla::csv_monitors(&data, objective).into_bytes(),
             reports::CSV_TYPE,
@@ -460,11 +597,7 @@ pub async fn download_sla(
             reports::CSV_TYPE,
             format!("{stem}-incidents.csv"),
         ),
-        other => {
-            return Err(ApiError::BadRequest(format!(
-                "Unknown format \"{other}\" (expected: pdf, csv, incidents_csv)."
-            )));
-        }
+        _ => (sla::pdf(&data, tz, &options), "application/pdf", format!("{stem}.pdf")),
     };
     Ok((
         [
@@ -475,4 +608,169 @@ pub async fn download_sla(
         body,
     )
         .into_response())
+}
+
+// --------------------------------------------------------------------------
+// Vue JSON du rapport SLA (`format=json`) : la page web imprimable
+// --------------------------------------------------------------------------
+
+#[derive(Debug, Serialize)]
+pub struct SlaReportView {
+    /// Organisation, page de statut ou « DumbMonit ».
+    pub brand: String,
+    /// Titre choisi, sinon « Availability report ».
+    pub title: String,
+    pub period_label: String,
+    pub period_start: String,
+    pub period_end: String,
+    pub timezone: String,
+    pub generated_at: String,
+    pub objective: Option<f64>,
+    pub layout: Layout,
+    /// Adresse du logo en tête (relative à `/api`), `None` sans logo.
+    pub logo_url: Option<String>,
+    pub availability_known: bool,
+    pub fleet_uptime: Option<f64>,
+    pub fleet_previous_uptime: Option<f64>,
+    /// `Met`, `Missed`, `Healthy`, `Degraded`, `Poor` ou `No data`.
+    pub fleet_status: String,
+    pub downtime_secs: i64,
+    pub incident_count: usize,
+    pub previous_incident_count: usize,
+    /// Vrai quand les moniteurs sont rangés en groupes.
+    pub grouped: bool,
+    pub groups: Vec<SlaGroupView>,
+    pub monitors: Vec<SlaMonitorView>,
+    pub incidents: Vec<SlaIncidentView>,
+    pub maintenance: Vec<SlaMaintenanceView>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SlaGroupView {
+    pub name: String,
+    pub monitors: usize,
+    pub uptime: Option<f64>,
+    pub previous_uptime: Option<f64>,
+    pub status: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SlaMonitorView {
+    pub name: String,
+    pub group: String,
+    pub uptime: Option<f64>,
+    pub previous_uptime: Option<f64>,
+    pub status: String,
+    pub incidents: usize,
+    pub downtime_secs: i64,
+    pub latency_avg_ms: Option<f64>,
+    pub latency_p95_ms: Option<f64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SlaIncidentView {
+    pub monitor: String,
+    pub rule: String,
+    pub severity: String,
+    pub started_at: String,
+    pub ended_at: Option<String>,
+    pub duration_secs: i64,
+    pub began_before_period: bool,
+    /// Parmi les incidents majeurs de la synthèse.
+    pub major: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SlaMaintenanceView {
+    pub name: String,
+    pub monitor: Option<String>,
+    pub starts_at: String,
+    pub ends_at: String,
+    pub recurring: bool,
+}
+
+fn sla_view(
+    data: &crate::reports::collect::ReportData,
+    tz: chrono_tz::Tz,
+    tz_name: &str,
+    options: &crate::reports::sla::Options,
+) -> SlaReportView {
+    use crate::reports::collect::UNGROUPED;
+    use crate::reports::sla;
+    let objective = options.objective;
+    let major = sla::major_incidents(data);
+    let grouped = data.groups.len() > 1 || data.groups.first().is_some_and(|g| g.name != UNGROUPED);
+    SlaReportView {
+        brand: options.brand.clone(),
+        title: sla::heading_title(&options.layout),
+        period_label: sla::period_label(data, tz),
+        period_start: iso(data.period.start),
+        period_end: iso(data.period.end),
+        timezone: tz_name.to_string(),
+        generated_at: iso(options.generated),
+        objective,
+        layout: options.layout.clone(),
+        logo_url: options.logo_url.clone(),
+        availability_known: data.availability_known,
+        fleet_uptime: data.fleet_uptime,
+        fleet_previous_uptime: data.fleet_previous_uptime,
+        fleet_status: sla::status_word(data.fleet_uptime, objective).to_string(),
+        downtime_secs: data.downtime_secs,
+        incident_count: data.incidents.len(),
+        previous_incident_count: data.previous_incident_count,
+        grouped,
+        groups: data
+            .groups
+            .iter()
+            .map(|g| SlaGroupView {
+                name: g.name.clone(),
+                monitors: g.devices,
+                uptime: g.uptime,
+                previous_uptime: g.previous_uptime,
+                status: sla::status_word(g.uptime, objective).to_string(),
+            })
+            .collect(),
+        monitors: data
+            .devices
+            .iter()
+            .take(sla::MAX_PDF_MONITORS)
+            .map(|d| SlaMonitorView {
+                name: d.name.clone(),
+                group: d.group.clone(),
+                uptime: d.uptime,
+                previous_uptime: d.previous_uptime,
+                status: sla::status_word(d.uptime, objective).to_string(),
+                incidents: d.incidents,
+                downtime_secs: d.downtime_secs,
+                latency_avg_ms: d.latency_avg_ms,
+                latency_p95_ms: d.latency_p95_ms,
+            })
+            .collect(),
+        incidents: data
+            .incidents
+            .iter()
+            .take(sla::MAX_PDF_INCIDENTS)
+            .map(|i| SlaIncidentView {
+                monitor: i.device.clone(),
+                rule: i.rule.clone(),
+                severity: i.severity.clone(),
+                started_at: iso(i.started),
+                ended_at: i.ended.map(iso),
+                duration_secs: i.duration(data.period.end).num_seconds().max(0),
+                began_before_period: i.began_before_period,
+                major: major.iter().any(|m| std::ptr::eq(*m, i)),
+            })
+            .collect(),
+        maintenance: data
+            .maintenance
+            .iter()
+            .map(|w| SlaMaintenanceView {
+                name: w.name.clone(),
+                monitor: w.monitor.clone(),
+                starts_at: iso(w.starts),
+                ends_at: iso(w.ends),
+                recurring: w.recurring,
+            })
+            .collect(),
+    }
 }

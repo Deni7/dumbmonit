@@ -3,7 +3,7 @@
  * phone's tab bar (the rail sets the `foot` ones apart, in its bottom group;
  * the tab bar keeps the order below). What used to be a page of its own now
  * lives in a tab of one of them (Map, Logs, Security under Monitors;
- * automation under Alerts; reports under Status); Explore and Clients are
+ * automation under Alerts; reports and SLA under Status); Explore and Clients are
  * reached from the command palette and the client picker. A new destination
  * is one line here.
  */
@@ -38,7 +38,7 @@ export const NAV: NavEntry[] = [
 	{ href: '/', label: () => m.misc_nav_overview(), icon: House, exact: true, unscoped: true },
 	{ href: '/targets', label: () => m.misc_nav_devices(), icon: Activity, also: ['/map', '/logs', '/security'], tour: 'nav-devices' },
 	{ href: '/alerts', label: () => m.misc_nav_alerts(), icon: Bell, badge: true, also: ['/actions', '/runbooks'], tour: 'nav-alerts' },
-	{ href: '/status', label: () => m.shell_nav_status(), icon: Globe, also: ['/reports'] },
+	{ href: '/status', label: () => m.shell_nav_status(), icon: Globe, also: ['/reports', '/sla'] },
 	{ href: '/settings', label: () => m.misc_nav_settings(), icon: Settings, tour: 'nav-settings', foot: true }
 ];
 

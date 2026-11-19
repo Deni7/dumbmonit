@@ -15,7 +15,7 @@
 	import type { LogInputs, LogSearchResult, LogSource, Target } from '#lib/api/types.js';
 	import { formatDateTime, formatDuration, formatRelative } from '#lib/format.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
-	import { Button, Disclosure, EmptyState, ErrorNotice, Field, Plate, Skeleton } from '#lib/ui/index.js';
+	import { Button, DateTimeField, Disclosure, EmptyState, ErrorNotice, Field, Plate, Skeleton } from '#lib/ui/index.js';
 	import { fromSeverityWord, severityOptions, type SeverityWord } from '#lib/components/alerts/rules/options.js';
 	import type { Tone } from '#lib/ui/index.js';
 	import { levelLabel } from '#lib/components/settings/logLabels.js';
@@ -221,10 +221,10 @@
 		{#if period === 'custom'}
 			<div class="grid gap-4 sm:grid-cols-2">
 				<Field label={m.logsearch_from()} for="logs-from" error={rangeError ? m.logsearch_range_invalid() : null}>
-					<input id="logs-from" type="datetime-local" class="input" bind:value={customStart} />
+					<DateTimeField id="logs-from" bind:value={customStart} label={m.logsearch_from()} invalid={rangeError} />
 				</Field>
 				<Field label={m.logsearch_to()} for="logs-to" help={m.logsearch_to_help()}>
-					<input id="logs-to" type="datetime-local" class="input" bind:value={customEnd} />
+					<DateTimeField id="logs-to" bind:value={customEnd} min={customStart || null} label={m.logsearch_to()} clearable />
 				</Field>
 			</div>
 		{/if}

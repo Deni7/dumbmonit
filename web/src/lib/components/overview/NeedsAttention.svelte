@@ -3,17 +3,13 @@
 	/**
 	 * "Needs attention": only what is broken now (see `attention.ts`), worst
 	 * first, each row with its quick action: acknowledge or snooze an alert,
-	 * mute a monitor (a small cross, see `MuteControl`). Then the week ahead
-	 * in one line at the foot (what expires in the next seven days). With
-	 * nothing broken, the pigeon sleeps and the card says so. Phones keep the
-	 * first five rows.
+	 * mute a monitor (a small cross, see `MuteControl`). With nothing broken,
+	 * the pigeon sleeps and the card says so. Phones keep the first five rows.
 	 */
 	import { ArrowRight } from 'lucide-svelte';
-	import { listAlertRules, listSilences, type AlertRule, type Deadline, type Silence } from '#lib/api/index.js';
-	import { listDeadlines } from '#lib/api/deadlines.js';
+	import { listAlertRules, listSilences, type AlertRule, type Silence } from '#lib/api/index.js';
 	import AlertActions from '#lib/components/alerts/AlertActions.svelte';
 	import { TONE_BAR } from '#lib/components/alerts/helpers.js';
-	import { kindName, whenLabel } from '#lib/components/deadlines/labels.js';
 	import Mascot from '#lib/components/Mascot.svelte';
 	import { formatRelative } from '#lib/format.js';
 	import { m } from '#lib/paraglide/messages.js';
@@ -23,27 +19,17 @@
 	import MuteControl from './MuteControl.svelte';
 	import { acknowledgedBy, mutedBy } from './mute.js';
 	import { readSky, type SkyRow } from './sky.js';
-	import { attentionRows, weekAhead } from './attention.js';
+	import { attentionRows } from './attention.js';
 
 	/** Rows shown on a larger screen; phones stop at five (CSS). */
-	const LIMIT = 8;
+	const LIMIT = 6;
 	const PHONE_LIMIT = 5;
-	const WEEK_SHOWN = 3;
 
 	let rules = $state<AlertRule[]>([]);
 	$effect(() => {
 		const controller = new AbortController();
 		listAlertRules(controller.signal)
 			.then((list) => (rules = list))
-			.catch(() => {});
-		return () => controller.abort();
-	});
-
-	let deadlines = $state<Deadline[]>([]);
-	$effect(() => {
-		const controller = new AbortController();
-		listDeadlines({ maxDays: 7, signal: controller.signal })
-			.then((list) => (deadlines = list))
 			.catch(() => {});
 		return () => controller.abort();
 	});
@@ -57,7 +43,6 @@
 		)
 	);
 	const shown = $derived(rows.slice(0, LIMIT));
-	const week = $derived(weekAhead(deadlines));
 	const monitors = $derived(alertsStore.targets.length);
 
 	function title(row: SkyRow): string {
@@ -177,22 +162,4 @@
 			</a>
 		{/if}
 	{/if}
-
-	<div class="mt-auto flex flex-wrap items-center gap-x-3 border-t border-line px-4 py-0.5 text-sm text-ink-2">
-		<span class="flex min-h-10 items-center font-medium text-ink">{m.overview_week_title()}</span>
-		{#if week.length === 0}
-			<span class="flex min-h-10 items-center">{m.overview_week_none()}</span>
-		{:else}
-			{#each week.slice(0, WEEK_SHOWN) as item (`${item.target}:${item.kind}:${item.what}`)}
-				<a href={withBase(`/targets/${item.target}`)} class="inline-flex min-h-10 min-w-0 items-center gap-1.5 hover:text-ink">
-					<span>{kindName(item.kind)}</span>
-					<span class="max-w-[12rem] truncate font-medium text-ink">{item.what || item.target_name}</span>
-					<span class={item.days_left < 3 ? 'text-warning-ink' : ''}>{whenLabel(item.days_left)}</span>
-				</a>
-			{/each}
-			{#if week.length > WEEK_SHOWN}
-				<a href={withBase('/status?tab=reports')} class="inline-flex min-h-10 items-center font-medium hover:text-ink">{m.overview_week_more({ count: week.length - WEEK_SHOWN })}</a>
-			{/if}
-		{/if}
-	</div>
 </section>

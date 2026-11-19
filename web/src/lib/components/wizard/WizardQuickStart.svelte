@@ -29,6 +29,8 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { withBase } from '#lib/paths.js';
 	import { Button, ErrorNotice, Skeleton } from '#lib/ui/index.js';
+	import { withoutOnCall } from '#lib/components/oncall/gate.js';
+	import { instanceStore } from '#lib/stores/instance.svelte.js';
 	import ChannelForm from '#lib/components/notifications/ChannelForm.svelte';
 	import { kindIcon, normalizeKind, type KindInfo } from '#lib/components/notifications/kinds.js';
 	import { expectedAlertMinutes, guessMonitor, ntfySubscribeUrl, ntfyTopic, quickKinds } from './quickstart.js';
@@ -131,13 +133,16 @@
 
 	// --- 2. Where the alert goes ---------------------------------------------------
 
-	const quick = $derived(quickKinds(kinds));
+	// On-call channels are not offered while on-call schedules are off.
+	const visibleKinds = $derived(withoutOnCall(kinds, instanceStore.oncallEnabled));
+	const visibleChannels = $derived(withoutOnCall(channels, instanceStore.oncallEnabled));
+	const quick = $derived(quickKinds(visibleKinds));
 	/** Kind whose form is open; `''` opens the full picker; `null`: no form. */
 	let picking = $state<string | null>(null);
 	let presetSettings = $state<Record<string, string>>({});
 	/** The channel set up here, or the first enabled one already there. */
 	let chosen = $state<Channel | null>(null);
-	const channel = $derived(chosen ?? channels[0] ?? null);
+	const channel = $derived(chosen ?? visibleChannels[0] ?? null);
 
 	function pick(kind: string) {
 		presetSettings = kind === 'ntfy' ? { topic: ntfyTopic() } : {};
@@ -293,7 +298,7 @@
 					{/if}
 					<div class="mt-3 min-w-0">
 						{#key picking}
-							<ChannelForm {kinds} initialKind={picking || undefined} initialSettings={presetSettings} onsaved={saved} oncancel={() => (picking = null)} />
+							<ChannelForm kinds={visibleKinds} initialKind={picking || undefined} initialSettings={presetSettings} onsaved={saved} oncancel={() => (picking = null)} />
 						{/key}
 					</div>
 				{/if}

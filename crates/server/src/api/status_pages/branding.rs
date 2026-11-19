@@ -26,7 +26,7 @@ pub struct LogoPayload {
     pub data: String,
 }
 
-fn logo_path(state: &AppState, id: i64) -> std::path::PathBuf {
+pub(crate) fn logo_path(state: &AppState, id: i64) -> std::path::PathBuf {
     state.config.data_dir.join("status-pages").join(format!("{id}.logo"))
 }
 

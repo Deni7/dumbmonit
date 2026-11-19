@@ -51,6 +51,11 @@ test('1. first run: the setup creates the admin account and opens the wizard', a
 
 	// Signed in as soon as the account exists, and the setup wizard takes over.
 	await expect(page).toHaveURL(/\/welcome/);
+	await expect(page.getByRole('heading', { level: 1 })).toContainText('Your first alert');
+	await expectNoHorizontalOverflow(page);
+
+	// The step lives in the URL: the next one is "Name this instance".
+	await page.goto('/welcome?step=instance');
 	await expect(page.getByRole('heading', { level: 1 })).toContainText('Name this instance');
 	await expectNoHorizontalOverflow(page);
 
@@ -115,7 +120,7 @@ test('3. notification channel and public status page, both healthy', async ({ pa
 	await page.getByLabel('Title', { exact: true }).fill(NAMES.statusTitle);
 	await page.getByLabel('Address', { exact: true }).fill(NAMES.statusSlug);
 	await page.getByRole('switch', { name: 'Published' }).click();
-	await page.getByRole('combobox', { name: 'Search a service' }).click();
+	await page.getByRole('combobox', { name: /^Add monitors to/ }).first().click();
 	await page.getByRole('option', { name: NAMES.monitor }).click();
 	await expectNoHorizontalOverflow(page);
 	await page.getByRole('button', { name: 'Create page', exact: true }).click();

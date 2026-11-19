@@ -11,6 +11,7 @@
 	 * health endpoint behind it is public.
 	 */
 	import { getHealth } from '#lib/api/index.js';
+	import { auth } from '#lib/stores/auth.svelte.js';
 	import UpdatePill from '#lib/components/UpdatePill.svelte';
 
 	let { inline = false }: { inline?: boolean } = $props();
@@ -25,12 +26,15 @@
 </script>
 
 {#if version}
-	<a
-		href={withBase('/settings/system#about')}
-		class={`tnum rounded-md px-1.5 py-0.5 text-[0.6875rem] font-medium transition-opacity hover:text-ink-2 hover:opacity-100 ${inline ? 'text-ink-3' : 'mr-4 mb-3 hidden self-end text-ink-3/70 opacity-70 sm:mr-6 sm:block'}`}
-		title={version.build ? `Version ${version.number}, build ${version.build}` : `Version ${version.number}`}
-		>v{version.number}{#if version.build}<span class="font-mono"> · {version.build}</span>{/if}</a
-	>
+	<div class={inline ? 'inline-flex items-center gap-1' : 'mr-4 mb-3 hidden items-center gap-1 self-end sm:mr-6 sm:flex'}>
+		<a
+			href={withBase('/settings/system#about')}
+			class={`tnum rounded-md px-1.5 py-0.5 text-[0.6875rem] font-medium transition-opacity hover:text-ink-2 hover:opacity-100 ${inline ? 'text-ink-3' : 'text-ink-3/70 opacity-70'}`}
+			title={version.build ? `Version ${version.number}, build ${version.build}` : `Version ${version.number}`}
+			>v{version.number}{#if version.build}<span class="font-mono"> · {version.build}</span>{/if}</a
+		>
+	</div>
 {/if}
 
-{#if !inline}<UpdatePill />{/if}
+<!-- The update check needs a session: asking before sign-in only logs a 401. -->
+{#if !inline && auth.canUseApi}<UpdatePill />{/if}

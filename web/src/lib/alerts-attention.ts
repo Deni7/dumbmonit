@@ -18,6 +18,17 @@ export function countsAsProblem(alert: {
 	return alert.effective_phase === 'firing' && !alert.acked && isProblemSeverity(alert.severity);
 }
 
+/**
+ * What the wall reads: a wall is read from across the room, so it leaves out
+ * alerts still building up (not triggered yet) and acknowledged ones (someone
+ * already knows). Neither is listed, nor counted in the verdict or the mood.
+ */
+export function visibleOnWall<T extends { effective_phase: string; acked: boolean }>(
+	alerts: readonly T[]
+): T[] {
+	return alerts.filter((alert) => alert.effective_phase !== 'pending' && !alert.acked);
+}
+
 /** The wall's "N problems": warnings, advisories, unreachable and misconfigured devices; never info. */
 export function attentionCount(parts: {
 	warnings: number;

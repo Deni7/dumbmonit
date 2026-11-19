@@ -198,11 +198,16 @@ anyone. Times are stored in UTC.
 
 ### Email subscribers
 
-Visitors can subscribe to your announcements by email once you pick an
-**email (SMTP) channel** in the editor, under **Email subscribers**. The
-channel is one you already configured under
-[Notifications](../alerting/notifications.md); its server and sender are reused, its
-own recipients are not. Without one, the page offers its RSS feed only.
+Turn on **Let visitors subscribe by email** in the editor (under **Subscribers
+and domain**). The emails go through the [email server](../notifications.md#email-server)
+of the instance, set once in **Settings → Notifications → Email server**: no
+notification channel to create. Until a server is set, the editor says so with
+a link to that setting, and the page offers its RSS feed only.
+
+A page can still send through one of your **email (SMTP) channels** instead:
+pick it under **Send with** in the editor. The channel wins while it is
+enabled; its server and sender are reused, its own recipients are not. Pages
+set up that way before the email server existed keep working unchanged.
 
 - **Double opt-in.** A visitor enters an address; DumbMonit mails a
   confirmation link, and nothing else is sent until it is followed. A request

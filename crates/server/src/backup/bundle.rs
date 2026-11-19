@@ -226,6 +226,25 @@ pub struct Bundle {
     /// délai, seuil d'arrêt et pause (clé `agent.update_rollout` de `settings`).
     #[serde(default)]
     pub agent_update_rollout: Option<Value>,
+    /// Serveur de courriel de l'instance (clé `mail.server` de `settings`), son
+    /// mot de passe en clair dans le lot, lui-même chiffré par la phrase de
+    /// passe. Absent tant qu'aucun serveur n'est enregistré ; un serveur décrit
+    /// par `DUMBMONIT_SMTP_*` n'y est jamais.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mail_server: Option<BundleMailServer>,
+    /// Logo téléversé pour les rapports SLA (migration 0247). Absent : pas de
+    /// logo propre aux rapports, et l'instance restaurée garde le sien.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub report_logo: Option<BundleReportLogo>,
+}
+
+/// Serveur de courriel enregistré et son mot de passe.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct BundleMailServer {
+    #[serde(flatten)]
+    pub server: crate::notify::mail_server::MailServer,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub password: Option<String>,
 }
 
 impl Bundle {
@@ -534,6 +553,9 @@ pub struct BundleLocation {
     pub longitude: f64,
     #[serde(default)]
     pub site: String,
+    /// Code de la pastille (deux caractères) ; absent d'un ancien lot : celui du nom.
+    #[serde(default)]
+    pub code: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -612,6 +634,13 @@ pub struct BundleSilence {
     pub enabled: bool,
 }
 
+/// Logo des rapports : son type MIME et ses octets en base64.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BundleReportLogo {
+    pub logo_type: String,
+    pub data: String,
+}
+
 /// Rapport périodique : le canal SMTP est référencé par son nom, comme pour les
 /// règles ; le dernier envoi n'est pas emporté (un rapport restauré repart de zéro).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -631,6 +660,34 @@ pub struct BundleReportSchedule {
     pub recipients: Vec<String>,
     #[serde(default)]
     pub channel: Option<String>,
+    /// `digest` ou `sla` ; absent (lot ancien) : `digest`.
+    #[serde(default = "digest")]
+    pub kind: String,
+    #[serde(default = "yes")]
+    pub attach_pdf: bool,
+    #[serde(default = "yes")]
+    pub attach_csv: bool,
+    /// Page de statut qui habille le rapport SLA, par son adresse (`slug`).
+    #[serde(default)]
+    pub page: Option<String>,
+    #[serde(default)]
+    pub objective: Option<f64>,
+    /// Mise en page du PDF SLA ; absente : le rapport détaillé en A4.
+    #[serde(default)]
+    pub layout: crate::reports::layout::Layout,
+    /// Moniteurs du périmètre, par référence (`kind|address`), comme ailleurs.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scope_targets: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scope_groups: Vec<String>,
+}
+
+fn digest() -> String {
+    "digest".to_string()
+}
+
+fn yes() -> bool {
+    true
 }
 
 fn one() -> u32 {
@@ -645,6 +702,10 @@ fn eight() -> u32 {
 /// de notification (courriel, SMS) sont désignés par leur nom.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BundleSubscriptions {
+    /// Abonnement par courriel ouvert (migration 0246). Absent d'une ancienne
+    /// sauvegarde : ouvert si un canal courriel est nommé.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub email: Option<bool>,
     #[serde(default)]
     pub email_channel: Option<String>,
     #[serde(default)]
@@ -709,6 +770,10 @@ pub struct BundleStatusPage {
     /// voyagent pas. Absent d'une ancienne sauvegarde : réglages inchangés.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subscriptions: Option<BundleSubscriptions>,
+    /// Marque blanche (migration 0243). Absent d'une ancienne sauvegarde : la
+    /// page garde son réglage (`false` sur une page créée).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hide_branding: Option<bool>,
 }
 
 /// Nom public d'une surveillance arrivée par un groupe coché.

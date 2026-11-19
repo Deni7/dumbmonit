@@ -6,12 +6,15 @@
 //!   rattrapage rétroactif) — pur.
 //! - [`collect`] : chiffres, depuis VictoriaMetrics et l'historique des alertes.
 //! - [`render`] : courriel HTML et texte.
+//! - [`sla`], [`pdf`], [`layout`] : rapport SLA en PDF (gabarits détaillé et
+//!   synthèse, sections au choix) et en CSV.
 //! - [`store`] : table `report_schedules`.
 //!
 //! Le courriel part par un canal SMTP existant : les réglages du serveur de
 //! messagerie restent ceux des notifications, sans second endroit à tenir.
 
 pub mod collect;
+pub mod layout;
 pub mod logo;
 pub mod pdf;
 pub mod render;
@@ -117,7 +120,8 @@ pub fn next_run(stored: &StoredSchedule, now: DateTime<Utc>) -> Option<DateTime<
     calendar.next_slot(now.max(stored.armed_at))
 }
 
-/// Canal SMTP à utiliser : celui du calendrier, sinon le premier actif.
+/// Canal SMTP à utiliser : celui du calendrier, sinon le premier actif, sinon
+/// le serveur de courriel de l'instance.
 async fn resolve_channel(
     state: &AppState,
     stored: &StoredSchedule,
@@ -132,37 +136,87 @@ async fn resolve_channel(
     match found {
         Some(channel) if channel.kind == "smtp" && channel.enabled => Ok(channel),
         Some(_) => Err("The selected channel is not an enabled email (SMTP) channel.".to_string()),
-        None => Err("No enabled email (SMTP) notification channel is configured.".to_string()),
+        None => crate::notify::mail_server::channel(&state.pool, &state.cipher)
+            .await
+            .ok_or_else(|| NO_SENDER.to_string()),
     }
 }
 
-/// Habillage d'un rapport SLA : le client (mode MSP : son nom et son logo),
-/// sinon le nom de la page de statut choisie, à défaut « DumbMonit ».
+/// Ni canal courriel actif, ni serveur de courriel réglé.
+const NO_SENDER: &str = "No email server is set (Settings, Notifications) and no email (SMTP) \
+                         notification channel is enabled.";
+
+/// Habillage d'un rapport SLA : le nom du client (mode MSP), sinon celui de
+/// la page de statut choisie, à défaut « DumbMonit » ; le logo selon
+/// [`layout::Layout::logo`] — `auto` : celui du client, sinon celui de la page.
+/// Un logo qui ne s'incorpore pas (WebP…) est laissé de côté, aperçu compris.
 pub async fn sla_options(
     state: &AppState,
     page_id: Option<i64>,
     client: Option<i64>,
     objective: Option<f64>,
+    layout: layout::Layout,
     now: DateTime<Utc>,
 ) -> sla::Options {
-    if let Some(client) = client
-        && let Ok(found) = clients::refs(&state.pool, Some(std::slice::from_ref(&client))).await
-        && let Some(found) = found.into_iter().next()
-    {
-        let stored = if found.has_logo {
-            clients::logo(&state.pool, client).await.ok().flatten()
-        } else {
-            None
-        };
-        let logo = stored.and_then(|(_, bytes)| logo::for_pdf(&bytes));
-        return sla::Options { brand: found.name, objective, generated: now, logo };
-    }
-    let brand = match page_id {
+    use layout::LogoSource;
+    let found = match client {
+        Some(client) => {
+            let only = std::slice::from_ref(&client);
+            clients::refs(&state.pool, Some(only)).await.ok().and_then(|f| f.into_iter().next())
+        }
+        None => None,
+    };
+    // Hors mode MSP (ou client introuvable), la page de statut habille le
+    // rapport ; avec un client, la page ne sert qu'à son logo, sur demande.
+    let page = match page_id {
         Some(id) => db::status_pages::get_page(&state.pool, id).await.ok().flatten(),
         None => None,
-    }
-    .map_or_else(|| "DumbMonit".to_string(), |page| page.title);
-    sla::Options { brand, objective, generated: now, logo: None }
+    };
+    let chosen = match layout.logo_source() {
+        LogoSource::Hidden => None,
+        LogoSource::Client => client_logo(state, found.as_ref()).await,
+        LogoSource::Page => page_logo(state, page.as_ref()).await,
+        LogoSource::Custom => custom_logo(state).await,
+        LogoSource::Auto if found.is_some() => client_logo(state, found.as_ref()).await,
+        LogoSource::Auto => page_logo(state, page.as_ref()).await,
+    };
+    let (logo, logo_url) = match chosen {
+        Some((image, url)) => (Some(image), Some(url)),
+        None => (None, None),
+    };
+    let brand = match (found, page) {
+        (Some(found), _) => found.name,
+        (None, Some(page)) => page.title,
+        (None, None) => "DumbMonit".to_string(),
+    };
+    sla::Options { brand, objective, generated: now, logo, logo_url, layout }
+}
+
+/// Logo du client, prêt pour le PDF, et son adresse pour l'aperçu.
+async fn client_logo(
+    state: &AppState,
+    found: Option<&clients::ClientRef>,
+) -> Option<(pdf::Image, String)> {
+    let found = found.filter(|found| found.has_logo)?;
+    let (_, bytes) = clients::logo(&state.pool, found.id).await.ok().flatten()?;
+    Some((logo::for_pdf(&bytes)?, format!("/clients/{}/logo", found.id)))
+}
+
+/// Logo téléversé pour les rapports, prêt pour le PDF, et son adresse.
+async fn custom_logo(state: &AppState) -> Option<(pdf::Image, String)> {
+    let (_, bytes) = logo::stored(&state.pool).await.ok().flatten()?;
+    Some((logo::for_pdf(&bytes)?, "/reports/logo".to_string()))
+}
+
+/// Logo de la page de statut, prêt pour le PDF, et son adresse pour l'aperçu.
+async fn page_logo(
+    state: &AppState,
+    page: Option<&db::status_pages::StatusPage>,
+) -> Option<(pdf::Image, String)> {
+    let page = page.filter(|page| page.logo_type.is_some())?;
+    let path = crate::api::status_pages::branding::logo_path(state, page.id);
+    let bytes = tokio::fs::read(&path).await.ok()?;
+    Some((logo::for_pdf(&bytes)?, format!("/status-pages/{}/logo", page.id)))
 }
 
 /// Les fichiers d'un rapport SLA : (nom, type MIME, octets).
@@ -218,7 +272,7 @@ pub async fn deliver(
     }
     let calendar = schedule_of(stored).ok_or("The schedule is unreadable.".to_string())?;
     let channel = resolve_channel(state, stored).await?;
-    let smtp = Smtp::new(&channel).map_err(|error| error.to_string())?;
+    let smtp = Smtp::sender(&channel).map_err(|error| error.to_string())?;
     // Mode MSP : le calendrier d'un client ne rapporte que sur ce client.
     let client = clients::owner_of(&state.pool, clients::Kind::Report, stored.id)
         .await
@@ -230,7 +284,8 @@ pub async fn deliver(
         // Le mois civil entier qui précède l'envoi, dans le fuseau du calendrier.
         let period = schedule::Period::previous_calendar_month(now, calendar.tz)
             .ok_or("Cannot work out the month to report.".to_string())?;
-        sla_email(state, &stored.name, period, calendar.tz, client, preview, now).await?
+        sla_email(state, &stored.name, period, calendar.tz, client, &stored.scope, preview, now)
+            .await?
     } else {
         let period = schedule::Period::ending_at(now, calendar.frequency);
         let data = collect::collect_period_for(
@@ -252,7 +307,15 @@ pub async fn deliver(
     rendered.subject = rendered.subject.replace(['\r', '\n'], " ");
 
     let attachments = if sla {
-        let options = sla_options(state, stored.page_id, client, stored.objective, now).await;
+        let options = sla_options(
+            state,
+            stored.page_id,
+            client,
+            stored.objective,
+            stored.layout.clone(),
+            now,
+        )
+        .await;
         sla_attachments(&data, calendar.tz, &options, stored.attach_pdf, stored.attach_csv)
     } else {
         Vec::new()
@@ -261,22 +324,24 @@ pub async fn deliver(
 }
 
 /// Données et courriel d'un rapport SLA mensuel (un client, ou toute
-/// l'instance).
+/// l'instance, dans le périmètre choisi).
+#[allow(clippy::too_many_arguments)]
 async fn sla_email(
     state: &AppState,
     name: &str,
     period: schedule::Period,
     tz: chrono_tz::Tz,
     client: Option<i64>,
+    scope: &layout::Scope,
     preview: bool,
     now: DateTime<Utc>,
 ) -> Result<(collect::ReportData, render::Rendered), String> {
-    let data = collect::collect_period_for(state, name, Frequency::Monthly, period, now, client)
-        .await
-        .map_err(|error| {
-            warn!(%error, "report: data collection failed");
-            "Cannot gather the report data.".to_string()
-        })?;
+    let collected =
+        collect::collect_scoped(state, name, Frequency::Monthly, period, now, client, scope).await;
+    let data = collected.map_err(|error| {
+        warn!(%error, "report: data collection failed");
+        "Cannot gather the report data.".to_string()
+    })?;
     let mut rendered = render::render(&data, tz, preview);
     let count = data.incidents.len();
     rendered.subject = format!(
@@ -465,7 +530,8 @@ pub async fn run_client_reports(state: &AppState, now: DateTime<Utc>) -> anyhow:
 type ClientReportRows = Vec<(i64, String, String, Option<f64>, String, Option<String>)>;
 
 /// Canal SMTP d'un client : le sien s'il en a un actif, sinon celui de
-/// l'instance. Jamais celui d'un autre client.
+/// l'instance, sinon le serveur de courriel de l'instance. Jamais celui d'un
+/// autre client.
 async fn client_channel(state: &AppState, client: i64) -> Result<ChannelConfig, String> {
     let channels = db::alerts::list_channels(&state.pool, &state.cipher)
         .await
@@ -474,13 +540,18 @@ async fn client_channel(state: &AppState, client: i64) -> Result<ChannelConfig, 
         .await
         .map_err(|_| "Cannot read the notification channels.".to_string())?;
     let usable = |c: &&ChannelConfig| c.enabled && c.kind == "smtp";
-    channels
+    let found = channels
         .iter()
         .filter(usable)
         .find(|c| owners.get(&c.id) == Some(&client))
         .or_else(|| channels.iter().filter(usable).find(|c| !owners.contains_key(&c.id)))
-        .cloned()
-        .ok_or_else(|| "No enabled email (SMTP) notification channel is configured.".to_string())
+        .cloned();
+    match found {
+        Some(channel) => Ok(channel),
+        None => crate::notify::mail_server::channel(&state.pool, &state.cipher)
+            .await
+            .ok_or_else(|| NO_SENDER.to_string()),
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -498,12 +569,14 @@ async fn send_client_report(
         return Err("Add at least one contact to this client.".to_string());
     }
     let channel = client_channel(state, client).await?;
-    let smtp = Smtp::new(&channel).map_err(|error| error.to_string())?;
+    let smtp = Smtp::sender(&channel).map_err(|error| error.to_string())?;
     let title = format!("{name} availability report");
+    let scope = layout::Scope::default();
     let (data, mut rendered) =
-        sla_email(state, &title, period, tz, Some(client), false, now).await?;
+        sla_email(state, &title, period, tz, Some(client), &scope, false, now).await?;
     rendered.subject = rendered.subject.replace(['\r', '\n'], " ");
-    let options = sla_options(state, None, Some(client), objective, now).await;
+    let options =
+        sla_options(state, None, Some(client), objective, layout::Layout::default(), now).await;
     let attachments = sla_attachments(&data, tz, &options, true, true);
     send_all(&smtp, contacts, &rendered, &attachments).await
 }
@@ -588,6 +661,8 @@ mod tests {
             attach_csv: true,
             page_id: None,
             objective: None,
+            layout: layout::Layout::default(),
+            scope: layout::Scope::default(),
         }
     }
 

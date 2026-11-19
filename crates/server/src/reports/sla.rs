@@ -8,15 +8,18 @@
 //! d'un mot.
 //!
 //! Le PDF est écrit par [`super::pdf`] (texte et tableaux, polices standard,
-//! sans dépendance). En mode MSP, le logo du client est incorporé en tête
-//! quand il est en JPEG ou en PNG (voir [`super::logo`]) ; sinon le nom du
-//! client en tient lieu.
+//! sans dépendance), en deux gabarits ([`Template`]) : détaillé (tout) ou
+//! synthèse (une à deux pages). Les sections, le papier (A4 ou Letter), le
+//! titre et les notes suivent [`Layout`]. Le logo du client (mode MSP) ou de
+//! la page de statut est incorporé en tête quand il est en JPEG ou en PNG
+//! (voir [`super::logo`]) ; sinon le nom en tient lieu.
 
 use chrono::{DateTime, Datelike, TimeDelta, Utc};
 use chrono_tz::Tz;
 
-use super::collect::{DeviceStat, ReportData, UNGROUPED};
-use super::pdf::{self, Document, Font, PAGE_H, PAGE_W, Page, Rgb};
+use super::collect::{DeviceStat, Incident, ReportData, UNGROUPED};
+use super::layout::{Layout, LogoSource, Paper, Template};
+use super::pdf::{self, Document, Font, Page, Rgb};
 use super::render::{count_delta, delta, duration, one_line, verdict, when};
 
 /// Plafonds : un PDF de plusieurs centaines de pages ne se lit plus.
@@ -31,8 +34,14 @@ pub struct Options {
     pub objective: Option<f64>,
     /// Instant de génération, écrit dans le pied de page et les métadonnées.
     pub generated: DateTime<Utc>,
-    /// Mode MSP : logo du client, en tête à droite.
+    /// Logo en tête à droite, selon [`Layout::logo`] : celui du client (mode
+    /// MSP), de la page de statut choisie ou le logo téléversé des rapports.
     pub logo: Option<pdf::Image>,
+    /// Adresse (relative à `/api`) du même logo, pour l'aperçu à l'écran ;
+    /// `None` quand le PDF n'en a pas.
+    pub logo_url: Option<String>,
+    /// Gabarit, papier, sections, titre et notes.
+    pub layout: Layout,
 }
 
 // --------------------------------------------------------------------------
@@ -77,7 +86,7 @@ fn ms(value: Option<f64>) -> String {
 
 /// Le mot qui accompagne un pourcentage : tenu / manqué avec un objectif, sinon
 /// le verdict habituel des rapports.
-fn status_word(uptime: Option<f64>, objective: Option<f64>) -> &'static str {
+pub fn status_word(uptime: Option<f64>, objective: Option<f64>) -> &'static str {
     match (uptime, objective) {
         (None, _) => "No data",
         (Some(value), Some(goal)) => {
@@ -189,28 +198,79 @@ pub fn csv_incidents(data: &ReportData) -> String {
 // --------------------------------------------------------------------------
 // PDF
 // --------------------------------------------------------------------------
+//
+// Mise en page pensée pour l'impression : marges de 17 mm, aucun fond coloré
+// (contours et filets seulement, qu'une imprimante n'omet jamais), en-têtes de
+// tableaux répétés à chaque page, rappel de la marque et de la période en tête
+// des pages suivantes, pagination en pied. Lisible en noir et blanc : chaque
+// statut est un mot, et les mauvais (« Missed », « Poor ») sont en gras.
 
-const LEFT: f64 = 40.0;
-const RIGHT: f64 = PAGE_W - 40.0;
-const TOP: f64 = PAGE_H - 44.0;
-const BOTTOM: f64 = 56.0;
+const MARGIN: f64 = 48.0;
+/// Hauteur réservée au rappel d'en-tête des pages suivantes.
+const RUNNING_HEADER: f64 = 26.0;
+/// Bas de la zone de contenu ; le pied de page est en dessous.
+const BOTTOM: f64 = 62.0;
+const FOOTER_RULE: f64 = 46.0;
+const FOOTER_TEXT: f64 = 32.0;
 const ROW: f64 = 15.0;
-/// Cadre du logo d'un client dans l'en-tête, en points.
+const GAP: f64 = 6.0;
+/// Cadre du logo dans l'en-tête, en points.
 const LOGO_W: f64 = 140.0;
 const LOGO_H: f64 = 44.0;
+/// Barres du graphe au plus.
+const MAX_CHART_BARS: usize = 15;
+/// Moniteurs de la synthèse, quand il n'y a pas de groupes.
+const MAX_SUMMARY_MONITORS: usize = 25;
+/// Incidents majeurs de la synthèse.
+const MAX_MAJOR_INCIDENTS: usize = 5;
 
 const INK: Rgb = Rgb(17, 24, 39);
 const MUTED: Rgb = Rgb(75, 85, 99);
-const RULE: Rgb = Rgb(209, 213, 219);
-const TINT: Rgb = Rgb(243, 244, 246);
+/// Filets de structure : assez foncés pour sortir à l'impression.
+const RULE: Rgb = Rgb(156, 163, 175);
+const HAIR: Rgb = Rgb(209, 213, 219);
+const BAR: Rgb = Rgb(107, 114, 128);
 
 fn word_color(word: &str) -> Rgb {
     match word {
         "Healthy" | "Met" => Rgb(21, 128, 61),
-        "Degraded" => Rgb(180, 83, 9),
-        "Poor" | "Missed" => Rgb(185, 28, 28),
+        "Degraded" => Rgb(146, 64, 14),
+        "Poor" | "Missed" => Rgb(153, 27, 27),
         _ => MUTED,
     }
+}
+
+/// Les mauvais statuts en gras : la différence survit au noir et blanc.
+fn word_font(word: &str) -> Font {
+    if matches!(word, "Poor" | "Missed" | "Degraded") { Font::Bold } else { Font::Regular }
+}
+
+/// Le titre du rapport : celui choisi, sinon « Availability report ».
+pub fn heading_title(layout: &Layout) -> String {
+    layout.title.clone().unwrap_or_else(|| "Availability report".to_string())
+}
+
+/// Coupe un texte en lignes de `max` points au plus ; les sauts de ligne du
+/// texte sont gardés, un mot trop long est tronqué.
+pub fn wrap(text: &str, font: Font, size: f64, max: f64) -> Vec<String> {
+    let mut lines = Vec::new();
+    for paragraph in text.split('\n') {
+        let mut line = String::new();
+        for word in paragraph.split_whitespace() {
+            let candidate =
+                if line.is_empty() { word.to_string() } else { format!("{line} {word}") };
+            if pdf::text_width(&candidate, font, size) <= max {
+                line = candidate;
+            } else {
+                if !line.is_empty() {
+                    lines.push(std::mem::take(&mut line));
+                }
+                line = pdf::fit(word, font, size, max);
+            }
+        }
+        lines.push(line);
+    }
+    lines
 }
 
 /// Les pages en construction, avec le curseur vertical.
@@ -219,16 +279,31 @@ struct Sheet {
     page: Page,
     /// Ordonnée de la prochaine ligne (l'origine est en bas de la page).
     y: f64,
+    left: f64,
+    right: f64,
+    top: f64,
 }
 
 impl Sheet {
-    fn new() -> Self {
-        Self { pages: Vec::new(), page: Page::default(), y: TOP }
+    fn new(paper: Paper) -> Self {
+        let (width, height) = paper.size();
+        Self {
+            pages: Vec::new(),
+            page: Page::default(),
+            y: height - MARGIN,
+            left: MARGIN,
+            right: width - MARGIN,
+            top: height - MARGIN,
+        }
+    }
+
+    fn width(&self) -> f64 {
+        self.right - self.left
     }
 
     fn break_page(&mut self) {
         self.pages.push(std::mem::take(&mut self.page));
-        self.y = TOP;
+        self.y = self.top - RUNNING_HEADER;
     }
 
     /// Passe à la page suivante s'il ne reste pas `height` points.
@@ -242,20 +317,33 @@ impl Sheet {
     }
 
     fn heading(&mut self, text: &str) {
-        self.need(60.0);
-        self.y -= 22.0;
-        self.page.text(LEFT, self.y, text, Font::Bold, 12.0, INK);
-        self.y -= 8.0;
+        // Un titre n'est jamais seul en bas de page : il emmène quelques lignes.
+        self.need(70.0);
+        self.y -= 26.0;
+        self.page.text(self.left, self.y, text, Font::Bold, 12.0, INK);
+        self.y -= 4.0;
     }
 
     fn note(&mut self, text: &str) {
-        self.need(ROW);
-        self.y -= ROW;
-        self.page.text(LEFT, self.y, text, Font::Regular, 9.0, MUTED);
+        let width = self.width();
+        for line in wrap(text, Font::Regular, 9.0, width) {
+            self.need(ROW);
+            self.y -= 13.0;
+            self.page.text(self.left, self.y, &line, Font::Regular, 9.0, MUTED);
+        }
+    }
+
+    fn paragraph(&mut self, text: &str) {
+        let width = self.width();
+        for line in wrap(text, Font::Regular, 10.0, width) {
+            self.need(ROW);
+            self.y -= 14.0;
+            self.page.text(self.left, self.y, &line, Font::Regular, 10.0, INK);
+        }
     }
 }
 
-/// Une colonne de tableau.
+/// Une colonne de tableau, placée.
 struct Column {
     title: &'static str,
     x: f64,
@@ -264,9 +352,24 @@ struct Column {
     right: bool,
 }
 
+/// Répartit la largeur de la page entre les colonnes, au prorata des poids.
+fn columns(sheet: &Sheet, specs: &[(&'static str, f64, bool)]) -> Vec<Column> {
+    let total: f64 = specs.iter().map(|(_, weight, _)| weight).sum();
+    let usable = sheet.width() - GAP * (specs.len().saturating_sub(1)) as f64;
+    let mut x = sheet.left;
+    specs
+        .iter()
+        .map(|&(title, weight, right)| {
+            let width = usable * weight / total;
+            let column = Column { title, x, width, right };
+            x += width + GAP;
+            column
+        })
+        .collect()
+}
+
 fn table_header(sheet: &mut Sheet, columns: &[Column]) {
     sheet.y -= ROW;
-    sheet.page.rect_fill(LEFT, sheet.y - 4.0, RIGHT - LEFT, ROW, TINT);
     for column in columns {
         if column.right {
             sheet.page.text_right(
@@ -275,16 +378,21 @@ fn table_header(sheet: &mut Sheet, columns: &[Column]) {
                 column.title,
                 Font::Bold,
                 8.0,
-                MUTED,
+                INK,
             );
         } else {
-            sheet.page.text(column.x, sheet.y, column.title, Font::Bold, 8.0, MUTED);
+            sheet.page.text(column.x, sheet.y, column.title, Font::Bold, 8.0, INK);
         }
     }
+    sheet.page.line(sheet.left, sheet.y - 5.0, sheet.right, sheet.y - 5.0, 0.8, INK);
 }
 
-/// Une ligne de tableau; le texte et sa couleur par colonne.
+/// Une ligne de tableau : texte, couleur et police par colonne. L'en-tête est
+/// répété en haut de chaque nouvelle page.
 fn table_row(sheet: &mut Sheet, columns: &[Column], cells: &[(String, Rgb, Font)]) {
+    if sheet.need(ROW * 2.0) {
+        table_header(sheet, columns);
+    }
     sheet.y -= ROW;
     for (column, (text, color, font)) in columns.iter().zip(cells) {
         let shown = pdf::fit(text, *font, 8.5, column.width);
@@ -294,11 +402,27 @@ fn table_row(sheet: &mut Sheet, columns: &[Column], cells: &[(String, Rgb, Font)
             sheet.page.text(column.x, sheet.y, &shown, *font, 8.5, *color);
         }
     }
-    sheet.page.line(LEFT, sheet.y - 4.0, RIGHT, sheet.y - 4.0, 0.4, RULE);
+    sheet.page.line(sheet.left, sheet.y - 5.0, sheet.right, sheet.y - 5.0, 0.3, HAIR);
+}
+
+/// Ouvre un tableau : l'en-tête et assez de place pour quelques lignes.
+fn table_open(sheet: &mut Sheet, specs: &[(&'static str, f64, bool)]) -> Vec<Column> {
+    sheet.need(ROW * 4.0);
+    let placed = columns(sheet, specs);
+    table_header(sheet, &placed);
+    placed
 }
 
 fn plain(text: impl Into<String>) -> (String, Rgb, Font) {
     (text.into(), INK, Font::Regular)
+}
+
+fn muted(text: impl Into<String>) -> (String, Rgb, Font) {
+    (text.into(), MUTED, Font::Regular)
+}
+
+fn status_cell(word: &str) -> (String, Rgb, Font) {
+    (word.to_string(), word_color(word), word_font(word))
 }
 
 /// Un chiffre clé : étiquette, valeur, précision.
@@ -310,77 +434,81 @@ struct Stat {
 }
 
 fn stat_box(page: &mut Page, x: f64, y: f64, width: f64, stat: &Stat) {
-    page.rect_fill(x, y - 52.0, width, 56.0, TINT);
-    page.text(x + 8.0, y - 10.0, &stat.label.to_uppercase(), Font::Bold, 7.0, MUTED);
-    page.text(x + 8.0, y - 32.0, &stat.value, Font::Bold, 17.0, stat.color);
-    let sub = pdf::fit(&stat.sub, Font::Regular, 7.5, width - 16.0);
-    page.text(x + 8.0, y - 46.0, &sub, Font::Regular, 7.5, MUTED);
+    page.rect_stroke(x, y - 54.0, width, 58.0, 0.6, RULE);
+    page.text(x + 9.0, y - 10.0, stat.label, Font::Bold, 8.0, MUTED);
+    page.text(x + 9.0, y - 32.0, &stat.value, Font::Bold, 17.0, stat.color);
+    let sub = pdf::fit(&stat.sub, Font::Regular, 7.5, width - 18.0);
+    page.text(x + 9.0, y - 46.0, &sub, Font::Regular, 7.5, MUTED);
 }
 
-/// Le PDF du rapport.
-pub fn pdf(data: &ReportData, tz: Tz, options: &Options) -> Vec<u8> {
-    let mut sheet = Sheet::new();
-    let (word, _) = verdict(data.fleet_uptime);
-    let incidents = data.incidents.len();
+fn has_groups(data: &ReportData) -> bool {
+    data.groups.len() > 1 || data.groups.first().is_some_and(|g| g.name != UNGROUPED)
+}
 
-    // En-tête : le logo du client à droite (image n° 0 du document), le nom à
-    // gauche dans la place qui reste.
-    let mut brand_width = RIGHT - LEFT;
-    if let Some(logo) = &options.logo {
-        let (w, h) = (f64::from(logo.width), f64::from(logo.height));
+/// Les incidents majeurs : critiques d'abord, puis les plus longs.
+pub fn major_incidents(data: &ReportData) -> Vec<&Incident> {
+    let mut ranked: Vec<&Incident> = data.incidents.iter().collect();
+    ranked.sort_by(|a, b| {
+        (b.severity == "critical")
+            .cmp(&(a.severity == "critical"))
+            .then(b.duration(data.period.end).cmp(&a.duration(data.period.end)))
+            .then(a.started.cmp(&b.started))
+    });
+    ranked.truncate(MAX_MAJOR_INCIDENTS);
+    ranked
+}
+
+/// En-tête de la première page : logo à droite (image n° 0 du document), la
+/// marque, le titre, la période.
+fn first_header(sheet: &mut Sheet, data: &ReportData, tz: Tz, options: &Options, logo: bool) {
+    let mut brand_width = sheet.width();
+    if logo && let Some(image) = &options.logo {
+        let (w, h) = (f64::from(image.width), f64::from(image.height));
         let scale = (LOGO_W / w).min(LOGO_H / h);
         let (dw, dh) = (w * scale, h * scale);
-        sheet.page.image(0, RIGHT - dw, TOP - dh, dw, dh);
+        sheet.page.image(0, sheet.right - dw, sheet.top - dh, dw, dh);
         brand_width -= LOGO_W + 12.0;
     }
+    let left = sheet.left;
     sheet.y -= 18.0;
-    sheet.page.text(
-        LEFT,
-        sheet.y,
-        &pdf::fit(&one_line(&options.brand), Font::Bold, 20.0, brand_width),
-        Font::Bold,
-        20.0,
-        INK,
-    );
-    sheet.y -= 18.0;
-    sheet.page.text(LEFT, sheet.y, "Availability report", Font::Bold, 12.0, MUTED);
+    let brand = pdf::fit(&one_line(&options.brand), Font::Bold, 20.0, brand_width);
+    sheet.page.text(left, sheet.y, &brand, Font::Bold, 20.0, INK);
+    sheet.y -= 19.0;
+    let title = heading_title(&options.layout);
+    let shown = pdf::fit(&one_line(&title), Font::Bold, 13.0, brand_width);
+    sheet.page.text(left, sheet.y, &shown, Font::Bold, 13.0, MUTED);
     sheet.y -= 15.0;
-    sheet.page.text(LEFT, sheet.y, &period_label(data, tz), Font::Regular, 10.0, INK);
+    sheet.page.text(left, sheet.y, &period_label(data, tz), Font::Regular, 10.0, INK);
     let report_name = one_line(&data.name);
-    if !report_name.is_empty() {
+    if !report_name.is_empty() && report_name != title && report_name != "Availability report" {
         sheet.y -= 13.0;
-        sheet.page.text(
-            LEFT,
-            sheet.y,
-            &pdf::fit(&report_name, Font::Regular, 9.0, RIGHT - LEFT),
-            Font::Regular,
-            9.0,
-            MUTED,
-        );
+        let shown = pdf::fit(&report_name, Font::Regular, 9.0, brand_width);
+        sheet.page.text(left, sheet.y, &shown, Font::Regular, 9.0, MUTED);
     }
-    sheet.y -= 10.0;
-    sheet.page.line(LEFT, sheet.y, RIGHT, sheet.y, 1.0, INK);
+    sheet.y = sheet.y.min(sheet.top - LOGO_H) - 10.0;
+    sheet.page.line(sheet.left, sheet.y, sheet.right, sheet.y, 1.0, INK);
+}
 
-    // Chiffres clés.
-    sheet.y -= 14.0;
-    let gap = 10.0;
-    let width = (RIGHT - LEFT - 2.0 * gap) / 3.0;
-    let top = sheet.y;
+/// Chiffres clés et, avec un objectif, combien de moniteurs le tiennent.
+fn summary_section(sheet: &mut Sheet, data: &ReportData, options: &Options) {
+    let incidents = data.incidents.len();
+    let (word, _) = verdict(data.fleet_uptime);
+    let availability_sub = match options.objective {
+        Some(goal) => format!(
+            "Objective {goal:.3}%: {}",
+            status_word(data.fleet_uptime, Some(goal)).to_lowercase()
+        ),
+        None => {
+            format!("{word}; {} vs previous", delta(data.fleet_uptime, data.fleet_previous_uptime))
+        }
+    };
+    let fleet_word = status_word(data.fleet_uptime, options.objective);
     let stats = [
         Stat {
             label: "Availability",
             value: pct(data.fleet_uptime),
-            sub: format!(
-                "{word}; {} vs previous",
-                delta(data.fleet_uptime, data.fleet_previous_uptime)
-            ),
-            color: word_color(word),
-        },
-        Stat {
-            label: "Incidents",
-            value: incidents.to_string(),
-            sub: count_delta(incidents, data.previous_incident_count),
-            color: INK,
+            sub: availability_sub,
+            color: word_color(fleet_word),
         },
         Stat {
             label: "Downtime",
@@ -388,172 +516,447 @@ pub fn pdf(data: &ReportData, tz: Tz, options: &Options) -> Vec<u8> {
             sub: "total across monitors".to_string(),
             color: INK,
         },
+        Stat {
+            label: "Incidents",
+            value: incidents.to_string(),
+            sub: count_delta(incidents, data.previous_incident_count),
+            color: INK,
+        },
     ];
+    sheet.need(80.0);
+    sheet.y -= 16.0;
+    let gap = 10.0;
+    let width = (sheet.width() - 2.0 * gap) / 3.0;
+    let top = sheet.y;
+    let left = sheet.left;
     for (index, stat) in stats.iter().enumerate() {
-        stat_box(&mut sheet.page, LEFT + index as f64 * (width + gap), top, width, stat);
+        stat_box(&mut sheet.page, left + index as f64 * (width + gap), top, width, stat);
     }
-    sheet.y -= 62.0;
+    sheet.y -= 60.0;
 
     if let Some(goal) = options.objective {
         let measured: Vec<&DeviceStat> =
             data.devices.iter().filter(|d| d.uptime.is_some()).collect();
         let met = measured.iter().filter(|d| status_word(d.uptime, Some(goal)) == "Met").count();
         sheet.note(&format!(
-            "SLA objective {goal:.3}%: met by {met} of {} monitor(s) with data. Fleet availability is {}.",
+            "SLA objective {goal:.3}%: met by {met} of {} monitor(s) with data. Fleet \
+             availability: {}.",
             measured.len(),
-            status_word(data.fleet_uptime, Some(goal)).to_lowercase()
+            fleet_word.to_lowercase()
         ));
     }
     if !data.availability_known {
         sheet.note("Availability could not be read from the time-series database for this report.");
     }
+}
 
-    // Groupes.
-    if data.groups.len() > 1 || data.groups.first().is_some_and(|g| g.name != UNGROUPED) {
-        sheet.heading("Availability by group");
-        let columns = [
-            Column { title: "GROUP", x: LEFT, width: 250.0, right: false },
-            Column { title: "MONITORS", x: 295.0, width: 60.0, right: true },
-            Column { title: "AVAILABILITY", x: 365.0, width: 90.0, right: true },
-            Column { title: "PREVIOUS", x: 465.0, width: 90.0, right: true },
-        ];
-        table_header(&mut sheet, &columns);
-        for group in &data.groups {
-            if sheet.need(ROW * 2.0) {
-                table_header(&mut sheet, &columns);
-            }
-            table_row(
-                &mut sheet,
-                &columns,
-                &[
-                    plain(group.name.clone()),
-                    plain(group.devices.to_string()),
-                    plain(pct(group.uptime)),
-                    plain(pct(group.previous_uptime)),
-                ],
-            );
-        }
+/// Barres horizontales : par groupe s'il y en a, sinon les moniteurs les moins
+/// disponibles. L'échelle ne part pas de zéro (tout serait collé à 100 %) :
+/// le point de départ est écrit sous le graphe, la valeur au bout de chaque
+/// barre, et l'objectif est un trait pointillé nommé.
+fn chart_section(sheet: &mut Sheet, data: &ReportData, objective: Option<f64>) {
+    let grouped = has_groups(data);
+    let bars: Vec<(String, f64)> = if grouped {
+        data.groups.iter().filter_map(|g| g.uptime.map(|v| (g.name.clone(), v))).collect()
+    } else {
+        data.devices.iter().filter_map(|d| d.uptime.map(|v| (d.name.clone(), v))).collect()
+    };
+    let total = bars.len();
+    let bars: Vec<(String, f64)> = bars.into_iter().take(MAX_CHART_BARS).collect();
+    sheet.heading(if grouped {
+        "Availability by group, lowest first"
+    } else {
+        "Least available monitors"
+    });
+    if bars.is_empty() {
+        sheet.note("No availability data to chart for this period.");
+        return;
     }
+    let lowest = bars.iter().map(|(_, v)| *v).fold(100.0_f64, f64::min);
+    let lowest = objective.map_or(lowest, |goal| lowest.min(goal));
+    let floor = [99.9, 99.5, 99.0, 98.0, 95.0, 90.0, 80.0, 50.0, 0.0]
+        .into_iter()
+        .find(|step| *step < lowest)
+        .unwrap_or(0.0);
+    // Tout le graphe sur une page.
+    sheet.need(ROW * bars.len() as f64 + 46.0);
+    let label_width = (sheet.width() * 0.3).min(160.0);
+    let x0 = sheet.left + label_width + 8.0;
+    let x1 = sheet.right - 52.0;
+    let scale =
+        |value: f64| x0 + (x1 - x0) * ((value.clamp(floor, 100.0) - floor) / (100.0 - floor));
+    sheet.y -= 6.0;
+    let top = sheet.y;
+    for (name, value) in &bars {
+        sheet.y -= ROW;
+        let label = pdf::fit(&one_line(name), Font::Regular, 8.5, label_width);
+        sheet.page.text(sheet.left, sheet.y, &label, Font::Regular, 8.5, INK);
+        let end = scale(*value);
+        if end > x0 {
+            sheet.page.rect_fill(x0, sheet.y - 2.0, end - x0, 9.0, BAR);
+            sheet.page.rect_stroke(x0, sheet.y - 2.0, end - x0, 9.0, 0.4, INK);
+        }
+        let shown = pct(Some(*value));
+        sheet.page.text_right(sheet.right, sheet.y, &shown, Font::Bold, 8.5, INK);
+    }
+    let bottom = sheet.y - 6.0;
+    sheet.page.line(x0, top, x0, bottom, 0.6, INK);
+    sheet.page.line(x0, bottom, x1, bottom, 0.6, INK);
+    sheet.page.text(x0, bottom - 10.0, &format!("{floor}%"), Font::Regular, 7.5, MUTED);
+    sheet.page.text_right(x1, bottom - 10.0, "100%", Font::Regular, 7.5, MUTED);
+    let mut legend = format!("Scale starts at {floor}%.");
+    if let Some(goal) = objective
+        && goal > floor
+    {
+        let x = scale(goal);
+        sheet.page.dashed_line(x, top + 2.0, x, bottom, 0.9, 2.0, INK);
+        legend.push_str(&format!(" The dashed line is the objective, {goal:.3}%."));
+    }
+    if total > bars.len() {
+        legend.push_str(&format!(" {} more not shown.", total - bars.len()));
+    }
+    sheet.y = bottom - 12.0;
+    sheet.note(&legend);
+}
 
-    // Moniteurs.
+fn groups_table(sheet: &mut Sheet, data: &ReportData, objective: Option<f64>) {
+    sheet.heading("Availability by group");
+    let placed = table_open(
+        sheet,
+        &[
+            ("Group", 3.0, false),
+            ("Monitors", 0.9, true),
+            ("Availability", 1.2, true),
+            ("Status", 0.9, false),
+            ("Previous", 1.2, true),
+        ],
+    );
+    for group in &data.groups {
+        let word = status_word(group.uptime, objective);
+        table_row(
+            sheet,
+            &placed,
+            &[
+                plain(group.name.clone()),
+                plain(group.devices.to_string()),
+                (pct(group.uptime), INK, Font::Bold),
+                status_cell(word),
+                muted(pct(group.previous_uptime)),
+            ],
+        );
+    }
+}
+
+fn monitors_table(sheet: &mut Sheet, data: &ReportData, objective: Option<f64>, cap: usize) {
     sheet.heading("Availability by monitor");
     if data.devices.is_empty() {
         sheet.note("No monitor is being monitored.");
+        return;
+    }
+    let placed = table_open(
+        sheet,
+        &[
+            ("Monitor", 3.0, false),
+            ("Group", 1.7, false),
+            ("Availability", 1.25, true),
+            ("Status", 0.95, false),
+            ("Incidents", 0.9, true),
+            ("Downtime", 1.0, true),
+        ],
+    );
+    for device in data.devices.iter().take(cap) {
+        let word = status_word(device.uptime, objective);
+        table_row(
+            sheet,
+            &placed,
+            &[
+                plain(device.name.clone()),
+                muted(device.group.clone()),
+                (pct(device.uptime), INK, Font::Bold),
+                status_cell(word),
+                plain(device.incidents.to_string()),
+                plain(duration(TimeDelta::seconds(device.downtime_secs))),
+            ],
+        );
+    }
+    if data.devices.len() > cap {
+        sheet.note(&format!(
+            "{} more monitor(s) are in the detailed report and the CSV export.",
+            data.devices.len() - cap
+        ));
+    }
+}
+
+fn incident_started(incident: &Incident, tz: Tz) -> String {
+    if incident.began_before_period {
+        "before period".to_string()
     } else {
-        let columns = [
-            Column { title: "MONITOR", x: LEFT, width: 150.0, right: false },
-            Column { title: "GROUP", x: 196.0, width: 78.0, right: false },
-            Column { title: "AVAILABILITY", x: 280.0, width: 66.0, right: true },
-            Column { title: "STATUS", x: 354.0, width: 44.0, right: false },
-            Column { title: "AVG", x: 400.0, width: 40.0, right: true },
-            Column { title: "P95", x: 442.0, width: 42.0, right: true },
-            Column { title: "INC.", x: 486.0, width: 22.0, right: true },
-            Column { title: "DOWNTIME", x: 512.0, width: 43.0, right: true },
-        ];
-        table_header(&mut sheet, &columns);
-        for device in data.devices.iter().take(MAX_PDF_MONITORS) {
-            if sheet.need(ROW * 2.0) {
-                table_header(&mut sheet, &columns);
+        when(incident.started, tz)
+    }
+}
+
+fn incident_length(incident: &Incident, end: DateTime<Utc>) -> String {
+    let mut length = duration(incident.duration(end));
+    if incident.ended.is_none() {
+        length.push_str(" (ongoing)");
+    }
+    length
+}
+
+fn incidents_table(sheet: &mut Sheet, data: &ReportData, tz: Tz, list: &[&Incident], title: &str) {
+    sheet.heading(title);
+    if list.is_empty() {
+        sheet.note("No incident in this period.");
+        return;
+    }
+    let placed = table_open(
+        sheet,
+        &[
+            ("Monitor", 2.6, false),
+            ("Started", 1.8, false),
+            ("Duration", 1.4, false),
+            ("Severity", 1.0, false),
+            ("Rule", 3.0, false),
+        ],
+    );
+    for incident in list {
+        let critical = incident.severity == "critical";
+        table_row(
+            sheet,
+            &placed,
+            &[
+                plain(incident.device.clone()),
+                plain(incident_started(incident, tz)),
+                plain(incident_length(incident, data.period.end)),
+                (incident.severity.clone(), INK, if critical { Font::Bold } else { Font::Regular }),
+                plain(incident.rule.clone()),
+            ],
+        );
+    }
+}
+
+fn maintenance_table(sheet: &mut Sheet, data: &ReportData, tz: Tz) {
+    sheet.heading("Maintenance windows");
+    if data.maintenance.is_empty() {
+        sheet.note("No maintenance window in this period.");
+        return;
+    }
+    let placed = table_open(
+        sheet,
+        &[
+            ("Window", 2.6, false),
+            ("Monitor", 2.2, false),
+            ("Starts", 1.7, false),
+            ("Ends", 1.7, false),
+            ("Repeats", 0.9, false),
+        ],
+    );
+    for window in &data.maintenance {
+        table_row(
+            sheet,
+            &placed,
+            &[
+                plain(window.name.clone()),
+                muted(window.monitor.clone().unwrap_or_else(|| "Several monitors".to_string())),
+                plain(when(window.starts, tz)),
+                plain(when(window.ends, tz)),
+                plain(if window.recurring { "Yes" } else { "No" }),
+            ],
+        );
+    }
+    if data.maintenance.len() >= super::collect::MAX_MAINTENANCE_WINDOWS {
+        sheet.note("Only the first windows of the period are listed.");
+    }
+}
+
+/// Les sondes qui mesurent un temps de réponse, les plus lentes d'abord.
+fn timed(data: &ReportData) -> Vec<&DeviceStat> {
+    let mut list: Vec<&DeviceStat> =
+        data.devices.iter().filter(|d| d.latency_avg_ms.is_some()).collect();
+    list.sort_by(|a, b| {
+        b.latency_p95_ms
+            .unwrap_or(0.0)
+            .total_cmp(&a.latency_p95_ms.unwrap_or(0.0))
+            .then(a.name.cmp(&b.name))
+    });
+    list
+}
+
+fn response_table(sheet: &mut Sheet, data: &ReportData) {
+    sheet.heading("Response times");
+    let list = timed(data);
+    if list.is_empty() {
+        sheet.note("No probe measured a response time in this period.");
+        return;
+    }
+    let placed = table_open(
+        sheet,
+        &[("Monitor", 3.2, false), ("Group", 2.0, false), ("Mean", 1.0, true), ("P95", 1.0, true)],
+    );
+    for device in list.iter().take(MAX_PDF_MONITORS) {
+        table_row(
+            sheet,
+            &placed,
+            &[
+                plain(device.name.clone()),
+                muted(device.group.clone()),
+                plain(ms(device.latency_avg_ms)),
+                (ms(device.latency_p95_ms), INK, Font::Bold),
+            ],
+        );
+    }
+    if list.len() > MAX_PDF_MONITORS {
+        sheet.note(&format!(
+            "{} more probe(s) are in the CSV export.",
+            list.len() - MAX_PDF_MONITORS
+        ));
+    }
+}
+
+fn notes_section(sheet: &mut Sheet, notes: &str) {
+    sheet.heading("Notes");
+    sheet.paragraph(notes);
+}
+
+/// Le PDF du rapport, selon le gabarit et les sections de `options.layout`.
+pub fn pdf(data: &ReportData, tz: Tz, options: &Options) -> Vec<u8> {
+    let layout = &options.layout;
+    let sections = layout.sections;
+    let logo = layout.logo_source() != LogoSource::Hidden && options.logo.is_some();
+    let mut sheet = Sheet::new(layout.paper);
+    first_header(&mut sheet, data, tz, options, logo);
+
+    if sections.summary {
+        summary_section(&mut sheet, data, options);
+    }
+    if sections.chart {
+        chart_section(&mut sheet, data, options.objective);
+    }
+    match layout.template {
+        Template::Detailed => {
+            if sections.monitors {
+                if has_groups(data) {
+                    groups_table(&mut sheet, data, options.objective);
+                }
+                monitors_table(&mut sheet, data, options.objective, MAX_PDF_MONITORS);
             }
-            let word = status_word(device.uptime, options.objective);
-            table_row(
-                &mut sheet,
-                &columns,
-                &[
-                    plain(device.name.clone()),
-                    (device.group.clone(), MUTED, Font::Regular),
-                    (pct(device.uptime), INK, Font::Bold),
-                    (word.to_string(), word_color(word), Font::Bold),
-                    plain(ms(device.latency_avg_ms)),
-                    plain(ms(device.latency_p95_ms)),
-                    plain(device.incidents.to_string()),
-                    plain(duration(TimeDelta::seconds(device.downtime_secs))),
-                ],
-            );
+            if sections.incidents {
+                let list: Vec<&Incident> = data.incidents.iter().take(MAX_PDF_INCIDENTS).collect();
+                incidents_table(&mut sheet, data, tz, &list, "Incidents");
+                if data.incidents.len() > MAX_PDF_INCIDENTS {
+                    sheet.note(&format!(
+                        "{} more incident(s) are in the CSV export.",
+                        data.incidents.len() - MAX_PDF_INCIDENTS
+                    ));
+                }
+            }
+            if sections.maintenance {
+                maintenance_table(&mut sheet, data, tz);
+            }
+            if sections.response_times {
+                response_table(&mut sheet, data);
+            }
         }
-        if data.devices.len() > MAX_PDF_MONITORS {
-            sheet.note(&format!(
-                "{} more monitor(s) are in the CSV export.",
-                data.devices.len() - MAX_PDF_MONITORS
-            ));
+        Template::Summary => {
+            if sections.monitors {
+                if has_groups(data) {
+                    groups_table(&mut sheet, data, options.objective);
+                } else {
+                    monitors_table(&mut sheet, data, options.objective, MAX_SUMMARY_MONITORS);
+                }
+            }
+            if sections.incidents {
+                let major = major_incidents(data);
+                incidents_table(&mut sheet, data, tz, &major, "Major incidents");
+                if data.incidents.len() > major.len() {
+                    sheet.note(&format!(
+                        "{} incident(s) in total; the detailed report lists them all.",
+                        data.incidents.len()
+                    ));
+                }
+            }
+            if sections.maintenance {
+                sheet.heading("Maintenance");
+                let total: i64 =
+                    data.maintenance.iter().map(|w| (w.ends - w.starts).num_seconds()).sum();
+                sheet.note(&match data.maintenance.len() {
+                    0 => "No maintenance window in this period.".to_string(),
+                    n => format!(
+                        "{n} maintenance window(s), {} in total.",
+                        duration(TimeDelta::seconds(total))
+                    ),
+                });
+            }
+            if sections.response_times {
+                sheet.heading("Response times");
+                let list = timed(data);
+                let slowest: Vec<String> = list
+                    .iter()
+                    .take(3)
+                    .map(|d| format!("{} (P95 {})", one_line(&d.name), ms(d.latency_p95_ms)))
+                    .collect();
+                sheet.note(&if slowest.is_empty() {
+                    "No probe measured a response time in this period.".to_string()
+                } else {
+                    format!("{} probe(s) measured. Slowest: {}.", list.len(), slowest.join(", "))
+                });
+            }
         }
     }
-
-    // Incidents.
-    sheet.heading("Incidents");
-    if data.incidents.is_empty() {
-        sheet.note("No incident in this period.");
-    } else {
-        let columns = [
-            Column { title: "MONITOR", x: LEFT, width: 130.0, right: false },
-            Column { title: "STARTED", x: 176.0, width: 90.0, right: false },
-            Column { title: "DURATION", x: 270.0, width: 62.0, right: false },
-            Column { title: "SEVERITY", x: 338.0, width: 50.0, right: false },
-            Column { title: "RULE", x: 394.0, width: 161.0, right: false },
-        ];
-        table_header(&mut sheet, &columns);
-        for incident in data.incidents.iter().take(MAX_PDF_INCIDENTS) {
-            if sheet.need(ROW * 2.0) {
-                table_header(&mut sheet, &columns);
-            }
-            let started = if incident.began_before_period {
-                "before period".to_string()
-            } else {
-                when(incident.started, tz)
-            };
-            let mut length = duration(incident.duration(data.period.end));
-            if incident.ended.is_none() {
-                length.push_str(" (ongoing)");
-            }
-            table_row(
-                &mut sheet,
-                &columns,
-                &[
-                    plain(incident.device.clone()),
-                    plain(started),
-                    plain(length),
-                    plain(incident.severity.clone()),
-                    plain(incident.rule.clone()),
-                ],
-            );
-        }
-        if data.incidents.len() > MAX_PDF_INCIDENTS {
-            sheet.note(&format!(
-                "{} more incident(s) are in the CSV export.",
-                data.incidents.len() - MAX_PDF_INCIDENTS
-            ));
-        }
+    if sections.notes && !layout.notes.trim().is_empty() {
+        notes_section(&mut sheet, &layout.notes);
     }
 
     // Méthode.
     sheet.heading("How this is measured");
-    for line in [
-        "Availability is the share of the period during which each monitor was up: probes count the",
-        "checks that succeeded, devices count the 5-minute slots in which they reported.",
-        "The comparison is with the period of the same length just before it. Response times are",
-        "the mean and 95th percentile of probe durations over the period.",
-    ] {
-        sheet.note(line);
-    }
+    sheet.note(
+        "Availability is the share of the period during which each monitor was up: probes \
+         count the checks that succeeded, devices count the 5-minute slots in which they \
+         reported. The comparison is with the period of the same length just before it. \
+         Response times are the mean and 95th percentile of probe durations over the period.",
+    );
 
-    // Pieds de page, une fois le nombre de pages connu.
+    // Rappel d'en-tête et pieds de page, une fois le nombre de pages connu.
     sheet.break_page();
+    let (left, right, top) = (sheet.left, sheet.right, sheet.top);
     let pages = std::mem::take(&mut sheet.pages);
     let total = pages.len();
     let stamp = options.generated.format("%Y-%m-%d %H:%M UTC").to_string();
+    let title = heading_title(layout);
+    let (width, height) = layout.paper.size();
     let mut doc = Document::new(
-        &format!("{} - availability report", one_line(&options.brand)),
+        &format!("{} - {}", one_line(&options.brand), one_line(&title)),
         Some(options.generated.format("D:%Y%m%d%H%M%SZ").to_string()),
-    );
-    if let Some(logo) = &options.logo {
-        doc.add_image(logo.clone());
+    )
+    .with_size(width, height);
+    if logo && let Some(image) = &options.logo {
+        doc.add_image(image.clone());
     }
+    let period = period_label(data, tz);
+    let running = pdf::fit(
+        &format!("{} - {}", one_line(&options.brand), one_line(&title)),
+        Font::Bold,
+        8.0,
+        (right - left) * 0.6,
+    );
     for (index, mut page) in pages.into_iter().enumerate() {
-        page.line(LEFT, 44.0, RIGHT, 44.0, 0.4, RULE);
-        page.text(LEFT, 32.0, &format!("DumbMonit - generated {stamp}"), Font::Regular, 8.0, MUTED);
+        if index > 0 {
+            page.text(left, top - 8.0, &running, Font::Bold, 8.0, MUTED);
+            page.text_right(right, top - 8.0, &period, Font::Regular, 8.0, MUTED);
+            page.line(left, top - 14.0, right, top - 14.0, 0.4, RULE);
+        }
+        page.line(left, FOOTER_RULE, right, FOOTER_RULE, 0.4, RULE);
+        page.text(
+            left,
+            FOOTER_TEXT,
+            &format!("DumbMonit - generated {stamp}"),
+            Font::Regular,
+            8.0,
+            MUTED,
+        );
         page.text_right(
-            RIGHT,
-            32.0,
+            right,
+            FOOTER_TEXT,
             &format!("Page {} of {total}", index + 1),
             Font::Regular,
             8.0,
@@ -667,7 +1070,38 @@ mod tests {
             objective: Some(99.9),
             generated: at("2026-11-03T08:00:00Z"),
             logo: None,
+            logo_url: None,
+            layout: Layout::default(),
         }
+    }
+
+    fn with_layout(layout: Layout) -> Options {
+        Options { layout, ..options() }
+    }
+
+    fn text_of(bytes: &[u8]) -> String {
+        String::from_utf8_lossy(bytes).into_owned()
+    }
+
+    fn page_count(text: &str) -> usize {
+        text.matches("/Type /Page ").count()
+    }
+
+    fn with_incidents() -> ReportData {
+        let mut data = sample();
+        for (i, severity) in
+            ["warning", "critical", "warning", "critical", "warning", "warning"].iter().enumerate()
+        {
+            data.incidents.push(crate::reports::collect::Incident {
+                device: format!("dev-{i}"),
+                rule: format!("rule-{i}"),
+                severity: (*severity).into(),
+                started: at("2026-10-06T10:00:00Z"),
+                ended: Some(at("2026-10-06T10:00:00Z") + TimeDelta::minutes(10 * (i as i64 + 1))),
+                began_before_period: false,
+            });
+        }
+        data
     }
 
     #[test]
@@ -679,7 +1113,8 @@ mod tests {
         assert!(text.contains("Availability report"));
         assert!(text.contains("2026-10-01 to 2026-10-31 \\(UTC\\)"));
         assert!(text.contains("SLA objective 99.900%"));
-        assert!(text.contains("Page 1 of 1"));
+        let pages = page_count(&text);
+        assert!(text.contains(&format!("Page {pages} of {pages}")));
         assert!(text.contains("/CreationDate (D:20261103080000Z)"));
         // Deux appels donnent les mêmes octets : rien d'aléatoire.
         assert_eq!(bytes, pdf(&sample(), Tz::UTC, &options()));
@@ -702,5 +1137,141 @@ mod tests {
     fn an_empty_estate_still_gives_a_document() {
         let bytes = pdf(&data_for(Vec::new(), HashMap::new()), Tz::UTC, &options());
         assert!(String::from_utf8_lossy(&bytes).contains("No monitor is being monitored."));
+    }
+
+    #[test]
+    fn the_detailed_template_has_every_section() {
+        let mut data = with_incidents();
+        data.maintenance.push(crate::reports::collect::MaintenanceWindow {
+            name: "Firmware upgrade".into(),
+            monitor: Some("Web".into()),
+            starts: at("2026-10-10T02:00:00Z"),
+            ends: at("2026-10-10T04:00:00Z"),
+            recurring: false,
+        });
+        let options = with_layout(Layout { notes: "Migration done.".into(), ..Layout::default() });
+        let text = text_of(&pdf(&data, Tz::UTC, &options));
+        for heading in [
+            "Availability by group, lowest first",
+            "Availability by group",
+            "Availability by monitor",
+            "Incidents",
+            "Maintenance windows",
+            "Firmware upgrade",
+            "Response times",
+            "Notes",
+            "Migration done.",
+            "How this is measured",
+            "Scale starts at",
+            "dashed line is the objective",
+        ] {
+            assert!(text.contains(heading), "{heading} is missing");
+        }
+        assert!(text.contains("(Missed)"), "a missed objective is written out");
+        assert!(text.contains("/MediaBox [0 0 595 842]"), "A4 by default");
+    }
+
+    #[test]
+    fn the_summary_template_is_short_and_keeps_the_major_incidents() {
+        let devices: Vec<DeviceInfo> = (0..120)
+            .map(|i| DeviceInfo { id: i, name: format!("monitor-{i}"), group: String::new() })
+            .collect();
+        let uptime = (0..120).map(|i| (i, 99.0 + (i % 10) as f64 / 10.0)).collect();
+        let mut data = data_for(devices, uptime);
+        data.incidents = with_incidents().incidents;
+        let detailed = text_of(&pdf(&data, Tz::UTC, &options()));
+        let summary_options =
+            with_layout(Layout { template: Template::Summary, ..Layout::default() });
+        let summary = text_of(&pdf(&data, Tz::UTC, &summary_options));
+        assert!(page_count(&summary) <= 2, "{} pages", page_count(&summary));
+        assert!(page_count(&detailed) > page_count(&summary));
+        assert!(summary.contains("Major incidents"));
+        assert!(summary.contains("6 incident\\(s\\) in total"), "the total is named");
+        // Les deux critiques d'abord, la plus longue en tête.
+        let first = summary.find("(dev-3)").expect("dev-3 listed");
+        let second = summary.find("(dev-1)").expect("dev-1 listed");
+        assert!(first < second);
+        assert!(!summary.contains("(dev-0)"), "only five major incidents");
+        assert!(summary.contains("more monitor\\(s\\) are in the detailed report"));
+    }
+
+    #[test]
+    fn unchecked_sections_are_left_out() {
+        let mut sections = crate::reports::layout::Sections::none();
+        sections.summary = true;
+        let layout =
+            Layout { sections, notes: "Should not be printed.".into(), ..Layout::default() };
+        let text = text_of(&pdf(&with_incidents(), Tz::UTC, &with_layout(layout)));
+        assert!(text.contains("(Availability)"), "the summary stays");
+        for absent in [
+            "Availability by monitor",
+            "Availability by group",
+            "(Severity)",
+            "(dev-1)",
+            "Maintenance windows",
+            "(Response times)",
+            "(Notes)",
+            "Should not be printed.",
+            "Scale starts at",
+        ] {
+            assert!(!text.contains(absent), "{absent} should be left out");
+        }
+    }
+
+    #[test]
+    fn paper_title_and_logo_follow_the_layout() {
+        let logo = pdf::Image {
+            width: 1,
+            height: 1,
+            color_space: "DeviceGray",
+            filter: "FlateDecode",
+            data: vec![0x78, 0x9c, 0xff],
+            alpha: None,
+        };
+        let layout = Layout {
+            paper: Paper::Letter,
+            title: Some("Quarterly service review".into()),
+            ..Layout::default()
+        };
+        let mut options = with_layout(layout.clone());
+        options.logo = Some(logo.clone());
+        let text = text_of(&pdf(&sample(), Tz::UTC, &options));
+        assert!(text.contains("/MediaBox [0 0 612 792]"));
+        assert!(text.contains("(Quarterly service review)"));
+        assert!(text.contains("/Title (Acme \\(Ops\\) - Quarterly service review)"));
+        assert!(text.contains("/Im0 Do"));
+
+        let mut hidden = with_layout(Layout { show_logo: false, ..layout });
+        hidden.logo = Some(logo);
+        let text = text_of(&pdf(&sample(), Tz::UTC, &hidden));
+        assert!(!text.contains("/XObject"), "no logo when it is turned off");
+    }
+
+    #[test]
+    fn a_long_report_repeats_the_header_on_every_page() {
+        let devices: Vec<DeviceInfo> = (0..120)
+            .map(|i| DeviceInfo { id: i, name: format!("monitor-{i}"), group: "G".into() })
+            .collect();
+        let uptime = (0..120).map(|i| (i, 99.0 + (i % 10) as f64 / 10.0)).collect();
+        let text = text_of(&pdf(&data_for(devices, uptime), Tz::UTC, &options()));
+        let pages = page_count(&text);
+        assert!(pages >= 3);
+        // Le rappel de la marque en tête de chaque page après la première, plus
+        // le titre des métadonnées, qui porte le même texte.
+        let running = text.matches("(Acme \\(Ops\\) - Availability report)").count();
+        assert_eq!(running, pages, "running header on pages 2..{pages}");
+        // La ligne d'en-tête du tableau des moniteurs, répétée.
+        assert!(text.matches("(Monitor) Tj").count() >= pages - 1);
+        // Aucun fond plein sous les tableaux : seulement les barres du graphe.
+        assert!(text.matches(" re f").count() <= 15, "no background fills");
+    }
+
+    #[test]
+    fn notes_are_wrapped_to_the_page_width() {
+        let long = "word ".repeat(200);
+        let lines = wrap(&long, Font::Regular, 10.0, 300.0);
+        assert!(lines.len() > 5);
+        assert!(lines.iter().all(|l| pdf::text_width(l, Font::Regular, 10.0) <= 300.0));
+        assert_eq!(wrap("a\n\nb", Font::Regular, 10.0, 300.0), vec!["a", "", "b"]);
     }
 }

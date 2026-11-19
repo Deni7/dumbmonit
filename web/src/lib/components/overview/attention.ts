@@ -1,6 +1,6 @@
 /**
  * What the Overview keeps from the sky and the history: the "Needs
- * attention" rows, the week's deadlines and the alerts of the last days.
+ * attention" rows and the incidents of the last days.
  *
  * Pure on purpose (types only), so it is tested with `node --test`; the
  * component picks the words.
@@ -53,52 +53,108 @@ export function attentionMonitors(rows: readonly AttentionRow[]): number {
 	return ids.size;
 }
 
-/** What expires within `days` (already expired first), soonest first. */
-export function weekAhead<T extends { days_left: number }>(items: readonly T[], days = 7): T[] {
-	return items.filter((item) => item.days_left <= days).sort((a, b) => a.days_left - b.days_left);
-}
-
-export interface AlertDay {
-	/** Local midnight that starts the day, in seconds (the chart's x). */
-	day: number;
-	opened: number;
-	resolved: number;
-}
-
 /** Server timestamps are UTC without a suffix (`parseServerDate` does the same). */
 function serverTime(value: string): number {
 	const normalised = /[zZ]|[+-]\d{2}:?\d{2}$/.test(value) ? value.replace(' ', 'T') : `${value.replace(' ', 'T')}Z`;
 	return new Date(normalised).getTime();
 }
 
+export interface IncidentDay {
+	/** Local midnight that starts the day, in seconds. */
+	day: number;
+	/** Incidents that started this day. */
+	count: number;
+	/** Seconds of this day spent inside an incident. */
+	seconds: number;
+}
+
+export interface IncidentWeek {
+	/** The last `days` local days including today, oldest first. */
+	days: IncidentDay[];
+	count: number;
+	seconds: number;
+	/** The same two figures over the `days` days before. */
+	previousCount: number;
+	previousSeconds: number;
+	/** The monitor behind the most incidents this week (`null` when none has a monitor). */
+	noisiest: { target: number; count: number } | null;
+}
+
+interface HistoryRow {
+	at: string;
+	fingerprint: string;
+	target_id: number | null;
+	from_phase: string;
+	to_phase: string;
+}
+
 /**
- * Alerts that fired and alerts that resolved, per local day, over the last
- * `days` days including today, oldest first. Every firing counts: an alert
- * that flaps three times opened three times.
+ * Incidents over the last `days` days: an incident runs from an alert going
+ * `firing` to its `resolved` (still open: until `now`). Every firing counts, so
+ * an alert that flaps three times is three incidents. Per local day: how many
+ * started and how long incidents were open; as a total and over the `days` days
+ * before for comparison; and the monitor behind the most incidents.
  */
-export function alertsPerDay(
-	history: readonly { at: string; to_phase: string }[],
-	now: number,
-	days = 7
-): AlertDay[] {
+export function incidentWeek(history: readonly HistoryRow[], now: number, days = 7): IncidentWeek {
 	const today = new Date(now);
 	today.setHours(0, 0, 0, 0);
 	const starts: number[] = [];
-	for (let i = days - 1; i >= 0; i -= 1) {
+	for (let i = days * 2 - 1; i >= 0; i -= 1) {
 		const start = new Date(today);
 		start.setDate(today.getDate() - i);
 		starts.push(start.getTime());
 	}
-	const out: AlertDay[] = starts.map((start) => ({ day: Math.round(start / 1000), opened: 0, resolved: 0 }));
-	const first = starts[0];
-	for (const entry of history) {
-		if (entry.to_phase !== 'firing' && entry.to_phase !== 'resolved') continue;
-		const at = serverTime(entry.at);
-		if (!Number.isFinite(at) || at < first || at > now) continue;
-		let index = starts.length - 1;
-		while (index > 0 && at < starts[index]) index -= 1;
-		if (entry.to_phase === 'firing') out[index].opened += 1;
-		else out[index].resolved += 1;
+	const edges = [...starts, now];
+	const windowStart = starts[0];
+	const thisWeek = starts[days];
+
+	const entries = history
+		.map((entry) => ({ entry, at: serverTime(entry.at) }))
+		.filter(({ at }) => Number.isFinite(at))
+		.sort((a, b) => a.at - b.at);
+	const open = new Map<string, { start: number; target: number | null }>();
+	const incidents: { start: number; end: number; target: number | null }[] = [];
+	for (const { entry, at } of entries) {
+		const current = open.get(entry.fingerprint);
+		if (entry.to_phase === 'firing') {
+			if (!current) open.set(entry.fingerprint, { start: at, target: entry.target_id });
+		} else if (current && (entry.to_phase === 'resolved' || entry.from_phase === 'firing')) {
+			incidents.push({ start: current.start, end: at, target: current.target });
+			open.delete(entry.fingerprint);
+		}
 	}
-	return out;
+	for (const current of open.values()) incidents.push({ ...current, end: now });
+
+	const out: IncidentDay[] = starts.map((start) => ({ day: Math.round(start / 1000), count: 0, seconds: 0 }));
+	const perTarget = new Map<number, number>();
+	for (const incident of incidents) {
+		if (incident.end < windowStart || incident.start > now) continue;
+		if (incident.start >= windowStart) {
+			let index = starts.length - 1;
+			while (index > 0 && incident.start < starts[index]) index -= 1;
+			out[index].count += 1;
+			if (incident.start >= thisWeek && incident.target !== null) {
+				perTarget.set(incident.target, (perTarget.get(incident.target) ?? 0) + 1);
+			}
+		}
+		for (let i = 0; i < starts.length; i += 1) {
+			const overlap = Math.min(incident.end, edges[i + 1] ?? now) - Math.max(incident.start, edges[i]);
+			if (overlap > 0) out[i].seconds += overlap / 1000;
+		}
+	}
+	let noisiest: IncidentWeek['noisiest'] = null;
+	for (const [target, count] of perTarget) {
+		if (!noisiest || count > noisiest.count) noisiest = { target, count };
+	}
+	const sum = (list: IncidentDay[], key: 'count' | 'seconds') => list.reduce((total, day) => total + day[key], 0);
+	const current = out.slice(days);
+	const previous = out.slice(0, days);
+	return {
+		days: current,
+		count: sum(current, 'count'),
+		seconds: Math.round(sum(current, 'seconds')),
+		previousCount: sum(previous, 'count'),
+		previousSeconds: Math.round(sum(previous, 'seconds')),
+		noisiest
+	};
 }

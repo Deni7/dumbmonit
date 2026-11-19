@@ -110,7 +110,7 @@
 		{#each shown as chip (chip.id)}
 			{@const Icon = ICON[chip.tone]}
 			<li class="min-w-0" class:wide={chip.word !== null && chip.tone !== 'ghost'} data-chip>
-				<a href={withBase('/targets/{chip.id}')} class="chip chip--{chip.tone}">
+				<a href={withBase(`/targets/${chip.id}`)} class="chip chip--{chip.tone}">
 					<Icon class="icon shrink-0" aria-hidden="true" />
 					<span class="min-w-0 flex-1 truncate">{chip.name}</span>
 					{#if chip.word}

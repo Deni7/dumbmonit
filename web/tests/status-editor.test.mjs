@@ -1,4 +1,4 @@
-// Status page editor: snippets to show a page elsewhere, service order and "unsaved changes". Run: npm test
+// Status page editor: snippets to show a page elsewhere and "unsaved changes" (order: status-structure.test.mjs). Run: npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -13,7 +13,7 @@ import {
 	serviceKeys,
 	slugify
 } from '../src/lib/components/status/share.ts';
-import { formFingerprint, moveId, savedItems } from '../src/lib/components/status/form-state.ts';
+import { formFingerprint } from '../src/lib/components/status/form-state.ts';
 
 const O = 'https://mon.example';
 
@@ -53,24 +53,6 @@ test('website banner snippets point at the public API of the page', () => {
 	assert.match(bannerHtml(api, 'fr'), /src="https:\/\/mon\.example\/api\/public\/status\/lab\/banner\.js"/);
 	assert.match(bannerHtml(api, 'fr'), /data-lang="fr"><\/script>$/);
 	assert.match(bannerPhp(api), /dumbmonit_banner\('https:\/\/mon\.example\/api\/public\/status\/lab',/);
-});
-
-test('moving a service stays inside the list', () => {
-	assert.deepEqual(moveId([1, 2, 3], 2, -1), [2, 1, 3]);
-	assert.deepEqual(moveId([1, 2, 3], 3, 1), [1, 2, 3]);
-	assert.deepEqual(moveId([1, 2, 3], 1, -1), [1, 2, 3]);
-	assert.deepEqual(moveId([1, 2, 3], 9, 1), [1, 2, 3]);
-});
-
-test('saved services keep the order and trim labels and groups', () => {
-	const picks = new Map([
-		[1, { label: ' Web ', group: '' }],
-		[2, { label: 'DB', group: ' Back ' }]
-	]);
-	assert.deepEqual(savedItems([2, 7, 1], picks), [
-		{ target_id: 2, label: 'DB', group_name: 'Back' },
-		{ target_id: 1, label: 'Web', group_name: '' }
-	]);
 });
 
 test('unsaved changes ignore surrounding spaces but see real edits', () => {

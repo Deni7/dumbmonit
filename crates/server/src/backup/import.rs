@@ -138,10 +138,12 @@ pub async fn restore(
     report.push(restore_agent_enrolment(&mut tx, bundle).await?);
     report.push(restore_wall_weather(&mut tx, bundle).await?);
     report.push(restore_agent_update_rollout(&mut tx, bundle).await?);
+    report.push(restore_mail_server(&mut tx, cipher, bundle).await?);
     report.push(restore_instance(&mut tx, bundle).await?);
     report.push(restore_silences(&mut tx, bundle, &refs).await?);
     report.push(restore_status_pages(&mut tx, bundle, &refs).await?);
-    report.push(restore_report_schedules(&mut tx, bundle, &channels).await?);
+    report.push(restore_report_schedules(&mut tx, bundle, &channels, &refs).await?);
+    report.push(restore_report_logo(&mut tx, bundle).await?);
     report.push(restore_incidents(&mut tx, bundle).await?);
     report.push(restore_agent_tokens(&mut tx, bundle).await?);
     report.push(restore_api_tokens(&mut tx, bundle).await?);
@@ -966,6 +968,79 @@ async fn restore_wall_weather(
     Ok(report)
 }
 
+/// Serveur de courriel de l'instance : remplacé par celui du lot, mot de
+/// passe compris (rechiffré par la clé de cette instance). Un lot sans section
+/// ne touche pas au réglage ; un réglage illisible est signalé et laissé de côté.
+async fn restore_mail_server(
+    tx: &mut Transaction<'_, Sqlite>,
+    cipher: &Cipher,
+    bundle: &Bundle,
+) -> Result<SectionReport> {
+    use crate::notify::mail_server::{PASSWORD_KEY, SETTINGS_KEY, check_password};
+    let mut report = SectionReport::new("mail_server");
+    let Some(saved) = &bundle.mail_server else { return Ok(report) };
+    let server = saved.server.clone().trimmed();
+    let password = saved.password.as_deref().filter(|password| !password.is_empty());
+    if !server.is_configured()
+        || server.validate().is_err()
+        || password.is_some_and(|password| check_password(password).is_err())
+    {
+        report.skipped += 1;
+        report.notes.push("The email server settings of the backup are unreadable".into());
+        return Ok(report);
+    }
+    let value = serde_json::to_vec(&server)?;
+    let existing: Option<Vec<u8>> = sqlx::query_scalar("SELECT value FROM settings WHERE key = ?")
+        .bind(SETTINGS_KEY)
+        .fetch_optional(&mut **tx)
+        .await
+        .context("lecture du serveur de courriel")?;
+    let sealed: Option<Vec<u8>> = sqlx::query_scalar("SELECT value FROM settings WHERE key = ?")
+        .bind(PASSWORD_KEY)
+        .fetch_optional(&mut **tx)
+        .await
+        .context("lecture du mot de passe du serveur de courriel")?;
+    let stored_password = sealed.and_then(|sealed| cipher.decrypt(&sealed).ok());
+    if existing.as_deref() == Some(value.as_slice())
+        && stored_password.as_deref() == password.map(str::as_bytes)
+    {
+        report.skipped += 1;
+        return Ok(report);
+    }
+    let write = "INSERT INTO settings (key, value) VALUES (?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value,
+             updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')";
+    sqlx::query(write)
+        .bind(SETTINGS_KEY)
+        .bind(&value)
+        .execute(&mut **tx)
+        .await
+        .context("écriture du serveur de courriel")?;
+    match password {
+        Some(password) => {
+            sqlx::query(write)
+                .bind(PASSWORD_KEY)
+                .bind(cipher.encrypt(password.as_bytes())?)
+                .execute(&mut **tx)
+                .await
+                .context("écriture du mot de passe du serveur de courriel")?;
+        }
+        None => {
+            sqlx::query("DELETE FROM settings WHERE key = ?")
+                .bind(PASSWORD_KEY)
+                .execute(&mut **tx)
+                .await
+                .context("effacement du mot de passe du serveur de courriel")?;
+        }
+    }
+    report.count(if existing.is_some() {
+        RestoreOutcome::Updated
+    } else {
+        RestoreOutcome::Created
+    });
+    Ok(report)
+}
+
 /// Garde de l'enrôlement des agents (validation, débit, mise en veille) :
 /// remplacée par celle du lot, après contrôle. Un réglage illisible est
 /// signalé et laissé de côté, l'instance garde le sien.
@@ -1101,6 +1176,10 @@ async fn restore_instance(
     };
 
     let mut next = incoming.clone();
+    // Un lot ne fait pas entrer une couleur qui n'en est pas une.
+    if !crate::instance::is_valid_accent(&next.accent) {
+        next.accent.clear();
+    }
     if let Some(current) = &current
         && current.setup_completed
         && !next.setup_completed
@@ -1215,17 +1294,66 @@ async fn restore_silences(
     Ok(report)
 }
 
+/// Logo des rapports : remplacé par celui du lot s'il se lit et s'incorpore au
+/// PDF (mêmes contrôles que l'API). Un lot sans logo ne touche à rien.
+async fn restore_report_logo(
+    tx: &mut Transaction<'_, Sqlite>,
+    bundle: &Bundle,
+) -> Result<SectionReport> {
+    use crate::api::status_pages::branding::{MAX_LOGO_BYTES, sniff};
+    let mut report = SectionReport::new("report_logo");
+    let Some(item) = &bundle.report_logo else { return Ok(report) };
+    let decoded = BASE64
+        .decode(item.data.trim())
+        .ok()
+        .filter(|bytes| !bytes.is_empty() && bytes.len() <= MAX_LOGO_BYTES)
+        .filter(|bytes| crate::reports::logo::for_pdf(bytes).is_some())
+        .and_then(|bytes| sniff(&bytes).map(|kind| (kind, bytes)));
+    let Some((kind, bytes)) = decoded else {
+        report.skipped += 1;
+        report.notes.push("The report logo of the backup is not a usable PNG or JPEG".into());
+        return Ok(report);
+    };
+    let existing: Option<(String, Vec<u8>)> =
+        sqlx::query_as("SELECT logo_type, logo FROM report_logo WHERE id = 1")
+            .fetch_optional(&mut **tx)
+            .await
+            .context("lecture du logo des rapports")?;
+    match existing {
+        Some((stored_kind, stored)) if stored_kind == kind && stored == bytes => {
+            report.skipped += 1;
+            return Ok(report);
+        }
+        Some(_) => report.count(RestoreOutcome::Updated),
+        None => report.count(RestoreOutcome::Created),
+    }
+    sqlx::query(
+        "INSERT INTO report_logo (id, logo_type, logo) VALUES (1, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET logo_type = excluded.logo_type, logo = excluded.logo,
+             updated_at = strftime('%Y-%m-%d %H:%M:%S', 'now')",
+    )
+    .bind(kind)
+    .bind(bytes.as_slice())
+    .execute(&mut **tx)
+    .await
+    .context("écriture du logo des rapports")?;
+    Ok(report)
+}
+
 async fn restore_report_schedules(
     tx: &mut Transaction<'_, Sqlite>,
     bundle: &Bundle,
     channels: &HashMap<String, i64>,
+    refs: &HashMap<String, i64>,
 ) -> Result<SectionReport> {
+    use crate::reports::layout::Scope;
     use crate::reports::schedule::{Frequency, parse_timezone};
 
     let mut report = SectionReport::new("report_schedules");
     for item in &bundle.report_schedules {
         // Une sauvegarde éditée à la main ne doit pas contourner les contrôles de l'API.
         let name = item.name.trim();
+        let kind = item.kind.trim();
         let valid = !name.is_empty()
             && name.chars().count() <= 80
             && !name.chars().any(char::is_control)
@@ -1233,9 +1361,12 @@ async fn restore_report_schedules(
             && item.weekday <= 6
             && (1..=28).contains(&item.day_of_month)
             && item.hour <= 23
-            && parse_timezone(&item.timezone).is_some();
+            && parse_timezone(&item.timezone).is_some()
+            && (kind == "digest" || (kind == "sla" && item.frequency == "monthly"))
+            && item.objective.is_none_or(|v| v.is_finite() && v > 0.0 && v <= 100.0);
         let recipients = crate::reports::normalise_recipients(&item.recipients);
-        let (true, Ok(recipients)) = (valid, recipients) else {
+        let layout = item.layout.clone().validate();
+        let (true, Ok(recipients), Ok(layout)) = (valid, recipients, layout) else {
             report.skipped += 1;
             report
                 .notes
@@ -1255,12 +1386,47 @@ async fn restore_report_schedules(
                 }
             },
         };
+        let page_id = match &item.page {
+            None => None,
+            Some(slug) => {
+                let found: Option<i64> =
+                    sqlx::query_scalar("SELECT id FROM status_pages WHERE slug = ?")
+                        .bind(slug)
+                        .fetch_optional(&mut **tx)
+                        .await
+                        .context("recherche de la page de statut du rapport")?;
+                if found.is_none() {
+                    report.notes.push(format!(
+                        "Report \"{name}\": the status page \"{slug}\" is not in this backup; \
+                         the report is headed by DumbMonit."
+                    ));
+                }
+                found
+            }
+        };
+        let mut targets = Vec::new();
+        for reference in &item.scope_targets {
+            match refs.get(reference) {
+                Some(id) => targets.push(*id),
+                None => report.notes.push(format!(
+                    "Report \"{name}\": the monitor \"{reference}\" of its scope is not in this \
+                     backup and was left out."
+                )),
+            }
+        }
+        let Ok(scope) = Scope { targets, groups: item.scope_groups.clone() }.validate() else {
+            report.skipped += 1;
+            report.notes.push(format!("Report \"{name}\" has an invalid scope and was skipped."));
+            continue;
+        };
         let recipients_json = serde_json::to_string(&recipients)?;
+        let layout_json = serde_json::to_string(&layout)?;
+        let scope_json = serde_json::to_string(&scope)?;
         let enabled = item.enabled && !recipients.is_empty();
 
         let existing = sqlx::query(
             "SELECT id, enabled, frequency, weekday, day_of_month, hour, timezone, recipients,
-                 channel_id
+                 channel_id, kind, attach_pdf, attach_csv, page_id, objective, layout, scope
              FROM report_schedules WHERE name = ?",
         )
         .bind(name)
@@ -1277,7 +1443,14 @@ async fn restore_report_schedules(
                     && row.try_get::<i64, _>("hour")? == i64::from(item.hour)
                     && row.try_get::<String, _>("timezone")? == item.timezone.trim()
                     && row.try_get::<String, _>("recipients")? == recipients_json
-                    && row.try_get::<Option<i64>, _>("channel_id")? == channel_id;
+                    && row.try_get::<Option<i64>, _>("channel_id")? == channel_id
+                    && row.try_get::<String, _>("kind")? == kind
+                    && (row.try_get::<i64, _>("attach_pdf")? != 0) == item.attach_pdf
+                    && (row.try_get::<i64, _>("attach_csv")? != 0) == item.attach_csv
+                    && row.try_get::<Option<i64>, _>("page_id")? == page_id
+                    && row.try_get::<Option<f64>, _>("objective")? == item.objective
+                    && row.try_get::<String, _>("layout")? == layout_json
+                    && row.try_get::<String, _>("scope")? == scope_json;
                 if same {
                     report.skipped += 1;
                     continue;
@@ -1286,7 +1459,8 @@ async fn restore_report_schedules(
                 sqlx::query(
                     "UPDATE report_schedules
                      SET enabled = ?, frequency = ?, weekday = ?, day_of_month = ?, hour = ?,
-                         timezone = ?, recipients = ?, channel_id = ?,
+                         timezone = ?, recipients = ?, channel_id = ?, kind = ?, attach_pdf = ?,
+                         attach_csv = ?, page_id = ?, objective = ?, layout = ?, scope = ?,
                          armed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
                      WHERE id = ?",
                 )
@@ -1298,6 +1472,13 @@ async fn restore_report_schedules(
                 .bind(item.timezone.trim())
                 .bind(&recipients_json)
                 .bind(channel_id)
+                .bind(kind)
+                .bind(i64::from(item.attach_pdf))
+                .bind(i64::from(item.attach_csv))
+                .bind(page_id)
+                .bind(item.objective)
+                .bind(&layout_json)
+                .bind(&scope_json)
                 .bind(row.try_get::<i64, _>("id")?)
                 .execute(&mut **tx)
                 .await
@@ -1308,8 +1489,10 @@ async fn restore_report_schedules(
                 sqlx::query(
                     "INSERT INTO report_schedules
                          (name, enabled, frequency, weekday, day_of_month, hour, timezone,
-                          recipients, channel_id, armed_at)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))",
+                          recipients, channel_id, kind, attach_pdf, attach_csv, page_id,
+                          objective, layout, scope, armed_at)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                             strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))",
                 )
                 .bind(name)
                 .bind(i64::from(enabled))
@@ -1320,6 +1503,13 @@ async fn restore_report_schedules(
                 .bind(item.timezone.trim())
                 .bind(&recipients_json)
                 .bind(channel_id)
+                .bind(kind)
+                .bind(i64::from(item.attach_pdf))
+                .bind(i64::from(item.attach_csv))
+                .bind(page_id)
+                .bind(item.objective)
+                .bind(&layout_json)
+                .bind(&scope_json)
                 .execute(&mut **tx)
                 .await
                 .context("création du rapport planifié")?;
@@ -1484,6 +1674,22 @@ async fn restore_status_pages(
             .await
             .context("mode simple de la page de statut")?;
 
+        // Marque blanche : absente (ancienne sauvegarde), la page garde son réglage.
+        if let Some(hide) = page.hide_branding {
+            let changed = sqlx::query(
+                "UPDATE status_pages SET hide_branding = ? WHERE id = ? AND hide_branding != ?",
+            )
+            .bind(i64::from(hide))
+            .bind(id)
+            .bind(i64::from(hide))
+            .execute(&mut **tx)
+            .await
+            .context("marque blanche de la page de statut")?;
+            if changed.rows_affected() > 0 && outcome == RestoreOutcome::Skipped {
+                outcome = RestoreOutcome::Updated;
+            }
+        }
+
         // Accès : revalidé contre le jeu fermé. Absent (page publique, ou ancienne
         // sauvegarde), la page garde son accès.
         if let Some(mode) = page.access_mode.as_deref()
@@ -1558,16 +1764,24 @@ async fn restore_status_pages(
                     ));
                 }
             }
+            // Une sauvegarde d'avant l'interrupteur (0246) ouvrait le courriel
+            // en nommant un canal ; sans canal ni interrupteur, rien ne change.
+            let email_open = subscriptions
+                .email
+                .or(subscriptions.email_channel.as_ref().map(|_| true))
+                .map(i64::from);
             sqlx::query(
                 "UPDATE status_pages SET subscribe_webhook = ?, subscribe_slack = ?,
                      subscribe_channel_id = COALESCE(?, subscribe_channel_id),
-                     subscribe_sms_channel_id = COALESCE(?, subscribe_sms_channel_id)
+                     subscribe_sms_channel_id = COALESCE(?, subscribe_sms_channel_id),
+                     subscribe_email = COALESCE(?, subscribe_email)
                  WHERE id = ?",
             )
             .bind(i64::from(subscriptions.webhook))
             .bind(i64::from(subscriptions.slack))
             .bind(email)
             .bind(sms)
+            .bind(email_open)
             .bind(id)
             .execute(&mut **tx)
             .await
@@ -2422,8 +2636,13 @@ async fn restore_locations(
             report.notes.push(format!("location \"{name}\" has no valid name or coordinates"));
             continue;
         }
+        // Un lot sans code (ancienne version) reçoit celui que le nom donne par défaut.
+        let code = match crate::api::locations::default_code(&entry.code) {
+            code if code.is_empty() => crate::api::locations::default_code(name),
+            code => code,
+        };
         let existing = sqlx::query(
-            "SELECT id, address, latitude, longitude, site FROM locations
+            "SELECT id, address, latitude, longitude, site, code FROM locations
              WHERE name = ? COLLATE NOCASE",
         )
         .bind(name)
@@ -2435,22 +2654,24 @@ async fn restore_locations(
             && row.try_get::<f64, _>("latitude")? == entry.latitude
             && row.try_get::<f64, _>("longitude")? == entry.longitude
             && row.try_get::<String, _>("site")? == entry.site
+            && row.try_get::<String, _>("code")? == code
         {
             report.skipped += 1;
             continue;
         }
         let result = sqlx::query(
-            "INSERT INTO locations (name, address, latitude, longitude, site)
-             VALUES (?, ?, ?, ?, ?)
+            "INSERT INTO locations (name, address, latitude, longitude, site, code)
+             VALUES (?, ?, ?, ?, ?, ?)
              ON CONFLICT(name) DO UPDATE SET address = excluded.address,
                  latitude = excluded.latitude, longitude = excluded.longitude,
-                 site = excluded.site",
+                 site = excluded.site, code = excluded.code",
         )
         .bind(name)
         .bind(&entry.address)
         .bind(entry.latitude)
         .bind(entry.longitude)
         .bind(&entry.site)
+        .bind(&code)
         .execute(&mut **tx)
         .await;
         match result {

@@ -3,7 +3,7 @@
 	 * Settings → My account → Appearance: the theme and the language, both
 	 * kept in this browser. The console is deep black by default; light is an
 	 * option, and "System" follows the device. The wall stays dark.
-	 */
+	 *	 */
 	import { Moon, Sun, SunMoon } from 'lucide-svelte';
 	import { Panel } from '#lib/ui/index.js';
 	import { m } from '#lib/paraglide/messages.js';

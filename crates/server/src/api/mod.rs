@@ -37,6 +37,7 @@ mod ldap;
 pub mod locations;
 mod logs;
 mod luns;
+mod mail_server;
 mod mcp;
 mod metrics;
 mod monitor_imports;
@@ -304,6 +305,8 @@ pub fn router_with_hubs(
         .merge(skipped_features::routes())
         // Politique de notification et surcharges par équipement (`notify_policy.rs`).
         .merge(notify_policy::routes())
+        // Serveur de courriel de l'instance : réglage et essai (`mail_server.rs`).
+        .merge(mail_server::routes())
         // Astreintes : plannings, escalades, contacts et heures de chacun (`oncall.rs`).
         .merge(oncall::routes())
         // Rapports périodiques par courriel (`reports.rs`).

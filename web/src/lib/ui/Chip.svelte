@@ -26,7 +26,7 @@
 	{onclick}
 	class={`inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[0.8125rem] font-medium whitespace-nowrap transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal disabled:cursor-not-allowed disabled:opacity-45 ${
 		pressed
-			? 'border-signal bg-signal-soft text-signal-ink'
+			? 'chip-on border-signal bg-signal-soft text-signal-ink'
 			: 'border-line bg-surface text-ink-2 enabled:hover:border-line-strong enabled:hover:text-ink'
 	} ${className}`}
 >

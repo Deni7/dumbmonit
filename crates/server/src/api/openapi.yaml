@@ -3733,6 +3733,76 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/notify/mail-server:
+    get:
+      operationId: getMailServer
+      tags: [Notifications]
+      summary: The email server (SMTP) of the instance
+      description: >-
+        Used by status page email subscriptions and by scheduled reports that have no email
+        channel of their own. The password is never returned (`has_password`). When
+        `DUMBMONIT_SMTP_HOST` is set, the `DUMBMONIT_SMTP_*` variables describe the server and
+        `locked_by_env` is true. Administrators only.
+      x-token-scope: read
+      responses:
+        "200":
+          description: The effective settings.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MailServer" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    put:
+      operationId: putMailServer
+      tags: [Notifications]
+      summary: Save the email server (SMTP) of the instance
+      description: >-
+        Omitted `secrets` keep the stored password, `"secrets": {}` clears it,
+        `"secrets": {"password": "…"}` replaces it. A stored password is only kept while the
+        host and username stay the same; otherwise it must be typed again (400). An empty host
+        and sender forget the server. 409 when the `DUMBMONIT_SMTP_*` variables set it.
+      x-token-scope: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MailServerUpdate" }
+      responses:
+        "200":
+          description: The new effective settings.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MailServer" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/notify/mail-server/test:
+    post:
+      operationId: testMailServer
+      tags: [Notifications]
+      summary: Send a test email through the email server
+      description: >-
+        Sends a short email to `to`, with the unsaved settings in `server` when given (same
+        password rules as `PUT`), otherwise with the effective ones. A failure answers 400 with
+        the SMTP error, the password redacted.
+      x-token-scope: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MailServerTest" }
+      responses:
+        "200":
+          description: The email left.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChannelTestReport" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /api/webpush:
     get:
       operationId: getWebPush
@@ -3932,7 +4002,8 @@ paths:
       description: >-
         A full replacement: `title` is required and every omitted field goes back
         to its default — except `accent`, `footer_text`, `homepage_url`,
-        `subscribe_channel_id` and `domain`, which keep their stored value when omitted.
+        `subscribe_channel_id`, `subscribe_email`, `domain` and `hide_branding`, which keep their
+        stored value when omitted.
       x-token-scope: write
       requestBody:
         required: true
@@ -3987,6 +4058,30 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/StatusPageItem" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/status-pages/{id}/preview:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      operationId: previewStatusPage
+      tags: [Status pages]
+      summary: Editor preview of a status page
+      description: >-
+        The public document of the saved page, published or not and whatever its
+        access mode, for the page editor. Each service also carries `target_id`,
+        the monitor it shows, so the editor can keep its state and history while
+        the page is being changed. Never cached; the public route never carries
+        `target_id`.
+      x-token-scope: read
+      responses:
+        "200":
+          description: The page as visitors would read it.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicStatus" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -4141,7 +4236,7 @@ paths:
       tags: [Status pages]
       summary: Open or close the SMS, webhook and Slack subscriptions of a page
       description: >-
-        Email is chosen with the page itself (`subscribe_channel_id`). SMS needs a Vonage, Telnyx
+        Email is opened with the page itself (`subscribe_email`). SMS needs a Vonage, Telnyx
         or ASPSMS notification channel; webhook and Slack need nothing, the visitor gives their URL.
       x-token-scope: write
       requestBody:
@@ -4318,18 +4413,78 @@ paths:
         - { name: tz, in: query, schema: { type: string, default: UTC }, description: IANA timezone of the period and of the dates shown. }
         - name: format
           in: query
-          schema: { type: string, enum: [pdf, csv, incidents_csv], default: pdf }
+          schema: { type: string, enum: [pdf, csv, incidents_csv, json], default: pdf }
         - { name: objective, in: query, schema: { type: number, exclusiveMinimum: 0, maximum: 100 }, description: Availability objective in percent. }
         - { name: page, in: query, schema: { type: integer, format: int64 }, description: Status page whose title heads the report. }
         - { name: title, in: query, schema: { type: string, maxLength: 120 }, description: Report name shown under the header. }
         - { name: client, in: query, schema: { type: integer, format: int64 }, description: "MSP mode: the client reported on (its targets only, its name and logo). Required for a member of several clients." }
+        - { name: template, in: query, schema: { type: string, enum: [detailed, summary], default: detailed }, description: "PDF template: `detailed` (every monitor and incident) or `summary` (one or two pages: overall availability against the objective, availability by group or monitor, major incidents, total downtime)." }
+        - { name: paper, in: query, schema: { type: string, enum: [a4, letter], default: a4 } }
+        - name: sections
+          in: query
+          schema: { type: string, example: "summary,chart,monitors,incidents" }
+          description: "Comma-separated sections to include, among `summary`, `chart`, `monitors`, `incidents`, `maintenance`, `response_times`, `notes`. Omitted: all of them."
+        - { name: notes, in: query, schema: { type: string, maxLength: 2000 }, description: Free text printed in the Notes section. }
+        - { name: logo, in: query, schema: { type: string, enum: [auto, client, page, custom, none], default: auto }, description: "Logo at the top: `auto` (the client's, else the status page's), `client`, `page`, `custom` (the logo uploaded for reports, `/api/reports/logo`) or `none`. `true` and `false` are read as `auto` and `none`." }
+        - name: scope
+          in: query
+          schema: { type: string, example: '{"targets":[1,2],"groups":["Edge"]}' }
+          description: "JSON `ReportScope`: the monitors listed and those of the groups listed (union). Omitted: every monitor the report can see."
       responses:
         "200":
-          description: The file, as an attachment.
+          description: The file, as an attachment, or with `format=json` the report as data (the printable page of the web interface).
           content:
             application/pdf: { schema: { type: string, format: binary } }
             text/csv: { schema: { type: string } }
+            application/json: { schema: { $ref: "#/components/schemas/SlaReport" } }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/reports/logo:
+    get:
+      operationId: getReportLogo
+      tags: [Reports]
+      summary: Logo uploaded for SLA reports
+      description: Shown at the top of an SLA report whose layout picks `custom`. Readable by any signed-in account, like the report preview that shows it.
+      x-token-scope: read
+      responses:
+        "200":
+          description: The image.
+          content:
+            image/png: { schema: { type: string, format: binary } }
+            image/jpeg: { schema: { type: string, format: binary } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      operationId: uploadReportLogo
+      tags: [Reports]
+      summary: Set the logo of SLA reports
+      description: Administrators only. A PNG (8-bit, not interlaced) or a JPEG, 256 KiB at most, the images the PDF can embed.
+      x-token-scope: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data: { type: string, description: "The file in base64, with or without a `data:` prefix." }
+      responses:
+        "204": { description: Logo stored. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    delete:
+      operationId: deleteReportLogo
+      tags: [Reports]
+      summary: Remove the logo of SLA reports
+      description: Administrators only. Reports set to `custom` then have no logo.
+      x-token-scope: write
+      responses:
+        "204": { description: Logo removed. }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
@@ -8422,7 +8577,10 @@ paths:
         Domains, certificates, application secrets (Entra), products
         (Infomaniak), device keys (Tailscale) and licences, read from the last
         point of each collected expiry series. Already expired items stay for
-        thirty days.
+        thirty days. With `upcoming=true` the list also holds what is about to
+        become a problem without being an expiry date: disks the forecast says
+        will be full within the horizon, and backups that are late or will be
+        within a day (age of the last success past the limit of the integration).
       x-token-scope: read
       parameters:
         - name: target
@@ -8435,6 +8593,11 @@ paths:
           required: false
           description: Horizon in days (default 366, at most 3650).
           schema: { type: number }
+        - name: upcoming
+          in: query
+          required: false
+          description: Add disks that are filling up and late backups (`disk` and `backup` kinds).
+          schema: { type: boolean }
       responses:
         "200":
           description: The deadlines of the monitors the caller can see.
@@ -12485,6 +12648,8 @@ components:
         name: { type: string, maxLength: 80, description: Empty shows "DumbMonit". }
         language: { type: string, description: "Default interface language (`en`, `fr`, `de`, `es`, `it`, `pt`, `pt-BR`, `ru`, `zh-Hans`); empty follows the browser." }
         timezone: { type: string, description: IANA time zone; empty means UTC. }
+        accent: { type: string, pattern: '^(#[0-9a-fA-F]{6})?$', description: "Accent colour of the interface (solid buttons, focus ring) as `#rrggbb`, stored in lower case; empty is the default look. Status colours never change. Included in the backup." }
+        oncall_enabled: { type: boolean, description: "On-call schedules are turned on. Off by default (`false` also when the field is missing); turned on at upgrade for an instance that already has a schedule, an escalation policy or an on-call channel. Off, the schedules, policies and channels are kept but inactive: the alerting engine no longer starts escalations through on-call channels and the interface hides the feature." }
     InstancePatch:
       type: object
       properties:
@@ -12492,6 +12657,8 @@ components:
         name: { type: string, maxLength: 80 }
         language: { type: string }
         timezone: { type: string }
+        oncall_enabled: { type: boolean }
+        accent: { type: string, pattern: '^(#[0-9a-fA-F]{6})?$', description: "`#rrggbb` or empty for the default look; anything else is refused with 400." }
 
     # ---------------------------------------------------------- équipements
     Target:
@@ -13198,6 +13365,40 @@ components:
       properties:
         ok: { type: boolean }
         message: { type: string }
+    MailServer:
+      type: object
+      required: [host, port, effective_port, security, username, has_password, from_address, from_name, configured, locked_by_env]
+      properties:
+        host: { type: string }
+        port: { type: [integer, "null"], minimum: 1, maximum: 65535, description: "`null`: the usual port of `security`." }
+        effective_port: { type: integer, description: "`port`, or 587 (STARTTLS), 465 (TLS), 25 (none)." }
+        security: { type: string, enum: [starttls, tls, none] }
+        username: { type: string, description: Empty for no authentication. }
+        has_password: { type: boolean, description: A password is stored (it is never returned). }
+        from_address: { type: string }
+        from_name: { type: string, description: Display name of the sender; empty for the address alone. }
+        configured: { type: boolean, description: A host and a sender are set. }
+        locked_by_env: { type: boolean, description: "Set by the `DUMBMONIT_SMTP_*` environment variables: read-only." }
+    MailServerUpdate:
+      type: object
+      properties:
+        host: { type: string, maxLength: 253, description: Host name or address, without scheme. }
+        port: { type: [integer, "null"], minimum: 1, maximum: 65535 }
+        security: { type: string, enum: [starttls, tls, none], default: starttls }
+        username: { type: string }
+        from_address: { type: string, format: email }
+        from_name: { type: string, maxLength: 120 }
+        secrets:
+          type: object
+          description: "Omitted: the stored password is kept. `{}`: cleared."
+          properties:
+            password: { type: string }
+    MailServerTest:
+      type: object
+      required: [to]
+      properties:
+        to: { type: string, format: email }
+        server: { $ref: "#/components/schemas/MailServerUpdate" }
     WebPushDevice:
       type: object
       required: [id, device, push_service, fingerprint, created_at, last_success_at, last_error]
@@ -13358,6 +13559,8 @@ components:
         attach_csv: { type: boolean }
         page_id: { type: [integer, "null"], format: int64, description: Status page whose title heads the SLA report. }
         objective: { type: [number, "null"], description: Availability objective in percent (SLA report). }
+        layout: { $ref: "#/components/schemas/ReportLayout" }
+        scope: { $ref: "#/components/schemas/ReportScope" }
     ReportSchedulePayload:
       type: object
       properties:
@@ -13378,6 +13581,108 @@ components:
         attach_csv: { type: boolean, default: true, description: "SLA report only: the monitors file and the incidents file." }
         page_id: { type: [integer, "null"], format: int64 }
         objective: { type: [number, "null"], exclusiveMinimum: 0, maximum: 100 }
+        layout: { $ref: "#/components/schemas/ReportLayout" }
+        scope: { $ref: "#/components/schemas/ReportScope" }
+    ReportLayout:
+      type: object
+      description: How the SLA PDF is laid out. Every field is optional; the default is the detailed report on A4 with every section.
+      properties:
+        template: { type: string, enum: [detailed, summary], default: detailed }
+        paper: { type: string, enum: [a4, letter], default: a4 }
+        sections:
+          type: object
+          description: Sections to include; an omitted one is included.
+          properties:
+            summary: { type: boolean, default: true, description: Key figures and the objective. }
+            chart: { type: boolean, default: true, description: Availability bars by group or monitor. }
+            monitors: { type: boolean, default: true, description: Table by monitor (by group in the summary). }
+            incidents: { type: boolean, default: true, description: Every incident (the major ones in the summary). }
+            maintenance: { type: boolean, default: true }
+            response_times: { type: boolean, default: true }
+            notes: { type: boolean, default: true }
+        title: { type: [string, "null"], maxLength: 120, description: Heading under the brand; null is "Availability report". }
+        notes: { type: string, maxLength: 2000, default: "" }
+        show_logo: { type: boolean, default: true, description: "Kept for layouts saved before `logo`; always `logo != none` once saved. `false` wins over `logo`." }
+        logo: { type: string, enum: [auto, client, page, custom, none], default: auto, description: "Where the logo comes from: `auto` (the client's, else the status page's), `client`, `page`, `custom` (`/api/reports/logo`) or `none`." }
+    ReportScope:
+      type: object
+      description: The monitors listed and those of the groups listed (union). Empty is every monitor the report can see.
+      properties:
+        targets: { type: array, maxItems: 1000, items: { type: integer, format: int64 } }
+        groups: { type: array, maxItems: 200, items: { type: string }, description: Group names; "Ungrouped" selects the monitors without a group. }
+    SlaReport:
+      type: object
+      required: [brand, title, period_label, period_start, period_end, timezone, generated_at, layout, availability_known, fleet_status, downtime_secs, incident_count, previous_incident_count, grouped, groups, monitors, incidents, maintenance]
+      properties:
+        brand: { type: string }
+        title: { type: string }
+        period_label: { type: string, example: "2026-10-01 to 2026-10-31 (UTC)" }
+        period_start: { type: string, format: date-time }
+        period_end: { type: string, format: date-time }
+        timezone: { type: string }
+        generated_at: { type: string, format: date-time }
+        objective: { type: [number, "null"] }
+        layout: { $ref: "#/components/schemas/ReportLayout" }
+        logo_url: { type: [string, "null"], description: "Address of the logo at the top, relative to `/api`; null without a logo." }
+        availability_known: { type: boolean }
+        fleet_uptime: { type: [number, "null"] }
+        fleet_previous_uptime: { type: [number, "null"] }
+        fleet_status: { type: string, enum: [Met, Missed, Healthy, Degraded, Poor, No data] }
+        downtime_secs: { type: integer }
+        incident_count: { type: integer }
+        previous_incident_count: { type: integer }
+        grouped: { type: boolean }
+        groups:
+          type: array
+          items:
+            type: object
+            required: [name, monitors, status]
+            properties:
+              name: { type: string }
+              monitors: { type: integer }
+              uptime: { type: [number, "null"] }
+              previous_uptime: { type: [number, "null"] }
+              status: { type: string }
+        monitors:
+          type: array
+          items:
+            type: object
+            required: [name, group, status, incidents, downtime_secs]
+            properties:
+              name: { type: string }
+              group: { type: string }
+              uptime: { type: [number, "null"] }
+              previous_uptime: { type: [number, "null"] }
+              status: { type: string }
+              incidents: { type: integer }
+              downtime_secs: { type: integer }
+              latency_avg_ms: { type: [number, "null"] }
+              latency_p95_ms: { type: [number, "null"] }
+        incidents:
+          type: array
+          items:
+            type: object
+            required: [monitor, rule, severity, started_at, duration_secs, began_before_period, major]
+            properties:
+              monitor: { type: string }
+              rule: { type: string }
+              severity: { type: string }
+              started_at: { type: string, format: date-time }
+              ended_at: { type: [string, "null"], format: date-time }
+              duration_secs: { type: integer }
+              began_before_period: { type: boolean }
+              major: { type: boolean, description: Among the major incidents of the summary template. }
+        maintenance:
+          type: array
+          items:
+            type: object
+            required: [name, starts_at, ends_at, recurring]
+            properties:
+              name: { type: string }
+              monitor: { type: [string, "null"] }
+              starts_at: { type: string, format: date-time }
+              ends_at: { type: string, format: date-time }
+              recurring: { type: boolean }
     MaintenanceCalendar:
       type: object
       required: [token, path]
@@ -13409,11 +13714,13 @@ components:
         show_calendar: { type: boolean }
         show_latency: { type: boolean }
         logo_type: { type: [string, "null"], enum: [image/png, image/jpeg, image/webp, null] }
-        subscribe_channel_id: { type: [integer, "null"], format: int64 }
+        subscribe_channel_id: { type: [integer, "null"], format: int64, description: "SMTP channel chosen for subscriber emails; `null`: the email server of the instance." }
+        subscribe_email: { type: boolean, description: Visitors may subscribe by email. }
         domain: { type: [string, "null"], description: "Public host name serving this page at `/`; `null` for none." }
         seo: { $ref: "#/components/schemas/StatusPageSeo" }
         access_mode: { type: string, enum: [public, password, users], description: "Who can read the page; set through `PUT /api/status-pages/{id}/access`." }
         has_password: { type: boolean, description: A page password is stored (the hash is never returned). }
+        hide_branding: { type: boolean, description: "White label: the public page shows no DumbMonit name, icon or app name; its browser-tab icon is the page logo, or none." }
         group_labels:
           type: array
           items: { $ref: "#/components/schemas/StatusPageGroupLabel" }
@@ -13487,7 +13794,9 @@ components:
         simple: { type: boolean, default: false, description: Omitted keeps the saved value. }
         show_calendar: { type: boolean, default: false, description: Public 90-day calendar. Omitted keeps the saved value. }
         show_latency: { type: boolean, default: false, description: Public response-time graph per service. Omitted keeps the saved value. }
-        subscribe_channel_id: { type: [integer, "null"], format: int64, description: "An `smtp` channel; `null` turns email subscription off." }
+        hide_branding: { type: boolean, default: false, description: "White label: nothing of DumbMonit on the public page (tab title, icon, app name). The tab icon becomes the page logo, or none. Omitted keeps the saved value." }
+        subscribe_email: { type: boolean, description: "Lets visitors subscribe by email. The emails go through `subscribe_channel_id` when set, otherwise through the email server of the instance (`/api/notify/mail-server`). Omitted keeps the saved value, unless `subscribe_channel_id` is given: a channel opens it, `null` closes it (as before this field)." }
+        subscribe_channel_id: { type: [integer, "null"], format: int64, description: "An `smtp` channel that sends the subscriber emails instead of the email server; `null`: the email server. Omitted keeps the saved channel." }
         seo:
           $ref: "#/components/schemas/StatusPageSeo"
         groups:
@@ -13615,6 +13924,7 @@ components:
               items: { type: string, enum: [email, sms, webhook, slack] }
             show_calendar: { type: boolean, description: Present (true) only when the page shows the calendar. }
             show_latency: { type: boolean, description: Present (true) only when the page shows response times. }
+            hide_branding: { type: boolean, description: "White label: the page names nothing of DumbMonit; the tab icon is the logo, or none." }
             seo:
               type: object
               description: Effective search-engine values (settings, or defaults built from the page name).
@@ -13651,6 +13961,7 @@ components:
                   type: object
                   properties:
                     key: { type: string }
+                    target_id: { type: integer, format: int64, description: "Editor preview (`GET /api/status-pages/{id}/preview`) only: the monitor of the service." }
                     label: { type: string }
                     state: { type: string }
                     uptime_24h: { type: [number, "null"] }
@@ -13757,10 +14068,11 @@ components:
           description: Devices no location gathers.
     Location:
       type: object
-      required: [id, name, address, latitude, longitude, site, members]
+      required: [id, name, address, latitude, longitude, site, code, members]
       properties:
         id: { type: integer, format: int64 }
         name: { type: string }
+        code: { type: string, maxLength: 2, description: "Two-character badge code, upper case (e.g. `CR`); never empty." }
         address: { type: string, description: Free text, shown only. }
         latitude: { type: number }
         longitude: { type: number }
@@ -13784,6 +14096,7 @@ components:
         latitude: { type: number, minimum: -90, maximum: 90 }
         longitude: { type: number, minimum: -180, maximum: 180 }
         site: { type: string, maxLength: 80 }
+        code: { type: string, maxLength: 2, description: "Badge code; normalised to at most two upper-case letters or digits, accents removed. Empty or omitted: the first two letters of the name." }
     Basemap:
       type: object
       required: [mode]
@@ -15288,10 +15601,18 @@ components:
         target_kind: { type: string }
         kind:
           type: string
-          description: "`domain`, `certificate`, `credential`, `product`, `key` or `license`."
+          description: >
+            `domain`, `certificate`, `credential`, `product`, `key` or `license`;
+            with `upcoming=true` also `disk` (full on that date) and `backup`
+            (late on that date).
         what: { type: string, description: The object that expires (host, application, device…). }
         expires_at: { type: string, description: UTC, no suffix. }
         days_left: { type: number, description: Negative once expired. }
+        value:
+          type: number
+          description: >
+            Context of a `disk` (used, in percent) or a `backup` (age of the last
+            success, in days). Absent from the other kinds.
     BlacklistOverview:
       type: object
       additionalProperties: true

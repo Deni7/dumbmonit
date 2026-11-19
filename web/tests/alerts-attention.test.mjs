@@ -1,7 +1,7 @@
 // Info alerts are not problems: nav badge and wall count only warnings and criticals. Run: npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { attentionCount, countAlertsByTarget, countsAsProblem } from '../src/lib/alerts-attention.ts';
+import { attentionCount, countAlertsByTarget, countsAsProblem, visibleOnWall } from '../src/lib/alerts-attention.ts';
 
 const alert = (over) => ({ effective_phase: 'firing', acked: false, severity: 'warning', ...over });
 
@@ -37,4 +37,16 @@ test('per-monitor counts split firing, acknowledged and masked alerts', () => {
 	assert.equal(map.has(2), false);
 	assert.equal(map.has(3), false);
 	assert.equal(map.size, 1);
+});
+
+test('the wall leaves out building-up and acknowledged alerts', () => {
+	const kept = alert({ target_id: 1 });
+	const shown = visibleOnWall([
+		kept,
+		alert({ effective_phase: 'pending' }),
+		alert({ acked: true }),
+		alert({ effective_phase: 'suppressed' })
+	]);
+	assert.equal(shown.length, 2);
+	assert.equal(shown[0], kept);
 });

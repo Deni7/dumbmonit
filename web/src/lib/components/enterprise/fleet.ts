@@ -1,17 +1,19 @@
 /**
  * Fleet-wide figures for the Enterprise console, a handful of queries for the
- * whole estate rather than one per monitor: the health river (every monitor,
- * slotted over the range), latency sparklines, p95 and 30-day availability.
+ * whole estate rather than one per monitor: the last 24 hours of every monitor
+ * (the overview's bars, slotted like a river), latency sparklines, p95 and 30-day availability.
  *
  * Every series carries the `target` label (the target id); multi-location
  * monitors have one series per place, folded here with the worst value.
  */
 import { queryInstant, queryRange, type MetricSeries, type TargetId } from '#lib/api/index.js';
 
-/** One slot of the river: every check passed, some failed, all failed, nothing measured. */
+/** One slot of a monitor's bar: every check passed, some failed, all failed, nothing measured. */
 export type RiverCell = 'up' | 'warn' | 'down' | 'none';
 
 export const RIVER_SLOTS = 72;
+/** What the overview's 24 hour bars cover, whatever range the console is on. */
+export const DAY_SECONDS = 86400;
 export const SPARK_POINTS = 28;
 
 /** Probes publish `probe_success`; devices only `up`. Both are 1 when healthy. */
@@ -49,11 +51,15 @@ export function cellOf(value: number | undefined): RiverCell {
 	return 'warn';
 }
 
-/** Every monitor's health over the range, in `RIVER_SLOTS` equal slots, oldest first. */
-export async function loadRiver(rangeSeconds: number, signal?: AbortSignal): Promise<Map<TargetId, RiverCell[]>> {
-	const step = Math.max(15, Math.round(rangeSeconds / RIVER_SLOTS));
+/** Every monitor's health over `rangeSeconds`, in `slots` equal slots (default `RIVER_SLOTS`), oldest first. */
+export async function loadRiver(
+	rangeSeconds: number,
+	signal?: AbortSignal,
+	slots: number = RIVER_SLOTS
+): Promise<Map<TargetId, RiverCell[]>> {
+	const step = Math.max(15, Math.round(rangeSeconds / slots));
 	const end = Date.now();
-	const start = end - step * RIVER_SLOTS * 1000;
+	const start = end - step * slots * 1000;
 	const series = await queryRange(
 		{ query: `min by (target) (avg_over_time(${HEALTH}[${step}s]))`, start, end, step },
 		signal
@@ -70,7 +76,7 @@ export async function loadRiver(rangeSeconds: number, signal?: AbortSignal): Pro
 			bySlot.set(slot, known === undefined ? value : Math.min(known, value));
 		}
 		const cells: RiverCell[] = [];
-		for (let i = 1; i <= RIVER_SLOTS; i += 1) cells.push(cellOf(bySlot.get(i)));
+		for (let i = 1; i <= slots; i += 1) cells.push(cellOf(bySlot.get(i)));
 		out.set(id, cells);
 	}
 	return out;

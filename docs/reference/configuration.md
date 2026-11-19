@@ -95,6 +95,25 @@ Off unless `DUMBMONIT_HA_DIR` is set. See
 | `DUMBMONIT_HA_TAKEOVER_MINUTES` | *(unset: manual)* | Automatic takeover after this many minutes without a heartbeat, 2 at least. |
 | `DUMBMONIT_HA_SNAPSHOT_SECS` | `30` | Database replication period, 10 to 3600 seconds. |
 
+### Email server {#email-server}
+
+The SMTP server of the instance, which mails status page subscribers and the
+scheduled reports that have no email channel. It is normally set in
+**Settings → Notifications → Email server** (see
+[Email server](../notifications.md#email-server)). When `DUMBMONIT_SMTP_HOST`
+is set, these variables describe it instead: they win over the saved setting,
+which the interface then shows read-only.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `DUMBMONIT_SMTP_HOST` | *(unset: use the setting)* | Host name or address of the SMTP server. |
+| `DUMBMONIT_SMTP_PORT` | from the encryption | `587` for STARTTLS, `465` for TLS, `25` for none. |
+| `DUMBMONIT_SMTP_SECURITY` | `starttls` | `starttls`, `tls` (encrypted from the first byte) or `none` (only towards a relay on your own network). |
+| `DUMBMONIT_SMTP_USERNAME` | *(empty: no authentication)* | Username. |
+| `DUMBMONIT_SMTP_PASSWORD` | *(empty)* | Password, used with the username. |
+| `DUMBMONIT_SMTP_FROM` | *(required with the host)* | Sender address, `status@example.com`. |
+| `DUMBMONIT_SMTP_FROM_NAME` | *(empty)* | Sender name shown by mail clients. |
+
 ### Former `EZYMONIT_*` names
 
 DumbMonit was called EzyMonit until September 2026. Every `DUMBMONIT_*`

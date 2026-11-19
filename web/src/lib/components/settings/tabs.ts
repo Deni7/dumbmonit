@@ -18,7 +18,9 @@ export const SECTION_TAB: Record<string, SettingsTab> = {
 	// Former anchor of the Homelab / Enterprise choice.
 	'product-mode': 'system',
 	'setup-wizard': 'system',
+	'oncall-schedules': 'system',
 	appearance: 'account',
+	accent: 'system',
 	security: 'account',
 	push: 'account',
 	users: 'team',
@@ -34,6 +36,7 @@ export const SECTION_TAB: Record<string, SettingsTab> = {
 	notifications: 'notifications',
 	'notifications-channels': 'notifications',
 	'notifications-policy': 'notifications',
+	'email-server': 'notifications',
 	'quiet-hours': 'notifications',
 	wall: 'wall',
 	music: 'wall',
@@ -53,15 +56,15 @@ export const SECTION_TAB: Record<string, SettingsTab> = {
 
 /**
  * Sections that used to live in Settings, and where they went: status pages
- * and announcements to `/status`, the SLA export and the scheduled reports to
- * `/reports`. An old `/settings/...#anchor` link follows them.
+ * and announcements to `/status`, the SLA export to its tab of `/status` and the
+ * scheduled reports to `/status?tab=reports`. An old `/settings/...#anchor` link follows them.
  */
 export const MOVED: Record<string, string> = {
 	status: '/status',
 	'status-pages': '/status',
 	incidents: '/status#incidents',
 	reports: '/status?tab=reports',
-	'reports-sla': '/status?tab=reports#reports-sla'
+	'reports-sla': '/status?tab=sla'
 };
 
 export function isTab(value: string | undefined): value is SettingsTab {
@@ -104,6 +107,7 @@ export function searchIndex(): SearchEntry[] {
 	});
 	return [
 		entry('general', m.settings_general_instance_title(), m.settings_search_kw_instance()),
+		entry('oncall-schedules', m.settings_oncall_title(), m.settings_oncall_text()),
 		entry('appearance', m['settings.section.appearance'](), m.settings_search_kw_appearance()),
 		entry('security', m['settings.section.security'](), m.settings_search_kw_security()),
 		entry('push', m.settings_nav_push(), m.settings_search_kw_push()),
@@ -119,6 +123,7 @@ export function searchIndex(): SearchEntry[] {
 		entry('locations', m.locations_title(), m.settings_search_kw_locations()),
 		entry('notifications-channels', m.notifications_channels_title(), m.settings_search_kw_notifications()),
 		entry('notifications-policy', m.notifications_policy_title(), m.settings_search_kw_policy()),
+		entry('email-server', m.settings_mail_title(), m.settings_mail_search_kw()),
 		entry('wall', m.settings_appearance_wall_title(), m.settings_search_kw_wall()),
 		entry('music', m.settings_music_title(), m.settings_search_kw_music()),
 		entry('backup', m['settings.section.backup'](), m.settings_search_kw_backup()),

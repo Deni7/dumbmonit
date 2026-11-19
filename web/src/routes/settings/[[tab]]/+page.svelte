@@ -60,6 +60,7 @@
 	import PushSection from '#lib/components/settings/PushSection.svelte';
 	import ChannelsSection from '#lib/components/notifications/ChannelsSection.svelte';
 	import NotificationPolicySection from '#lib/components/notifications/NotificationPolicySection.svelte';
+	import MailServerSection from '#lib/components/settings/MailServerSection.svelte';
 
 	// Accounts only exist once the instance is protected; viewers never see that tab.
 	const showAccounts = $derived(auth.available && auth.configured && auth.isAdmin);
@@ -91,7 +92,7 @@
 		account: [AppearanceSection, SecuritySection, PushSection],
 		team: [UsersSection, TeamsSection, ...(auth.isAdmin ? [ClientsSection] : []), SsoSection, SamlSection, ScimSection, LdapSection],
 		monitoring: [AgentsSection, PacksSection, SecurityScoreSection, ...(auth.isAdmin ? [LocationsSection] : [])],
-		notifications: [ChannelsSection, NotificationPolicySection],
+		notifications: [ChannelsSection, ...(auth.isAdmin ? [MailServerSection] : []), NotificationPolicySection],
 		wall: [WallModeSection, WallWeatherSection, MusicSection],
 		system: [...(auth.isAdmin ? [GeneralSection] : []), BackupSection, ...(auth.isAdmin ? [ConfigFilesSection] : []), SelfMonitoringSection, ...(auth.isAdmin ? [HttpsSection, PortsSection, StorageSection, LogsSection] : []), AssistantSection, AboutSection]
 	});
@@ -149,7 +150,7 @@
 	let query = $state('');
 	const results = $derived(
 		searchSettings(searchIndex(), query).filter(
-			(entry) => tabs.includes(entry.tab) && (auth.isAdmin || (entry.id !== 'locations' && entry.id !== 'logs' && entry.id !== 'storage'))
+			(entry) => tabs.includes(entry.tab) && (auth.isAdmin || (entry.id !== 'locations' && entry.id !== 'logs' && entry.id !== 'storage' && entry.id !== 'email-server'))
 		)
 	);
 	const href = (entry: { tab: SettingsTab; id: string }) => `/settings/${entry.tab}#${entry.id}`;
@@ -228,7 +229,7 @@
 		{#each tabs as id (id)}
 			<li class="min-w-0">
 				<a
-					href={withBase('/settings/{id}')}
+					href={withBase(`/settings/${id}`)}
 					data-tab={id}
 					class={`inline-flex h-10 items-center rounded-full border px-3.5 text-[0.8125rem] font-semibold transition-colors ${tab === id ? 'border-line-strong bg-surface-2 text-ink' : 'border-line text-ink-2 hover:text-ink'}`}
 					aria-current={tab === id ? 'page' : undefined}
@@ -250,7 +251,7 @@
 						{@const Icon = ICONS[id]}
 						<li>
 							<a
-								href={withBase('/settings/{id}')}
+								href={withBase(`/settings/${id}`)}
 								class={`flex h-10 items-center gap-2.5 rounded-md px-2.5 transition-colors hover:bg-surface-2 hover:text-ink ${tab === id ? 'bg-surface-2 font-semibold text-ink' : 'text-ink-2'}`}
 								aria-current={tab === id ? 'page' : undefined}
 							>

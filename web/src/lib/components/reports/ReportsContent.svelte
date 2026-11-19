@@ -1,22 +1,23 @@
 <script lang="ts">
 	import { withBase } from '#lib/paths.js';
 	/**
-	 * The Reports page: the availability (SLA) export of a period on demand,
-	 * the scheduled reports (periodic emails for the team — mostly one, weekly
-	 * by default, though a few may coexist, for instance a daily one for the
+	 * The Reports page: the scheduled reports (periodic emails for the team — mostly one, weekly by
+	 * default, though a few may coexist, for instance a daily one for the
 	 * on-call and a monthly one for management) and the history of their
-	 * sends. Settings used to hold the last two; `/settings/reports` forwards
-	 * here.
+	 * sends (the SLA ones included: the report itself is the SLA tab of Status). Settings used to hold the last two; `/settings/reports` forwards
+	 * here. `?schedule=sla&…` (the SLA tab's "Schedule") opens a new SLA
+	 * report prefilled with the options in the address.
 	 */
+	import { untrack } from 'svelte';
+	import { page } from '$app/state';
 	import ClientAssign from '#lib/components/ClientAssign.svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { Info, Mail, Plus } from 'lucide-svelte';
 	import { listChannels, listStatusPages, type Channel, type StatusPage } from '#lib/api/index.js';
-	import { listReportSchedules, type ReportSchedule } from '#lib/api/reports.js';
+	import { listReportSchedules, slaRequestFrom, type ReportSchedule, type ReportSchedulePayload } from '#lib/api/reports.js';
 	import { Button, EmptyState, ErrorNotice, Panel, Plate, Skeleton } from '#lib/ui/index.js';
 	import { formatDateTime, formatRelative } from '#lib/format.js';
 	import ReportEditor from '#lib/components/settings/ReportEditor.svelte';
-	import SlaDownload from '#lib/components/settings/SlaDownload.svelte';
 
 	const DOCS_URL = 'https://dumbmonit.selfhostr.io/docs/using/reports/';
 
@@ -25,7 +26,22 @@
 	let pages = $state<StatusPage[]>([]);
 	let loading = $state(true);
 	let error = $state<unknown>(null);
-	let adding = $state(false);
+	/** Starting values handed over by the SLA page, for a new SLA report. */
+	const draft = untrack((): Partial<ReportSchedulePayload> | null => {
+		const params = page.url.searchParams;
+		if (params.get('schedule') !== 'sla') return null;
+		const asked = slaRequestFrom(params);
+		return {
+			kind: 'sla',
+			frequency: 'monthly',
+			objective: asked.objective ?? null,
+			page_id: asked.page ?? null,
+			timezone: asked.tz,
+			layout: asked.layout,
+			scope: asked.scope
+		};
+	});
+	let adding = $state(untrack(() => draft !== null));
 	let showInfo = $state(false);
 
 	const emailChannels = $derived(channels.filter((channel) => channel.kind === 'smtp'));
@@ -66,6 +82,8 @@
 		} finally {
 			loading = false;
 		}
+		// Handed over by the SLA page: the new report's form is the thing to look at.
+		if (draft && !error) requestAnimationFrame(() => document.getElementById('reports')?.scrollIntoView({ block: 'start' }));
 	}
 
 	$effect(() => {
@@ -85,16 +103,6 @@
 </script>
 
 <div class="grid gap-6 [&_section[id]]:scroll-mt-20">
-<Panel id="reports-sla" title={m.settings_sla_title()} description={m.settings_sla_description()}>
-	{#if error}
-		<ErrorNotice {error} title={m.settings_reports_load_error()} onretry={() => void load()} />
-	{:else if loading}
-		<Skeleton class="h-40 w-full" />
-	{:else}
-		<SlaDownload {pages} {defaultTimezone} {timezones} />
-	{/if}
-</Panel>
-
 <Panel
 	id="reports"
 	title={m.settings_reports_title()}
@@ -154,6 +162,7 @@
 				<div class="border-t border-line pt-6 first:border-t-0 first:pt-0">
 					<ReportEditor
 						schedule={null}
+						{draft}
 						channels={emailChannels}
 						{defaultTimezone}
 						{timezones}
