@@ -110,8 +110,12 @@ export function inkOn(fill: string): string {
 export function deriveAccent(raw: string): DerivedAccent | null {
 	const hex = parseAccent(raw);
 	if (!hex) return null;
-	const lightFill = holdContrast(hex, SURFACE_LIGHT, 3, [0, 0, 0]);
-	const darkFill = holdContrast(hex, SURFACE_DARK, 3, [255, 255, 255]);
+	// A mid-tone can hold 3:1 against the page and still read poorly under either ink:
+	// it then darkens until white text holds 4.5:1 (on dark, it lightens for the near-black).
+	const legible = (fill: string, toward: Rgb, ink: string) =>
+		contrast(fill, inkOn(fill)) >= 4.5 ? fill : holdContrast(fill, ink, 4.5, toward);
+	const lightFill = legible(holdContrast(hex, SURFACE_LIGHT, 3, [0, 0, 0]), [0, 0, 0], INK_LIGHT);
+	const darkFill = legible(holdContrast(hex, SURFACE_DARK, 3, [255, 255, 255]), [255, 255, 255], INK_DARK);
 	return {
 		lightFill,
 		lightOn: inkOn(lightFill),

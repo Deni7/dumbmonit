@@ -27,7 +27,7 @@
 
 	const current = $derived(instanceStore.accent);
 	const isPreset = $derived(ACCENT_PALETTE.some((p) => p.hex === current));
-	const derived = $derived(deriveAccent(current));
+	const preview = $derived(deriveAccent(current));
 	// A colour input needs a value even for the default look.
 	const customValue = $derived(current || '#2563eb');
 
@@ -99,13 +99,13 @@
 			{#if !isPreset}<Check class="size-4" strokeWidth={3} aria-hidden="true" />{/if}
 		</label>
 	</div>
-	{#if derived}
+	{#if preview}
 		<!-- What the pick becomes in each light, with the ink laid on it. -->
 		<div class="flex flex-wrap items-center gap-2 text-sm font-semibold" aria-hidden="true">
-			<span class="inline-flex h-10 items-center rounded-lg px-4" style={`background-color: ${derived.lightFill}; color: ${derived.lightOn}`}>
+			<span class="inline-flex h-10 items-center rounded-lg px-4" style={`background-color: ${preview.lightFill}; color: ${preview.lightOn}`}>
 				{m.settings_appearance_theme_light()}
 			</span>
-			<span class="inline-flex h-10 items-center rounded-lg px-4" style={`background-color: ${derived.darkFill}; color: ${derived.darkOn}`}>
+			<span class="inline-flex h-10 items-center rounded-lg px-4" style={`background-color: ${preview.darkFill}; color: ${preview.darkOn}`}>
 				{m.settings_appearance_theme_dark()}
 			</span>
 		</div>
