@@ -21,7 +21,7 @@
 	import type { Serie } from '#lib/components/Chart.svelte';
 	import type { TargetAlertCounts } from '#lib/alerts-attention.js';
 	import CompactRow from './CompactRow.svelte';
-	import { GRID, SHOW } from './columns';
+	import { GRID, HEADER_HEIGHT, SHOW } from './columns';
 	import type { RiverCell } from '#lib/components/enterprise/fleet.js';
 	import RackTile from './RackTile.svelte';
 	import type { RackRow } from './rack';
@@ -193,13 +193,12 @@
 {#if layout === 'compact'}
 	<!-- The table: one header line over the rows, both on the grid of `columns.ts`. -->
 	<div class="@container overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
-		<div class="flex gap-1.5 border-b border-line bg-surface-2/50 text-[0.75rem] font-semibold text-ink-3" aria-hidden="true">
+		<div class="flex items-center gap-1.5 border-b border-line bg-surface-2/50 text-[0.75rem] font-medium text-ink-3" aria-hidden="true">
 			{#if selection}<span class="w-9 shrink-0"></span>{/if}
 			<div class="min-w-0 flex-1">
-				<div class={`${GRID} min-h-9`}>
-					<span class="truncate">{m.devices_cols_status()}</span>
+				<div class={`${GRID} ${HEADER_HEIGHT}`}>
+					<span></span>
 					<span class="truncate">{m.devices_cols_name()}</span>
-					<span class={`${SHOW.address} truncate`}>{m.devices_cols_address()}</span>
 					<span class={`${SHOW.site} justify-center truncate`}>{m.devices_cols_site()}</span>
 					<span class={`${SHOW.river} truncate`}>{m.devices_cols_last24h()}</span>
 					<span class={`${SHOW.response} truncate text-right`}>{m.devices_cols_response()}</span>
