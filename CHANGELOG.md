@@ -3,7 +3,190 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## Unreleased
+## 0.19.0 — 2026-11-19
+
+### Added
+
+- **Accent colour.** Administrators pick the accent of the whole interface in Settings ›
+  System: eight preset hues or any custom colour, shown straight away. It colours the solid
+  buttons, focus rings, the active side bar item and tab underline, active filter chips, links,
+  switches, checkboxes, selected alert rows, the setup progress bar and the first chart series; the hue is adjusted for the light and the dark console so
+  the text on it keeps a 4.5:1 contrast and the fill stands out from the surface. Status colours
+  (red, amber, green) never change. Stored on the instance (`accent` in `/api/instance/settings`)
+  and included in the backup.
+- **Email server in Settings.** Settings › Notifications › Email server takes one SMTP server for the
+  instance (host, port, STARTTLS / TLS / none, username, password, sender address and name), with
+  "Send a test email" that shows the server's own error when it fails. The password is stored
+  encrypted, never shown again and backed up with the other secrets. The `DUMBMONIT_SMTP_*`
+  variables can set it instead; the setting is then read-only.
+- **Email subscriptions in one switch.** A status page offers email subscriptions with "Let visitors
+  subscribe by email", sent through the email server: no notification channel to create first. A
+  page that used an email channel keeps it (it still wins while enabled), and SMS, webhook and Slack
+  subscriptions are unchanged. Scheduled reports also fall back on the email server when no email
+  channel is enabled.
+
+- **An SLA tab in Status.** The availability report is the **SLA** tab of Status, next to Reports
+  (administrators; `/sla` and `/reports/sla` forward there, query included). Status › Reports keeps
+  only the scheduled reports (the SLA ones too) and their history. Set the period, the monitors, the
+  template (Summary or Detailed) and the options in a form that uses the whole page, then take the
+  report out directly: **Download PDF**, **Print** (a printable sheet opens in a new tab and starts
+  the print dialog), CSV or Schedule. There is no on-screen preview of the report. The options stay in the address, so a setup can be
+  linked; Schedule opens a new scheduled SLA report prefilled with them. Also in the command palette.
+- **Monitor picker for SLA reports.** Search, groups with a checkbox each (half-checked when only some
+  of their monitors are in), All and None, and one line saying how many monitors are covered. A whole
+  group is kept as the group, so monitors added to it later are covered too.
+- **Report logo.** The logo at the top of an SLA report is now a choice: automatic (the client's, else
+  the status page's, as before), the client's, the status page's, a logo uploaded for reports
+  (`GET`/`PUT`/`DELETE /api/reports/logo`, PNG or JPEG up to 256 KiB, stored in the database and in
+  the backup as `report_logo`), or none. The layout field is `logo` (`auto`, `client`, `page`,
+  `custom`, `none`), and so is the `logo` parameter of `GET /api/reports/sla` (`true` and `false`
+  still work). The report data (`format=json`) gives `logo_url`. PNG logos with a palette now go in
+  the PDF too.
+- **The app's own calendar.** Every date and time field (silences, mutes, maintenance and incident
+  dates, on-call rotations and overrides, quiet hours, log search, SLA period) uses a calendar and a
+  time box in the app's theme instead of the device's picker: full keyboard (arrows, Page Up/Down,
+  Home/End, Escape), month and day names in the interface language, the week starting where the
+  language says, 40px targets. The SLA period has shortcuts: last 7 or 30 days, this month, last
+  month, last quarter. Values sent to the API are unchanged.
+- **Swiss cross.** A "Made in Switzerland" cross beside the name on the sign-in page, with a tagline
+  under it: "Monitoring with Swiss precision" (translated in the nine languages). It is not shown
+  inside the app.
+- **Incidents of the week, on the overview.** A compact block in the right-hand column, beside
+  "Needs attention", shows how many incidents the last seven days had (an incident starts when an
+  alert fires and ends when it resolves), how long they stayed open, the figures of the week before,
+  one bar per day (heights relative to a floor of four, so one incident is not a huge bar) and the
+  monitor behind the most of them; long durations read "32 d 7 h". It fills the height of
+  "Needs attention" (six rows, then "See all"). It replaces the "Alerts, last 7 days" chart.
+- **Coming up, on the overview.** Under the incidents, what is about to become a problem, most
+  urgent first (up to six rows, then "See all"): certificates, domains, secrets, licences and keys
+  that expire, disks the forecast says will be full ("~11 days"), backups that are late or about to
+  be (Proxmox, Proxmox Backup Server, Veeam, Kopia, Duplicati, Synology, TrueNAS, Hetzner, Immich,
+  Plakar, restic and Borg repositories), critical vulnerabilities (one row per monitor, when the CVE
+  feature is on) and a DumbMonit update when one is published. Each row names what and where, one
+  line of context and the date as words ("in 6 days", "3 days ago"). Nothing due: the same card, with "Nothing due in the next 30 days" and a line on what is watched
+  (certificates, domains, disks, backups, vulnerabilities).
+  `GET /api/deadlines?upcoming=true` adds the `disk` and `backup` kinds (and a `value` field: used
+  percent, or days since the last success); without the parameter the answer is unchanged.
+
+- **A two-letter code for each location.** A location has a "Badge code" (two letters or digits,
+  upper case, no accents): the first two letters of its name by default ("CR" for Crissier), editable
+  in the location form, and kept in backups. Existing locations get theirs from their name when the
+  server updates. The Monitors list shows it as a small pill (the full name on hover).
+
+### Changed
+
+- **A plainer sign-in page.** A wrong password shows only "Wrong username or password."; the
+  "lost password" note is gone, and the footer reads "Open source, MIT" (the name is already at the
+  top). Monitors: the Map tab comes last.
+- **No icon in page titles.** The access screen of a protected status page no longer puts a padlock
+  or a sign-in icon before its title, like every other page title.
+
+
+- **Monitors list, a real table.** The list has a header line and fixed columns that line up on
+  every row: a status mark whose shape tells the state (filled circle online, square offline,
+  triangle misconfigured, diamond pending, hollow ring disabled; the name of the state and the last
+  error on hover), the name over the kind of monitor and its address, Site, Last 24 h (24 hourly
+  segments: green all good, orange some checks failed, red down, grey no data), Response, the
+  security grade, Checked (compact age, the full date on hover) and the alerts. The columns fold with
+  the width of the list, header and rows together; on a phone only the status, the name, Checked
+  and the alerts remain.
+- **Tiles, plainer.** Tiles are bordered cards like the rest of the app: no shadow, light that
+  follows the pointer, lift or staggered entrance.
+- **Selection and folders.** "Select" and "Create folder" are labelled buttons. The selection bar
+  keeps enable, disable, move to folder and delete in view and puts location, "Reached through" and
+  the CVE check in one "More" menu.
+- **Tag filter in one control.** The row of tag chips is now one button that shows the chosen tags on
+  one line ("prod, db +1") and opens a searchable checklist, with a × to clear.
+
+- **SLA report forms line up with the rest of the settings.** Same field heights, labels, grid and
+  spacing as the other forms; the template, kind and frequency choices are 40px segmented controls;
+  the layout options no longer sit in a box inside a box. The printable page is now the SLA tab of Status.
+
+- **A tidier map.** Monitors › Map is laid out as a clean tree: a device with many dependants
+  gets them in a compact grid of up to eight per row, joined by square lines (one bus, short drops)
+  instead of a fan of long diagonals. Each site frame is as big as its content and the sites sit side
+  by side, so a small site no longer leaves a hole beside a big one; a site without links is a small
+  grid. A device placed by a link to another site sits under the device it is cabled to in its own
+  site rather than alone at the bottom. Links between sites are a single curve between the facing
+  edges of the two frames, without the junction circles.
+- **The map legend behind a button.** The legend under the map is replaced by a "Legend" button in
+  the map's toolbar. Its panel explains the circles, the state badges, the site frames and only the
+  kinds of link the map actually draws (plus the load scale with the weathermap on).
+- **On-call schedules are optional.** The On-call tab of Alerts, the "DumbMonit on-call" channel type
+  and the on-call step of the setup wizard are hidden until you turn on **On-call schedules** in
+  Settings › System (for teams that take turns handling alerts at night and on weekends). Turned off,
+  alerts no longer open escalations through on-call channels and go out as they would without
+  on-call; schedules, policies and channels are kept, just inactive. An instance that already has a
+  schedule, an escalation policy or an on-call channel is upgraded with the setting turned on. The
+  setting is part of the backup (`instance` section) and of `GET`/`PUT /api/instance/settings`
+  (`oncall_enabled`).
+- **A plainer overview.** The "health river" and the grid of monitor tiles give way to "Coming up";
+  what is wrong is listed once, under "Needs attention". The p95 figure and the "Week ahead" line are
+  gone from the overview (the p95 still has its chart; expiry dates stay on Status › Reports and on
+  each monitor).
+- **Calmer monitor header.** The monitor page header is a flat surface with one main action (Probe
+  now) and a Settings gear. The gear opens a menu, every entry with an icon: snooze with its durations,
+  enable or disable, logs, then Settings, then Delete (apart, in the danger tone). This replaces the row of icon
+  buttons, the "..." menu and the strip under the name. The security badge no longer shows in grey
+  when a monitor has no security grade. Rules ignored on a monitor are no longer listed under its
+  alerts.
+
+- **Swiss cross.** A small "Made in Switzerland" cross after the version number at the foot of the
+  page and beside the name on the sign-in page, and a tagline under it: "Monitoring with Swiss
+  precision" (translated in the nine languages).
+- **SLA reports you can shape.** When you download an availability report, or in a monthly SLA
+  schedule, "Customize the report" chooses the template (Detailed, or a one-to-two-page Summary:
+  overall availability against the objective, availability by group or monitor, major incidents,
+  total downtime), the paper (A4 or US Letter), the sections (key figures, availability chart,
+  monitors, incidents, maintenance windows, response times, notes), a title, free notes, whether the
+  logo is shown, and which monitors or groups are covered. Scheduled reports keep these options, and
+  so do backups. The report also lists the maintenance windows of the period.
+- **Printable report page.** "Open printable page" shows the same report in the browser; printing it
+  gives only the report, black on white, with table headers repeated on each page.
+
+- **SLA PDF made for paper.** Wider print margins, no background fills (outlines and rules only),
+  table headers repeated on every page, the name and period at the top of each following page, a
+  bar chart of availability with the objective marked, and statuses that read in black and white
+  (bad ones in bold). A status page used to brand the report now brings its logo too.
+
+
+- **White-label status pages.** A "Hide DumbMonit branding" switch per status page: the public
+  page then names nothing of DumbMonit, not even in the browser tab (title and icon), the phone
+  shortcut name or the page served before the app loads. The tab icon becomes the page's logo, or
+  no icon. Saved in backups and GitOps files (`hide_branding`).
+
+- **A two-pane status page editor.** Settings on the left, a live preview on the right drawn
+  exactly like the public page, from what is not saved yet (title, colours, logo, groups,
+  monitors, white label). Groups and monitors are reordered by dragging their grip, or with their
+  Move up / Move down buttons from the keyboard; monitors are added to a group from its own
+  search box. Save and Cancel stay at the bottom, and leaving with unsaved changes asks first.
+  On phones and tablets, Settings and Preview become two tabs. Replaces the previous form.
+- **A plainer overview health panel.** The "health river" gives way to a grid of small tiles, one
+  per monitor (state as a shape and a colour, problems first, shrinking from 10 to 500 monitors),
+  and, below, only what is wrong: each failing monitor with its last 24 hours, how long it has
+  been down and its last error. When all is well, one calm line.
+
+- **Calmer monitor header.** The monitor page header is a flat surface with one main action (Probe now) and Settings; silencing, logs, the on/off switch and Delete sit in a quiet strip below, replacing the row of icon buttons and the "..." menu. Rules ignored on a monitor are no longer listed under its alerts.
+- **Clearer, more detailed Alerts panel.** Each alert row now unfolds with what used to need a trip
+  to the monitor: how long it has lasted, the monitor and its address, the rule, the current value
+  against its limit, the last check and last data received, the probe error, notifications sent and
+  the latest state changes. The list refreshes every 10 seconds while the tab is open without
+  losing the open row, groups or selection, with a discreet "Updated … ago" and a refresh button.
+  The acknowledged group no longer shows a count.
+
+### Fixed
+
+- **Email over STARTTLS hardened.** `lettre` 0.11.24 fixes a STARTTLS reply injection that let a
+  man-in-the-middle make a rejected message look sent (RUSTSEC-2026-0560 to 0564).
+- **Settings tabs open again.** The tabs of Settings pointed to `/settings/{id}` literally, so
+  only the first one could be reached; the wall's device chips had the same broken link.
+
+- **Wall: no more "building up" or acknowledged alerts.** Alerts that have not triggered yet and
+  alerts someone has acknowledged are no longer listed on the wall, and no longer count in its
+  headline, weather or pigeons.
+- **No more blocked font or 401 on first launch.** Fonts are never inlined as `data:` URIs (the
+  Content Security Policy only allows files from the server), and the update check is only asked
+  once signed in.
 
 ## 0.18.0 — 2026-11-17
 

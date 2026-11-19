@@ -1,9 +1,11 @@
-//! Logo d'un client (mode MSP) préparé pour le PDF du rapport SLA.
+//! Logo du rapport SLA préparé pour le PDF (client en mode MSP, page de
+//! statut, ou logo téléversé pour les rapports — table `report_logo`).
 //!
 //! JPEG : incorporé tel quel, seules ses dimensions sont lues. PNG 8 bits non
-//! entrelacé (gris, RVB, avec ou sans alpha) : décompressé, défiltré, puis
-//! recompressé en pixels bruts et masque alpha séparé. Le reste (WebP, PNG à
-//! palette ou 16 bits) n'est pas incorporé : le nom du client en tient lieu.
+//! entrelacé (gris, RVB, palette, avec ou sans alpha) : décompressé, défiltré,
+//! puis recompressé en pixels bruts et masque alpha séparé. Le reste (WebP, PNG
+//! 16 bits ou entrelacé) n'est pas incorporé : le nom en tient lieu, et le logo
+//! téléversé pour les rapports est refusé dès le dépôt.
 //!
 //! L'entrée vient d'un administrateur mais reste bornée comme une entrée
 //! hostile : dimensions plafonnées avant toute allocation, décompression
@@ -11,7 +13,44 @@
 
 use std::io::{Read, Write};
 
+use anyhow::{Context, Result};
+use sqlx::SqlitePool;
+
 use super::pdf::Image;
+
+/// Logo téléversé pour les rapports : (type MIME, octets), s'il y en a un.
+pub async fn stored(pool: &SqlitePool) -> Result<Option<(String, Vec<u8>)>> {
+    sqlx::query_as::<_, (String, Vec<u8>)>("SELECT logo_type, logo FROM report_logo WHERE id = 1")
+        .fetch_optional(pool)
+        .await
+        .context("logo des rapports")
+}
+
+/// Remplace (ou efface, avec `None`) le logo téléversé pour les rapports.
+pub async fn set_stored(pool: &SqlitePool, logo: Option<(&str, &[u8])>) -> Result<()> {
+    match logo {
+        Some((kind, bytes)) => {
+            sqlx::query(
+                "INSERT INTO report_logo (id, logo_type, logo) VALUES (1, ?, ?)
+                 ON CONFLICT(id) DO UPDATE SET logo_type = excluded.logo_type,
+                     logo = excluded.logo,
+                     updated_at = strftime('%Y-%m-%d %H:%M:%S', 'now')",
+            )
+            .bind(kind)
+            .bind(bytes)
+            .execute(pool)
+            .await
+            .context("logo des rapports")?;
+        }
+        None => {
+            sqlx::query("DELETE FROM report_logo WHERE id = 1")
+                .execute(pool)
+                .await
+                .context("logo des rapports")?;
+        }
+    }
+    Ok(())
+}
 
 /// Pixels au plus : 2 Mpx, bien plus qu'il n'en faut pour un logo.
 const MAX_PIXELS: u64 = 2_000_000;
@@ -78,6 +117,8 @@ fn png(bytes: &[u8]) -> Option<Image> {
     let mut at = 8;
     let mut header: Option<(u32, u32, u8, u8, u8)> = None;
     let mut compressed: Vec<u8> = Vec::new();
+    let mut palette: Vec<u8> = Vec::new();
+    let mut transparency: Vec<u8> = Vec::new();
     while at + 8 <= bytes.len() {
         let length = u32::from_be_bytes(bytes[at..at + 4].try_into().ok()?) as usize;
         let kind = &bytes[at + 4..at + 8];
@@ -88,6 +129,10 @@ fn png(bytes: &[u8]) -> Option<Image> {
                 let height = u32::from_be_bytes(data[4..8].try_into().ok()?);
                 header = Some((width, height, data[8], data[9], data[12]));
             }
+            b"PLTE" if data.len() % 3 == 0 && data.len() <= 256 * 3 => {
+                palette = data.to_vec();
+            }
+            b"tRNS" if data.len() <= 256 => transparency = data.to_vec(),
             b"IDAT" => compressed.extend_from_slice(data),
             b"IEND" => break,
             _ => {}
@@ -107,7 +152,8 @@ fn png(bytes: &[u8]) -> Option<Image> {
         2 => 3,
         4 => 2,
         6 => 4,
-        // Palette : non prise en charge.
+        // Palette : un octet par pixel, l'index dans `PLTE`.
+        3 if !palette.is_empty() => 1,
         _ => return None,
     };
     let (w, h) = (width as usize, height as usize);
@@ -121,7 +167,24 @@ fn png(bytes: &[u8]) -> Option<Image> {
     if raw.len() != expected {
         return None;
     }
-    let pixels = unfilter(&raw, stride, h, channels)?;
+    let mut pixels = unfilter(&raw, stride, h, channels)?;
+    // Palette : chaque index devient sa couleur RVB, et son alpha (`tRNS`) s'il
+    // y en a un ; un index hors de la palette rend le fichier illisible.
+    let channels = if color_type == 3 {
+        let with_alpha = !transparency.is_empty();
+        let mut expanded = Vec::with_capacity(w * h * if with_alpha { 4 } else { 3 });
+        for &index in &pixels {
+            let at = usize::from(index) * 3;
+            expanded.extend_from_slice(palette.get(at..at + 3)?);
+            if with_alpha {
+                expanded.push(transparency.get(usize::from(index)).copied().unwrap_or(255));
+            }
+        }
+        pixels = expanded;
+        if with_alpha { 4 } else { 3 }
+    } else {
+        channels
+    };
 
     let color_channels = if channels <= 2 { 1 } else { 3 };
     let has_alpha = channels == 2 || channels == 4;
@@ -251,10 +314,35 @@ mod tests {
         assert!(for_pdf(&png_file(5000, 5000, 6, &[0])).is_none());
         // Données tronquées.
         assert!(for_pdf(&png_file(4, 4, 2, &[0, 1, 2])).is_none());
-        // Palette.
+        // Palette absente.
         assert!(for_pdf(&png_file(1, 1, 3, &[0, 0])).is_none());
         assert!(for_pdf(b"RIFF\0\0\0\0WEBPVP8 ").is_none());
         assert!(for_pdf(b"").is_none());
+    }
+
+    #[test]
+    fn a_palette_png_is_expanded_with_its_transparency() {
+        // 2×1, palette de deux couleurs, la seconde à moitié transparente.
+        let mut file = b"\x89PNG\r\n\x1a\n".to_vec();
+        let mut chunk = |kind: &[u8], data: &[u8]| {
+            file.extend_from_slice(&(data.len() as u32).to_be_bytes());
+            file.extend_from_slice(kind);
+            file.extend_from_slice(data);
+            file.extend_from_slice(&[0, 0, 0, 0]);
+        };
+        let mut ihdr = Vec::new();
+        ihdr.extend_from_slice(&2u32.to_be_bytes());
+        ihdr.extend_from_slice(&1u32.to_be_bytes());
+        ihdr.extend_from_slice(&[8, 3, 0, 0, 0]);
+        chunk(b"IHDR", &ihdr);
+        chunk(b"PLTE", &[255, 0, 0, 0, 0, 255]);
+        chunk(b"tRNS", &[255, 128]);
+        chunk(b"IDAT", &deflate(&[0, 0, 1]).unwrap());
+        chunk(b"IEND", &[]);
+        let image = for_pdf(&file).expect("decoded");
+        assert_eq!(image.color_space, "DeviceRGB");
+        assert_eq!(inflate(&image.data), vec![255, 0, 0, 0, 0, 255]);
+        assert_eq!(inflate(&image.alpha.unwrap()), vec![255, 128]);
     }
 
     #[test]

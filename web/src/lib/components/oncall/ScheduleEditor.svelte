@@ -16,7 +16,7 @@
 		type SchedulePayload,
 		type Window
 	} from '#lib/api/index.js';
-	import { Button, ErrorNotice, Field, Toggle } from '#lib/ui/index.js';
+	import { Button, DateTimeField, ErrorNotice, Field, TimeField, Toggle } from '#lib/ui/index.js';
 	import Avatar from './Avatar.svelte';
 	import {
 		browserTimezone,
@@ -225,7 +225,7 @@
 							</select>
 						</Field>
 						<Field label={m.oncall_rotation_start()} for={`layer-${i}-start`} help={m.oncall_rotation_start_help()} class="sm:col-span-2">
-							<input id={`layer-${i}-start`} type="datetime-local" class="input tnum" bind:value={layer.rotation.start} />
+							<DateTimeField id={`layer-${i}-start`} bind:value={layer.rotation.start} label={m.oncall_rotation_start()} />
 						</Field>
 					</div>
 					{#if layer.rotation.kind === 'custom'}
@@ -305,10 +305,10 @@
 								</div>
 								<div class="flex flex-wrap items-end gap-3">
 									<Field label={m.oncall_window_from()} for={`layer-${i}-w${k}-s`}>
-										<input id={`layer-${i}-w${k}-s`} type="time" class="input tnum" bind:value={clocks[i][k].start} />
+										<TimeField id={`layer-${i}-w${k}-s`} bind:value={clocks[i][k].start} class="w-32" />
 									</Field>
 									<Field label={m.oncall_window_to()} for={`layer-${i}-w${k}-e`}>
-										<input id={`layer-${i}-w${k}-e`} type="time" class="input tnum" bind:value={clocks[i][k].end} />
+										<TimeField id={`layer-${i}-w${k}-e`} bind:value={clocks[i][k].end} class="w-32" />
 									</Field>
 									{#if !readonly}
 										<Button variant="ghost" size="sm" onclick={() => removeWindow(i, k)}>

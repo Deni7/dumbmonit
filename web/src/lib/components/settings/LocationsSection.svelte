@@ -27,6 +27,8 @@
 	import { Button, Confirm, Disclosure, ErrorNotice, Field, Panel, Skeleton, Toggle } from '#lib/ui/index.js';
 	import WorldMap, { type WorldPin } from '#lib/components/worldmap/WorldMap.svelte';
 	import { MapPin, Pencil, Plus, Search } from 'lucide-svelte';
+	import SiteBadge from '#lib/components/devices/SiteBadge.svelte';
+	import { defaultLocationCode, normalizeLocationCode } from './locationCode.js';
 	import { getGeoip, setGeoip } from '#lib/api/opnsense.js';
 	import type { GeoipStatus } from '#lib/api/types.js';
 
@@ -98,6 +100,8 @@
 		latitude: string;
 		longitude: string;
 		site: string;
+		/** Two-letter badge code; follows the name until it is typed by hand. */
+		code: string;
 	}
 
 	let draft = $state<Draft | null>(null);
@@ -111,6 +115,7 @@
 		attempted = false;
 		found = null;
 		placeQuery = '';
+		codeTouched = location !== null;
 		draft = location
 			? {
 					id: location.id,
@@ -118,10 +123,17 @@
 					address: location.address,
 					latitude: String(location.latitude),
 					longitude: String(location.longitude),
-					site: location.site
+					site: location.site,
+					code: location.code
 				}
-			: { id: null, name: '', address: '', latitude: '', longitude: '', site: '' };
+			: { id: null, name: '', address: '', latitude: '', longitude: '', site: '', code: '' };
 	}
+
+	/** A new location takes the first two letters of its name until the code is edited by hand. */
+	let codeTouched = $state(false);
+	$effect(() => {
+		if (draft && !codeTouched) draft.code = defaultLocationCode(draft.name);
+	});
 
 	const latitude = $derived(draft && draft.latitude.trim() !== '' ? Number(draft.latitude) : NaN);
 	const longitude = $derived(draft && draft.longitude.trim() !== '' ? Number(draft.longitude) : NaN);
@@ -160,7 +172,8 @@
 			address: draft.address.trim(),
 			latitude,
 			longitude,
-			site: draft.site
+			site: draft.site,
+			code: normalizeLocationCode(draft.code) || defaultLocationCode(draft.name)
 		};
 		saving = true;
 		saveError = null;
@@ -282,7 +295,7 @@
 				<ul class="divide-y divide-line rounded-lg border border-line">
 					{#each data.locations as location (location.id)}
 						<li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
-							<MapPin class="size-4 shrink-0 text-ink-3" aria-hidden="true" />
+							<SiteBadge code={location.code} name={location.name} />
 							<div class="min-w-0 flex-1">
 								<p class="flex flex-wrap items-center gap-x-2 text-sm font-semibold text-ink">
 									<span class="truncate">{location.name}</span>
@@ -318,9 +331,23 @@
 					}}
 				>
 					<h3 class="text-sm font-semibold text-ink">{draft.id === null ? m.locations_new_title() : m.locations_edit_title({ name: draft.name })}</h3>
-					<div class="grid items-start gap-4 sm:grid-cols-2">
+					<div class="grid items-start gap-4 sm:grid-cols-[minmax(0,1.2fr)_6rem_minmax(0,1.5fr)]">
 						<Field label={m.locations_name()} for="location-name" required error={attempted ? nameError : null}>
 							<input id="location-name" class="input" maxlength="80" bind:value={draft.name} autocomplete="off" />
+						</Field>
+						<Field label={m.locations_code()} for="location-code">
+							<input
+								id="location-code"
+								class="input text-center font-semibold tracking-widest uppercase"
+								maxlength="2"
+								autocomplete="off"
+								value={draft.code}
+								oninput={(e) => {
+									codeTouched = true;
+									if (draft) draft.code = normalizeLocationCode(e.currentTarget.value);
+									e.currentTarget.value = draft?.code ?? '';
+								}}
+							/>
 						</Field>
 						<Field label={m.locations_address()} for="location-address" help={m.locations_address_help()}>
 							<input id="location-address" class="input" maxlength="200" bind:value={draft.address} autocomplete="off" />

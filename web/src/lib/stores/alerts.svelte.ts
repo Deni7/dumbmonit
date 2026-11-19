@@ -30,6 +30,8 @@ class AlertsStore {
 	available = $state(true);
 	/** The cause of the last failed refresh; `null` once one succeeds. */
 	lastError = $state<unknown>(null);
+	/** When the last refresh succeeded (ms since epoch); `null` before the first. */
+	updatedAt = $state<number | null>(null);
 	#subscribers = 0;
 
 	/**
@@ -73,12 +75,13 @@ class AlertsStore {
 			this.probes = probes;
 			this.available = true;
 			this.lastError = null;
+			this.updatedAt = Date.now();
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
-			// The badge must not pollute the interface with a stale count; the
-			// pages that show the error in detail keep their last known targets
-			// (`available`/`lastError` tell them whether to trust that list).
-			this.alerts = [];
+			// Keep the last alerts and devices on screen: a blip must not empty
+			// the list or fold open rows. `available`/`lastError` say the data is
+			// stale; pages show a full error only when nothing was ever loaded
+			// (`updatedAt === null`), and the freshness line says "not refreshed".
 			this.available = false;
 			this.lastError = cause;
 		} finally {

@@ -6,7 +6,7 @@
 	 * Five tabs (the shared `Tabs`, `?tab=` in the URL), the daily ones first:
 	 * Now (the live list, by severity or by monitor, with the maintenance
 	 * windows folded under it), History, Rules, Automation (remediation log,
-	 * runbooks, actions, policies) and On-call. Notification channels and their
+	 * runbooks, actions, policies) and On-call (only while turned on in Settings → System). Notification channels and their
 	 * policy live in Settings → Notifications; the old `#notifications…` links
 	 * forward there, and so do the old `#scheduled`, `#oncall`, `#history` and
 	 * `#rules` anchors, to their tab. Active alerts, monitors and probe states
@@ -36,10 +36,12 @@
 		type CollectorInfo
 	} from '#lib/api/index.js';
 	import { alertsStore } from '#lib/stores/alerts.svelte.js';
+	import { instanceStore } from '#lib/stores/instance.svelte.js';
 	import { PageHeader, Button, Disclosure, ErrorNotice, Plate, Skeleton, Tabs, confetti, type TabItem } from '#lib/ui/index.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import { dismissals } from '#lib/stores/dismissals.svelte.js';
 	import { readSky } from '#lib/components/overview/sky.js';
+	import UpdatedAgo from '#lib/components/alerts/UpdatedAgo.svelte';
 	import AlertList from '#lib/components/alerts/AlertList.svelte';
 	import DismissedList from '#lib/components/alerts/DismissedList.svelte';
 	import ScheduleForm from '#lib/components/alerts/ScheduleForm.svelte';
@@ -101,7 +103,7 @@
 	// This page's own fetch (rules/silences/history) takes precedence; absent
 	// that, a failure on the shared store is this page's problem too — "Now"
 	// needs both devices and alerts.
-	const pageError = $derived(error ?? (!alertsStore.available ? alertsStore.lastError : null));
+	const pageError = $derived(error ?? (!alertsStore.available && alertsStore.updatedAt === null ? alertsStore.lastError : null));
 	const firstLoad = $derived(loading || (alertsStore.loading && targets.length === 0));
 
 	// The last row leaving "Now" while the reader watches is the moment the
@@ -268,13 +270,55 @@
 	]);
 	const activeWindows = $derived(silences.filter((silence) => silence.active_now).length);
 
+	// On-call schedules are optional (Settings → System): the tab only exists while they are on.
+	const oncallOn = $derived(instanceStore.oncallEnabled);
 	const tabs: TabItem[] = $derived([
 		{ id: 'now', label: m.alerts_page_tab_now(), badge: sky.attention, attention: true },
 		{ id: 'history', label: m.alerts_page_tab_history() },
 		{ id: 'rules', label: m.alerts_page_tab_rules() },
 		{ id: 'automation', label: m.alerts_tab_automation() },
-		{ id: 'oncall', label: m.oncall_tab() }
+		...(oncallOn ? [{ id: 'oncall', label: m.oncall_tab() }] : [])
 	]);
+	// An old link to the tab, once the settings say the feature is off: back to "Now".
+	$effect(() => {
+		if (tab !== 'oncall' || !instanceStore.settingsLoaded || oncallOn) return;
+		void goto(tabUrl('/alerts', 'now', { searchParams: untrack(() => page.url.searchParams) }, {}, 'now'), {
+			replace: true,
+			reset: false
+		});
+	});
+
+	/** The refresh button: the shared lists and this page's own (history, windows). */
+	async function refreshNow() {
+		await Promise.all([alertsStore.refresh(), refreshSilences(), refreshHistory()]);
+	}
+
+	async function refreshHistory(signal?: AbortSignal) {
+		try {
+			history = await listAlertHistory({ limit: 200 }, signal);
+		} catch {
+			// Kept as is: the mini history of a row just stays a little behind.
+		}
+	}
+
+	// The live list is the point of this tab: while it is open and visible it
+	// refreshes on a short clock (the app-wide poll stays at 30 s). It only
+	// replaces data — expanded rows, groups and the selection live in the list
+	// and are keyed, so nothing the reader set is lost.
+	const LIVE_MS = 10_000;
+	$effect(() => {
+		if (tab !== 'now') return;
+		const controller = new AbortController();
+		const timer = setInterval(() => {
+			if (document.visibilityState === 'hidden') return;
+			void alertsStore.refresh(controller.signal);
+			void refreshHistory(controller.signal);
+		}, LIVE_MS);
+		return () => {
+			controller.abort();
+			clearInterval(timer);
+		};
+	});
 
 	$effect(() => {
 		const controller = new AbortController();
@@ -326,7 +370,7 @@
 		{#if id === 'automation'}
 			<AutomationTab />
 		{:else if id === 'oncall'}
-			<OnCallSection />
+			{#if oncallOn}<OnCallSection />{/if}
 		{:else if pageError}
 			<ErrorNotice
 				error={pageError}
@@ -374,8 +418,9 @@
 					/>
 				</Disclosure>
 			{/if}
-			{#if dismissed.length > 0}
-				<div class="mb-3 flex justify-end">
+			<div class="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+				<UpdatedAgo updatedAt={alertsStore.updatedAt} onrefresh={refreshNow} />
+				{#if dismissed.length > 0}
 					<Segmented
 						options={nowViews}
 						value={nowView}
@@ -383,12 +428,12 @@
 						label={m.alerts_dismiss_view_label()}
 						size="sm"
 					/>
-				</div>
-			{/if}
+				{/if}
+			</div>
 			{#if nowView === 'dismissed'}
 				<DismissedList alerts={dismissed} targets={targetsMap} rules={rulesMap} />
 			{:else}
-				<AlertList {sky} {silences} onchanged={() => void onNeedsYouChanged()} />
+				<AlertList {sky} {silences} {history} {probes} onchanged={() => void onNeedsYouChanged()} />
 			{/if}
 		{/if}
 	{/snippet}

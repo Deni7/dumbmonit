@@ -46,6 +46,10 @@ pub struct InstancePatch {
     pub language: Option<String>,
     #[serde(default)]
     pub timezone: Option<String>,
+    #[serde(default)]
+    pub oncall_enabled: Option<bool>,
+    #[serde(default)]
+    pub accent: Option<String>,
 }
 
 /// La démonstration publique n'a pas d'assistant : son parc est déjà là.
@@ -111,6 +115,18 @@ fn apply(value: &mut InstanceSettings, patch: InstancePatch) -> ApiResult<()> {
         }
         value.timezone = timezone.to_string();
     }
+    if let Some(accent) = patch.accent {
+        let accent = accent.trim();
+        if !accent.is_empty() && !instance::is_valid_accent(accent) {
+            return Err(ApiError::BadRequest(
+                "The accent colour must be empty or a #rrggbb value.".into(),
+            ));
+        }
+        value.accent = accent.to_ascii_lowercase();
+    }
+    if let Some(on) = patch.oncall_enabled {
+        value.oncall_enabled = on;
+    }
     if let Some(done) = patch.setup_completed {
         // L'assistant peut être relancé depuis les réglages : remettre à faux
         // est permis, et la date suit. Répéter la même valeur ne la change pas.
@@ -136,12 +152,28 @@ mod tests {
     }
 
     #[test]
+    fn the_accent_is_stored_in_lower_case_and_can_be_cleared() {
+        let mut value = InstanceSettings::default();
+        let set = InstancePatch { accent: Some(" #2563EB ".into()), ..Default::default() };
+        assert!(apply(&mut value, set).is_ok());
+        assert_eq!(value.accent, "#2563eb");
+        let keep = InstancePatch { name: Some("Lab".into()), ..Default::default() };
+        assert!(apply(&mut value, keep).is_ok());
+        assert_eq!(value.accent, "#2563eb");
+        let clear = InstancePatch { accent: Some(String::new()), ..Default::default() };
+        assert!(apply(&mut value, clear).is_ok());
+        assert!(value.accent.is_empty());
+    }
+
+    #[test]
     fn bad_values_are_refused() {
         let mut value = InstanceSettings::default();
         for patch in [
             InstancePatch { language: Some("klingon".into()), ..Default::default() },
             InstancePatch { timezone: Some("Mars/Olympus".into()), ..Default::default() },
             InstancePatch { name: Some("x".repeat(MAX_NAME_LEN + 1)), ..Default::default() },
+            InstancePatch { accent: Some("blue".into()), ..Default::default() },
+            InstancePatch { accent: Some("#12345".into()), ..Default::default() },
         ] {
             assert!(apply(&mut value, patch).is_err());
         }

@@ -101,6 +101,10 @@ async fn bad_requests_are_refused_with_a_reason() {
         "/api/reports/sla?from=yesterday",
         "/api/reports/sla?to=2024-10-31",
         "/api/reports/sla?from=2099-01-01&to=2099-01-31",
+        "/api/reports/sla?from=2024-10-01&to=2024-10-31&template=fancy",
+        "/api/reports/sla?from=2024-10-01&to=2024-10-31&paper=a3",
+        "/api/reports/sla?from=2024-10-01&to=2024-10-31&sections=summary,bogus",
+        "/api/reports/sla?from=2024-10-01&to=2024-10-31&scope=not-json",
     ] {
         let reply = get(&app, uri, Some(&admin)).await;
         assert_eq!(reply.status, StatusCode::BAD_REQUEST, "{uri}");
@@ -161,4 +165,166 @@ async fn an_sla_schedule_is_monthly_and_keeps_its_options() {
         let reply = app.post("/api/reports/schedules", body, Some(&admin)).await;
         assert_eq!(reply.status, StatusCode::BAD_REQUEST, "{bad}");
     }
+}
+
+#[tokio::test]
+async fn the_summary_template_and_the_paper_follow_the_request() {
+    let app = TestApp::configured().await;
+    let admin = app.admin_cookie().await;
+    let uri = "/api/reports/sla?from=2024-10-01&to=2024-10-31&template=summary&paper=letter\
+               &sections=summary,incidents&title=Board%20pack&notes=Hidden";
+    let reply = get(&app, uri, Some(&admin)).await;
+    assert_eq!(reply.status, StatusCode::OK);
+    let text = String::from_utf8_lossy(&reply.bytes);
+    assert!(text.contains("/MediaBox [0 0 612 792]"), "Letter paper");
+    assert!(text.contains("(Major incidents)"));
+    assert!(text.contains("(Board pack)"));
+    assert!(!text.contains("(Availability by monitor)"), "monitors were not asked for");
+    assert!(!text.contains("Hidden"), "notes were not asked for");
+}
+
+#[tokio::test]
+async fn the_json_view_follows_the_scope_and_the_layout() {
+    let app = TestApp::configured().await;
+    let admin = app.admin_cookie().await;
+    let mut ids = Vec::new();
+    for (name, address) in [("Web", "10.0.0.7"), ("Mail", "10.0.0.8")] {
+        let created = app
+            .post(
+                "/api/targets",
+                json!({ "name": name, "address": address, "kind": "dummy" }),
+                Some(&admin),
+            )
+            .await;
+        assert_eq!(created.status, StatusCode::CREATED, "{}", created.body);
+        ids.push(created.body["id"].as_i64().unwrap());
+    }
+    let all =
+        app.get("/api/reports/sla?from=2024-10-01&to=2024-10-31&format=json", Some(&admin)).await;
+    assert_eq!(all.status, StatusCode::OK, "{}", all.body);
+    assert_eq!(all.body["monitors"].as_array().unwrap().len(), 2);
+    assert_eq!(all.body["layout"]["template"], "detailed");
+    assert_eq!(all.body["title"], "Availability report");
+
+    // `{"targets":[id]}`, encodé pour l'adresse.
+    let uri = format!(
+        "/api/reports/sla?from=2024-10-01&to=2024-10-31&format=json&template=summary\
+         &objective=99.5&scope=%7B%22targets%22%3A%5B{}%5D%7D",
+        ids[0]
+    );
+    let scoped = app.get(&uri, Some(&admin)).await;
+    assert_eq!(scoped.status, StatusCode::OK, "{}", scoped.body);
+    let monitors = scoped.body["monitors"].as_array().unwrap();
+    assert_eq!(monitors.len(), 1);
+    assert_eq!(monitors[0]["name"], "Web");
+    assert_eq!(scoped.body["layout"]["template"], "summary");
+    assert_eq!(scoped.body["objective"], 99.5);
+    assert_eq!(scoped.body["fleet_status"], "No data", "no time-series database here");
+}
+
+#[tokio::test]
+async fn a_schedule_keeps_its_layout_and_scope() {
+    let app = TestApp::configured().await;
+    let admin = app.admin_cookie().await;
+    let created = app
+        .post(
+            "/api/reports/schedules",
+            json!({
+                "name": "Board SLA", "kind": "sla", "frequency": "monthly", "enabled": false,
+                "layout": { "template": "summary", "paper": "letter", "title": "Board pack",
+                            "notes": "Quiet month.", "show_logo": false,
+                            "sections": { "chart": false } },
+                "scope": { "targets": [3, 3, 1], "groups": ["Edge", " Edge "] }
+            }),
+            Some(&admin),
+        )
+        .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{}", created.body);
+    let layout = &created.body["layout"];
+    assert_eq!(layout["template"], "summary");
+    assert_eq!(layout["paper"], "letter");
+    assert_eq!(layout["title"], "Board pack");
+    assert_eq!(layout["show_logo"], false);
+    assert_eq!(layout["sections"]["chart"], false);
+    assert_eq!(layout["sections"]["incidents"], true, "unnamed sections stay in");
+    assert_eq!(created.body["scope"], json!({ "targets": [1, 3], "groups": ["Edge"] }));
+
+    let id = created.body["id"].as_i64().unwrap();
+    let read = app.get(&format!("/api/reports/schedules/{id}"), Some(&admin)).await;
+    assert_eq!(read.body["layout"], created.body["layout"]);
+
+    let too_long = app
+        .post(
+            "/api/reports/schedules",
+            json!({ "name": "Bad", "kind": "sla", "frequency": "monthly", "enabled": false,
+                    "layout": { "notes": "n".repeat(2001) } }),
+            Some(&admin),
+        )
+        .await;
+    assert_eq!(too_long.status, StatusCode::BAD_REQUEST);
+}
+
+/// Un JPEG minimal : SOI, APP0, SOF0 (8 bits, 3×2, 3 composantes), EOI.
+fn tiny_jpeg() -> Vec<u8> {
+    let mut bytes = vec![0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x04, 0x00, 0x00];
+    bytes.extend_from_slice(&[0xFF, 0xC0, 0x00, 0x11, 8, 0, 2, 0, 3, 3]);
+    bytes.extend_from_slice(&[1, 0x11, 0, 2, 0x11, 1, 3, 0x11, 1]);
+    bytes.extend_from_slice(&[0xFF, 0xD9]);
+    bytes
+}
+
+#[tokio::test]
+async fn the_report_logo_is_uploaded_and_chosen_by_the_layout() {
+    use base64::Engine as _;
+    let app = TestApp::configured().await;
+    let admin = app.admin_cookie().await;
+    let base = "/api/reports/sla?from=2024-10-01&to=2024-10-31&format=json";
+
+    // Rien de téléversé : `custom` n'a pas de logo, et l'adresse répond 404.
+    let none = app.get(&format!("{base}&logo=custom"), Some(&admin)).await;
+    assert_eq!(none.status, StatusCode::OK, "{}", none.body);
+    assert!(none.body["logo_url"].is_null());
+    assert_eq!(none.body["layout"]["logo"], "custom");
+    let missing = get(&app, "/api/reports/logo", Some(&admin)).await;
+    assert_eq!(missing.status, StatusCode::NOT_FOUND);
+
+    // Le WebP ne s'incorpore pas au PDF : refusé dès le dépôt.
+    let webp = base64::engine::general_purpose::STANDARD.encode(b"RIFF\0\0\0\0WEBPVP8 ");
+    let refused = app.put("/api/reports/logo", json!({ "data": webp }), Some(&admin)).await;
+    assert_eq!(refused.status, StatusCode::BAD_REQUEST, "{}", refused.body);
+
+    let data = format!(
+        "data:image/jpeg;base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(tiny_jpeg())
+    );
+    let viewer = app.viewer_cookie(&admin).await;
+    let denied = app.put("/api/reports/logo", json!({ "data": data }), Some(&viewer)).await;
+    assert_eq!(denied.status, StatusCode::FORBIDDEN, "{}", denied.body);
+    let stored = app.put("/api/reports/logo", json!({ "data": data }), Some(&admin)).await;
+    assert_eq!(stored.status, StatusCode::NO_CONTENT, "{}", stored.body);
+
+    let image = get(&app, "/api/reports/logo", Some(&admin)).await;
+    assert_eq!(image.status, StatusCode::OK);
+    assert_eq!(image.headers[header::CONTENT_TYPE], "image/jpeg");
+    assert_eq!(image.bytes, tiny_jpeg());
+
+    let custom = format!("{base}&logo=custom");
+    let chosen = app.get(&custom, Some(&admin)).await;
+    assert_eq!(chosen.body["logo_url"], "/reports/logo");
+    let pdf_uri = "/api/reports/sla?from=2024-10-01&to=2024-10-31&logo=custom";
+    let pdf = get(&app, pdf_uri, Some(&admin)).await;
+    assert!(String::from_utf8_lossy(&pdf.bytes).contains("/XObject"), "the PDF carries it");
+    // `auto` sans client ni page : pas de logo ; `false` (ancienne adresse) non plus.
+    let automatic = app.get(base, Some(&admin)).await;
+    assert!(automatic.body["logo_url"].is_null());
+    let hidden = app.get(&format!("{base}&logo=false"), Some(&admin)).await;
+    assert_eq!(hidden.body["layout"]["logo"], "none");
+    assert_eq!(hidden.body["layout"]["show_logo"], false);
+    let unknown = app.get(&format!("{base}&logo=svg"), Some(&admin)).await;
+    assert_eq!(unknown.status, StatusCode::BAD_REQUEST);
+
+    let removed = app.delete("/api/reports/logo", Some(&admin)).await;
+    assert_eq!(removed.status, StatusCode::NO_CONTENT);
+    let gone = app.get(&custom, Some(&admin)).await;
+    assert!(gone.body["logo_url"].is_null());
 }

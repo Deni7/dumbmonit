@@ -11,6 +11,8 @@
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import { Button, ClickSpark, Confirm, EmptyState, ErrorNotice, Menu, Panel, Plate, Skeleton } from '#lib/ui/index.js';
 	import { kindIcon, normalizeKind, type KindInfo } from './kinds';
+	import { withoutOnCall } from '#lib/components/oncall/gate.js';
+	import { instanceStore } from '#lib/stores/instance.svelte.js';
 	import ChannelForm from './ChannelForm.svelte';
 	import ChannelErrorDetail from './ChannelErrorDetail.svelte';
 	import { m } from '#lib/paraglide/messages.js';
@@ -18,6 +20,9 @@
 
 	let kinds = $state<KindInfo[]>([]);
 	let channels = $state<Channel[]>([]);
+	// The on-call channel kind (and the channels made with it) only shows while on-call schedules are on.
+	const pickKinds = $derived(withoutOnCall(kinds, instanceStore.oncallEnabled));
+	const shownChannels = $derived(withoutOnCall(channels, instanceStore.oncallEnabled));
 	let loading = $state(true);
 	let error = $state<unknown>(null);
 
@@ -133,7 +138,7 @@
 	{#snippet aside()}
 		{#if !auth.isAdmin}
 			<Plate tone="ghost" label={auth.readOnlyLabel} />
-		{:else if !loading && !error && form === null && channels.length > 0}
+		{:else if !loading && !error && form === null && shownChannels.length > 0}
 			<ClickSpark>
 				<Button variant="primary" size="sm" onclick={() => (form = 'new')}>
 					<Plus class="size-4" aria-hidden="true" />
@@ -155,12 +160,12 @@
 				<div class="mb-4">
 					<!-- The key forces a fresh form on every opening: no leftover input. -->
 					{#key form}
-						<ChannelForm {kinds} channel={form === 'new' ? undefined : form} onsaved={afterSave} oncancel={() => (form = null)} />
+						<ChannelForm kinds={pickKinds} channel={form === 'new' ? undefined : form} onsaved={afterSave} oncancel={() => (form = null)} />
 					{/key}
 				</div>
 			{/if}
 
-			{#if channels.length === 0}
+			{#if shownChannels.length === 0}
 				{#if !auth.isAdmin}
 					<EmptyState icon={BellRing} title={m.notifications_channels_empty_title()} description={m.notifications_channels_empty_viewer()} />
 				{:else if form === null}
@@ -181,7 +186,7 @@
 				{/if}
 			{:else}
 				<ul class="grid gap-2" role="list">
-					{#each channels as channel, i (channel.id)}
+					{#each shownChannels as channel, i (channel.id)}
 						{@const Icon = kindIcon(channel.kind)}
 						{@const current = busy?.id === channel.id ? busy.action : null}
 						<li

@@ -4,6 +4,11 @@
  */
 import { m } from '#lib/paraglide/messages.js';
 import { ApiError, clientViewHeaders, request } from './client';
+import { slaParams, type ReportLayout, type ReportScope, type SlaReport, type SlaRequest } from '../sla-report.js';
+
+// The layout, the scope and the report data are plain types and pure helpers,
+// kept apart so tests can load them without the network layer.
+export * from '../sla-report.js';
 
 export type ReportFrequency = 'daily' | 'weekly' | 'monthly';
 
@@ -37,6 +42,10 @@ export interface ReportSchedule {
 	page_id: number | null;
 	/** Availability objective in percent (SLA report); `null`: none. */
 	objective: number | null;
+	/** SLA report only. */
+	layout: ReportLayout;
+	/** SLA report only. */
+	scope: ReportScope;
 }
 
 /** Body of `POST` and `PUT` (a full replacement). */
@@ -55,6 +64,8 @@ export interface ReportSchedulePayload {
 	attach_csv: boolean;
 	page_id: number | null;
 	objective: number | null;
+	layout: ReportLayout;
+	scope: ReportScope;
 }
 
 export interface ReportPreviewResult {
@@ -86,20 +97,10 @@ export function sendReportPreview(id: number): Promise<ReportPreviewResult> {
 	return request<ReportPreviewResult>(`/reports/schedules/${id}/send-test`, { method: 'POST' });
 }
 
-export type SlaFormat = 'pdf' | 'csv' | 'incidents_csv';
-
-export interface SlaRequest {
-	/** First day included, `YYYY-MM-DD`; with `to` omitted, up to today. */
-	from?: string;
-	to?: string;
-	/** IANA name; the period and the dates in the report follow it. */
-	tz?: string;
-	format: SlaFormat;
-	objective?: number;
-	/** Status page whose title heads the report. */
-	page?: number;
-	/** MSP mode: the client reported on (its targets, name and logo). */
-	client?: number;
+/** Builds the report as data (same rules and access as the PDF). */
+export function getSlaReport(request_: SlaRequest, signal?: AbortSignal): Promise<SlaReport> {
+	const params = slaParams({ ...request_, format: 'json' });
+	return request<SlaReport>(`/reports/sla?${params}`, { signal });
 }
 
 /**
@@ -107,10 +108,7 @@ export interface SlaRequest {
  * Administrators only. A refusal comes back as an `ApiError` like any other call.
  */
 export async function downloadSlaReport(request_: SlaRequest): Promise<{ blob: Blob; filename: string }> {
-	const params = new URLSearchParams();
-	for (const [key, value] of Object.entries(request_)) {
-		if (value !== undefined && value !== '') params.set(key, String(value));
-	}
+	const params = slaParams(request_);
 	let response: Response;
 	try {
 		response = await fetch(`/api/reports/sla?${params}`, {
@@ -132,4 +130,18 @@ export async function downloadSlaReport(request_: SlaRequest): Promise<{ blob: B
 	const disposition = response.headers.get('content-disposition') ?? '';
 	const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? `availability.${request_.format === 'pdf' ? 'pdf' : 'csv'}`;
 	return { blob: await response.blob(), filename };
+}
+
+/** Logo uploaded for SLA reports (layouts set to `custom`): PNG or JPEG, as a base64 or `data:` URL. */
+export function uploadReportLogo(data: string): Promise<void> {
+	return request<void>('/reports/logo', { method: 'PUT', body: { data } });
+}
+
+export function deleteReportLogo(): Promise<void> {
+	return request<void>('/reports/logo', { method: 'DELETE' });
+}
+
+/** Image URL of the report logo; `version` busts the browser cache after a change. */
+export function reportLogoUrl(version = ''): string {
+	return `/api/reports/logo${version ? `?v=${encodeURIComponent(version)}` : ''}`;
 }

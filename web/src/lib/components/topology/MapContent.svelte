@@ -385,10 +385,6 @@
 	{/each}
 {/if}
 
-{#each layout.ports as port, i (i)}
-	<circle cx={port.x} cy={port.y} r="5" class={`fill-surface ${port.down ? 'stroke-warning' : 'stroke-ink-3'}`} stroke-width="2" opacity={highlight ? 0.4 : 1} />
-{/each}
-
 {#each layout.nodes as p (p.node.id)}
 	{@const l = look(p)}
 	{@const dimmed = highlight !== null && !highlight.has(p.node.id)}

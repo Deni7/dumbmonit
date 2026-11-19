@@ -23,3 +23,7 @@ test('extra parameters and the hash', () => {
 	assert.equal(tabUrl('/alerts', 'automation', from(), { view: 'runbooks' }), '/alerts?tab=automation&view=runbooks');
 	assert.equal(tabUrl('/alerts', 'rules', from('', '#r4')), '/alerts?tab=rules#r4');
 });
+
+test('the SLA tab of Status keeps the report options of the old /sla address', () => {
+	assert.equal(tabUrl('/status', 'sla', from('from=2026-10-01&to=2026-10-31&tz=UTC')), '/status?from=2026-10-01&to=2026-10-31&tz=UTC&tab=sla');
+});

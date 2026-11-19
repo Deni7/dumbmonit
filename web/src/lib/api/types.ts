@@ -2243,8 +2243,10 @@ export interface StatusPage {
 	homepage_url: string;
 	/** MIME type of the uploaded logo, `null` without one. */
 	logo_type: string | null;
-	/** SMTP channel mailing the subscribers; `null`: no email subscription. */
+	/** SMTP channel mailing the subscribers instead of the email server; `null`: the email server. */
 	subscribe_channel_id: number | null;
+	/** Visitors may subscribe by email. */
+	subscribe_email: boolean;
 	/** Public host name serving this page at `/` (`status.example.com`); `null`: none. */
 	domain: string | null;
 	seo: StatusPageSeo;
@@ -2252,6 +2254,8 @@ export interface StatusPage {
 	access_mode: StatusPageAccess;
 	/** A page password is stored (the hash itself never leaves the server). */
 	has_password: boolean;
+	/** White label: the public page names nothing of DumbMonit; its tab icon is the logo, or none. */
+	hide_branding: boolean;
 	/** Checked monitor folders (dynamic): their current members are shown. */
 	groups: string[];
 	/** Public names of the monitors that come in through a ticked group; none: the monitor name. */
@@ -2276,8 +2280,10 @@ export interface StatusPagePayload {
 	show_latency?: boolean;
 	footer_text?: string;
 	homepage_url?: string;
-	/** `null` turns email subscription off. */
+	/** An SMTP channel sending the subscriber emails; `null`: the email server. Omitted: kept. */
 	subscribe_channel_id?: number | null;
+	/** Lets visitors subscribe by email. Omitted: kept. */
+	subscribe_email?: boolean;
 	/** Public host name; `null` or `''` removes it. Omitted: kept. */
 	domain?: string | null;
 	/** Omitted: kept. */
@@ -2286,6 +2292,8 @@ export interface StatusPagePayload {
 	groups?: string[];
 	/** Public names of group members; omitted: kept. */
 	group_labels?: StatusPageGroupLabel[];
+	/** White label (no DumbMonit name or icon on the public page); omitted: kept. */
+	hide_branding?: boolean;
 }
 
 export type StatusSubscriptionKind = 'email' | 'sms' | 'webhook' | 'slack';
@@ -2450,6 +2458,8 @@ export interface PublicCalendarDay {
 export interface PublicStatusItem {
 	/** Stable public key of the service (from its label), used in badge URLs. */
 	key: string;
+	/** Editor preview only (`GET /api/status-pages/{id}/preview`): the monitor shown. */
+	target_id?: TargetId;
 	label: string;
 	state: PublicItemState;
 	uptime_24h: number | null;
@@ -2535,6 +2545,8 @@ export interface PublicStatus {
 		subscribe: boolean;
 		/** Subscriptions offered. */
 		subscribe_kinds: StatusSubscriptionKind[];
+		/** White label: no DumbMonit icon or name around the page. Older servers omit it. */
+		hide_branding?: boolean;
 		/** Effective search-engine values (settings, or defaults built from the page name). */
 		seo?: {
 			indexable: boolean;
@@ -3091,6 +3103,8 @@ export interface LocationMember {
 export interface MapLocation {
 	id: LocationId;
 	name: string;
+	/** Two-character badge code, upper case; never empty. */
+	code: string;
 	/** Free text, shown only. */
 	address: string;
 	latitude: number;
@@ -3116,6 +3130,8 @@ export interface LocationPayload {
 	latitude: number;
 	longitude: number;
 	site: string;
+	/** Badge code; empty: the first two letters of the name. */
+	code?: string;
 }
 
 export type BasemapMode = 'offline' | 'osm' | 'custom';
@@ -4108,6 +4124,10 @@ export interface InstanceSettings {
 	language: string;
 	/** IANA time zone; empty means UTC. */
 	timezone: string;
+	/** On-call schedules are turned on. Off by default; schedules are kept while off. */
+	oncall_enabled?: boolean;
+	/** Accent colour of the interface as `#rrggbb`; empty or missing is the default look. */
+	accent?: string;
 }
 
 /** `PUT /api/instance/settings`: an omitted field keeps its value. */
@@ -4116,6 +4136,9 @@ export interface InstancePatch {
 	name?: string;
 	language?: string;
 	timezone?: string;
+	oncall_enabled?: boolean;
+	/** `#rrggbb`, or empty for the default look. */
+	accent?: string;
 }
 
 // --- Backup and restore -----------------------------------------------------
@@ -6952,7 +6975,17 @@ export interface TargetRemediation {
 // Expiry dates collected across the instance: domains, certificates,
 // application secrets, products, device keys, licences.
 
-export type DeadlineKind = 'domain' | 'certificate' | 'credential' | 'product' | 'key' | 'license';
+export type DeadlineKind =
+	| 'domain'
+	| 'certificate'
+	| 'credential'
+	| 'product'
+	| 'key'
+	| 'license'
+	/** Only with `upcoming`: full on that date. */
+	| 'disk'
+	/** Only with `upcoming`: late on that date. */
+	| 'backup';
 
 export interface Deadline {
 	target: TargetId;
@@ -6966,6 +6999,8 @@ export interface Deadline {
 	expires_at: string;
 	/** Negative once expired. */
 	days_left: number;
+	/** `disk`: used, in percent; `backup`: age of the last success, in days. */
+	value?: number;
 }
 
 // --- Sentinel mode of an agent (`/api/targets/{id}/agent/sentinel`) ------------
@@ -7026,4 +7061,43 @@ export interface WallWeather {
 		condition: WallWeatherCondition;
 		is_day: boolean;
 	} | null;
+}
+
+/** Encryption of the connection to the email server. */
+export type MailSecurity = 'starttls' | 'tls' | 'none';
+
+/** `GET /api/notify/mail-server` — the password never comes back. */
+export interface MailServer {
+	host: string;
+	/** `null`: the usual port of `security`. */
+	port: number | null;
+	/** `port`, or 587 / 465 / 25 after `security`. */
+	effective_port: number;
+	security: MailSecurity;
+	/** Empty: no authentication. */
+	username: string;
+	has_password: boolean;
+	from_address: string;
+	/** Display name of the sender; empty: the address alone. */
+	from_name: string;
+	/** A host and a sender are set. */
+	configured: boolean;
+	/** Set by the `DUMBMONIT_SMTP_*` environment variables: read-only. */
+	locked_by_env: boolean;
+}
+
+/** `PUT /api/notify/mail-server`. `secrets` omitted keeps the password, `{}` clears it. */
+export interface MailServerPayload {
+	host: string;
+	port: number | null;
+	security: MailSecurity;
+	username: string;
+	from_address: string;
+	from_name: string;
+	secrets?: { password?: string };
+}
+
+export interface MailServerTestReport {
+	ok: boolean;
+	message: string;
 }

@@ -96,6 +96,7 @@
 	import { catalogLayout, ratedFamilies, withCatalogUnits } from '#lib/components/devices/catalog.js';
 	import CatalogViews from '#lib/components/devices/CatalogViews.svelte';
 	import SilenceControl from '#lib/components/devices/SilenceControl.svelte';
+	import TargetMenu from '#lib/components/devices/TargetMenu.svelte';
 	import ManagedNotice from '#lib/components/devices/ManagedNotice.svelte';
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import { dismissals } from '#lib/stores/dismissals.svelte.js';
@@ -106,19 +107,16 @@
 	import TargetDeadlines from '#lib/components/deadlines/TargetDeadlines.svelte';
 	import {
 		Button,
-		Confirm,
 		EmptyState,
 		ErrorNotice,
 		Led,
-		Menu,
 		Panel,
 		Plate,
 		Skeleton,
-		Toggle,
 		confetti,
 		type Tone
 	} from '#lib/ui/index.js';
-	import { Activity, ArrowUpRight, ChevronDown, EllipsisVertical, ExternalLink, Loader2, PowerOff, ScrollText, Search, ServerOff, Settings } from 'lucide-svelte';
+	import { Activity, ArrowUpRight, ChevronDown, ExternalLink, PowerOff, Search, ServerOff } from 'lucide-svelte';
 	import KindIcon from '#lib/components/KindIcon.svelte';
 
 	const id = $derived(Number(page.params.id));
@@ -188,9 +186,6 @@
 		return target.kind === 'agent' ? (hostname ?? '') : target.address;
 	});
 
-	const ICON_BUTTON =
-		'flex size-10 items-center justify-center rounded-lg border border-line text-ink-2 hover:bg-surface-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal disabled:cursor-not-allowed disabled:opacity-50';
-
 	// --- Security score (opt-in in Settings) ---------------------------------
 	// A badge in the header when the score is on and this kind is rated; the
 	// report opens under the header, straight away when the link said so
@@ -199,7 +194,8 @@
 
 	let security = $state<SecurityReportData | null>(null);
 	let securityOpen = $state(false);
-	const securityShown = $derived(security?.enabled && security.supported ? security : null);
+	// No grade (nothing to rate yet): no badge, rather than a grey one.
+	const securityShown = $derived(security?.enabled && security.supported && security.grade !== null ? security : null);
 
 	$effect(() => {
 		const targetId = id;
@@ -412,7 +408,7 @@
 			refreshKey += 1;
 		});
 	});
-	/** The alert story has nothing to tell (never fired, nothing ignored). */
+	/** The alert story has nothing to tell (never fired). */
 	let timelineEmpty = $state(false);
 
 	// --- Actions --------------------------------------------------------------
@@ -431,7 +427,6 @@
 			? !loadingUptime && responseTimes.length === 0 && availability === null
 			: !loadingMetrics && groups.length === 0
 	);
-	let enabledDraft = $state(true);
 	let savingEnabled = $state(false);
 	let enabledError = $state<unknown>(null);
 
@@ -460,10 +455,8 @@
 		enabledError = null;
 		try {
 			target = await updateTarget(target.id, payloadOf(target, value));
-			enabledDraft = target.enabled;
 		} catch (cause) {
 			enabledError = cause;
-			enabledDraft = !value;
 		} finally {
 			savingEnabled = false;
 		}
@@ -506,7 +499,6 @@
 		try {
 			const next = await getTarget(id, signal);
 			target = next;
-			enabledDraft = next.enabled;
 			if (next.parent_id !== null && parent?.id !== next.parent_id) {
 				parent = await getTarget(next.parent_id, signal).catch(() => null);
 			} else if (next.parent_id === null) {
@@ -648,17 +640,6 @@
 	$effect(() => () => {
 		if (probeTimer) clearTimeout(probeTimer);
 	});
-
-	// The action row sits right-aligned from `lg`, left-aligned and wrapping
-	// below: the "more" menu opens towards the free side so it never leaves the screen.
-	let actionsAtEnd = $state(false);
-	$effect(() => {
-		const query = window.matchMedia('(min-width: 64rem)');
-		actionsAtEnd = query.matches;
-		const onchange = () => (actionsAtEnd = query.matches);
-		query.addEventListener('change', onchange);
-		return () => query.removeEventListener('change', onchange);
-	});
 </script>
 
 <svelte:head><title>{m.devices_target_page_title({ name: target?.name ?? m.devices_target_title_fallback() })}</title></svelte:head>
@@ -684,8 +665,8 @@
 		</div>
 	</div>
 {:else}
-	<!-- Header band: the device's own faceplate, larger. -->
-	<section class="faceplate rise-in overflow-x-clip px-5 py-5 max-sm:px-4 max-sm:py-4 sm:px-6" aria-labelledby="device-name">
+	<!-- Header band: flat surface, identity on the left, one main action on the right. -->
+	<section class="rise-in overflow-x-clip rounded-[var(--radius-card)] border border-line bg-surface px-5 py-5 max-sm:px-4 max-sm:py-4 sm:px-6" aria-labelledby="device-name">
 		<div class="flex flex-col gap-5 max-sm:gap-3 lg:flex-row lg:items-start lg:justify-between">
 			<div class="flex min-w-0 gap-4">
 				<Led {tone} {blink} size="lg" class="mt-2.5" label={STATE_LABEL[stateNow]} />
@@ -754,58 +735,28 @@
 				</div>
 			</div>
 
-			<!-- Icon-only actions (name in aria-label/title), one 40px row that fits a phone. -->
+			<!-- One main action, then the gear: enable, snooze, logs, delete and Settings sit in its menu. -->
 			<div class="flex min-w-0 max-w-full flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end">
 				{#if target.enabled}
-					<button type="button" class={ICON_BUTTON} onclick={probe} disabled={probing} aria-busy={probing} aria-label={m.devices_target_probe_now()} title={m.devices_target_probe_now()}>
-						{#if probing}
-							<Loader2 class="size-4 animate-spin" aria-hidden="true" />
-						{:else}
-							<Activity class="size-4" aria-hidden="true" />
-						{/if}
-					</button>
+					<Button variant="primary" onclick={probe} loading={probing}>
+						<Activity class="size-4" aria-hidden="true" />
+						{m.devices_target_probe_now()}
+					</Button>
 				{:else if auth.isAdmin}
 					<Button variant="primary" onclick={() => void setEnabled(true)} loading={savingEnabled}>
 						{m.devices_target_enable()}
 					</Button>
 				{/if}
 				{#if auth.isAdmin}
-					{#if target.enabled}
-						<SilenceControl {target} {refreshKey} />
-					{/if}
-					<a href={withBase(`/targets?tab=logs&target=${target.id}`)} class={ICON_BUTTON} aria-label={m.devices_target_logs()} title={m.devices_target_logs()}>
-						<ScrollText class="size-4" aria-hidden="true" />
-					</a>
-					<a href={withBase(`/targets/${target.id}/edit`)} class={ICON_BUTTON} aria-label={m.devices_target_settings()} title={m.devices_target_settings()}>
-						<Settings class="size-4" aria-hidden="true" />
-					</a>
-					<!-- Rare and heavier actions: switching the monitor off, deleting it. -->
-					<Menu label={m.devices_target_more_actions()} align={actionsAtEnd ? 'right' : 'left'}>
-						{#snippet trigger({ toggle, open })}
-							<button
-								type="button"
-								class={ICON_BUTTON}
-								onclick={toggle}
-								aria-haspopup="menu"
-								aria-expanded={open}
-								aria-label={m.devices_target_more_actions()}
-								title={m.devices_target_more_actions()}
-							>
-								<EllipsisVertical class="size-4" aria-hidden="true" />
-							</button>
-						{/snippet}
-						{#snippet children()}
-							<div class="flex min-h-10 items-center gap-2 rounded-lg px-2 py-1.5">
-								<Toggle id="device-enabled" bind:checked={enabledDraft} disabled={savingEnabled} onchange={(v) => void setEnabled(v)} />
-								<label for="device-enabled" class="text-sm font-semibold text-ink">{m.devices_target_enabled()}</label>
-							</div>
-							{#if target?.kind === 'agent'}
-								<Button variant="ghost" class="mt-1 w-full justify-start" onclick={() => (askAgentRemoval = true)}>{m.devices_target_delete()}</Button>
-							{:else}
-								<Confirm size="md" class="mt-1 w-full justify-start" confirmLabel={m.devices_target_delete_confirm()} onconfirm={remove} loading={deleting}>{m.devices_target_delete()}</Confirm>
-							{/if}
-						{/snippet}
-					</Menu>
+					<TargetMenu
+						{target}
+						{refreshKey}
+						{savingEnabled}
+						{deleting}
+						onsetenabled={(value) => void setEnabled(value)}
+						ondelete={remove}
+						onasktoremove={() => (askAgentRemoval = true)}
+					/>
 				{:else}
 					{#if auth.canOperate && target.enabled}
 						<SilenceControl {target} {refreshKey} />

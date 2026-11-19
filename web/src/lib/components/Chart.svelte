@@ -23,6 +23,7 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { getLocale } from '#lib/paraglide/runtime.js';
 	import { theme } from '#lib/stores/theme.svelte.js';
+	import { instanceStore } from '#lib/stores/instance.svelte.js';
 
 	export interface Serie {
 		label: string;
@@ -134,7 +135,8 @@
 	function palette(): string[] {
 		if (colorTokens && colorTokens.length > 0) return colorTokens.map((name) => cssVar(`--c-${name}`));
 		return [
-			cssVar('--c-signal'),
+			// The instance's accent when one is set (`--c-series`), else the signal teal.
+			cssVar('--c-series') || cssVar('--c-signal'),
 			cssVar('--c-info'),
 			cssVar('--c-advisory'),
 			'#c084fc',
@@ -409,7 +411,7 @@
 	const eventKey = $derived(events.map((e) => `${e.at}|${e.tone}|${e.label}`).join('\u0000'));
 	/** Series labels only: a ghost reload must not depend on its own result. */
 	const shapeOfSeries = $derived(series.map((serie) => serie.label).join('\u0000'));
-	const themeKey = $derived(theme.resolved);
+	const themeKey = $derived(`${theme.resolved}|${instanceStore.accent}`);
 
 	/** Create or fully rebuild: host appears, theme changes, or the series
 	 *  shape changes (label added/removed/reordered), plus the few props that

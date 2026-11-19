@@ -11,7 +11,7 @@
 	 * round trip.
 	 */
 	import type { NthWeekday, Target, SilencePayload } from '#lib/api/index.js';
-	import { Button, Field, Panel } from '#lib/ui/index.js';
+	import { Button, DateTimeField, Field, Panel, TimeField } from '#lib/ui/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { pad2 } from '#lib/format.js';
 	import { dayName } from './helpers';
@@ -267,10 +267,10 @@
 		{#if mode === 'once'}
 			<div class="grid gap-4 sm:grid-cols-2">
 				<Field label={m.alerts_form_start()} for="silence-start">
-					<input id="silence-start" type="datetime-local" class="input" bind:value={startAt} />
+					<DateTimeField id="silence-start" bind:value={startAt} label={m.alerts_form_start()} />
 				</Field>
 				<Field label={m.alerts_form_end()} for="silence-end">
-					<input id="silence-end" type="datetime-local" class="input" bind:value={endAt} />
+					<DateTimeField id="silence-end" bind:value={endAt} min={startAt} label={m.alerts_form_end()} />
 				</Field>
 			</div>
 		{:else if mode === 'weekly'}
@@ -291,10 +291,10 @@
 			</div>
 			<div class="grid gap-4 sm:grid-cols-2">
 				<Field label={m.alerts_form_from()} for="silence-wstart" help={m.alerts_form_local_time_help()}>
-					<input id="silence-wstart" type="time" class="input" bind:value={weeklyStart} />
+					<TimeField id="silence-wstart" bind:value={weeklyStart} />
 				</Field>
 				<Field label={m.alerts_form_to()} for="silence-wend">
-					<input id="silence-wend" type="time" class="input" bind:value={weeklyEnd} />
+					<TimeField id="silence-wend" bind:value={weeklyEnd} />
 				</Field>
 			</div>
 		{:else}
@@ -341,7 +341,7 @@
 			{/if}
 			<div class="grid gap-4 sm:grid-cols-2">
 				<Field label={m.alerts_form_from()} for="silence-mstart" help={m.alerts_form_local_time_help()}>
-					<input id="silence-mstart" type="time" class="input" bind:value={monthlyStart} />
+					<TimeField id="silence-mstart" bind:value={monthlyStart} />
 				</Field>
 				<Field label={m.alerts_form_for()} for="silence-mduration" help={m.alerts_form_for_help()}>
 					<select id="silence-mduration" class="input" bind:value={monthlyDuration}>

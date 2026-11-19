@@ -9,8 +9,12 @@
 //! tourné depuis. Les alertes à 30, 14 et 7 jours restent celles de chaque
 //! famille (`alerting/rules.rs`) ; l'interface colorie les mêmes paliers.
 //!
-//! Paramètres : `target` (une seule cible, pour sa page de détail) et
-//! `max_days` (horizon, 366 par défaut).
+//! Paramètres : `target` (une seule cible, pour sa page de détail),
+//! `max_days` (horizon, 366 par défaut) et `upcoming` : avec `upcoming=true`, la
+//! liste ajoute ce qui va devenir un problème sans être une date d'expiration
+//! (disques dont la prévision annonce « plein dans N jours », sauvegardes qui
+//! n'ont pas tourné ou vont être en retard). Sans ce paramètre, la réponse reste
+//! celle de la frise des échéances.
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -19,6 +23,11 @@ use axum::routing::get;
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
+use crate::alerting::capacity::{self, Selection};
+use crate::alerting::derived::{self, SeriesForecast};
+use crate::alerting::forecast::Status;
+use crate::alerting::model::AnomalyParams;
+use crate::alerting::rules::RULE_CAPACITY_FORECAST;
 use crate::api::ApiResult;
 use crate::auth::teams::TeamAccess;
 use crate::db;
@@ -169,6 +178,70 @@ const FAMILIES: &[Family] = &[
     },
 ];
 
+/// Une famille de sauvegarde : une série « âge de la dernière réussite, en
+/// secondes » et le délai au-delà duquel la sauvegarde est en retard. Les délais
+/// sont ceux des règles livrées (deux jours pour une sauvegarde nocturne, sept
+/// pour Proxmox).
+struct BackupFamily {
+    /// Nom de la série, sans le préfixe `dumbmonit_`.
+    metric: &'static str,
+    limit_days: f64,
+    /// Étiquettes qui nomment la tâche, jointes par « · ». Aucune : le nom de la
+    /// cible.
+    what: &'static [&'static str],
+}
+
+const BACKUP_FAMILIES: &[BackupFamily] = &[
+    BackupFamily { metric: "proxmox_backup_last_age_seconds", limit_days: 7.0, what: &["name"] },
+    BackupFamily {
+        metric: "pbs_backup_last_age_seconds",
+        limit_days: 2.0,
+        what: &["backup_type", "group"],
+    },
+    BackupFamily { metric: "backup_last_success_seconds", limit_days: 2.0, what: &["source"] },
+    BackupFamily {
+        metric: "agent_backup_repo_last_snapshot_age_seconds",
+        limit_days: 2.0,
+        what: &["repo"],
+    },
+    BackupFamily {
+        metric: "duplicati_backup_last_success_age_seconds",
+        limit_days: 2.0,
+        what: &["backup"],
+    },
+    BackupFamily {
+        metric: "kopia_source_last_snapshot_age_seconds",
+        limit_days: 2.0,
+        what: &["source"],
+    },
+    BackupFamily {
+        metric: "synology_backup_last_success_age_seconds",
+        limit_days: 2.0,
+        what: &["name"],
+    },
+    BackupFamily {
+        metric: "veeam_config_backup_last_success_age_seconds",
+        limit_days: 2.0,
+        what: &[],
+    },
+    BackupFamily {
+        metric: "hetzner_server_backup_age_seconds",
+        limit_days: 2.0,
+        what: &["server"],
+    },
+    BackupFamily {
+        metric: "truenas_backup_task_last_run_age_seconds",
+        limit_days: 7.0,
+        what: &["task"],
+    },
+    BackupFamily { metric: "immich_db_backup_last_age_seconds", limit_days: 2.0, what: &[] },
+];
+
+/// Une sauvegarde est listée dès qu'elle sera en retard dans ce délai, ou l'est déjà.
+const BACKUP_HORIZON_DAYS: f64 = 1.0;
+/// Familles de capacité qui ne sont pas du stockage : elles ne sont pas des disques.
+const NOT_STORAGE: &[&str] = &["m365_licenses", "ups_battery"];
+
 pub fn routes() -> Router<AppState> {
     Router::new().route("/deadlines", get(list))
 }
@@ -177,6 +250,8 @@ pub fn routes() -> Router<AppState> {
 pub struct DeadlinesQuery {
     pub target: Option<i64>,
     pub max_days: Option<f64>,
+    /// Ajoute les disques qui se remplissent et les sauvegardes en retard.
+    pub upcoming: Option<bool>,
 }
 
 #[derive(Debug, Serialize, PartialEq)]
@@ -184,7 +259,9 @@ pub struct Deadline {
     pub target: i64,
     pub target_name: String,
     pub target_kind: String,
-    /// `domain`, `certificate`, `credential`, `product`, `key`, `license`.
+    /// `domain`, `certificate`, `credential`, `product`, `key`, `license` ; avec
+    /// `upcoming=true` aussi `disk` (plein à cette date) et `backup` (en retard
+    /// à cette date).
     pub kind: String,
     /// L'objet qui expire : domaine, nom d'hôte, application, appareil…
     pub what: String,
@@ -192,6 +269,11 @@ pub struct Deadline {
     pub expires_at: String,
     /// Négatif : déjà expiré.
     pub days_left: f64,
+    /// Contexte d'une échéance qui n'est pas une date : `disk`, le taux
+    /// d'occupation en pourcentage ; `backup`, l'âge de la dernière réussite en
+    /// jours. Absent des autres.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<f64>,
 }
 
 /// Une cible telle que la route en a besoin pour nommer ses échéances.
@@ -228,7 +310,180 @@ async fn list(
     let (last, at) = tokio::try_join!(state.victoria.query(&last), state.victoria.query(&at))?;
     let max_days = query.max_days.filter(|d| d.is_finite()).unwrap_or(DEFAULT_MAX_DAYS);
     let now = chrono::Utc::now().timestamp() as f64;
-    Ok(Json(build(&last, &at, &targets, now, max_days.clamp(1.0, MAX_MAX_DAYS))))
+    let max_days = max_days.clamp(1.0, MAX_MAX_DAYS);
+    let mut out = build(&last, &at, &targets, now, max_days);
+    if query.upcoming.unwrap_or(false) {
+        out.extend(upcoming(&state, &targets, query.target, now, max_days).await);
+        sort(&mut out);
+    }
+    Ok(Json(out))
+}
+
+/// Disques qui se remplissent et sauvegardes en retard. Une source qui ne
+/// répond pas est laissée de côté : la frise des échéances reste lisible.
+async fn upcoming(
+    state: &AppState,
+    targets: &HashMap<i64, TargetInfo>,
+    only: Option<i64>,
+    now: f64,
+    max_days: f64,
+) -> Vec<Deadline> {
+    let mut out = Vec::new();
+
+    let names: Vec<String> = BACKUP_FAMILIES
+        .iter()
+        .map(|f| format!("{}{}", crate::tsdb::METRIC_PREFIX, f.metric))
+        .collect();
+    let mut selector = format!(r#"{{__name__=~"{}""#, names.join("|"));
+    if let Some(only) = only {
+        selector.push_str(&format!(r#", target="{only}""#));
+    }
+    selector.push('}');
+    let last = format!("last_over_time({selector}[{LOOKBACK_SECONDS}s]) keep_metric_names");
+    let at = format!("tlast_over_time({selector}[{LOOKBACK_SECONDS}s]) keep_metric_names");
+    match tokio::try_join!(state.victoria.query(&last), state.victoria.query(&at)) {
+        Ok((last, at)) => out.extend(build_backups(&last, &at, targets, now)),
+        Err(error) => tracing::warn!(?error, "backup deadlines not read"),
+    }
+
+    let params = match crate::db::alerts::list_rules(&state.pool).await {
+        Ok(rules) => rules
+            .into_iter()
+            .find(|rule| rule.uid == RULE_CAPACITY_FORECAST)
+            .map_or_else(AnomalyParams::default, |rule| rule.params),
+        Err(_) => AnomalyParams::default(),
+    };
+    let selection = Selection::Families(capacity::FAMILIES.iter().collect());
+    let filter = only.map(|id| format!("{{target=\"{id}\"}}"));
+    let at = chrono::DateTime::from_timestamp(now as i64, 0).unwrap_or_else(chrono::Utc::now);
+    match derived::collect_forecasts(&state.victoria, &selection, &params, at, filter.as_deref())
+        .await
+    {
+        Ok(forecasts) => out.extend(build_disks(
+            &forecasts,
+            targets,
+            params.forecast_min_confidence,
+            now,
+            max_days,
+        )),
+        Err(error) => tracing::warn!(?error, "disk forecasts not computed"),
+    }
+    out
+}
+
+fn sort(out: &mut [Deadline]) {
+    out.sort_by(|a, b| {
+        a.days_left
+            .total_cmp(&b.days_left)
+            .then_with(|| a.target.cmp(&b.target))
+            .then_with(|| a.what.cmp(&b.what))
+    });
+}
+
+/// Les disques dont la prévision annonce « plein » dans l'horizon : ceux que la
+/// règle `capacity_forecast` signalerait (déjà pleins, ou tendance assez sûre).
+pub fn build_disks(
+    forecasts: &[SeriesForecast],
+    targets: &HashMap<i64, TargetInfo>,
+    min_confidence: f64,
+    now: f64,
+    max_days: f64,
+) -> Vec<Deadline> {
+    let mut out = Vec::new();
+    for item in forecasts {
+        if NOT_STORAGE.contains(&item.family) {
+            continue;
+        }
+        let Some(target) = item.labels.get("target").and_then(|t| t.parse::<i64>().ok()) else {
+            continue;
+        };
+        let Some(info) = targets.get(&target) else { continue };
+        let f = &item.forecast;
+        let Some(days) = f.days_to_full.filter(|d| d.is_finite()) else { continue };
+        if f.status != Status::Full && f.confidence < min_confidence {
+            continue;
+        }
+        if days > max_days {
+            continue;
+        }
+        let entity = capacity::entity(&item.labels);
+        let what = if entity.is_empty() { info.name.clone() } else { entity };
+        let Some(date) = chrono::DateTime::from_timestamp((now + days * DAY) as i64, 0) else {
+            continue;
+        };
+        out.push(Deadline {
+            target,
+            target_name: info.name.clone(),
+            target_kind: info.kind.clone(),
+            kind: "disk".to_string(),
+            what,
+            expires_at: date.format("%Y-%m-%dT%H:%M:%S").to_string(),
+            days_left: (days * 100.0).round() / 100.0,
+            value: Some(f.current).filter(|v| v.is_finite()).map(|v| (v * 10.0).round() / 10.0),
+        });
+    }
+    out
+}
+
+/// Les sauvegardes en retard, ou qui le seront dans [`BACKUP_HORIZON_DAYS`].
+/// `last` porte l'âge de la dernière réussite au moment du dernier point,
+/// `at` l'horodatage de ce point : la date de retard est la dernière réussite
+/// plus le délai de la famille, donc elle reste juste même si la sonde n'a pas
+/// tourné depuis.
+pub fn build_backups(
+    last: &[InstantSeries],
+    at: &[InstantSeries],
+    targets: &HashMap<i64, TargetInfo>,
+    now: f64,
+) -> Vec<Deadline> {
+    let stamps: HashMap<Vec<(&str, &str)>, f64> = at
+        .iter()
+        .filter_map(|s| s.value.1.parse::<f64>().ok().map(|t| (key(&s.metric), t)))
+        .collect();
+    let mut out = Vec::new();
+    for series in last {
+        let Some(name) = series.metric.get("__name__") else { continue };
+        let Some(family) = BACKUP_FAMILIES
+            .iter()
+            .find(|f| name.strip_prefix(crate::tsdb::METRIC_PREFIX) == Some(f.metric))
+        else {
+            continue;
+        };
+        let Some(target) = series.metric.get("target").and_then(|t| t.parse::<i64>().ok()) else {
+            continue;
+        };
+        let Some(info) = targets.get(&target) else { continue };
+        let Ok(age) = series.value.1.parse::<f64>() else { continue };
+        let Some(&sampled) = stamps.get(&key(&series.metric)) else { continue };
+        if !age.is_finite() || age < 0.0 {
+            continue;
+        }
+        let succeeded = sampled - age;
+        let late_at = succeeded + family.limit_days * DAY;
+        let days_left = (late_at - now) / DAY;
+        if days_left > BACKUP_HORIZON_DAYS || days_left < EXPIRED_KEEP_DAYS {
+            continue;
+        }
+        let parts: Vec<&str> = family
+            .what
+            .iter()
+            .filter_map(|l| series.metric.get(*l).map(String::as_str))
+            .filter(|v| !v.is_empty())
+            .collect();
+        let what = if parts.is_empty() { info.name.clone() } else { parts.join(" · ") };
+        let Some(date) = chrono::DateTime::from_timestamp(late_at as i64, 0) else { continue };
+        out.push(Deadline {
+            target,
+            target_name: info.name.clone(),
+            target_kind: info.kind.clone(),
+            kind: "backup".to_string(),
+            what,
+            expires_at: date.format("%Y-%m-%dT%H:%M:%S").to_string(),
+            days_left: (days_left * 100.0).round() / 100.0,
+            value: Some((((now - succeeded) / DAY) * 10.0).round() / 10.0),
+        });
+    }
+    out
 }
 
 /// Identité d'une série : son nom et toutes ses étiquettes.
@@ -317,14 +572,10 @@ pub fn build(
             what,
             expires_at: date.format("%Y-%m-%dT%H:%M:%S").to_string(),
             days_left: (days_left * 100.0).round() / 100.0,
+            value: None,
         });
     }
-    out.sort_by(|a, b| {
-        a.days_left
-            .total_cmp(&b.days_left)
-            .then_with(|| a.target.cmp(&b.target))
-            .then_with(|| a.what.cmp(&b.what))
-    });
+    sort(&mut out);
     out
 }
 
@@ -438,5 +689,108 @@ mod tests {
         let at = vec![InstantSeries { metric, value: (NOW, NOW.to_string()) }];
         assert!(build(&last, &at, &targets(), NOW, 90.0).is_empty());
         assert_eq!(build(&last, &at, &targets(), NOW, 366.0).len(), 1);
+    }
+
+    fn at_of(last: &[InstantSeries], sampled: f64) -> Vec<InstantSeries> {
+        last.iter()
+            .map(|s| InstantSeries { metric: s.metric.clone(), value: (NOW, sampled.to_string()) })
+            .collect()
+    }
+
+    #[test]
+    fn une_sauvegarde_en_retard_ou_bientot_en_retard_est_listee() {
+        // Dernier point à l'instant : Duplicati a 3 jours d'âge (limite 2 j, en
+        // retard d'un jour), Kopia 1,5 jour (en retard dans 12 h), Veeam 2 h.
+        let last = vec![
+            series(
+                "duplicati_backup_last_success_age_seconds",
+                1,
+                &[("backup", "Photos")],
+                3.0 * DAY,
+            ),
+            series("kopia_source_last_snapshot_age_seconds", 2, &[("source", "/srv")], 1.5 * DAY),
+            series("veeam_config_backup_last_success_age_seconds", 2, &[], 7200.0),
+        ];
+        let at = at_of(&last, NOW);
+        let out = build_backups(&last, &at, &targets(), NOW);
+        assert_eq!(out.len(), 2, "la sauvegarde récente n'est pas une échéance");
+        assert_eq!(out[0].kind, "backup");
+        assert_eq!(out[0].what, "Photos");
+        assert!((out[0].days_left + 1.0).abs() < 0.01, "{}", out[0].days_left);
+        assert_eq!(out[0].value, Some(3.0));
+        assert_eq!(out[1].what, "/srv");
+        assert!((out[1].days_left - 0.5).abs() < 0.01, "{}", out[1].days_left);
+    }
+
+    #[test]
+    fn la_date_de_retard_d_une_sauvegarde_vient_de_la_derniere_reussite() {
+        // Le point date d'un jour et portait 1,5 j : la dernière réussite remonte
+        // à 2,5 jours, la limite de 2 jours est passée depuis 12 h.
+        let last = vec![series(
+            "duplicati_backup_last_success_age_seconds",
+            1,
+            &[("backup", "Docs")],
+            1.5 * DAY,
+        )];
+        let at = at_of(&last, NOW - DAY);
+        let out = build_backups(&last, &at, &targets(), NOW);
+        assert_eq!(out.len(), 1);
+        assert!((out[0].days_left + 0.5).abs() < 0.01, "{}", out[0].days_left);
+        assert_eq!(out[0].value, Some(2.5));
+        // Retard de plus de trente jours : du ménage, plus une échéance.
+        let old = vec![series(
+            "duplicati_backup_last_success_age_seconds",
+            1,
+            &[("backup", "Docs")],
+            40.0 * DAY,
+        )];
+        let at = at_of(&old, NOW);
+        assert!(build_backups(&old, &at, &targets(), NOW).is_empty());
+    }
+
+    fn forecast(
+        family: &'static str,
+        target: &str,
+        mount: &str,
+        days: Option<f64>,
+        confidence: f64,
+    ) -> SeriesForecast {
+        use crate::alerting::forecast::Forecast;
+        let labels = BTreeMap::from([
+            ("target".to_string(), target.to_string()),
+            ("mountpoint".to_string(), mount.to_string()),
+        ]);
+        SeriesForecast {
+            family,
+            labels,
+            limit: 100.0,
+            window_days: 14,
+            forecast: Forecast {
+                status: if days.is_some() { Status::Growing } else { Status::Stable },
+                current: 83.44,
+                growth_per_day: Some(1.5),
+                days_to_full: days,
+                confidence,
+            },
+        }
+    }
+
+    #[test]
+    fn les_disques_qui_se_remplissent_sont_des_echeances() {
+        let items = vec![
+            forecast("filesystem", "1", "/srv", Some(11.2), 0.9),
+            forecast("filesystem", "1", "/var", Some(5.0), 0.1),
+            forecast("filesystem", "1", "/tmp", None, 0.9),
+            forecast("filesystem", "1", "/data", Some(200.0), 0.9),
+            forecast("filesystem", "99", "/ghost", Some(2.0), 0.9),
+            forecast("ups_battery", "1", "", Some(3.0), 0.9),
+        ];
+        let out = build_disks(&items, &targets(), 0.5, NOW, 30.0);
+        assert_eq!(out.len(), 1, "{out:?}");
+        assert_eq!(out[0].kind, "disk");
+        assert_eq!(out[0].what, "/srv");
+        assert!((out[0].days_left - 11.2).abs() < 0.01);
+        assert_eq!(out[0].value, Some(83.4));
+        assert_eq!(out[0].target_name, "example.com");
     }
 }

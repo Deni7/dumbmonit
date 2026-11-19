@@ -65,7 +65,7 @@ pub async fn collect(pool: &SqlitePool, cipher: &Cipher, options: ExportOptions)
         .await?,
         silences: silences(pool, &refs).await?,
         status_pages: status_pages(pool, &refs, &channel_names).await?,
-        report_schedules: report_schedules(pool, &channel_names).await?,
+        report_schedules: report_schedules(pool, &channel_names, &refs).await?,
         incidents: incidents(pool).await?,
         users: users(pool, cipher, options).await?,
         agent_tokens: agent_tokens(pool).await?,
@@ -110,7 +110,26 @@ pub async fn collect(pool: &SqlitePool, cipher: &Cipher, options: ExportOptions)
         agent_update_rollout: Some(serde_json::to_value(
             crate::collectors::agent::rollout::load(pool).await?,
         )?),
+        mail_server: mail_server(pool, cipher).await?,
+        report_logo: crate::reports::logo::stored(pool)
+            .await?
+            .map(|(logo_type, bytes)| BundleReportLogo { logo_type, data: BASE64.encode(bytes) }),
     })
+}
+
+/// Serveur de courriel enregistré, mot de passe déchiffré : il repart chiffré
+/// par la phrase de passe. Un mot de passe illisible part vide, signalé.
+async fn mail_server(pool: &SqlitePool, cipher: &Cipher) -> Result<Option<BundleMailServer>> {
+    use crate::notify::mail_server;
+    let Some(server) = mail_server::load_stored(pool).await? else { return Ok(None) };
+    let password = match mail_server::load_password(pool, cipher).await {
+        Ok(password) => password,
+        Err(error) => {
+            tracing::warn!(%error, "mot de passe du serveur de courriel illisible, exporté vide");
+            None
+        }
+    };
+    Ok(Some(BundleMailServer { server, password }))
 }
 
 /// Changements de configuration fermés.
@@ -452,11 +471,12 @@ async fn topology_rules(
 }
 
 async fn locations(pool: &SqlitePool) -> Result<Vec<BundleLocation>> {
-    let rows =
-        sqlx::query("SELECT name, address, latitude, longitude, site FROM locations ORDER BY id")
-            .fetch_all(pool)
-            .await
-            .context("lecture des emplacements")?;
+    let rows = sqlx::query(
+        "SELECT name, address, latitude, longitude, site, code FROM locations ORDER BY id",
+    )
+    .fetch_all(pool)
+    .await
+    .context("lecture des emplacements")?;
     rows.iter()
         .map(|row| {
             Ok(BundleLocation {
@@ -465,6 +485,7 @@ async fn locations(pool: &SqlitePool) -> Result<Vec<BundleLocation>> {
                 latitude: row.try_get("latitude")?,
                 longitude: row.try_get("longitude")?,
                 site: row.try_get("site")?,
+                code: row.try_get("code")?,
             })
         })
         .collect()
@@ -739,7 +760,15 @@ async fn silences(pool: &SqlitePool, refs: &HashMap<i64, String>) -> Result<Vec<
 async fn report_schedules(
     pool: &SqlitePool,
     channel_names: &HashMap<i64, String>,
+    refs: &HashMap<i64, String>,
 ) -> Result<Vec<BundleReportSchedule>> {
+    let slugs: HashMap<i64, String> =
+        sqlx::query_as::<_, (i64, String)>("SELECT id, slug FROM status_pages")
+            .fetch_all(pool)
+            .await
+            .context("lecture des pages de statut")?
+            .into_iter()
+            .collect();
     Ok(crate::reports::store::list(pool)
         .await?
         .into_iter()
@@ -753,6 +782,20 @@ async fn report_schedules(
             timezone: row.timezone,
             recipients: row.recipients,
             channel: row.channel_id.and_then(|id| channel_names.get(&id).cloned()),
+            kind: row.kind,
+            attach_pdf: row.attach_pdf,
+            attach_csv: row.attach_csv,
+            page: row.page_id.and_then(|id| slugs.get(&id).cloned()),
+            objective: row.objective,
+            layout: row.layout,
+            // Un moniteur supprimé depuis n'a pas de référence : il est oublié.
+            scope_targets: row
+                .scope
+                .targets
+                .iter()
+                .filter_map(|id| refs.get(id).cloned())
+                .collect(),
+            scope_groups: row.scope.groups,
         })
         .collect())
 }
@@ -766,7 +809,8 @@ async fn status_pages(
         "SELECT id, slug, title, description, published, theme, show_uptime_days,
              accent, scenes, scene_rotation, simple, footer_text, homepage_url, domain, seo,
              access_mode, access_password_hash, subscribe_channel_id,
-             subscribe_sms_channel_id, subscribe_webhook, subscribe_slack
+             subscribe_sms_channel_id, subscribe_webhook, subscribe_slack, hide_branding,
+             subscribe_email
          FROM status_pages ORDER BY id",
     )
     .fetch_all(pool)
@@ -842,6 +886,7 @@ async fn status_pages(
             groups: groups.into_iter().map(|(name,)| name).collect(),
             group_labels,
             subscriptions: Some(BundleSubscriptions {
+                email: Some(row.try_get::<i64, _>("subscribe_email")? != 0),
                 email_channel: row
                     .try_get::<Option<i64>, _>("subscribe_channel_id")?
                     .and_then(|id| channel_names.get(&id).cloned()),
@@ -851,6 +896,7 @@ async fn status_pages(
                 webhook: row.try_get::<i64, _>("subscribe_webhook")? != 0,
                 slack: row.try_get::<i64, _>("subscribe_slack")? != 0,
             }),
+            hide_branding: Some(row.try_get::<i64, _>("hide_branding")? != 0),
         });
     }
     Ok(out)

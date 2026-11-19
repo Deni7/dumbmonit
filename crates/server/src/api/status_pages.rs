@@ -102,6 +102,7 @@ pub fn routes() -> Router<AppState> {
         .route("/status-pages", get(list_pages).post(create_page))
         .route("/status-pages/{id}", get(get_page).put(update_page).delete(delete_page))
         .route("/status-pages/{id}/items", put(set_items))
+        .route("/status-pages/{id}/preview", get(preview_page))
         .route(
             "/status-pages/{id}/logo",
             get(branding::admin_logo).put(branding::upload_logo).delete(branding::delete_logo),
@@ -204,10 +205,16 @@ pub struct StatusPagePayload {
     pub footer_text: Option<String>,
     #[serde(default)]
     pub homepage_url: Option<String>,
-    /// Absent : inchangé ; `null` : abonnements coupés ; un nombre : le canal
-    /// SMTP qui envoie les courriels aux abonnés.
-    #[serde(default)]
+    /// Absent : inchangé ; `null` : pas de canal, les courriels partent par le
+    /// serveur de courriel de l'instance ; un nombre : le canal SMTP qui envoie
+    /// les courriels aux abonnés, prioritaire.
+    #[serde(default, deserialize_with = "present")]
     pub subscribe_channel_id: Option<Value>,
+    /// Abonnement par courriel ouvert aux visiteurs. Absent : la valeur
+    /// enregistrée est gardée — sauf si `subscribe_channel_id` est donné, qui
+    /// l'ouvre (un nombre) ou la ferme (`null`), comme avant la migration 0246.
+    #[serde(default)]
+    pub subscribe_email: Option<bool>,
     /// Absent : inchangé ; `null` ou `""` : pas de domaine ; sinon le nom
     /// d'hôte public de la page (`crate::status_host`).
     #[serde(default, deserialize_with = "present")]
@@ -223,6 +230,10 @@ pub struct StatusPagePayload {
     /// Noms publics des surveillances arrivées par un groupe ; absent : inchangés.
     #[serde(default)]
     pub group_labels: Option<Vec<GroupLabel>>,
+    /// Marque blanche : rien de DumbMonit sur la page publique. Absent : la
+    /// valeur enregistrée est gardée (`false` à la création).
+    #[serde(default)]
+    pub hide_branding: Option<bool>,
 }
 
 /// Distingue un champ absent (`None`, par `default`) d'un `null` explicite
@@ -311,6 +322,8 @@ impl StatusPagePayload {
             self.show_calendar.unwrap_or_else(|| existing.is_some_and(|page| page.show_calendar));
         let show_latency =
             self.show_latency.unwrap_or_else(|| existing.is_some_and(|page| page.show_latency));
+        let hide_branding =
+            self.hide_branding.unwrap_or_else(|| existing.is_some_and(|page| page.hide_branding));
         let footer_text = match self.footer_text {
             Some(text) => text.trim().to_string(),
             None => existing.map(|page| page.footer_text.clone()).unwrap_or_default(),
@@ -326,6 +339,14 @@ impl StatusPagePayload {
         let homepage_url = match self.homepage_url {
             Some(url) => validate_homepage(url.trim())?,
             None => existing.map(|page| page.homepage_url.clone()).unwrap_or_default(),
+        };
+        // Un client d'avant l'interrupteur ouvrait le courriel en choisissant
+        // un canal et le fermait avec `null`.
+        let subscribe_email = match (self.subscribe_email, &self.subscribe_channel_id) {
+            (Some(open), _) => open,
+            (None, Some(Value::Null)) => false,
+            (None, Some(_)) => true,
+            (None, None) => existing.is_some_and(|page| page.subscribe_email),
         };
         let subscribe_channel_id = match self.subscribe_channel_id {
             None => existing.and_then(|page| page.subscribe_channel_id),
@@ -428,6 +449,8 @@ impl StatusPagePayload {
             link_origin: origin,
             domain,
             seo,
+            hide_branding,
+            subscribe_email,
             groups,
             group_labels,
         })
@@ -621,6 +644,19 @@ pub async fn get_page(
     let page =
         db::status_pages::get_page(&state.pool, id).await?.ok_or_else(|| page_not_found(id))?;
     Ok(Json(page_view(&state, page).await?))
+}
+
+/// Aperçu de l'éditeur : le document public de la page enregistrée, publiée ou
+/// non, avec l'identifiant de surveillance de chaque service. L'éditeur y
+/// reprend l'état et l'historique des services pendant qu'on modifie la page.
+pub async fn preview_page(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> ApiResult<Response> {
+    let page =
+        db::status_pages::get_page(&state.pool, id).await?.ok_or_else(|| page_not_found(id))?;
+    let status = build_public(&state, &page, true).await?;
+    Ok(([(header::CACHE_CONTROL, "no-store")], Json(status)).into_response())
 }
 
 pub async fn create_page(
@@ -1336,6 +1372,8 @@ struct PublicPage {
     subscribe_kinds: Vec<&'static str>,
     /// Valeurs de référencement effectives (réglages, ou défauts tirés du nom).
     seo: crate::status_seo::Resolved,
+    /// Marque blanche : l'interface ne montre ni l'icône ni le nom de DumbMonit.
+    hide_branding: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -1349,6 +1387,10 @@ struct PublicItem {
     /// Clé stable du service dans les adresses publiques (badges), dérivée de
     /// son libellé public — jamais de l'identifiant interne.
     key: String,
+    /// Aperçu d'administration seulement : la surveillance du service, pour que
+    /// l'éditeur retrouve ses mesures. Jamais dans le document public.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    target_id: Option<TargetId>,
     label: String,
     /// `up`, `down`, `degraded`, `maintenance` ou `unknown`.
     state: &'static str,
@@ -1440,7 +1482,7 @@ static CACHE: LazyLock<Mutex<HashMap<String, CachedStatus>>> =
 
 /// Vide le cache public. Appelé après toute écriture d'administration, pour que
 /// l'annonce d'un incident soit visible sans attendre.
-fn invalidate_cache() {
+pub(crate) fn invalidate_cache() {
     CACHE.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clear();
     // Le domaine ou le slug d'une page a pu changer.
     crate::status_host::invalidate();
@@ -1479,7 +1521,7 @@ async fn load_public_checked(
         }
     }
 
-    let status = build_public(state, &page).await?;
+    let status = build_public(state, &page, false).await?;
     let body = Arc::new(serde_json::to_value(&status)?);
     let mut cache = CACHE.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     cache.insert(
@@ -1977,7 +2019,14 @@ fn round(value: f64) -> f64 {
     (value * 100.0).round() / 100.0
 }
 
-async fn build_public(state: &AppState, page: &StatusPage) -> ApiResult<PublicStatus> {
+/// Document d'une page tel que le public le lit. `preview` : pour l'éditeur
+/// (administration), chaque service porte en plus son identifiant de
+/// surveillance ; ce document-là n'est jamais mis en cache ni servi au public.
+async fn build_public(
+    state: &AppState,
+    page: &StatusPage,
+    preview: bool,
+) -> ApiResult<PublicStatus> {
     let now = Utc::now();
     // Fenêtre adaptative : l'âge des données (plus ancien appareil montré), borné
     // par le réglage de la page, `MIN_HISTORY_DAYS` au moins.
@@ -2186,6 +2235,7 @@ async fn build_public(state: &AppState, page: &StatusPage) -> ApiResult<PublicSt
         let key = unique_key(&item.label, &mut keys);
         let public_item = PublicItem {
             key,
+            target_id: preview.then_some(target.id),
             label: item.label,
             state: state_word,
             uptime_24h: metrics.uptime_24h.get(&target.id).map(|v| round(*v)),
@@ -2320,6 +2370,7 @@ async fn build_public(state: &AppState, page: &StatusPage) -> ApiResult<PublicSt
             subscribe: !subscribe_kinds.is_empty(),
             subscribe_kinds,
             seo: crate::status_seo::resolve(page),
+            hide_branding: page.hide_branding,
         },
         overall,
         generated_at: format_timestamp(now),

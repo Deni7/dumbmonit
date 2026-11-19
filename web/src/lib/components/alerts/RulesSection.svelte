@@ -24,6 +24,8 @@
 	import { alertsStore } from '#lib/stores/alerts.svelte.js';
 	import { Button, Confirm, Field, Panel, Plate, Toggle, EmptyState } from '#lib/ui/index.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
+	import { withoutOnCall } from '#lib/components/oncall/gate.js';
+	import { instanceStore } from '#lib/stores/instance.svelte.js';
 	import { SlidersHorizontal, ChevronDown, ChevronUp, Search } from 'lucide-svelte';
 	import { formatDuration } from '#lib/format.js';
 	import { severityTone, severityWord } from './helpers';
@@ -234,6 +236,8 @@
 
 	let channels = $state<Channel[]>([]);
 	let channelsError = $state<string | null>(null);
+	// On-call channels are not offered while on-call schedules are off.
+	const pickableChannels = $derived(withoutOnCall(channels, instanceStore.oncallEnabled));
 	$effect(() => {
 		const controller = new AbortController();
 		listChannels(controller.signal)
@@ -562,7 +566,7 @@
 		</div>
 
 		{#if editing}
-			<RuleEditor {rule} {channels} {channelsError} onsaved={onSaved} oncancel={() => (editingId = null)} />
+			<RuleEditor {rule} channels={pickableChannels} {channelsError} onsaved={onSaved} oncancel={() => (editingId = null)} />
 		{/if}
 	</div>
 {/snippet}

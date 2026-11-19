@@ -5,11 +5,19 @@
 The **Monitors** page shows every monitor in one of two layouts, remembered in
 your browser:
 
-- **Compact** (the default): one line per monitor — status light, name, kind,
-  address, when it was last seen and the state. Children are indented under
-  their parent and dim when the parent is unreachable.
+- **Compact** (the default): one line per monitor, in fixed columns — icon,
+  name, address, location, when it was last seen (short: `2min`, `3h`, `5d`;
+  hover for the date), security grade, alerts and the state. A column stays in
+  place whether or not a line has something to show in it. Children are
+  indented under their parent and dim when the parent is unreachable. On a
+  narrow window the address moves under the name, then the age and the grade
+  are dropped.
 - **Tiles**: one card per monitor, with a sparkline of a representative metric.
   A child names the monitor it sits behind.
+
+A monitor's location appears as a two-letter code (`CR` for Crissier; hover for
+the name). You choose the code when you edit the location in Settings; by
+default it is the first two letters of the name.
 
 Devices are grouped by folder; a folder header shows its state only when
 something inside is not reporting. Administrators reorder monitors by dragging
@@ -29,14 +37,18 @@ One toolbar holds everything:
 - the **search** box (name, address or kind);
 - **Filter**, which opens the state (All, Needs attention, Reporting,
   Disabled), kind, site, sort and tag filters — the number on the button counts the
-  ones in use, and **Clear filters** resets them. Filters live in the address,
+  ones in use, and **Clear filters** resets them. The tag filter is one button
+  that opens a searchable checklist and summarises the chosen tags on one line,
+  with a × to clear them. Filters live in the address,
   so a filtered list can be bookmarked or shared;
 - **Compact** / **Tiles**;
+- **Create folder** (administrators): a name field opens under the toolbar;
 - **Select** (administrators), which turns on a checkbox per monitor and a
   floating bar at the bottom with the bulk actions (enable, disable, move to a
-  folder, delete); **Done** or Escape leaves the mode;
-- **⋯** (more actions): the topology **Map**, **Create folder**, **Import
-  websites (CSV)** and **Import from Uptime Kuma**;
+  folder, delete, and under **More** location, relay and CVE check); **Done**
+  or Escape leaves the mode;
+- **⋯** (more actions): the topology **Map**, **Import websites (CSV)** and
+  **Import from Uptime Kuma**;
 - **Add a monitor**, the primary action.
 
 ## A monitor

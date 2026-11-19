@@ -5,7 +5,6 @@
 	 * server has set its access cookie, and `onunlocked` reloads the page.
 	 */
 	import { m } from '#lib/paraglide/messages.js';
-	import { Lock, LogIn } from 'lucide-svelte';
 	import { toApiError, unlockStatusPage } from '#lib/api/index.js';
 	import { Button, Field } from '#lib/ui/index.js';
 
@@ -44,10 +43,7 @@
 
 <section class="rise-in mx-auto grid max-w-sm gap-4 rounded-[var(--radius-card)] border border-line bg-surface p-6 shadow-lift">
 	{#if access === 'password'}
-		<div class="flex items-center gap-2.5">
-			<Lock class="size-5 text-ink-2" aria-hidden="true" />
-			<h1 class="text-lg font-semibold text-ink">{m.status_gate_password_title()}</h1>
-		</div>
+		<h1 class="text-lg font-semibold text-ink">{m.status_gate_password_title()}</h1>
 		<p class="text-sm text-ink-2">{m.status_gate_password_help()}</p>
 		<form class="grid gap-3" onsubmit={submit}>
 			<Field label={m.status_gate_password_label()} for="gate-password" {error}>
@@ -64,10 +60,7 @@
 			<Button type="submit" loading={busy} disabled={!password}>{m.status_gate_password_submit()}</Button>
 		</form>
 	{:else}
-		<div class="flex items-center gap-2.5">
-			<LogIn class="size-5 text-ink-2" aria-hidden="true" />
-			<h1 class="text-lg font-semibold text-ink">{m.status_gate_users_title()}</h1>
-		</div>
+		<h1 class="text-lg font-semibold text-ink">{m.status_gate_users_title()}</h1>
 		<p class="text-sm text-ink-2">{m.status_gate_users_help()}</p>
 		<Button href={login}>{m.status_gate_users_action()}</Button>
 	{/if}

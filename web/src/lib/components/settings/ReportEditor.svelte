@@ -1,8 +1,10 @@
 <script lang="ts">
 	/**
 	 * One periodic report: its form, its status line and its actions. `schedule`
-	 * is `null` for a report not saved yet. The parent owns the list; this
-	 * component reports back with `onsaved` and `ondeleted`.
+	 * is `null` for a report not saved yet, which `draft` may prefill (the SLA
+	 * page's "Schedule" hands over its layout, monitors, objective and page).
+	 * The parent owns the list; this component reports back with `onsaved` and
+	 * `ondeleted`.
 	 */
 	import { untrack } from 'svelte';
 	import { Send } from 'lucide-svelte';
@@ -11,17 +13,23 @@
 	import { toApiError, type Channel, type StatusPage } from '#lib/api/index.js';
 	import {
 		MAX_REPORT_RECIPIENTS,
+		emptyScope,
+		normaliseLayout,
 		createReportSchedule,
 		deleteReportSchedule,
 		sendReportPreview,
 		updateReportSchedule,
 		type ReportFrequency,
 		type ReportKind,
+		type ReportLayout,
 		type ReportSchedule,
-		type ReportSchedulePayload
+		type ReportSchedulePayload,
+		type ReportScope
 	} from '#lib/api/reports.js';
+	import ReportLayoutFields from '#lib/components/reports/ReportLayoutFields.svelte';
+	import MonitorPicker from '#lib/components/reports/MonitorPicker.svelte';
 	import { formatDateTime, formatRelative } from '#lib/format.js';
-	import { Button, Confirm, ErrorNotice, Field, Plate, Toggle } from '#lib/ui/index.js';
+	import { Button, Confirm, Disclosure, ErrorNotice, Field, Plate, Segmented, Toggle } from '#lib/ui/index.js';
 	import UnsavedBadge from './UnsavedBadge.svelte';
 	import { useUnsavedGuard } from '#lib/settings/unsaved.svelte.js';
 
@@ -34,12 +42,14 @@
 		timezones: string[];
 		/** Status pages whose title can head an SLA report. */
 		pages?: StatusPage[];
+		/** Starting values of a new report (ignored when `schedule` is set). */
+		draft?: Partial<ReportSchedulePayload> | null;
 		onsaved: (saved: ReportSchedule) => void;
 		ondeleted: (id: number) => void;
 		oncancel?: () => void;
 	}
 
-	let { schedule, channels, defaultTimezone, timezones, pages = [], onsaved, ondeleted, oncancel }: Props = $props();
+	let { schedule, channels, defaultTimezone, timezones, pages = [], draft = null, onsaved, ondeleted, oncancel }: Props = $props();
 
 	// 2024-01-01 was a Monday: seven consecutive days give the localized weekday names.
 	const WEEKDAYS = Array.from({ length: 7 }, (_, i) =>
@@ -56,8 +66,9 @@
 		{ value: 'sla', label: m.settings_report_kind_sla() }
 	];
 
-	// The form starts from the saved report; it is a draft until saved.
-	const initial = untrack(() => schedule);
+	// The form starts from the saved report (or the draft handed over); it is
+	// a draft until saved.
+	const initial = untrack(() => schedule ?? (draft ? { ...draft, id: 0 } : null)) as (Partial<ReportSchedule> & { id: number }) | null;
 	let name = $state(initial?.name ?? m.settings_report_default_name());
 	let enabled = $state(initial?.enabled ?? true);
 	let frequency = $state<ReportFrequency>(initial?.frequency ?? 'weekly');
@@ -69,10 +80,18 @@
 	let kind = $state<ReportKind>(initial?.kind ?? 'digest');
 	let attachPdf = $state(initial?.attach_pdf ?? true);
 	let attachCsv = $state(initial?.attach_csv ?? true);
-	let objective = $state(initial?.objective === null || initial === null ? '' : String(initial.objective));
-	let pageId = $state<string>(initial?.page_id === null || initial === null ? '' : String(initial.page_id));
+	let objective = $state(initial?.objective == null ? '' : String(initial.objective));
+	let pageId = $state<string>(initial?.page_id == null ? '' : String(initial.page_id));
 	let objectiveError = $state<string | null>(null);
-	let channelId = $state<string>(initial?.channel_id === null || initial === null ? '' : String(initial.channel_id));
+	let channelId = $state<string>(initial?.channel_id == null ? '' : String(initial.channel_id));
+	let layout = $state<ReportLayout>(normaliseLayout(initial?.layout));
+	let scope = $state<ReportScope>(initial?.scope ? { targets: [...initial.scope.targets], groups: [...initial.scope.groups] } : emptyScope());
+	let customizing = $state(untrack(() => schedule === null && draft !== null));
+	let scopeEmpty = $state(false);
+
+	/** Comparable form of the layout and scope, for the unsaved-changes check. */
+	const shape = (value: { layout: ReportLayout; scope: ReportScope }) =>
+		JSON.stringify({ layout: { ...value.layout, title: value.layout.title?.trim() || null, notes: value.layout.notes.trim() }, scope: value.scope });
 
 	let saving = $state(false);
 	let previewing = $state(false);
@@ -107,7 +126,9 @@
 			attach_pdf: attachPdf,
 			attach_csv: attachCsv,
 			page_id: kind === 'sla' && pageId !== '' ? Number(pageId) : null,
-			objective: kind === 'sla' && objective.trim() !== '' ? Number(objective.replace(',', '.')) : null
+			objective: kind === 'sla' && objective.trim() !== '' ? Number(objective.replace(',', '.')) : null,
+			layout: { ...layout, title: layout.title?.trim() || null, notes: layout.notes.trim() },
+			scope
 		};
 	}
 
@@ -118,6 +139,11 @@
 		recipientsError = null;
 		objectiveError = null;
 		const goal = Number(objective.replace(',', '.'));
+		if (kind === 'sla' && scopeEmpty) {
+			customizing = true;
+			error = new Error(m.reports_scope_none_selected());
+			return;
+		}
 		if (kind === 'sla' && objective.trim() !== '' && !(goal > 0 && goal <= 100)) {
 			objectiveError = m.settings_report_objective_invalid();
 			return;
@@ -186,6 +212,7 @@
 				dayOfMonth !== schedule.day_of_month ||
 				hour !== schedule.hour ||
 				timezone !== schedule.timezone ||
+				shape({ layout, scope }) !== shape({ layout: normaliseLayout(schedule.layout), scope: schedule.scope ?? emptyScope() }) ||
 				parsed.join(',') !== schedule.recipients.join(',') ||
 				channelId !== (schedule.channel_id === null ? '' : String(schedule.channel_id)))
 	);
@@ -204,19 +231,7 @@
 		<Toggle bind:checked={enabled} label={m.settings_report_send()} disabled={saving} />
 	</Field>
 
-	<fieldset class="grid min-w-0 content-start gap-1.5 sm:col-span-2" disabled={saving}>
-		<legend class="mb-1.5 block text-sm font-semibold text-ink">{m.settings_report_kind()}</legend>
-		<div class="flex w-fit max-w-full flex-wrap gap-1 rounded-lg border border-line bg-canvas-deep p-1" role="radiogroup" aria-label={m.settings_report_kind()}>
-			{#each KINDS as option (option.value)}
-				<label
-					class={`cursor-pointer rounded-md px-3 py-1.5 text-sm transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-signal ${kind === option.value ? 'bg-surface font-semibold text-ink shadow-lift' : 'text-ink-2 hover:text-ink'}`}
-				>
-					<input type="radio" class="sr-only" name={`${idPrefix}-kind`} value={option.value} bind:group={kind} />
-					{option.label}
-				</label>
-			{/each}
-		</div>
-	</fieldset>
+	<Segmented legend={m.settings_report_kind()} options={KINDS} value={kind} onchange={(next) => (kind = next === 'sla' ? 'sla' : 'digest')} name={`${idPrefix}-kind`} disabled={saving} class="sm:col-span-2" />
 
 	{#if kind === 'sla'}
 		<Field label={m.settings_report_objective()} for={`${idPrefix}-objective`} error={objectiveError} help={m.settings_report_objective_help()}>
@@ -236,25 +251,27 @@
 		<Field label={m.settings_report_attach_csv()} inline>
 			<Toggle bind:checked={attachCsv} label={m.settings_report_attach_csv()} disabled={saving} />
 		</Field>
+		<Disclosure
+			title={m.reports_layout_customize()}
+			summary={m.reports_layout_customize_summary({
+				template: layout.template === 'summary' ? m.reports_layout_template_summary() : m.reports_layout_template_detailed(),
+				paper: layout.paper === 'letter' ? m.reports_layout_paper_letter() : m.reports_layout_paper_a4()
+			})}
+			bind:open={customizing}
+			class="sm:col-span-2"
+		>
+			<div class="grid gap-6">
+				<ReportLayoutFields bind:layout {idPrefix} pageId={pageId === '' ? null : Number(pageId)} {pages} disabled={saving} />
+				<MonitorPicker bind:scope bind:empty={scopeEmpty} {idPrefix} disabled={saving} />
+			</div>
+		</Disclosure>
 	{/if}
 
 	{#if kind === 'digest'}
-	<fieldset class="grid min-w-0 gap-1.5" disabled={saving}>
-		<legend class="mb-1.5 block text-sm font-semibold text-ink">{m.settings_report_frequency()}</legend>
-		<div class="flex w-fit max-w-full flex-wrap gap-1 rounded-lg border border-line bg-canvas-deep p-1" role="radiogroup" aria-label={m.settings_report_frequency()}>
-			{#each FREQUENCIES as option (option.value)}
-				<label
-					class={`cursor-pointer rounded-md px-3 py-1.5 text-sm transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-signal ${frequency === option.value ? 'bg-surface font-semibold text-ink shadow-lift' : 'text-ink-2 hover:text-ink'}`}
-				>
-					<input type="radio" class="sr-only" name={`${idPrefix}-frequency`} value={option.value} bind:group={frequency} />
-					{option.label}
-				</label>
-			{/each}
-		</div>
-	</fieldset>
+		<Segmented legend={m.settings_report_frequency()} options={FREQUENCIES} value={frequency} onchange={(next) => (frequency = next === 'daily' || next === 'monthly' ? next : 'weekly')} name={`${idPrefix}-frequency`} disabled={saving} />
 	{/if}
 
-	<div class="grid grid-cols-2 gap-3">
+	<div class="grid grid-cols-2 gap-4">
 		{#if kind === 'sla' || frequency === 'monthly'}
 			<Field label={m.settings_report_day_of_month()} for={`${idPrefix}-dom`} help={m.settings_report_day_of_month_help()}>
 				<input id={`${idPrefix}-dom`} type="number" class="input" min="1" max="28" bind:value={dayOfMonth} disabled={saving} />

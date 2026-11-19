@@ -1,10 +1,12 @@
 /**
  * What the interface knows about the instance: whether the setup wizard is
  * done (public `GET /api/instance`, read before sign-in) and, once signed in,
- * the instance name shown in the breadcrumb and on the wall.
+ * the instance name shown in the breadcrumb and on the wall, and whether the
+ * optional on-call feature is turned on.
  */
 import { browser } from '$app/env';
 import { getInstance, getInstanceSettings } from '#lib/api/instance.js';
+import { applyAccent, parseAccent } from '#lib/accent.js';
 
 /** Key of the former Homelab / Enterprise choice, cleared once on load. */
 const LEGACY_MODE_KEY = 'dumbmonit-mode';
@@ -16,6 +18,15 @@ class InstanceStore {
 	loaded = $state(false);
 	/** Instance name, read once signed in; empty shows "DumbMonit". */
 	name = $state('');
+	/**
+	 * On-call schedules are turned on (Settings → System). Off until the
+	 * settings are read: the feature stays hidden rather than flashing.
+	 */
+	oncallEnabled = $state(false);
+	/** Accent colour (`#rrggbb`), empty for the default look; applied to the page as it is read. */
+	accent = $state('');
+	/** True once the settings were read, so a page can tell "off" from "not known yet". */
+	settingsLoaded = $state(false);
 	#settingsRead = false;
 
 	constructor() {
@@ -46,10 +57,19 @@ class InstanceStore {
 		try {
 			const settings = await getInstanceSettings();
 			this.name = settings.name;
+			this.oncallEnabled = settings.oncall_enabled === true;
 			this.setupCompleted = settings.setup_completed;
+			this.setAccent(settings.accent);
+			this.settingsLoaded = true;
 		} catch {
 			this.#settingsRead = false;
 		}
+	}
+
+	/** Wears (and remembers for the next first paint) the instance's accent. */
+	setAccent(raw: string | null | undefined): void {
+		this.accent = parseAccent(raw);
+		applyAccent(this.accent);
 	}
 
 	/** Display name of the instance. */

@@ -18,6 +18,7 @@
 	import { passkeysSupported } from '#lib/api/passkeys.js';
 	import { tick } from 'svelte';
 	import Logo from '#lib/components/Logo.svelte';
+	import SwissCross from '#lib/components/SwissCross.svelte';
 	import LanguageSelect from '#lib/components/LanguageSelect.svelte';
 	import PasswordInput from '#lib/components/settings/PasswordInput.svelte';
 	import Mascot from '#lib/components/Mascot.svelte';
@@ -40,7 +41,7 @@
 	let code = $state('');
 	let codeError = $state<string | null>(null);
 	let usernameError = $state<string | null>(null);
-	let failure = $state<{ title: string; error: unknown } | null>(null);
+	let failure = $state<{ title: string; error: unknown; compact?: boolean } | null>(null);
 	let localError = $state<string | null>(null);
 
 	// A refused sign-in shakes the gate once, and the pigeon's eyes cross
@@ -132,7 +133,9 @@
 			if (cause instanceof ApiError && cause.status === 401) {
 				failure = {
 					title: m.auth_login_wrong_title(),
-					error: new ApiError(m.auth_login_wrong_detail(), 400)
+					error: new ApiError(m.auth_login_wrong_title(), 400),
+					// Just the sentence: no hint, no repeated message.
+					compact: true
 				};
 			} else if (cause instanceof ApiError && cause.status === 429) {
 				const seconds = retryDelay(cause.message);
@@ -218,7 +221,12 @@
 			<Mascot mood={failure ? 'dizzy' : 'watch'} class="mascot pointer-events-none absolute -top-12 -right-4 size-20 rotate-6 sm:-top-16 sm:-right-6 sm:size-28" />
 			<div class="flex items-center gap-2.5">
 				<Logo class="size-8" />
-				<span class="text-[1.05rem] font-bold tracking-tight text-ink">DumbMonit</span>
+				<div class="min-w-0">
+					<p class="m-0 flex items-center gap-1.5 text-[1.05rem] leading-tight font-bold tracking-tight text-ink">
+						DumbMonit<SwissCross class="size-3.5" />
+					</p>
+					<p class="m-0 text-xs text-ink-2">{m.brand_tagline()}</p>
+				</div>
 			</div>
 
 			{#if pending !== null}
@@ -361,7 +369,7 @@
 				</Field>
 
 				{#if failure}
-					<ErrorNotice title={failure.title} error={failure.error} />
+					<ErrorNotice title={failure.title} error={failure.error} compact={failure.compact} />
 				{/if}
 
 				<ClickSpark class="w-full">
@@ -374,14 +382,10 @@
 					</Button>
 				</ClickSpark>
 			</form>
-
-			<p class="mt-5 text-[0.8125rem] text-ink-2">
-				{m.auth_login_lost()}
-			</p>
 			{/if}
 		</section>
 
-		<p class="mt-6 text-[0.8125rem] text-ink-2">{m.auth_footer()}</p>
+		<p class="mt-6 text-[0.8125rem] text-ink-2">{m.auth_login_footer()}</p>
 	</main>
 </div>
 
