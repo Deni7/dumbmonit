@@ -51,11 +51,15 @@ export function cellOf(value: number | undefined): RiverCell {
 	return 'warn';
 }
 
-/** Every monitor's health over `rangeSeconds`, in `RIVER_SLOTS` equal slots, oldest first. */
-export async function loadRiver(rangeSeconds: number, signal?: AbortSignal): Promise<Map<TargetId, RiverCell[]>> {
-	const step = Math.max(15, Math.round(rangeSeconds / RIVER_SLOTS));
+/** Every monitor's health over `rangeSeconds`, in `slots` equal slots (default `RIVER_SLOTS`), oldest first. */
+export async function loadRiver(
+	rangeSeconds: number,
+	signal?: AbortSignal,
+	slots: number = RIVER_SLOTS
+): Promise<Map<TargetId, RiverCell[]>> {
+	const step = Math.max(15, Math.round(rangeSeconds / slots));
 	const end = Date.now();
-	const start = end - step * RIVER_SLOTS * 1000;
+	const start = end - step * slots * 1000;
 	const series = await queryRange(
 		{ query: `min by (target) (avg_over_time(${HEALTH}[${step}s]))`, start, end, step },
 		signal
@@ -72,7 +76,7 @@ export async function loadRiver(rangeSeconds: number, signal?: AbortSignal): Pro
 			bySlot.set(slot, known === undefined ? value : Math.min(known, value));
 		}
 		const cells: RiverCell[] = [];
-		for (let i = 1; i <= RIVER_SLOTS; i += 1) cells.push(cellOf(bySlot.get(i)));
+		for (let i = 1; i <= slots; i += 1) cells.push(cellOf(bySlot.get(i)));
 		out.set(id, cells);
 	}
 	return out;

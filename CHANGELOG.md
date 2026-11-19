@@ -82,14 +82,14 @@ All notable changes to this project are documented here. The format follows
   or a sign-in icon before its title, like every other page title.
 
 
-- **Monitors list, tidied.** In the list every piece of information has its own column, the same
-  width on every line whether or not the monitor has an alert, a score or a location, so the score and
-  the alert count no longer move. The columns fold with the width (the address goes under the name,
-  then the age and the score are dropped on a phone). Lines no longer repeat what the icon, the folder
-  or the page already say: the kind's name (on hover), the "Last seen" prefix, an address equal to the
-  name and the location when the list is filtered to one. The age is compact ("2min", "3h", "5d") with
-  the full date on hover; alerts and score are plain icons rather than outlined plates; the state is
-  the status light and its word.
+- **Monitors list, a real table.** The list has a header line and fixed columns, the same width on
+  every row: Status (the light and its word), Name over the kind of monitor, Address (monospace),
+  Site, Last 24 h (24 hourly segments: green all good, orange some checks failed, red down, grey no
+  data), Response, Checked (compact age, the full date on hover) and the alerts, with the security
+  grade before Checked. The columns fold with the width of the list (Address first, then Response and
+  the security grade, then Last 24 h); on a phone only Status, Name, Checked and the alerts remain.
+  The whole row opens the monitor. The hourly bars come from the same VictoriaMetrics health series
+  as the Enterprise overview, one query for all monitors.
 - **Tiles, plainer.** Tiles are bordered cards like the rest of the app: no shadow, light that
   follows the pointer, lift or staggered entrance.
 - **Selection and folders.** "Select" and "Create folder" are labelled buttons. The selection bar

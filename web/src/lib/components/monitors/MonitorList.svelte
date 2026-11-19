@@ -27,6 +27,7 @@
 	} from '#lib/api/index.js';
 	import { displayState } from '#lib/format.js';
 	import { loadSparklines } from '#lib/metrics.js';
+	import { loadLatency, loadRiver, DAY_SECONDS, type RiverCell } from '#lib/components/enterprise/fleet.js';
 	import { getSecuritySummary } from '#lib/api/security.js';
 	import type { SecurityGrade } from '#lib/api/index.js';
 	import type { Serie } from '#lib/components/Chart.svelte';
@@ -97,6 +98,9 @@
 	/** One pass over the shared alert list, not a request per monitor. */
 	const alertCounts = $derived(countAlertsByTarget(alertsStore.alerts));
 	let sparklines = $state<Map<TargetId, Serie[]>>(new Map());
+	/** Last 24 hours per monitor, one cell per hour, and the latest response time (ms): the table's columns. */
+	let river = $state<Map<TargetId, RiverCell[]>>(new Map());
+	let latency = $state<Map<TargetId, number>>(new Map());
 	/** Security badges: empty while the score is off in Settings, or for unrated kinds. */
 	let security = $state<Map<TargetId, { grade: SecurityGrade | null; score: number | null }>>(new Map());
 	let kindLabels = $state<Map<string, string>>(new Map());
@@ -1009,6 +1013,12 @@
 		// failure here must not take the rack down with it.
 		const next = await loadSparklines(24 * 3600, signal).catch(() => null);
 		if (next) sparklines = next;
+		const [cells, times] = await Promise.all([
+			loadRiver(DAY_SECONDS, signal, 24).catch(() => null),
+			loadLatency(1800, signal).catch(() => null)
+		]);
+		if (cells) river = cells;
+		if (times) latency = new Map([...times].filter(([, v]) => v.length > 0).map(([id, v]) => [id, v[v.length - 1]]));
 	}
 
 	async function loadSecurity(signal?: AbortSignal) {
@@ -1483,6 +1493,8 @@
 					{security}
 					{alertCounts}
 					{selection}
+					{river}
+					{latency}
 				/>
 			{/if}
 		{/each}
@@ -1502,7 +1514,7 @@
 					</button>
 				{/if}
 				{#if disabledExpanded}
-					<RackList rows={disabledRows} {sparklines} {kindLabels} {sites} {showSite} layout={view} {names} {alertCounts} {selection} />
+					<RackList rows={disabledRows} {sparklines} {kindLabels} {sites} {showSite} layout={view} {names} {alertCounts} {selection} {river} {latency} />
 				{/if}
 			</section>
 		{/if}

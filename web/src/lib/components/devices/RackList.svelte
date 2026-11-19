@@ -21,6 +21,8 @@
 	import type { Serie } from '#lib/components/Chart.svelte';
 	import type { TargetAlertCounts } from '#lib/alerts-attention.js';
 	import CompactRow from './CompactRow.svelte';
+	import { GRID, SHOW } from './columns';
+	import type { RiverCell } from '#lib/components/enterprise/fleet.js';
 	import RackTile from './RackTile.svelte';
 	import type { RackRow } from './rack';
 	import type { RackView } from './view';
@@ -72,16 +74,21 @@
 		alertCounts?: Map<TargetId, TargetAlertCounts>;
 		/** When given (admins), every row carries a checkbox. */
 		selection?: RowSelection | null;
+		/** id → the last 24 hours, one cell per hour, for the availability bar. */
+		river?: Map<TargetId, RiverCell[]>;
+		/** id → latest response time in milliseconds. */
+		latency?: Map<TargetId, number>;
 	}
 
-	let { rows, sparklines, kindLabels, sites = new Map(), showSite = true, reorder = null, layout = 'compact', names = new Map(), security = new Map(), alertCounts = new Map(), selection = null }: Props = $props();
+	let { rows, sparklines, kindLabels, sites = new Map(), showSite = true, reorder = null, layout = 'compact', names = new Map(), security = new Map(), alertCounts = new Map(), selection = null, river = new Map(), latency = new Map() }: Props = $props();
 
 	const LIST_CLASS: Record<RackView, string> = {
-		compact: 'flex flex-col divide-y divide-line rounded-[var(--radius-card)] border border-line bg-surface',
+		compact: 'flex flex-col divide-y divide-line',
 		tiles: 'grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-3 max-sm:grid-cols-2 max-sm:gap-2'
 	};
 </script>
 
+{#snippet list()}
 <ol class={LIST_CLASS[layout]} aria-label={m.devices_rack_aria()}>
 	{#each rows as row (row.target.id)}
 		{@const id = row.target.id}
@@ -99,6 +106,8 @@
 					shadowed={row.shadowed}
 					security={security.get(row.target.id) ?? null}
 					alerts={alertCounts.get(row.target.id)}
+					river={river.get(row.target.id) ?? null}
+					latencyMs={latency.get(row.target.id) ?? null}
 				/>
 			{:else}
 				<RackTile
@@ -179,3 +188,29 @@
 		</li>
 	{/each}
 </ol>
+{/snippet}
+
+{#if layout === 'compact'}
+	<!-- The table: one header line over the rows, both on the grid of `columns.ts`. -->
+	<div class="@container overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
+		<div class="flex gap-1.5 border-b border-line bg-surface-2/50 text-[0.75rem] font-semibold text-ink-3" aria-hidden="true">
+			{#if selection}<span class="w-9 shrink-0"></span>{/if}
+			<div class="min-w-0 flex-1">
+				<div class={`${GRID} min-h-9`}>
+					<span class="truncate">{m.devices_cols_status()}</span>
+					<span class="truncate">{m.devices_cols_name()}</span>
+					<span class={`${SHOW.address} truncate`}>{m.devices_cols_address()}</span>
+					<span class={`${SHOW.site} justify-center truncate`}>{m.devices_cols_site()}</span>
+					<span class={`${SHOW.river} truncate`}>{m.devices_cols_last24h()}</span>
+					<span class={`${SHOW.response} truncate text-right`}>{m.devices_cols_response()}</span>
+					<span class={`${SHOW.security} justify-center truncate`}>{m.devices_cols_security()}</span>
+					<span class="truncate text-right">{m.devices_cols_checked()}</span>
+					<span></span>
+				</div>
+			</div>
+		</div>
+		{@render list()}
+	</div>
+{:else}
+	{@render list()}
+{/if}
