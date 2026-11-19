@@ -176,6 +176,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **Email over STARTTLS hardened.** `lettre` 0.11.24 fixes a STARTTLS reply injection that let a
+  man-in-the-middle make a rejected message look sent (RUSTSEC-2026-0560 to 0564).
 - **Settings tabs open again.** The tabs of Settings pointed to `/settings/{id}` literally, so
   only the first one could be reached; the wall's device chips had the same broken link.
 
