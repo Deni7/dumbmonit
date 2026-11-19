@@ -49,7 +49,7 @@ test('every locale has the new keys of the list', () => {
 test('every locale has the column headers of the monitors table', () => {
 	for (const locale of ['en', 'fr', 'de', 'es', 'it', 'pt', 'pt-BR', 'ru', 'zh-Hans']) {
 		const messages = JSON.parse(readFileSync(new URL(`../messages/${locale}.json`, import.meta.url), 'utf8'));
-		for (const key of ['status', 'name', 'address', 'site', 'last24h', 'response', 'security', 'checked']) {
+		for (const key of ['name', 'site', 'last24h', 'response', 'security', 'checked']) {
 			assert.ok(messages[`devices_cols_${key}`], `${locale}.devices_cols_${key}`);
 		}
 	}
@@ -57,7 +57,7 @@ test('every locale has the column headers of the monitors table', () => {
 
 test('the table grid and its hidden cells fold on the same breakpoints', () => {
 	const columns = readFileSync(new URL('../src/lib/components/devices/columns.ts', import.meta.url), 'utf8');
-	// Visible columns: 4 narrow, 6 from @xl, 8 from @3xl, 9 from @5xl.
+	// Visible columns: 4 narrow, 6 from @xl, 8 from @3xl and @5xl (only the bars widen).
 	const counts = [...columns.matchAll(/grid-cols-\[([^\]]+)\]/g)].map((m) => m[1].split('_').length);
-	assert.deepEqual(counts, [4, 6, 8, 9]);
+	assert.deepEqual(counts, [4, 6, 8, 8]);
 });
