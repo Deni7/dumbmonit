@@ -185,7 +185,8 @@
 			<div class="mb-4" aria-live="polite"><ErrorNotice error={downloadError} title={m.reports_print_download_error()} /></div>
 		{/if}
 
-		<div class="grid items-start gap-6 md:grid-cols-2 xl:grid-cols-3">
+		<div class="grid items-start gap-6 lg:grid-cols-2">
+			<div class="grid gap-6">
 			<Panel title={m.reports_sla_period_title()}>
 				<div class="grid gap-4">
 					<Field label={m.reports_sla_period()} for="sla-period" error={periodError} help={m.settings_sla_period_help()}>
@@ -225,6 +226,7 @@
 					<MonitorPicker bind:scope bind:empty={scopeEmpty} idPrefix="sla" />
 				</div>
 			</Panel>
+			</div>
 
 			<Panel title={m.reports_sla_layout_title()}>
 				<div class="grid gap-4">
