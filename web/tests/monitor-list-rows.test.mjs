@@ -1,5 +1,5 @@
 // Monitors list: compact age, tag picker, location badge code, table columns
-// and sub-monitors folded inside their parent.
+// (named once over the list) and sub-monitors folded inside their parent.
 // Run: npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,7 +8,7 @@ import { ageParts } from '../src/lib/components/devices/age.ts';
 import { tagChoices } from '../src/lib/components/devices/listState.ts';
 import { defaultLocationCode, normalizeLocationCode } from '../src/lib/components/settings/locationCode.ts';
 import { buildRack } from '../src/lib/components/devices/rack.ts';
-import { foldRack, hostOf, inferHosts, markContext, nestSorted, withAncestors } from '../src/lib/components/devices/nesting.ts';
+import { foldRack, hostOf, inferHosts, markContext, nestSorted, ownName, withAncestors } from '../src/lib/components/devices/nesting.ts';
 import { gridFor, SHOW, STATE_GLYPH } from '../src/lib/components/devices/columns.ts';
 
 test('the age is the largest whole unit, rounded down', () => {
@@ -57,7 +57,7 @@ test('every locale has the column headers of the monitors table', () => {
 			assert.ok(messages[`devices_cols_${key}`], `${locale}.devices_cols_${key}`);
 		}
 		assert.equal(messages.devices_cols_response, undefined, `${locale}: the response column is gone`);
-		for (const key of ['devices_rack_children', 'devices_rack_children_trouble']) {
+		for (const key of ['devices_rack_children', 'devices_rack_children_trouble', 'devices_folder_trouble']) {
 			assert.ok(messages[key], `${locale}.${key}`);
 		}
 	}
@@ -79,9 +79,32 @@ test('the table grid and its hidden cells fold on the same breakpoints', () => {
 	assert.equal(SHOW.security, 'hidden @3xl:flex');
 	// Without the site column, the rows and the header drop the site cell (not just empty it).
 	const row = readFileSync(new URL('../src/lib/components/devices/CompactRow.svelte', import.meta.url), 'utf8');
-	const list = readFileSync(new URL('../src/lib/components/devices/RackList.svelte', import.meta.url), 'utf8');
+	const header = readFileSync(new URL('../src/lib/components/devices/ColumnHeader.svelte', import.meta.url), 'utf8');
 	assert.match(row, /\{#if siteColumn\}\s*<span class=\{`\$\{SHOW\.site\}/);
-	assert.match(list, /\{#if showSite\}<span class=\{`\$\{SHOW\.site\}/);
+	assert.match(header, /\{#if showSite\}<span class=\{`\$\{SHOW\.site\}/);
+	// The column names are never cut short.
+	assert.doesNotMatch(header, /truncate[^"]*">\{m\.devices_cols_(?!name)/);
+});
+
+test('the column names are written once over the list, not in every folder card', () => {
+	const list = readFileSync(new URL('../src/lib/components/devices/RackList.svelte', import.meta.url), 'utf8');
+	const page = readFileSync(new URL('../src/lib/components/monitors/MonitorList.svelte', import.meta.url), 'utf8');
+	assert.doesNotMatch(list, /devices_cols_/, 'no header line inside a folder card');
+	assert.equal(page.match(/<ColumnHeader\b/g)?.length, 1);
+});
+
+test('under its parent, a sub-monitor drops the name it repeats', () => {
+	assert.equal(ownName('NAS70 · Databases', 'NAS70'), 'Databases');
+	assert.equal(ownName('nas · Databases', 'NAS'), 'Databases', 'whatever the case');
+	assert.equal(ownName('pve: backup', 'pve'), 'backup');
+	assert.equal(ownName('nas - Docker', 'nas'), 'Docker');
+	assert.equal(ownName('nas Docker', 'nas'), 'Docker');
+	assert.equal(ownName('nas-01', 'nas'), 'nas-01', 'a mark glued to a word is part of the name');
+	assert.equal(ownName('nasa', 'nas'), 'nasa');
+	assert.equal(ownName('Postgres', 'nas'), 'Postgres');
+	assert.equal(ownName('nas · ', 'nas'), 'nas · ', 'never an empty name');
+	assert.equal(ownName('nas', 'nas'), 'nas');
+	assert.equal(ownName('nas · Docker', null), 'nas · Docker');
 });
 
 test('every state is the same circle, told apart by its glyph as well as its tone', () => {

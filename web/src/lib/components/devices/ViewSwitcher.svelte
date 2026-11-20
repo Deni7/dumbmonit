@@ -1,9 +1,10 @@
 <script lang="ts">
 	/**
-	 * Compact / tiles for /targets: two toggle buttons in one strip,
-	 * the same machined look as `Segmented`. Each button carries its name
-	 * (visible from `sm`, read out everywhere), `aria-pressed` says which one
-	 * is on, and the strip is 40 px tall on phones.
+	 * Compact / tiles for /targets: two toggle buttons in one strip, drawn
+	 * exactly as the "Severity / Monitor" switch of the Alerts list (32 px
+	 * from `sm`, 40 px on phones). Each button carries its name (a word from
+	 * `sm`, an icon on phones, read out everywhere) and `aria-pressed` says
+	 * which one is on.
 	 */
 	import { m } from '#lib/paraglide/messages.js';
 	import { LayoutGrid, List } from 'lucide-svelte';
@@ -22,11 +23,8 @@
 	]);
 </script>
 
-<div
-	role="group"
-	aria-label={m.devices_targets_view_label()}
-	class="inline-flex shrink-0 items-center gap-0.5 rounded-lg border border-line-strong bg-surface-2 p-0.5 max-sm:gap-0 max-sm:p-0"
->
+<!-- The very strip of the Alerts "Severity / Monitor" switch: same frame, height and type; an icon alone on phones. -->
+<div role="group" aria-label={m.devices_targets_view_label()} class="inline-flex shrink-0 rounded-lg border border-line bg-surface-2 p-0.5">
 	{#each OPTIONS as option (option.id)}
 		{@const active = option.id === value}
 		{@const Icon = option.icon}
@@ -35,10 +33,10 @@
 			aria-pressed={active}
 			title={option.label}
 			onclick={() => onchange(option.id)}
-			class={`inline-flex h-[34px] min-w-10 items-center justify-center gap-1.5 rounded-[6px] px-2.5 text-sm font-semibold whitespace-nowrap transition-[background-color,color,box-shadow] duration-200 ease-out-expo focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-signal max-sm:h-10 ${active ? 'bg-surface text-ink shadow-lift' : 'text-ink-2 hover:text-ink'}`}
+			class={`inline-flex h-10 min-w-10 items-center justify-center rounded-md px-3 text-[0.8125rem] font-semibold whitespace-nowrap transition max-sm:px-0 sm:h-8 ${active ? 'bg-surface text-ink shadow-lift' : 'text-ink-2 hover:text-ink'}`}
 		>
-			<Icon class="size-4" aria-hidden="true" />
-			<span class="max-xl:sr-only">{option.label}</span>
+			<Icon class="size-4 sm:hidden" aria-hidden="true" />
+			<span class="max-sm:sr-only">{option.label}</span>
 		</button>
 	{/each}
 </div>

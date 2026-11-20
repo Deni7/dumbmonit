@@ -1808,6 +1808,7 @@
 	"devices_folder_delete": "Elimina cartella",
 	"devices_folder_delete_confirm": "Eliminare definitivamente?",
 	"devices_folder_empty": "Vuota",
+	"devices_folder_trouble": "Richiedono attenzione: {count}",
 	"devices_folder_rename": "Rinomina cartella",
 	"devices_folder_rename_aria": "Rinomina la cartella «{name}»",
 	"devices_folder_renaming": "Rinomina della cartella",

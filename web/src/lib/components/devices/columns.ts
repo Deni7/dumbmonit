@@ -10,17 +10,21 @@
  * The site column only exists when it can tell two monitors apart: with fewer
  * than two locations (or the list filtered to one), the grid has no site track
  * at all, header and rows alike (`gridFor`).
+ *
+ * The header line is drawn once, over the whole list (`ColumnHeader`), not in
+ * every folder; the padding follows the rows of the Alerts list (12 px on
+ * phones, 16 px from `sm`).
  */
 import type { TargetState } from '#lib/format.js';
 
 const GRID_WITH_SITE =
-	'grid items-center gap-x-3 px-3 grid-cols-[1.25rem_minmax(0,1fr)_3rem] ' +
+	'grid items-center gap-x-3 px-3 sm:px-4 grid-cols-[1.25rem_minmax(0,1fr)_3rem] ' +
 	'@xl:grid-cols-[1.25rem_minmax(0,1fr)_2.5rem_9rem_3rem] ' +
 	'@3xl:grid-cols-[1.25rem_minmax(0,1fr)_2.5rem_11rem_2.75rem_3rem] ' +
 	'@5xl:grid-cols-[1.25rem_minmax(0,1fr)_2.5rem_16rem_2.75rem_3rem]';
 
 const GRID_WITHOUT_SITE =
-	'grid items-center gap-x-3 px-3 grid-cols-[1.25rem_minmax(0,1fr)_3rem] ' +
+	'grid items-center gap-x-3 px-3 sm:px-4 grid-cols-[1.25rem_minmax(0,1fr)_3rem] ' +
 	'@xl:grid-cols-[1.25rem_minmax(0,1fr)_9rem_3rem] ' +
 	'@3xl:grid-cols-[1.25rem_minmax(0,1fr)_11rem_2.75rem_3rem] ' +
 	'@5xl:grid-cols-[1.25rem_minmax(0,1fr)_16rem_2.75rem_3rem]';
@@ -30,9 +34,14 @@ export function gridFor(site: boolean): string {
 	return site ? GRID_WITH_SITE : GRID_WITHOUT_SITE;
 }
 
-/** Fixed heights, so the header and the rows never differ from one list to the next. */
-export const HEADER_HEIGHT = 'h-9';
-export const ROW_HEIGHT = 'h-14';
+/**
+ * Heights, so the header and the rows never differ from one list to the next.
+ * A row has the rhythm of an Alerts row: two 20 px lines, 10 px above and
+ * below (62 px, `ROW_INTRINSIC` for the lines skipped off screen).
+ */
+export const HEADER_HEIGHT = 'h-8';
+export const ROW_HEIGHT = 'min-h-14 py-2.5';
+export const ROW_INTRINSIC = '[contain-intrinsic-block-size:auto_3.875rem]';
 
 /** Cell visibility per column, matching `gridFor`. The site cell exists only with the site column. */
 export const SHOW = {

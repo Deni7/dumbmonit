@@ -304,6 +304,32 @@ export function foldRack(
 	return out;
 }
 
+/**
+ * A separator between a parent's name and a child's own part: a mark with
+ * spaces after it ("NAS70 · Databases", "nas - Docker", "pve: backup"), or
+ * plain spaces ("nas Docker"). A mark glued to the next word ("nas-01") is
+ * part of a name, not a separator.
+ */
+const PARENT_SEPARATOR = /^(?:\s*[·•|:/>›–—-]\s+|\s+(?![·•|:/>›–—-]))(?=\S)/u;
+
+/**
+ * The name of a sub-monitor as shown right under its parent: without the
+ * parent's name it starts with ("NAS70 · Databases" under "NAS70" reads
+ * "Databases"), since the row above already says it. The whole name stays
+ * everywhere else (title, screen readers, search); a name that does not
+ * start with the parent's, or that would be left empty, is kept whole.
+ */
+export function ownName(name: string, parentName: string | null | undefined): string {
+	const parent = parentName?.trim() ?? '';
+	if (!parent || name.length <= parent.length) return name;
+	if (name.slice(0, parent.length).toLowerCase() !== parent.toLowerCase()) return name;
+	const rest = name.slice(parent.length);
+	const separator = PARENT_SEPARATOR.exec(rest);
+	if (!separator) return name;
+	const own = rest.slice(separator[0].length).trim();
+	return own || name;
+}
+
 const STORAGE_KEY = 'dumbmonit-targets-open';
 
 /** Parents opened or closed by hand: id → open. */

@@ -1808,6 +1808,7 @@
 	"devices_folder_delete": "Delete folder",
 	"devices_folder_delete_confirm": "Delete for good?",
 	"devices_folder_empty": "Empty",
+	"devices_folder_trouble": "Needing attention: {count}",
 	"devices_folder_rename": "Rename folder",
 	"devices_folder_rename_aria": "Rename folder \"{name}\"",
 	"devices_folder_renaming": "Renaming folder",

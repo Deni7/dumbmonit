@@ -4,11 +4,15 @@
 	 * One monitor as a row of the table on /targets. Every column is the same
 	 * width on every row whether the monitor has a score or a site or not (an
 	 * empty cell stays empty):
-	 * status (a marked circle, no word), name over its address and kind tag, site
-	 * (only when the instance has several),
+	 * status (a marked circle, no word), name over its address and kind (the
+	 * quiet second line of an Alerts row: `address · Kind`), site (only when
+	 * the instance has several),
 	 * the last 24 hours as 24 hourly segments, security grade, age of the last
 	 * check. The alert count sits on the name line, right after the name, and
-	 * so does the disclosure of a parent's sub-monitors (`nesting.ts`).
+	 * so does the disclosure of a parent's sub-monitors (`nesting.ts`): a bare
+	 * chevron and count, quiet like the bell. Under its parent, a sub-monitor
+	 * shows only its own part of the name (`ownName`); the whole name stays in
+	 * the title and for screen readers.
 	 * `columns.ts` holds the grid shared with the header line, and which
 	 * columns fold when the list is narrow.
 	 * Opened through a stretched link on the name, so the security grade, the
@@ -20,11 +24,12 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import SecurityBadge from './SecurityBadge.svelte';
 	import SiteBadge from './SiteBadge.svelte';
-	import { StatusMark, Tag } from '#lib/ui/index.js';
+	import { StatusMark } from '#lib/ui/index.js';
 	import AlertBell from './AlertBell.svelte';
 	import { AlertTriangle, ChevronRight } from 'lucide-svelte';
 	import { ROW_HEIGHT, SHOW, STATE_GLYPH, gridFor } from './columns';
 	import { kindTag } from './kindTag';
+	import { ownName } from './nesting';
 	import type { RiverCell } from '#lib/components/enterprise/fleet.js';
 	import type { TargetAlertCounts } from '#lib/alerts-attention.js';
 	import type { SecurityGrade } from '#lib/api/index.js';
@@ -38,6 +43,8 @@
 		/** The table has a site column (several locations); without it the site track is gone. */
 		siteColumn?: boolean;
 		depth?: number;
+		/** The parent's name, so a sub-monitor under it shows only its own part. */
+		parentName?: string | null;
 		shadowed?: boolean;
 		/** Security grade, when the score is on and this kind is rated. */
 		security?: { grade: SecurityGrade | null; score: number | null } | null;
@@ -62,6 +69,7 @@
 		site = null,
 		siteColumn = true,
 		depth = 0,
+		parentName = null,
 		shadowed = false,
 		security = null,
 		alerts,
@@ -109,9 +117,11 @@
 	const kind = $derived(kindLabel ?? target.kind);
 	const tag = $derived(kindTag(target, kind));
 	const grid = $derived(gridFor(siteColumn));
+	/** Right under its parent, the parent's name is not repeated. */
+	const shownName = $derived(depth > 0 ? ownName(target.name, parentName) : target.name);
 </script>
 
-<div class={`relative transition-colors hover:bg-surface-2 ${shadowed ? 'opacity-60' : ''}`}>
+<div class={`relative transition-colors hover:bg-surface-2/60 ${shadowed ? 'opacity-60' : ''}`}>
 	<div class={`${grid} ${ROW_HEIGHT}`}>
 		<span class="flex items-center justify-center">
 			<StatusMark glyph={STATE_GLYPH[state]} tone={STATE_TONE[state]} label={STATE_LABEL[state]} title={target.last_error ?? STATE_LABEL[state]} />
@@ -124,7 +134,8 @@
 					href={withBase(`/targets/${target.id}`)}
 					class="min-w-0 truncate text-sm font-semibold leading-5 text-ink after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-signal"
 					aria-label={`${target.name}, ${STATE_LABEL[state]}`}
-				>{target.name}</a>
+					title={shownName !== target.name ? target.name : undefined}
+				>{shownName}</a>
 				<!-- 40 px hit areas, pulled into the 20 px line so the row keeps its height. -->
 				<AlertBell quiet targetId={target.id} counts={alerts} class="-my-2.5" />
 				{#if childCount > 0 && ontoggle}
@@ -138,21 +149,25 @@
 						onpointerdown={(e) => e.stopPropagation()}
 						onkeydown={(e) => e.stopPropagation()}
 					>
+						<!-- Bare, as the bell beside it: the chevron of the group headers and the count; a hairline only on hover. -->
 						<span
-							class={`tnum inline-flex h-6 items-center gap-0.5 rounded-[var(--radius-plate)] border px-1 text-[0.75rem] font-semibold leading-none transition-colors group-hover:border-line-strong ${hiddenTrouble ? 'border-warning/35 bg-warning-soft text-warning-ink' : 'border-line text-ink-3'}`}
+							class={`tnum inline-flex h-6 items-center gap-0.5 rounded-[var(--radius-plate)] border border-transparent pr-1.5 pl-0.5 text-[0.75rem] font-semibold leading-none transition-colors group-hover:border-line-strong ${hiddenTrouble ? 'text-warning-ink' : 'text-ink-3 group-hover:text-ink-2'}`}
 						>
-							<ChevronRight class={`size-3.5 shrink-0 transition-transform motion-reduce:transition-none ${open ? 'rotate-90' : ''}`} aria-hidden="true" />
+							<ChevronRight class={`size-4 shrink-0 transition-transform duration-200 motion-reduce:transition-none ${open ? 'rotate-90' : ''}`} aria-hidden="true" />
 							{#if hiddenTrouble}<AlertTriangle class="size-3 shrink-0" aria-hidden="true" />{/if}
 							<span aria-hidden="true">{childCount}</span>
 						</span>
 					</button>
 				{/if}
 			</span>
-			<!-- The address first (it gives way first when the line is short), then the kind as a quiet tag. -->
-			<span class="flex h-5 min-w-0 items-center gap-1.5 text-[0.8125rem] leading-5 text-ink-2">
+			<!-- The quiet line of an Alerts row: the address first (it gives way first when the line is short), a dot, then the kind. -->
+			<span class="mt-0.5 flex h-5 min-w-0 items-center gap-1.5 text-[0.8125rem] leading-5 text-ink-2">
 				{#if site}<SiteBadge code={site.code} name={site.name} class={siteColumn ? '@xl:hidden' : ''} />{/if}
-				{#if address}<span class="min-w-0 truncate" title={address}>{address}</span>{/if}
-				<Tag title={kind}>{tag}</Tag>
+				{#if address}
+					<span class="min-w-0 truncate" title={address}>{address}</span>
+					<span class="shrink-0 text-ink-3" aria-hidden="true">·</span>
+				{/if}
+				<span class="max-w-40 shrink-0 truncate text-ink-3" title={kind}>{tag}</span>
 			</span>
 		</span>
 

@@ -1808,6 +1808,7 @@
 	"devices_folder_delete": "Eliminar carpeta",
 	"devices_folder_delete_confirm": "¿Eliminar definitivamente?",
 	"devices_folder_empty": "Vacía",
+	"devices_folder_trouble": "Requieren atención: {count}",
 	"devices_folder_rename": "Renombrar carpeta",
 	"devices_folder_rename_aria": "Renombrar la carpeta «{name}»",
 	"devices_folder_renaming": "Renombrando carpeta",

@@ -1808,6 +1808,7 @@
 	"devices_folder_delete": "Ordner löschen",
 	"devices_folder_delete_confirm": "Endgültig löschen?",
 	"devices_folder_empty": "Leer",
+	"devices_folder_trouble": "Brauchen Aufmerksamkeit: {count}",
 	"devices_folder_rename": "Ordner umbenennen",
 	"devices_folder_rename_aria": "Ordner „{name}“ umbenennen",
 	"devices_folder_renaming": "Ordner wird umbenannt",

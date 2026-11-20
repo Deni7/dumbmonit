@@ -1808,6 +1808,7 @@
 	"devices_folder_delete": "Supprimer le dossier",
 	"devices_folder_delete_confirm": "Supprimer définitivement ?",
 	"devices_folder_empty": "Vide",
+	"devices_folder_trouble": "À surveiller : {count}",
 	"devices_folder_rename": "Renommer le dossier",
 	"devices_folder_rename_aria": "Renommer le dossier « {name} »",
 	"devices_folder_renaming": "Renommage du dossier",

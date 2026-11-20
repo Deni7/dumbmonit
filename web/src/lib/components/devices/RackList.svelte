@@ -23,7 +23,7 @@
 	import type { Serie } from '#lib/components/Chart.svelte';
 	import type { TargetAlertCounts } from '#lib/alerts-attention.js';
 	import CompactRow from './CompactRow.svelte';
-	import { HEADER_HEIGHT, SHOW, gridFor } from './columns';
+	import { ROW_INTRINSIC } from './columns';
 	import type { RiverCell } from '#lib/components/enterprise/fleet.js';
 	import RackTile from './RackTile.svelte';
 	import type { RackRow } from './rack';
@@ -71,7 +71,7 @@
 		reorder?: ReorderControls | null;
 		/** One dense line each (default) or tiles in a grid. */
 		layout?: RackView;
-		/** id → name, so a tile can say which unit it sits behind. */
+		/** id → name, so a tile can say which unit it sits behind, and a sub-monitor drop its parent's name. */
 		names?: Map<TargetId, string>;
 		/** id → security grade, only for rated devices while the score is on. */
 		security?: Map<TargetId, { grade: SecurityGrade | null; score: number | null }>;
@@ -86,8 +86,6 @@
 	}
 
 	let { rows, sparklines, kindLabels, sites = new Map(), showSite = true, reorder = null, layout = 'compact', names = new Map(), security = new Map(), alertCounts = new Map(), selection = null, river = new Map(), ontoggle = null }: Props = $props();
-
-	const grid = $derived(gridFor(showSite));
 
 	const LIST_CLASS: Record<RackView, string> = {
 		compact: 'flex flex-col divide-y divide-line',
@@ -111,6 +109,7 @@
 					site={showSite && row.target.location_id != null ? (sites.get(row.target.location_id) ?? null) : null}
 					siteColumn={showSite}
 					depth={row.depth}
+					parentName={row.target.parent_id !== null ? (names.get(row.target.parent_id) ?? null) : null}
 					shadowed={row.shadowed}
 					security={security.get(row.target.id) ?? null}
 					alerts={alertCounts.get(row.target.id)}
@@ -141,7 +140,7 @@
 			cost more than building them.
 		-->
 		<li
-			class={`relative flex min-w-0 items-stretch gap-1.5 first:rounded-t-[inherit] last:rounded-b-[inherit] ${layout === 'compact' ? 'overflow-hidden [content-visibility:auto] [contain-intrinsic-block-size:auto_3.5rem]' : ''}`}
+			class={`relative flex min-w-0 items-stretch gap-1.5 first:rounded-t-[inherit] last:rounded-b-[inherit] ${layout === 'compact' ? `overflow-hidden [content-visibility:auto] ${ROW_INTRINSIC}` : ''}`}
 			{@attach (node) => {
 				reorder?.registerRow(id, node);
 				return () => reorder?.registerRow(id, null);
@@ -202,21 +201,11 @@
 {/snippet}
 
 {#if layout === 'compact'}
-	<!-- The table: one header line over the rows, both on the grid of `columns.ts`. -->
+	<!--
+		One card of rows, no header line in it: the column names are drawn once
+		over the whole list by the page (`ColumnHeader`), on the same grid.
+	-->
 	<div class="@container overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-lift">
-		<div class="flex items-center gap-1.5 border-b border-line bg-surface-2 text-[0.75rem] font-medium text-ink-3" aria-hidden="true">
-			{#if selection}<span class="w-9 shrink-0"></span>{/if}
-			<div class="min-w-0 flex-1">
-				<div class={`${grid} ${HEADER_HEIGHT}`}>
-					<span></span>
-					<span class="truncate">{m.devices_cols_name()}</span>
-					{#if showSite}<span class={`${SHOW.site} justify-center truncate`}>{m.devices_cols_site()}</span>{/if}
-					<span class={`${SHOW.river} truncate`}>{m.devices_cols_last24h()}</span>
-					<span class={`${SHOW.security} justify-center truncate`}>{m.devices_cols_security()}</span>
-					<span class="truncate text-right">{m.devices_cols_checked()}</span>
-				</div>
-			</div>
-		</div>
 		{@render list()}
 	</div>
 {:else}

@@ -1776,6 +1776,7 @@
 	"devices_folder_delete": "删除文件夹",
 	"devices_folder_delete_confirm": "确定永久删除？",
 	"devices_folder_empty": "空",
+	"devices_folder_trouble": "需要关注：{count}",
 	"devices_folder_rename": "重命名文件夹",
 	"devices_folder_rename_aria": "重命名文件夹“{name}”",
 	"devices_folder_renaming": "正在重命名文件夹",

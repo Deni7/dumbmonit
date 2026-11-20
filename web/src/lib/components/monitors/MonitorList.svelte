@@ -5,9 +5,14 @@
 	/**
 	 * Monitors › List — the first tab of /targets (the other tabs are the map, the logs and security).
 	 *
-	 * One sober toolbar (search, Filter, List/Tiles, New folder, Select, Add);
-	 * the filters, the sort and the tags fold behind "Filter". Children are
-	 * folded inside their parent (`nesting.ts`), in folders.
+	 * One sober toolbar, at the size and in the manner of the Alerts list:
+	 * search and Filter on the left; the Compact/Tiles switch, a quiet
+	 * "Create folder" (a small popover with the name field) and "Select" on
+	 * the right. "Add a monitor", the one primary, sits in the page header
+	 * (`routes/targets`). The filters, the sort and the tags fold behind
+	 * "Filter". Children are folded inside their parent (`nesting.ts`), in
+	 * folders drawn as the groups of the Alerts list; the column names are
+	 * written once, over the whole list (`ColumnHeader`).
 	 * Targets and probe states come from the shared store (polled app-wide by
 	 * the root layout, see `alertsStore`); this page only adds the sparklines,
 	 * from one batched query refreshed every 30 s.
@@ -36,6 +41,7 @@
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import ReviewNotice from '#lib/components/device-form/ReviewNotice.svelte';
 	import { Button, ClickSpark, Confirm, EmptyState, ErrorNotice, Menu, SelectionBar, Skeleton, Toast } from '#lib/ui/index.js';
+	import ColumnHeader from '#lib/components/devices/ColumnHeader.svelte';
 	import TagFilter from './TagFilter.svelte';
 	import RackList from '#lib/components/devices/RackList.svelte';
 	import type { ReorderControls, RowSelection } from '#lib/components/devices/RackList.svelte';
@@ -86,7 +92,6 @@
 		FolderInput,
 		FolderPlus,
 		ListChecks,
-		Plus,
 		Power,
 		PowerOff,
 		Search,
@@ -332,6 +337,8 @@
 	);
 	/** Rows that match the filters, without the parents shown as context. */
 	const matchCount = (rows: RackRow[]) => rows.reduce((n, row) => n + (row.context ? 0 : 1), 0);
+	/** Monitors of a folder needing attention, said on its header only while it is folded away. */
+	const troubleCount = (rows: RackRow[]) => rows.reduce((n, row) => n + (!row.context && needsAttention(row.state) ? 1 : 0), 0);
 	const disabledCount = $derived(matchCount(disabledRows));
 	let disabledOpen = $state(false);
 	/** The "Disabled" segment is about nothing else: no point folding it. */
@@ -383,13 +390,8 @@
 		sortDir = 'asc';
 	}
 
-	// "New folder" and "Select" are quiet buttons beside the view switch.
-	let folderFormOpen = $state(false);
-	function toggleFolderForm() {
-		folderFormOpen = !folderFormOpen;
-		newFolderDraft = '';
-		if (folderFormOpen) queueMicrotask(() => newFolderInput?.focus());
-	}
+	// "Create folder" and "Select" are quiet buttons beside the view switch;
+	// the folder's name is typed in a small popover under the first.
 
 	// Sites (locations of the world map): a badge on each monitor and a filter.
 	let siteLocations = $state<MapLocation[]>([]);
@@ -434,10 +436,8 @@
 		collapsedFolders = next;
 	}
 
-	// "Create folder" in the "More" menu: an in-app inline name field, never
-	// `window.prompt`.
+	// "Create folder": an in-app name field in a popover, never `window.prompt`.
 	let newFolderDraft = $state('');
-	let newFolderInput = $state<HTMLInputElement | null>(null);
 
 	/** Builds the payload a save needs to echo every field the server does not keep by itself. */
 	function targetToPayload(target: Target, patch: Partial<TargetPayload> = {}): TargetPayload {
@@ -572,7 +572,7 @@
 		if (rows.length > 0) void bulkSetGroup(rows, '');
 	}
 
-	/** "Create folder" in the "More" menu: an empty folder with nowhere to drop a
+	/** "Create folder": an empty folder with nowhere to drop a
 	 *  device yet, until the user drags one in (there is no server-side
 	 *  folder entity to create — see `pendingEmptyFolders` above). */
 	function createFolder(name: string) {
@@ -1165,117 +1165,105 @@
 
 <ReviewNotice />
 
-{#if auth.isAdmin && (firstLoad || pageError)}
-	<!-- Loading or failed: the toolbar is not there yet, the add button still is. The empty state carries its own. -->
-	<div class="mb-4 flex justify-end">
-		<Button variant="primary" href="/targets/new">
-			<Plus class="size-4" aria-hidden="true" />
-			{m.devices_targets_add()}
-		</Button>
-	</div>
-{/if}
-
 {#if !firstLoad && !pageError && targets.length > 0}
-	<!-- Phones: the toolbar stays put while the list scrolls under it. -->
-	<div class="mb-4 flex flex-wrap items-center gap-2 max-sm:sticky max-sm:top-[calc(var(--safe-top)_+_var(--tabs-h,0px))] max-sm:z-10 max-sm:-mx-4 max-sm:mb-2 max-sm:border-b max-sm:border-line max-sm:bg-canvas max-sm:px-4 max-sm:py-2">
-		<label class="relative order-1 min-w-0 flex-1 sm:max-w-sm">
+	<!--
+		The toolbar of the Alerts list, at its size: 32 px controls from `sm`
+		(40 px on phones), quiet ghost buttons, one switch. Phones: the search
+		on its own line, the controls under it, and the bar stays put while the
+		list scrolls under it.
+	-->
+	<div class="mb-4 flex flex-wrap items-center gap-x-2 gap-y-2 max-sm:sticky max-sm:top-[calc(var(--safe-top)_+_var(--tabs-h,0px))] max-sm:z-10 max-sm:-mx-4 max-sm:mb-2 max-sm:border-b max-sm:border-line max-sm:bg-canvas max-sm:px-4 max-sm:py-2">
+		<label class="relative min-w-0 basis-full sm:max-w-xs sm:flex-1 sm:basis-auto">
 			<span class="sr-only">{m.devices_targets_search_label()}</span>
-			<Search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3" aria-hidden="true" />
+			<Search class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-ink-3" aria-hidden="true" />
 			<input
 				type="search"
-				class="input !pl-9"
+				class="input !pl-8 sm:!min-h-8 sm:!py-1"
 				placeholder={m.devices_targets_search_placeholder()}
 				bind:value={search}
 				autocomplete="off"
 			/>
 		</label>
-
-		<div class="order-3 flex w-full min-w-0 items-center gap-2 sm:order-2 sm:w-auto sm:flex-1">
-			<Button
-				variant="secondary"
-				data-filter-toggle
-				aria-expanded={filtersOpen}
-				aria-controls="monitors-filters"
-				aria-label={activeFilters > 0 ? m.devices_targets_filter_aria({ count: activeFilters }) : undefined}
-				class={filtersOpen ? '!border-ink-3 bg-surface-2' : ''}
-				onclick={() => (filtersOpen = !filtersOpen)}
-			>
-				<SlidersHorizontal class="size-4" aria-hidden="true" />
-				{m.devices_targets_filter()}
-				{#if activeFilters > 0}
-					<span class="tnum -mr-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-ink px-1.5 text-[0.6875rem] text-surface">{activeFilters}</span>
-				{/if}
-			</Button>
+		<Button
+			size="sm"
+			variant="ghost"
+			data-filter-toggle
+			aria-expanded={filtersOpen}
+			aria-controls="monitors-filters"
+			aria-label={activeFilters > 0 ? m.devices_targets_filter_aria({ count: activeFilters }) : undefined}
+			class={filtersOpen ? 'bg-surface-2 text-ink' : ''}
+			onclick={() => (filtersOpen = !filtersOpen)}
+		>
+			<SlidersHorizontal class="size-4" aria-hidden="true" />
+			{m.devices_targets_filter()}
+			{#if activeFilters > 0}
+				<span class="tnum -mr-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-ink px-1 text-[0.6875rem] leading-none text-surface">{activeFilters}</span>
+			{/if}
+		</Button>
+		<span class="flex-1" aria-hidden="true"></span>
+		<div class="flex items-center gap-2">
 			<ViewSwitcher value={view} onchange={setView} />
-			<span class="flex-1" aria-hidden="true"></span>
 			{#if auth.isAdmin}
+				<Menu label={m.devices_targets_create_folder()} align="right">
+					{#snippet trigger({ toggle, open })}
+						<Button
+							size="sm"
+							variant="ghost"
+							aria-haspopup="menu"
+							aria-expanded={open}
+							aria-label={m.devices_targets_create_folder()}
+							title={m.devices_targets_create_folder()}
+							class={`!w-10 !px-0 sm:!w-8 ${open ? 'bg-surface-2 text-ink' : ''}`}
+							onclick={() => {
+								newFolderDraft = '';
+								toggle();
+							}}
+						>
+							<FolderPlus class="size-4" aria-hidden="true" />
+						</Button>
+					{/snippet}
+					{#snippet children({ close })}
+						<form
+							class="flex w-72 max-w-full items-center gap-1 p-0.5"
+							onsubmit={(e) => {
+								e.preventDefault();
+								if (!newFolderDraft.trim()) return;
+								createFolder(newFolderDraft);
+								newFolderDraft = '';
+								close();
+							}}
+						>
+							<input
+								bind:value={newFolderDraft}
+								class="input !h-10 min-w-0 flex-1 text-[0.8125rem]"
+								placeholder={m.devices_targets_folder_placeholder()}
+								maxlength="80"
+								aria-label={m.devices_targets_folder_aria()}
+								autocomplete="off"
+								{@attach (node) => {
+									const timer = setTimeout(() => node.focus(), 0);
+									return () => clearTimeout(timer);
+								}}
+							/>
+							<Button type="submit" size="sm" variant="secondary" disabled={!newFolderDraft.trim()}>{m.devices_targets_folder_create()}</Button>
+						</form>
+					{/snippet}
+				</Menu>
 				<Button
-					variant="ghost"
-					aria-pressed={folderFormOpen}
-					aria-expanded={folderFormOpen}
-					aria-controls="monitors-new-folder"
-					aria-label={m.devices_targets_create_folder()}
-					title={m.devices_targets_create_folder()}
-					class={`max-sm:!w-10 max-sm:!px-0 ${folderFormOpen ? 'bg-surface-2 text-ink' : 'text-ink-2'}`}
-					onclick={toggleFolderForm}
-				>
-					<FolderPlus class="size-4" aria-hidden="true" />
-					<span class="max-lg:sr-only">{m.devices_targets_create_folder()}</span>
-				</Button>
-				<Button
+					size="sm"
 					variant="ghost"
 					aria-pressed={selecting}
 					aria-label={m.devices_list_select()}
 					title={m.devices_list_select()}
-					class={`max-sm:!w-10 max-sm:!px-0 ${selecting ? 'bg-surface-2 text-ink' : 'text-ink-2'}`}
+					class={`max-sm:!w-10 max-sm:!px-0 ${selecting ? 'bg-surface-2 text-ink' : ''}`}
 					onclick={() => (selecting ? stopSelecting() : (selecting = true))}
 				>
 					<ListChecks class="size-4" aria-hidden="true" />
-					<span class="max-lg:sr-only">{m.devices_list_select()}</span>
+					<span class="max-sm:sr-only">{m.devices_list_select()}</span>
 				</Button>
 			{/if}
 		</div>
-
-		{#if auth.isAdmin}
-			<ClickSpark class="order-2 sm:order-3">
-				<Button variant="primary" href="/targets/new" class="max-sm:w-10 max-sm:!px-0" aria-label={m.devices_targets_add()}>
-					<Plus class="size-4" aria-hidden="true" />
-					<span class="max-sm:sr-only">{m.devices_targets_add()}</span>
-				</Button>
-			</ClickSpark>
-		{/if}
 	</div>
-
-	{#if folderFormOpen && auth.isAdmin}
-		<form
-			id="monitors-new-folder"
-			class="mb-4 flex max-w-md items-center gap-2"
-			onsubmit={(e) => {
-				e.preventDefault();
-				if (!newFolderDraft.trim()) return;
-				createFolder(newFolderDraft);
-				newFolderDraft = '';
-				folderFormOpen = false;
-			}}
-		>
-			<input
-				bind:this={newFolderInput}
-				bind:value={newFolderDraft}
-				class="input min-w-0 flex-1"
-				placeholder={m.devices_targets_folder_placeholder()}
-				maxlength="80"
-				aria-label={m.devices_targets_folder_aria()}
-				autocomplete="off"
-				onkeydown={(e) => {
-					if (e.key === 'Escape') {
-						e.preventDefault();
-						folderFormOpen = false;
-					}
-				}}
-			/>
-			<Button type="submit" variant="secondary" disabled={!newFolderDraft.trim()}>{m.devices_targets_folder_create()}</Button>
-		</form>
-	{/if}
 
 	{#if filtersOpen}
 		<section
@@ -1556,16 +1544,21 @@
 			</ErrorNotice>
 		</div>
 	{/if}
+	{#if view === 'compact'}
+		<!-- The column names, once over every folder, on the grid of the rows. -->
+		<ColumnHeader {showSite} selecting={selection !== null} class="-mb-1" />
+	{/if}
 	<!-- Folders apart, each header close over its own rows (as the groups of the Alerts list). -->
 	<div class="flex flex-col gap-5">
 		{#each shownSections as section (section.key)}
 			{@const collapsed = collapsedFolders.has(section.key)}
-			<div class={`flex flex-col ${view === 'compact' ? 'gap-1' : 'gap-2'}`}>
+			<div class={`flex flex-col ${view === 'compact' ? 'gap-1.5' : 'gap-2'}`}>
 				{#if showFolderHeaders}
 					<FolderHeader
 						label={section.label}
 						folderKey={section.key}
 						count={matchCount(section.rows)}
+						trouble={troubleCount(section.rows)}
 						worst={worstState(section.rows)}
 						{collapsed}
 						ontoggle={() => toggleFolder(section.key)}
@@ -1598,17 +1591,22 @@
 			</div>
 		{/each}
 		{#if disabledRows.length > 0}
-			<section class="flex flex-col gap-1" aria-label={m.devices_list_disabled_section({ count: disabledCount })}>
+			<!-- A quiet group, as the folded ones of the Alerts list: same header, ink-2. -->
+			<section class={`flex flex-col ${view === 'compact' ? 'gap-1.5' : 'gap-2'}`} aria-label={m.devices_list_disabled_section({ count: disabledCount })}>
 				{#if segment === 'disabled'}
-					<h2 class="flex min-h-10 items-center px-1 text-[0.9375rem] font-semibold text-ink-2">{m.devices_list_disabled_section({ count: disabledCount })}</h2>
+					<h2 class="flex min-h-10 items-center gap-2 text-[0.9375rem] font-semibold text-ink-2">
+						<PowerOff class="size-4 shrink-0 text-ink-3" aria-hidden="true" />
+						{m.devices_list_disabled_section({ count: disabledCount })}
+					</h2>
 				{:else}
 					<button
 						type="button"
-						class="flex min-h-10 items-center gap-2 self-start rounded-lg px-1 text-[0.9375rem] font-semibold text-ink-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-signal"
+						class="-ml-2 flex min-h-10 items-center gap-2 self-start rounded-md px-2 text-[0.9375rem] font-semibold text-ink-2 hover:bg-surface-2/60 hover:text-ink focus-visible:outline-2 focus-visible:outline-signal"
 						aria-expanded={disabledOpen}
 						onclick={() => (disabledOpen = !disabledOpen)}
 					>
-						<ChevronRight class={`size-4 shrink-0 text-ink-3 transition-transform motion-reduce:transition-none ${disabledOpen ? 'rotate-90' : ''}`} aria-hidden="true" />
+						<ChevronRight class={`size-4 shrink-0 text-ink-3 transition-transform duration-200 motion-reduce:transition-none ${disabledOpen ? 'rotate-90' : ''}`} aria-hidden="true" />
+						<PowerOff class="size-4 shrink-0 text-ink-3" aria-hidden="true" />
 						{m.devices_list_disabled_section({ count: disabledCount })}
 					</button>
 				{/if}

@@ -1830,6 +1830,7 @@
 	"devices_folder_delete": "Удалить папку",
 	"devices_folder_delete_confirm": "Удалить навсегда?",
 	"devices_folder_empty": "Пусто",
+	"devices_folder_trouble": "Требуют внимания: {count}",
 	"devices_folder_rename": "Переименовать папку",
 	"devices_folder_rename_aria": "Переименовать папку «{name}»",
 	"devices_folder_renaming": "Переименование папки",

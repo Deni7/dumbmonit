@@ -1,10 +1,13 @@
 <script lang="ts">
 	import { m } from '#lib/paraglide/messages.js';
 	/**
-	 * Header of one folder section on /targets: a plain line, no panel — the
-	 * collapse toggle, the name, the device count and, only when something in
-	 * the folder is not reporting, its worst state (so trouble stays visible
-	 * even collapsed). While a device is being dragged it becomes a drop
+	 * Header of one folder section on /targets, drawn as the group headers of
+	 * the Alerts list: a plain line, no panel — the chevron, a folder icon,
+	 * the name and the count, in the same type and spacing. No state plate:
+	 * the rows already mark their own trouble. Only while the folder is
+	 * folded away does a quiet warning sign and the number of monitors
+	 * needing attention stay after the count, so trouble never hides behind
+	 * a closed folder. While a device is being dragged it becomes a drop
 	 * target that moves it here.
 	 *
 	 * Folder actions are entirely in-app: double-click (or the "⋯" menu)
@@ -12,15 +15,17 @@
 	 * `Confirm` used elsewhere — no browser prompt or confirm dialog.
 	 */
 	import type { TargetState } from '#lib/format.js';
-	import { STATE_LABEL, STATE_TONE } from '#lib/format.js';
-	import { Confirm, Menu, Plate } from '#lib/ui/index.js';
-	import { ChevronDown, EllipsisVertical } from 'lucide-svelte';
+	import { STATE_TONE } from '#lib/format.js';
+	import { Confirm, Menu } from '#lib/ui/index.js';
+	import { AlertTriangle, ChevronRight, EllipsisVertical, Folder } from 'lucide-svelte';
 
 	interface Props {
 		label: string;
 		/** Empty: the "no folder" section — it has no rename/delete, only a drop zone. */
 		folderKey: string;
 		count: number;
+		/** Monitors of the folder needing attention (down, unreachable, misconfigured). */
+		trouble?: number;
 		worst: TargetState;
 		collapsed: boolean;
 		ontoggle: () => void;
@@ -41,6 +46,7 @@
 		label,
 		folderKey,
 		count,
+		trouble = 0,
 		worst,
 		collapsed,
 		ontoggle,
@@ -87,31 +93,49 @@
 	// list — which otherwise paints (and catches pointer events) above it,
 	// being later in the document. Lift the header while it is open.
 	let actionsOpen = $state(false);
-	/** All reporting: nothing to say beyond the count. */
-	const quiet = $derived(count > 0 && STATE_TONE[worst] === 'signal');
+
+	const TROUBLE_INK: Record<string, string> = {
+		warning: 'text-warning-ink',
+		advisory: 'text-advisory-ink'
+	};
+	/** Folded away with trouble inside: the only time the header says more than the count. */
+	const hiddenTrouble = $derived(collapsed && trouble > 0);
+	const troubleLabel = $derived(m.devices_folder_trouble({ count: trouble }));
 </script>
 
+<!-- The drop cue is an outline, so the header never shifts by a border when a drag starts. -->
 <div
 	bind:this={el}
-	class={`relative flex items-center gap-2 rounded-lg border pr-1 pl-1 transition-colors ${dropHover ? 'border-signal bg-signal-soft' : dropActive ? 'border-dashed border-line-strong' : 'border-transparent'}`}
+	class={`relative flex items-center gap-2 rounded-lg transition-colors ${dropHover ? 'bg-signal-soft outline-1 outline-signal' : dropActive ? 'outline-1 outline-dashed outline-line-strong' : ''}`}
 	style={actionsOpen ? 'z-index: 40;' : undefined}
 >
 	<button
 		type="button"
-		class="flex min-h-10 min-w-0 flex-1 items-center gap-2 text-left"
+		class="-ml-2 flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-left hover:bg-surface-2/60"
 		onclick={ontoggle}
 		ondblclick={() => {
 			if (canManage) startRename();
 		}}
 		aria-expanded={!collapsed}
 	>
-		<ChevronDown class={`size-4 shrink-0 text-ink-3 transition-transform duration-200 motion-reduce:transition-none ${collapsed ? '-rotate-90' : ''}`} aria-hidden="true" />
+		<ChevronRight class={`size-4 shrink-0 text-ink-3 transition-transform duration-200 motion-reduce:transition-none ${collapsed ? '' : 'rotate-90'}`} aria-hidden="true" />
+		<Folder class="size-4 shrink-0 text-ink-3" aria-hidden="true" />
 		{#if renaming}
 			<span class="sr-only">{m.devices_folder_renaming()}</span>
 		{:else}
-			<span class="min-w-0 text-[0.9375rem] font-semibold break-words text-ink" title={label}>{label}</span>
+			<span class="min-w-0 truncate text-[0.9375rem] font-semibold text-ink" title={label}>{label}</span>
 		{/if}
-		<span class="tnum text-[0.8125rem] text-ink-3">{count}</span>
+		<span class="tnum shrink-0 text-[0.8125rem] text-ink-3">{count}</span>
+		{#if hiddenTrouble}
+			<span class={`tnum inline-flex shrink-0 items-center gap-1 text-[0.8125rem] font-medium ${TROUBLE_INK[STATE_TONE[worst]] ?? 'text-warning-ink'}`} title={troubleLabel}>
+				<AlertTriangle class="size-3.5 shrink-0" aria-hidden="true" />
+				<span aria-hidden="true">{trouble}</span>
+				<span class="sr-only">{troubleLabel}</span>
+			</span>
+		{/if}
+		{#if count === 0}
+			<span class="shrink-0 text-[0.8125rem] text-ink-3">{m.devices_folder_empty()}</span>
+		{/if}
 	</button>
 
 	{#if renaming}
@@ -135,18 +159,12 @@
 		/>
 	{/if}
 
-	{#if count === 0}
-		<span class="text-[0.8125rem] text-ink-3">{m.devices_folder_empty()}</span>
-	{:else if !quiet}
-		<Plate tone={STATE_TONE[worst]} label={STATE_LABEL[worst]} size="sm" />
-	{/if}
-
 	{#if canManage && !renaming}
 		<Menu label={m.devices_folder_actions({ name: label })} align="right" bind:open={actionsOpen}>
 			{#snippet trigger({ toggle, open })}
 				<button
 					type="button"
-					class="inline-flex size-10 items-center justify-center rounded-lg text-ink-3 hover:bg-surface-2 hover:text-ink"
+					class="inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink sm:size-8"
 					onclick={toggle}
 					aria-haspopup="menu"
 					aria-expanded={open}

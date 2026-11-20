@@ -1808,6 +1808,7 @@
 	"devices_folder_delete": "Excluir pasta",
 	"devices_folder_delete_confirm": "Excluir definitivamente?",
 	"devices_folder_empty": "Vazia",
+	"devices_folder_trouble": "Requerem atenção: {count}",
 	"devices_folder_rename": "Renomear pasta",
 	"devices_folder_rename_aria": "Renomear a pasta «{name}»",
 	"devices_folder_renaming": "Renomeando a pasta",
