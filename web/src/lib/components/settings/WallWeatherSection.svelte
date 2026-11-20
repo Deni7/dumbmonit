@@ -119,21 +119,39 @@
 		<Skeleton class="h-8 w-full" rows={2} />
 	{:else}
 		<div class="grid gap-5">
-			<div class="grid gap-1" aria-live="polite">
-				<p class="m-0 text-sm text-ink">
-					{setting.place ? m.settings_wall_weather_current({ place: describe(setting.place) }) : m.settings_wall_weather_none()}
-				</p>
-				{#if setting.place && !setting.current}
-					<p class="m-0 text-[0.8125rem] text-ink-2">{m.settings_wall_weather_no_reading()}</p>
-				{/if}
-			</div>
+			{#if setting.place}
+				<!-- The chosen city, as a card: what the wall shows, at a glance. -->
+				<div class="grid gap-1.5" aria-live="polite">
+					<p class="m-0 text-sm font-semibold text-ink">{m.settings_wall_weather_selected_label()}</p>
+					<div class="flex min-h-14 items-center gap-3 rounded-[var(--radius-plate)] border border-signal bg-signal-soft px-3 py-2">
+						<MapPin class="size-5 shrink-0 text-ink-2" aria-hidden="true" />
+						<div class="grid min-w-0 flex-1">
+							<span class="truncate text-sm font-semibold text-ink">{setting.place.name}</span>
+							{#if setting.place.region || setting.place.country}
+								<span class="truncate text-[0.8125rem] text-ink-2">{[setting.place.region, setting.place.country].filter(Boolean).join(', ')}</span>
+							{/if}
+						</div>
+						{#if setting.current}
+							<span class="tnum shrink-0 text-lg font-semibold text-ink">{setting.current.temperature}°{setting.unit === 'f' ? 'F' : 'C'}</span>
+						{/if}
+						{#if auth.isAdmin}
+							<Button variant="secondary" class="shrink-0" loading={pending === 'remove'} disabled={saving} onclick={() => void save(null, setting?.unit ?? 'c', 'remove')}>{m.settings_wall_weather_remove()}</Button>
+						{/if}
+					</div>
+					{#if !setting.current}
+						<p class="m-0 text-[0.8125rem] text-ink-2">{m.settings_wall_weather_no_reading()}</p>
+					{/if}
+				</div>
+			{:else}
+				<p class="m-0 text-sm text-ink-2" aria-live="polite">{m.settings_wall_weather_none()}</p>
+			{/if}
 
 			{#if saveError}<ErrorNotice error={saveError} title={m.settings_wall_weather_save_error()} />{/if}
 
 			{#if auth.isAdmin}
 				<div class="grid gap-3">
 					<form onsubmit={search} novalidate>
-						<Field label={m.settings_wall_weather_search_label()} for="wall-weather-query" help={m.settings_wall_weather_search_help()}>
+						<Field label={setting.place ? m.settings_wall_weather_change_label() : m.settings_wall_weather_search_label()} for="wall-weather-query" help={m.settings_wall_weather_search_help()}>
 							<!-- The input and its button on one line, both 2.5rem high. -->
 							<div class="flex items-stretch gap-2">
 								<input
@@ -205,11 +223,6 @@
 					</div>
 				</div>
 
-				{#if setting.place}
-					<div>
-						<Button variant="secondary" loading={pending === 'remove'} disabled={saving} onclick={() => void save(null, setting?.unit ?? 'c', 'remove')}>{m.settings_wall_weather_remove()}</Button>
-					</div>
-				{/if}
 			{:else}
 				<p class="m-0 text-[0.8125rem] text-ink-3">{m.settings_wall_weather_admin_only()}</p>
 			{/if}
