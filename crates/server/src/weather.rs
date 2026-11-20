@@ -395,9 +395,9 @@ mod tests {
     fn la_recherche_garde_les_lieux_valides_et_dit_pourquoi_elle_echoue() {
         let body = br#"{"results":[
             {"name":"Lyon","latitude":45.75,"longitude":4.85,
-             "admin1":"Auvergne-Rhône-Alpes","country":"France"},
+             "admin1":"Auvergne-Rh\u00f4ne-Alpes","country":"France"},
             {"name":"Hors carte","latitude":400.0,"longitude":4.85},
-            {"name":"Sans région","latitude":10.0,"longitude":20.0,"admin1":"  ","country":""}],
+            {"name":"Sans r\u00e9gion","latitude":10.0,"longitude":20.0,"admin1":"  ","country":""}],
             "generationtime_ms":0.4}"#;
         let places = parse_search(body).unwrap();
         assert_eq!(places.len(), 2, "le lieu hors limites est écarté");
