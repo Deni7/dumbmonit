@@ -8906,6 +8906,7 @@
 	"wall_scene_world_title": "City behind the board",
 	"wall_status_empty": "Nothing to watch yet",
 	"wall_status_ok": "All good",
+	"wall_status_no_critical": "Nothing critical",
 	"wall_status_problem_one": "1 problem",
 	"wall_status_problems": "{count} problems",
 	"wall_status_waiting": "Waiting for reports",

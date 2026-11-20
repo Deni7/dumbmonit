@@ -8906,6 +8906,7 @@
 	"wall_scene_world_title": "Città dietro il pannello",
 	"wall_status_empty": "Ancora nulla da monitorare",
 	"wall_status_ok": "Tutto a posto",
+	"wall_status_no_critical": "Niente di critico",
 	"wall_status_problem_one": "1 problema",
 	"wall_status_problems": "{count} problemi",
 	"wall_status_waiting": "In attesa di report",

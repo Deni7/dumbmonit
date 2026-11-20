@@ -8906,6 +8906,7 @@
 	"wall_scene_world_title": "Stadt hinter der Tafel",
 	"wall_status_empty": "Noch nichts zu überwachen",
 	"wall_status_ok": "Alles in Ordnung",
+	"wall_status_no_critical": "Nichts Kritisches",
 	"wall_status_problem_one": "1 Problem",
 	"wall_status_problems": "{count} Probleme",
 	"wall_status_waiting": "Warten auf Meldungen",

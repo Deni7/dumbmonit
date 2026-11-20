@@ -42,7 +42,7 @@
 	import { parseMusicLink } from '#lib/wall/music.js';
 	import { cardVisible, displaySpeakerName, pickPlaying, progressAt } from '#lib/wall/spotify.js';
 	import { WallSpeaker } from '#lib/wall/speaker.svelte.js';
-	import { countAlertsByTarget, countsAsProblem, visibleOnWall } from '#lib/alerts-attention.js';
+	import { countAlertsByTarget, countsAsProblem, criticalCount, quietedOnWall, visibleOnWall } from '#lib/alerts-attention.js';
 	import { readSky } from '#lib/components/overview/sky.js';
 	import { fleetStore } from '#lib/components/enterprise/fleet.svelte.js';
 	import { mean } from '#lib/components/enterprise/fleet.js';
@@ -158,18 +158,22 @@
 	const targets = $derived(alertsStore.targets);
 	const probes = $derived(alertsStore.probes);
 	const firstLoad = $derived(alertsStore.loading && targets.length === 0);
-	// Building-up and acknowledged alerts stay off the wall: not listed, not counted, no mood.
+	// Building-up, acknowledged and info alerts stay off the wall: not listed, not counted, no mood.
 	const wallAlerts = $derived(visibleOnWall(alertsStore.alerts));
-	const sky = $derived(readSky({ targets, probes, alerts: wallAlerts, rules }));
+	// A monitor whose only alerts are building up or acknowledged is no problem either.
+	const quieted = $derived(quietedOnWall(alertsStore.alerts));
+	const sky = $derived(readSky({ targets: targets.filter((t) => !quieted.has(t.id)), probes, alerts: wallAlerts, rules }));
+	// The number at the top counts the red problems only; advisories are listed, not counted.
+	const critical = $derived(criticalCount(sky.needsYou));
 	const verdict = $derived.by(() => {
-		if (sky.counts.devices === 0) return { tone: 'ghost' as const, text: m.wall_status_empty() };
-		if (sky.attention > 0) {
-			const severe = sky.counts.warnings > 0 || sky.counts.unreachable > 0;
+		if (targets.length === 0) return { tone: 'ghost' as const, text: m.wall_status_empty() };
+		if (critical > 0) {
 			return {
-				tone: severe ? ('warning' as const) : ('advisory' as const),
-				text: sky.attention === 1 ? m.wall_status_problem_one() : m.wall_status_problems({ count: sky.attention })
+				tone: 'warning' as const,
+				text: critical === 1 ? m.wall_status_problem_one() : m.wall_status_problems({ count: critical })
 			};
 		}
+		if (sky.attention > 0) return { tone: 'advisory' as const, text: m.wall_status_no_critical() };
 		if (sky.counts.reporting === 0) return { tone: 'ghost' as const, text: m.wall_status_waiting() };
 		return { tone: 'signal' as const, text: m.wall_status_ok() };
 	});
@@ -198,7 +202,7 @@
 	const statuses = $derived(
 		targets.map((target) => ({
 			target,
-			status: consoleStatus(target, probes.get(target.id), alertCounts.get(target.id))
+			status: quieted.has(target.id) ? ('waiting' as const) : consoleStatus(target, probes.get(target.id), alertCounts.get(target.id))
 		}))
 	);
 	const total = $derived(statuses.filter((r) => r.status !== 'paused').length);
@@ -206,7 +210,7 @@
 	const down = $derived(statuses.filter((r) => r.status === 'down').length);
 	const paused = $derived(statuses.filter((r) => r.status === 'paused').length);
 	const firing = $derived(wallAlerts.filter(countsAsProblem));
-	const critical = $derived(firing.filter((a) => a.severity === 'critical').length);
+	const criticalAlerts = $derived(firing.filter((a) => a.severity === 'critical').length);
 	const availability = $derived(mean(fleetStore.figures.uptime30.values()));
 
 	const figures = $derived<BandFigure[]>([
@@ -231,8 +235,8 @@
 			label: m.console_kpi_alerts(),
 			value: String(firing.length),
 			unit: '',
-			note: m.console_kpi_alerts_note({ critical, warning: firing.length - critical }),
-			tone: critical > 0 ? 'text-warning-ink' : firing.length > 0 ? 'text-advisory-ink' : 'text-ink-2'
+			note: m.console_kpi_alerts_note({ critical: criticalAlerts, warning: firing.length - criticalAlerts }),
+			tone: criticalAlerts > 0 ? 'text-warning-ink' : firing.length > 0 ? 'text-advisory-ink' : 'text-ink-2'
 		}
 	]);
 
@@ -555,7 +559,7 @@
 						city={sceneCity}
 						{now}
 						{weather}
-						problems={firstLoad ? 0 : sky.attention}
+						problems={firstLoad ? 0 : critical}
 						{startle}
 						paused={sceneStill}
 						pulse={live.pulse}
@@ -588,7 +592,7 @@
 					{/key}
 					<div class="board-list mt-7 flex min-h-0 flex-1 flex-col gap-4 lg:mt-9" bind:clientHeight={leftRoom}>
 						<WallProblems {sky} {now} room={problemsRoom} bind:listed={problemListed} />
-						<WallDevices {targets} {probes} {sky} skip={problemListed} />
+						<WallDevices {targets} {probes} {sky} {quieted} skip={problemListed} />
 					</div>
 				{/if}
 			</div>

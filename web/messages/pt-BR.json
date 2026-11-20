@@ -8906,6 +8906,7 @@
 	"wall_scene_world_title": "Cidade atrás do painel",
 	"wall_status_empty": "Ainda nada para vigiar",
 	"wall_status_ok": "Tudo bem",
+	"wall_status_no_critical": "Nada crítico",
 	"wall_status_problem_one": "1 problema",
 	"wall_status_problems": "{count} problemas",
 	"wall_status_waiting": "Aguardando relatórios",
