@@ -57,7 +57,7 @@
 	<article class="flex flex-col gap-4">
 		<header class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
 			<div class="min-w-0 flex-1">
-				<h3 class="flex min-w-0 items-center gap-1.5 text-base font-semibold text-ink">
+				<h3 class="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-ink">
 					<span class="truncate" title={detail.url}>{pagePath(detail.url)}</span>
 					<a
 						href={withBase(detail.url)}
@@ -84,7 +84,7 @@
 
 		{#if sameEdit.length > 0}
 			<section class="rounded-lg border border-line bg-canvas-deep px-3 py-2">
-				<h4 class="text-[0.8125rem] font-semibold text-ink">
+				<h4 class="text-sm font-semibold text-ink">
 					{(sameEdit.length === 1 ? m.devicesb_webchange_pane_also_one : m.devicesb_webchange_pane_also_other)({ count: sameEdit.length })}
 				</h4>
 				<ul class="mt-1 flex flex-wrap gap-x-3 gap-y-1">

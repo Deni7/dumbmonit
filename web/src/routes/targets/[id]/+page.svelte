@@ -666,12 +666,12 @@
 	</div>
 {:else}
 	<!-- Header band: flat surface, identity on the left, one main action on the right. -->
-	<section class="rise-in overflow-x-clip rounded-[var(--radius-card)] border border-line bg-surface px-5 py-5 max-sm:px-4 max-sm:py-4 sm:px-6" aria-labelledby="device-name">
+	<section class="rise-in overflow-x-clip rounded-[var(--radius-card)] border border-line bg-surface px-4 py-4 shadow-lift sm:px-6 sm:py-5" aria-labelledby="device-name">
 		<div class="flex flex-col gap-5 max-sm:gap-3 lg:flex-row lg:items-start lg:justify-between">
 			<div class="flex min-w-0 gap-4">
 				<Led {tone} {blink} size="lg" class="mt-2.5" label={STATE_LABEL[stateNow]} />
 				<div class="min-w-0 flex-1">
-					<h1 id="device-name" class="display text-3xl break-words text-ink max-sm:text-2xl sm:text-4xl">{target.name}</h1>
+					<h1 id="device-name" class="display text-xl break-words text-ink sm:text-3xl">{target.name}</h1>
 					<!-- Quiet identity line: what it is, where it answers, how often, behind whom. -->
 					<div class="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-ink-2">
 						<span class="inline-flex items-center gap-1.5">

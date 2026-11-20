@@ -268,7 +268,7 @@
 						{/each}
 					</ul>
 					{#if view.unavailable.length >= 50}
-						<p class="mt-2 text-[0.8rem] text-ink-3">{m.devices_ha_first_50()}</p>
+						<p class="mt-2 text-[0.8125rem] text-ink-3">{m.devices_ha_first_50()}</p>
 					{/if}
 				</div>
 			{/if}
@@ -301,7 +301,7 @@
 						</div>
 					{/if}
 					{#if quietDomains.length > 0}
-						<p class="mt-2 text-[0.8rem] text-ink-3">
+						<p class="mt-2 text-[0.8125rem] text-ink-3">
 							{m.devices_ha_all_available({ list: quietDomains.map((d) => `${d.name} (${formatCount(d.total)})`).join(', ') })}
 						</p>
 					{/if}

@@ -331,7 +331,7 @@
 					</dl>
 
 					<div class="min-w-0">
-						<h4 class="mb-2 text-[0.8125rem] font-medium text-ink-2">{m.devices_switch_traffic()}</h4>
+						<h4 class="mb-2 text-sm font-semibold text-ink">{m.devices_switch_traffic()}</h4>
 						{#if traffic.length === 2}
 							<Chart series={traffic} unit="Mbit/s" height={180} pair />
 						{:else if trafficLoaded}

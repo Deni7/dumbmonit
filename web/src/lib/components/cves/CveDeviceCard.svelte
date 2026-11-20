@@ -47,7 +47,7 @@
 </script>
 
 {#if summary}
-	<section class="mt-6 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3" aria-labelledby="device-cve">
+	<section class="mt-6 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 shadow-lift sm:px-5" aria-labelledby="device-cve">
 		<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
 			<h2 id="device-cve" class="text-sm font-semibold text-ink">{m.security_cves_card_title()}</h2>
 			<p class="tnum m-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.8125rem] text-ink-2">
