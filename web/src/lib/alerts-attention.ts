@@ -20,13 +20,52 @@ export function countsAsProblem(alert: {
 
 /**
  * What the wall reads: a wall is read from across the room, so it leaves out
- * alerts still building up (not triggered yet) and acknowledged ones (someone
- * already knows). Neither is listed, nor counted in the verdict or the mood.
+ * alerts still building up (not triggered yet), acknowledged ones (someone
+ * already knows) and "info" ones (notices, not problems). None is listed, nor
+ * counted in the verdict, the figures or the mood.
  */
-export function visibleOnWall<T extends { effective_phase: string; acked: boolean }>(
+export function visibleOnWall<T extends { effective_phase: string; acked: boolean; severity?: string }>(
 	alerts: readonly T[]
 ): T[] {
-	return alerts.filter((alert) => alert.effective_phase !== 'pending' && !alert.acked);
+	return alerts.filter(
+		(alert) => alert.effective_phase !== 'pending' && !alert.acked && alert.severity !== 'info'
+	);
+}
+
+/**
+ * Monitors the wall must not call a problem: they have alerts that are building
+ * up or acknowledged, and not one alert the wall shows as firing. A monitor
+ * that is down on its own, with no alert at all, is still a problem.
+ */
+export function quietedOnWall(
+	alerts: readonly {
+		target_id: number | null;
+		effective_phase: string;
+		acked: boolean;
+		severity?: string;
+	}[]
+): Set<number> {
+	const quieted = new Set<number>();
+	const live = new Set<number>();
+	for (const alert of alerts) {
+		if (alert.target_id === null || alert.severity === 'info') continue;
+		if (alert.effective_phase === 'pending' || (alert.acked && alert.effective_phase === 'firing')) {
+			quieted.add(alert.target_id);
+		} else if (alert.effective_phase === 'firing') {
+			live.add(alert.target_id);
+		}
+	}
+	for (const id of live) quieted.delete(id);
+	return quieted;
+}
+
+/**
+ * The number at the top of the wall (headline and pigeons' sign): only the red
+ * problems, i.e. rows of rank 0 (a critical alert, a device that is down).
+ * Advisories stay listed but are not counted.
+ */
+export function criticalCount(rows: readonly { rank: number }[]): number {
+	return rows.filter((row) => row.rank === 0).length;
 }
 
 /** The wall's "N problems": warnings, advisories, unreachable and misconfigured devices; never info. */

@@ -22,8 +22,8 @@
 	 * the weather when Settings gives the wall a place.
 	 *
 	 * Music, once set up in Settings (Spotify connected, or a link sent to the
-	 * walls), sits in a small dock at the foot of the right-hand column, away
-	 * from the problems: what plays on the account wherever it plays, with
+	 * walls), sits in a small dock in the bottom band, right of the figures, clear
+	 * of the scene and its pigeons: what plays on the account wherever it plays, with
 	 * play / pause when this session may, or the shared link's own player. The
 	 * display can also be a Spotify Connect speaker ("DumbMonit Wall", the name
 	 * chosen in Settings, or `?speaker=Living room` for this display alone):
@@ -42,7 +42,7 @@
 	import { parseMusicLink } from '#lib/wall/music.js';
 	import { cardVisible, displaySpeakerName, pickPlaying, progressAt } from '#lib/wall/spotify.js';
 	import { WallSpeaker } from '#lib/wall/speaker.svelte.js';
-	import { countAlertsByTarget, countsAsProblem, visibleOnWall } from '#lib/alerts-attention.js';
+	import { countAlertsByTarget, countsAsProblem, criticalCount, quietedOnWall, visibleOnWall } from '#lib/alerts-attention.js';
 	import { readSky } from '#lib/components/overview/sky.js';
 	import { fleetStore } from '#lib/components/enterprise/fleet.svelte.js';
 	import { mean } from '#lib/components/enterprise/fleet.js';
@@ -58,7 +58,7 @@
 	import { Button, Skeleton, calmMotion } from '#lib/ui/index.js';
 	import WallBand, { type BandFigure } from '#lib/components/wall/WallBand.svelte';
 	import WallOutdoor from '#lib/components/wall/WallOutdoor.svelte';
-	import { OUTDOOR_REFRESH_MS } from '#lib/components/wall/outdoor.js';
+	import { OUTDOOR_REFRESH_MS, OUTDOOR_RETRY_MS } from '#lib/components/wall/outdoor.js';
 	import WallDevices from '#lib/components/wall/WallDevices.svelte';
 	import WallProblems from '#lib/components/wall/WallProblems.svelte';
 	import WallSceneControl from '#lib/components/wall/WallSceneControl.svelte';
@@ -90,7 +90,8 @@
 
 	// The weather outside, beside the date. The server asks Open-Meteo (browsers
 	// never do) and keeps the reading ten minutes; a failure, or no place chosen
-	// in Settings, leaves the wall without it, silently.
+	// in Settings, leaves the wall without it, silently, and the wall asks again
+	// after a minute rather than ten, so a city just chosen shows up quickly.
 	let outdoor = $state<OutdoorWeather | null>(null);
 	$effect(() => {
 		const controller = new AbortController();
@@ -107,7 +108,7 @@
 					if (cause instanceof ApiError && cause.missing) stopped = true;
 				}
 			}
-			if (!stopped && !controller.signal.aborted) timer = setTimeout(poll, OUTDOOR_REFRESH_MS);
+			if (!stopped && !controller.signal.aborted) timer = setTimeout(poll, outdoor?.current ? OUTDOOR_REFRESH_MS : OUTDOOR_RETRY_MS);
 		};
 		untrack(() => void poll());
 		return () => {
@@ -157,18 +158,22 @@
 	const targets = $derived(alertsStore.targets);
 	const probes = $derived(alertsStore.probes);
 	const firstLoad = $derived(alertsStore.loading && targets.length === 0);
-	// Building-up and acknowledged alerts stay off the wall: not listed, not counted, no mood.
+	// Building-up, acknowledged and info alerts stay off the wall: not listed, not counted, no mood.
 	const wallAlerts = $derived(visibleOnWall(alertsStore.alerts));
-	const sky = $derived(readSky({ targets, probes, alerts: wallAlerts, rules }));
+	// A monitor whose only alerts are building up or acknowledged is no problem either.
+	const quieted = $derived(quietedOnWall(alertsStore.alerts));
+	const sky = $derived(readSky({ targets: targets.filter((t) => !quieted.has(t.id)), probes, alerts: wallAlerts, rules }));
+	// The number at the top counts the red problems only; advisories are listed, not counted.
+	const critical = $derived(criticalCount(sky.needsYou));
 	const verdict = $derived.by(() => {
-		if (sky.counts.devices === 0) return { tone: 'ghost' as const, text: m.wall_status_empty() };
-		if (sky.attention > 0) {
-			const severe = sky.counts.warnings > 0 || sky.counts.unreachable > 0;
+		if (targets.length === 0) return { tone: 'ghost' as const, text: m.wall_status_empty() };
+		if (critical > 0) {
 			return {
-				tone: severe ? ('warning' as const) : ('advisory' as const),
-				text: sky.attention === 1 ? m.wall_status_problem_one() : m.wall_status_problems({ count: sky.attention })
+				tone: 'warning' as const,
+				text: critical === 1 ? m.wall_status_problem_one() : m.wall_status_problems({ count: critical })
 			};
 		}
+		if (sky.attention > 0) return { tone: 'advisory' as const, text: m.wall_status_no_critical() };
 		if (sky.counts.reporting === 0) return { tone: 'ghost' as const, text: m.wall_status_waiting() };
 		return { tone: 'signal' as const, text: m.wall_status_ok() };
 	});
@@ -197,7 +202,7 @@
 	const statuses = $derived(
 		targets.map((target) => ({
 			target,
-			status: consoleStatus(target, probes.get(target.id), alertCounts.get(target.id))
+			status: quieted.has(target.id) ? ('waiting' as const) : consoleStatus(target, probes.get(target.id), alertCounts.get(target.id))
 		}))
 	);
 	const total = $derived(statuses.filter((r) => r.status !== 'paused').length);
@@ -205,7 +210,7 @@
 	const down = $derived(statuses.filter((r) => r.status === 'down').length);
 	const paused = $derived(statuses.filter((r) => r.status === 'paused').length);
 	const firing = $derived(wallAlerts.filter(countsAsProblem));
-	const critical = $derived(firing.filter((a) => a.severity === 'critical').length);
+	const criticalAlerts = $derived(firing.filter((a) => a.severity === 'critical').length);
 	const availability = $derived(mean(fleetStore.figures.uptime30.values()));
 
 	const figures = $derived<BandFigure[]>([
@@ -230,8 +235,8 @@
 			label: m.console_kpi_alerts(),
 			value: String(firing.length),
 			unit: '',
-			note: m.console_kpi_alerts_note({ critical, warning: firing.length - critical }),
-			tone: critical > 0 ? 'text-warning-ink' : firing.length > 0 ? 'text-advisory-ink' : 'text-ink-2'
+			note: m.console_kpi_alerts_note({ critical: criticalAlerts, warning: firing.length - criticalAlerts }),
+			tone: criticalAlerts > 0 ? 'text-warning-ink' : firing.length > 0 ? 'text-advisory-ink' : 'text-ink-2'
 		}
 	]);
 
@@ -554,7 +559,7 @@
 						city={sceneCity}
 						{now}
 						{weather}
-						problems={firstLoad ? 0 : sky.attention}
+						problems={firstLoad ? 0 : critical}
 						{startle}
 						paused={sceneStill}
 						pulse={live.pulse}
@@ -587,7 +592,7 @@
 					{/key}
 					<div class="board-list mt-7 flex min-h-0 flex-1 flex-col gap-4 lg:mt-9" bind:clientHeight={leftRoom}>
 						<WallProblems {sky} {now} room={problemsRoom} bind:listed={problemListed} />
-						<WallDevices {targets} {probes} {sky} skip={problemListed} />
+						<WallDevices {targets} {probes} {sky} {quieted} skip={problemListed} />
 					</div>
 				{/if}
 			</div>
@@ -874,15 +879,27 @@
 			grid-row: 2;
 			margin-inline: -3.5rem;
 		}
-		/* The dock shares the right-hand column's cell, at its foot, over the band. */
+		/*
+		 * The dock sits in the band's row, in the right-hand column, level with the
+		 * figures: bottom-aligned, zero height, so it never moves the rows and a
+		 * taller card (or a link's player) grows upward, not into the figures.
+		 */
 		.board-music {
 			grid-column: 3;
-			grid-row: 1;
+			grid-row: 2;
 			align-self: end;
 			justify-self: end;
 			position: relative;
+			z-index: 1;
+			display: flex;
+			align-items: flex-end;
+			height: 0;
 			width: min(100%, 22rem);
-			padding-bottom: 1.25rem;
+			padding-bottom: 0.625rem;
+		}
+		/* The figures stop short of the dock. */
+		.board:has(.board-music:not(:empty)) .board-band {
+			--band-reserve: 24rem;
 		}
 		.headline {
 			font-size: clamp(4.25rem, 5vw, 6rem);
@@ -920,6 +937,9 @@
 		.board-band {
 			margin-inline: -2.5rem;
 		}
+		.board:has(.board-music:not(:empty)) .board-band {
+			--band-reserve: 21.5rem;
+		}
 		.headline {
 			font-size: clamp(3.5rem, 5.4vw, 4.5rem);
 		}
@@ -931,6 +951,9 @@
 	@media (min-width: 1024px) and (max-height: 940px) {
 		.board {
 			padding-top: 2.25rem;
+		}
+		.board-music {
+			padding-bottom: 0.375rem;
 		}
 		.instance,
 		.updated {

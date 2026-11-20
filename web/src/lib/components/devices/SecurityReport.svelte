@@ -28,7 +28,7 @@
 	const failing = $derived(report.checks.filter((c): c is SecurityCheck => c.result === 'fail'));
 	const passing = $derived(report.checks.filter((c): c is SecurityCheck => c.result === 'pass'));
 	const unknown = $derived(report.checks.filter((c): c is SecurityCheck => c.result === 'unknown'));
-	const linkClass = 'inline-flex min-h-10 w-fit items-center gap-1 text-[0.8125rem] font-semibold text-ink-2 hover:text-ink hover:underline';
+	const linkClass = 'inline-flex min-h-10 w-fit items-center gap-1 text-sm font-semibold text-ink-2 hover:text-ink hover:underline';
 </script>
 
 <section {id} class="mt-6 scroll-mt-20 rounded-[var(--radius-card)] border border-line bg-surface shadow-lift rise-in" aria-labelledby={`${id}-title`}>
@@ -73,7 +73,7 @@
 
 	<div class="grid gap-0 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
 		<div class="min-w-0 lg:border-r lg:border-line">
-			<h3 class="px-4 pt-4 pb-1 text-[0.8125rem] font-semibold text-ink sm:px-5">{m.devices_security_missing()}</h3>
+			<h3 class="px-4 pt-4 pb-1 text-sm font-semibold text-ink sm:px-5">{m.devices_security_missing()}</h3>
 			{#if failing.length === 0}
 				<p class="px-4 pb-4 text-sm text-ink-2 sm:px-5">{m.devices_security_no_failures()}</p>
 			{:else}
@@ -99,7 +99,7 @@
 			{/if}
 
 			{#if passing.length > 0}
-				<h3 class="border-t border-line px-4 pt-4 pb-1 text-[0.8125rem] font-semibold text-ink sm:px-5">{m.devices_security_good()}</h3>
+				<h3 class="border-t border-line px-4 pt-4 pb-1 text-sm font-semibold text-ink sm:px-5">{m.devices_security_good()}</h3>
 				<ul class="divide-y divide-line">
 					{#each passing as check (check.id)}
 						<li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 sm:px-5">
@@ -142,7 +142,7 @@
 
 		{#if report.guide}
 			<div class="min-w-0 border-t border-line px-4 py-4 sm:px-5 lg:border-t-0">
-				<h3 class="text-[0.8125rem] font-semibold text-ink">{m.devices_security_improve({ product: report.guide.product })}</h3>
+				<h3 class="text-sm font-semibold text-ink">{m.devices_security_improve({ product: report.guide.product })}</h3>
 				<ol class="mt-2 grid list-decimal gap-2 pl-5 text-sm text-ink-2">
 					{#each report.guide.steps as step, i (i)}
 						<li class="break-words">{step}</li>

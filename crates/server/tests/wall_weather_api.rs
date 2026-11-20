@@ -47,15 +47,23 @@ async fn forecast(
 async fn search(
     State(fake): State<Arc<Fake>>,
     Query(query): Query<std::collections::HashMap<String, String>>,
-) -> axum::Json<Value> {
+) -> (StatusCode, axum::Json<Value>) {
     fake.searches.fetch_add(1, Ordering::SeqCst);
     if query["name"] == "Nowhere" {
-        return axum::Json(json!({ "generationtime_ms": 0.4 }));
+        return (StatusCode::OK, axum::Json(json!({ "generationtime_ms": 0.4 })));
     }
-    axum::Json(json!({ "results": [
-        { "name": "Lyon", "latitude": 45.75, "longitude": 4.85, "admin1": "Auvergne-Rhône-Alpes", "country": "France" },
-        { "name": "Broken", "latitude": 400.0, "longitude": 4.85 }
-    ] }))
+    if query["name"] == "Panne" {
+        return (StatusCode::SERVICE_UNAVAILABLE, axum::Json(json!({ "error": true })));
+    }
+    // La langue des noms suit l'interface, réduite à sa sous-étiquette principale.
+    assert_eq!(query["language"].len(), 2, "{}", query["language"]);
+    (
+        StatusCode::OK,
+        axum::Json(json!({ "results": [
+            { "name": "Lyon", "latitude": 45.75, "longitude": 4.85, "admin1": "Auvergne-Rhône-Alpes", "country": "France" },
+            { "name": "Broken", "latitude": 400.0, "longitude": 4.85 }
+        ] })),
+    )
 }
 
 struct Harness {
@@ -186,6 +194,15 @@ async fn la_recherche_de_ville_est_reservee_aux_admins_et_ecarte_les_lieux_inval
     let short = h.app.get("/api/wall/weather/places?q=L", Some(&h.admin)).await;
     assert_eq!(short.status, StatusCode::BAD_REQUEST);
     assert_eq!(h.fake.searches.load(Ordering::SeqCst), 2);
+    // Une langue régionale de l'interface garde sa langue de base.
+    let regional = h.app.get("/api/wall/weather/places?q=Lyon&lang=pt-BR", Some(&h.admin)).await;
+    assert_eq!(regional.status, StatusCode::OK);
+    // Un service en panne : 502, et le message dit pourquoi.
+    let down = h.app.get("/api/wall/weather/places?q=Panne", Some(&h.admin)).await;
+    assert_eq!(down.status, StatusCode::BAD_GATEWAY);
+    let why = down.body["error"].as_str().unwrap();
+    assert!(why.contains("answered 503"), "{why}");
+    assert!(!why.contains("127.0.0.1"), "l'adresse appelée ne fuit pas : {why}");
 }
 
 #[tokio::test]

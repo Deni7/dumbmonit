@@ -3,7 +3,9 @@
 	/**
 	 * The rack itself, in one of two layouts (`view.ts`): one dense line each
 	 * with children indented under their parent, or plain tiles in a grid.
-	 * Ordering lives in `rack.ts`.
+	 * Ordering lives in `rack.ts`; which sub-monitors are folded inside their
+	 * parent is decided by the page (`nesting.ts`), this only draws the rows
+	 * it is given and reports the disclosure (`ontoggle`).
 	 *
 	 * `reorder`, when given, makes the row itself the drag surface — no
 	 * separate handle. Pointer-based (mouse and touch — HTML5 drag-and-drop
@@ -21,7 +23,7 @@
 	import type { Serie } from '#lib/components/Chart.svelte';
 	import type { TargetAlertCounts } from '#lib/alerts-attention.js';
 	import CompactRow from './CompactRow.svelte';
-	import { GRID, HEADER_HEIGHT, SHOW } from './columns';
+	import { ROW_INTRINSIC } from './columns';
 	import type { RiverCell } from '#lib/components/enterprise/fleet.js';
 	import RackTile from './RackTile.svelte';
 	import type { RackRow } from './rack';
@@ -61,12 +63,15 @@
 		kindLabels: Map<string, string>;
 		/** location id → name and code, for the site badge. */
 		sites?: Map<number, { code: string; name: string }>;
-		/** Show the site badge: off when the list is already filtered to one site. */
+		/**
+		 * Show the site badge and the site column: off when the instance has
+		 * fewer than two locations, or the list is already filtered to one site.
+		 */
 		showSite?: boolean;
 		reorder?: ReorderControls | null;
 		/** One dense line each (default) or tiles in a grid. */
 		layout?: RackView;
-		/** id → name, so a tile can say which unit it sits behind. */
+		/** id → name, so a tile can say which unit it sits behind, and a sub-monitor drop its parent's name. */
 		names?: Map<TargetId, string>;
 		/** id → security grade, only for rated devices while the score is on. */
 		security?: Map<TargetId, { grade: SecurityGrade | null; score: number | null }>;
@@ -76,11 +81,11 @@
 		selection?: RowSelection | null;
 		/** id → the last 24 hours, one cell per hour, for the availability bar. */
 		river?: Map<TargetId, RiverCell[]>;
-		/** id → latest response time in milliseconds. */
-		latency?: Map<TargetId, number>;
+		/** Opens or closes a parent's sub-monitors; `open` is its current state. Compact layout only. */
+		ontoggle?: ((id: TargetId, open: boolean) => void) | null;
 	}
 
-	let { rows, sparklines, kindLabels, sites = new Map(), showSite = true, reorder = null, layout = 'compact', names = new Map(), security = new Map(), alertCounts = new Map(), selection = null, river = new Map(), latency = new Map() }: Props = $props();
+	let { rows, sparklines, kindLabels, sites = new Map(), showSite = true, reorder = null, layout = 'compact', names = new Map(), security = new Map(), alertCounts = new Map(), selection = null, river = new Map(), ontoggle = null }: Props = $props();
 
 	const LIST_CLASS: Record<RackView, string> = {
 		compact: 'flex flex-col divide-y divide-line',
@@ -102,12 +107,17 @@
 					state={row.state}
 					kindLabel={kindLabels.get(row.target.kind)}
 					site={showSite && row.target.location_id != null ? (sites.get(row.target.location_id) ?? null) : null}
+					siteColumn={showSite}
 					depth={row.depth}
+					parentName={row.target.parent_id !== null ? (names.get(row.target.parent_id) ?? null) : null}
 					shadowed={row.shadowed}
 					security={security.get(row.target.id) ?? null}
 					alerts={alertCounts.get(row.target.id)}
 					river={river.get(row.target.id) ?? null}
-					latencyMs={latency.get(row.target.id) ?? null}
+					childCount={row.childCount ?? 0}
+					trouble={row.trouble ?? 0}
+					open={row.open ?? false}
+					ontoggle={ontoggle ? () => ontoggle?.(id, row.open ?? false) : undefined}
 				/>
 			{:else}
 				<RackTile
@@ -130,7 +140,7 @@
 			cost more than building them.
 		-->
 		<li
-			class={`relative flex min-w-0 items-stretch gap-1.5 first:rounded-t-[inherit] last:rounded-b-[inherit] ${layout === 'compact' ? 'overflow-hidden [content-visibility:auto] [contain-intrinsic-block-size:auto_3rem]' : ''}`}
+			class={`relative flex min-w-0 items-stretch gap-1.5 first:rounded-t-[inherit] last:rounded-b-[inherit] ${layout === 'compact' ? `overflow-hidden [content-visibility:auto] ${ROW_INTRINSIC}` : ''}`}
 			{@attach (node) => {
 				reorder?.registerRow(id, node);
 				return () => reorder?.registerRow(id, null);
@@ -191,23 +201,11 @@
 {/snippet}
 
 {#if layout === 'compact'}
-	<!-- The table: one header line over the rows, both on the grid of `columns.ts`. -->
-	<div class="@container overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
-		<div class="flex items-center gap-1.5 border-b border-line bg-surface-2/50 text-[0.75rem] font-medium text-ink-3" aria-hidden="true">
-			{#if selection}<span class="w-9 shrink-0"></span>{/if}
-			<div class="min-w-0 flex-1">
-				<div class={`${GRID} ${HEADER_HEIGHT}`}>
-					<span></span>
-					<span class="truncate">{m.devices_cols_name()}</span>
-					<span class={`${SHOW.site} justify-center truncate`}>{m.devices_cols_site()}</span>
-					<span class={`${SHOW.river} truncate`}>{m.devices_cols_last24h()}</span>
-					<span class={`${SHOW.response} truncate text-right`}>{m.devices_cols_response()}</span>
-					<span class={`${SHOW.security} justify-center truncate`}>{m.devices_cols_security()}</span>
-					<span class="truncate text-right">{m.devices_cols_checked()}</span>
-					<span></span>
-				</div>
-			</div>
-		</div>
+	<!--
+		One card of rows, no header line in it: the column names are drawn once
+		over the whole list by the page (`ColumnHeader`), on the same grid.
+	-->
+	<div class="@container overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-lift">
 		{@render list()}
 	</div>
 {:else}

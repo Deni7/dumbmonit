@@ -9822,7 +9822,11 @@ paths:
       x-token-scope: read
       parameters:
         - { name: q, in: query, required: true, schema: { type: string, minLength: 2, maxLength: 80 } }
-        - { name: lang, in: query, required: false, schema: { type: string, example: fr } }
+        - name: lang
+          in: query
+          required: false
+          description: Language of the place names; only the primary subtag is used (`pt-BR` → `pt`), English otherwise.
+          schema: { type: string, example: fr }
       responses:
         "200":
           description: Up to six places.
@@ -9834,7 +9838,11 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
-        "502": { description: The weather service did not answer. }
+        "502":
+          description: The weather service failed or did not answer; the `error` message says why.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
 
   # ---------------------------------------------------------- on-call
   /api/oncall/people:

@@ -25,7 +25,7 @@
 <div
 	role="group"
 	aria-label={label}
-	class={`inline-flex max-w-full min-w-0 flex-wrap items-center gap-0.5 rounded-lg border border-line-strong bg-surface-2 p-0.5 shadow-[inset_0_1px_2px_rgb(0_0_0/0.04)] ${className}`}
+	class={`inline-flex max-w-full min-w-0 flex-wrap items-center gap-0.5 rounded-lg border border-line-strong bg-surface-2 p-0.5 ${className}`}
 >
 	{#each options as option (option.id)}
 		{@const active = option.id === value}

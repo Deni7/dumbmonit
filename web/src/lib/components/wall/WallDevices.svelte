@@ -20,9 +20,11 @@
 		sky: Sky;
 		/** Devices already written out as problems: not repeated here. */
 		skip?: Set<TargetId>;
+		/** Devices whose only alerts are building up or acknowledged: not shown as a problem. */
+		quieted?: Set<TargetId>;
 	}
 
-	let { targets, probes, sky, skip = new Set() }: Props = $props();
+	let { targets, probes, sky, skip = new Set(), quieted = new Set() }: Props = $props();
 
 	type ChipTone = 'warning' | 'advisory' | 'info' | 'ghost' | 'signal';
 	interface Chip {
@@ -57,6 +59,7 @@
 							? 'advisory'
 							: 'ghost';
 			let word: string | null = state === 'online' ? null : STATE_LABEL[state];
+			if (quieted.has(target.id) && tone !== 'signal') tone = 'ghost';
 			const alert = alertTone.get(target.id);
 			if (alert && ORDER[alert.tone] < ORDER[tone]) {
 				tone = alert.tone;

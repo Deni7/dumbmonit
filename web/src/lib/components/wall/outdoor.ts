@@ -11,6 +11,13 @@ export type OutdoorIcon = 'sun' | 'moon' | 'cloud-sun' | 'cloud-moon' | 'cloud' 
 
 /** The server keeps the reading ten minutes: asking more often only returns the same one. */
 export const OUTDOOR_REFRESH_MS = 10 * 60_000;
+/**
+ * Without a reading (no city yet, or the weather service did not answer), the
+ * wall asks again sooner: a city chosen in Settings, or a service back up,
+ * shows within a minute instead of ten. The server retries a failure no more
+ * than once a minute, so this costs no extra call to Open-Meteo.
+ */
+export const OUTDOOR_RETRY_MS = 60_000;
 
 /** One icon per condition; the sun and the partial cloud turn to the moon at night. */
 export function outdoorIcon(condition: WallWeatherCondition, isDay: boolean): OutdoorIcon {
