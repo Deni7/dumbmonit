@@ -22,8 +22,8 @@
 	 * the weather when Settings gives the wall a place.
 	 *
 	 * Music, once set up in Settings (Spotify connected, or a link sent to the
-	 * walls), sits in a small dock at the foot of the right-hand column, away
-	 * from the problems: what plays on the account wherever it plays, with
+	 * walls), sits in a small dock in the bottom band, right of the figures, clear
+	 * of the scene and its pigeons: what plays on the account wherever it plays, with
 	 * play / pause when this session may, or the shared link's own player. The
 	 * display can also be a Spotify Connect speaker ("DumbMonit Wall", the name
 	 * chosen in Settings, or `?speaker=Living room` for this display alone):
@@ -874,15 +874,27 @@
 			grid-row: 2;
 			margin-inline: -3.5rem;
 		}
-		/* The dock shares the right-hand column's cell, at its foot, over the band. */
+		/*
+		 * The dock sits in the band's row, in the right-hand column, level with the
+		 * figures: bottom-aligned, zero height, so it never moves the rows and a
+		 * taller card (or a link's player) grows upward, not into the figures.
+		 */
 		.board-music {
 			grid-column: 3;
-			grid-row: 1;
+			grid-row: 2;
 			align-self: end;
 			justify-self: end;
 			position: relative;
+			z-index: 1;
+			display: flex;
+			align-items: flex-end;
+			height: 0;
 			width: min(100%, 22rem);
-			padding-bottom: 1.25rem;
+			padding-bottom: 0.625rem;
+		}
+		/* The figures stop short of the dock. */
+		.board:has(.board-music:not(:empty)) .board-band {
+			--band-reserve: 24rem;
 		}
 		.headline {
 			font-size: clamp(4.25rem, 5vw, 6rem);
@@ -920,6 +932,9 @@
 		.board-band {
 			margin-inline: -2.5rem;
 		}
+		.board:has(.board-music:not(:empty)) .board-band {
+			--band-reserve: 21.5rem;
+		}
 		.headline {
 			font-size: clamp(3.5rem, 5.4vw, 4.5rem);
 		}
@@ -931,6 +946,9 @@
 	@media (min-width: 1024px) and (max-height: 940px) {
 		.board {
 			padding-top: 2.25rem;
+		}
+		.board-music {
+			padding-bottom: 0.375rem;
 		}
 		.instance,
 		.updated {

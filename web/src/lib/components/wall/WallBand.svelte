@@ -99,7 +99,7 @@
 	 */
 	@media (min-width: 1024px) {
 		.band {
-			padding: 0.625rem 3.5rem;
+			padding: 0.625rem calc(3.5rem + var(--band-reserve, 0px)) 0.625rem 3.5rem;
 			border-top: 0;
 			background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--c-canvas) 78%, transparent) 38%);
 		}
