@@ -8,6 +8,11 @@
  * of those rows are on screen. A parent shows a disclosure with its count of
  * direct sub-monitors; its children appear when it is open.
  *
+ * Most monitors have no `parent_id` though: a PostgreSQL, a Redis or a web
+ * check aimed at a server already in the list. `inferHosts` puts them inside
+ * that server for display only (nothing is saved, alerts are not suppressed
+ * by it): same host name or IP address as exactly one machine monitor.
+ *
  * While the list is filtered, a matching sub-monitor brings its parents along
  * (`withAncestors`, flagged `context`) so it is still shown where it lives.
  *
@@ -17,6 +22,192 @@
 import type { Target, TargetId } from '#lib/api/index.js';
 // Explicit extension: this module is also loaded straight by Node (`npm test`).
 import { needsAttention, type RackRow } from './rack.ts';
+
+/**
+ * How surely a kind stands for the machine itself rather than a service on
+ * it: an agent first, then a hypervisor, a NAS, a firewall or a Windows
+ * host, then a bare SNMP device, a ping last. A monitor that already has
+ * sub-monitors of its own counts as a machine too, at the first rank.
+ */
+const HOST_RANK: Record<string, number> = {
+	agent: 0,
+	winrm: 1,
+	proxmox: 1,
+	xcpng: 1,
+	nutanix: 1,
+	synology: 1,
+	truenas: 1,
+	unraid: 1,
+	qnap: 1,
+	pbs: 1,
+	pmg: 1,
+	opnsense: 1,
+	pfsense: 1,
+	fortigate: 1,
+	sophos: 1,
+	'pack.paloalto': 1,
+	'pack.sonicwall': 1,
+	mikrotik: 1,
+	snmp: 2,
+	ping: 3
+};
+
+/**
+ * Kinds whose address names no machine on the network: an agent's is its
+ * identity (its host name is its name), a service's is `machine#module`, the
+ * others are accounts, domains or heartbeats.
+ */
+const NOT_A_HOST = new Set([
+	'agent',
+	'agent_service',
+	'push',
+	'dummy',
+	'otlp',
+	'domain',
+	'provider',
+	'ip_blacklist',
+	'mail_blacklist',
+	'aws',
+	'azure',
+	'm365',
+	'entra',
+	'cloudflare',
+	'hetzner',
+	'ovh',
+	'infomaniak',
+	'tailscale',
+	'arubacentral'
+]);
+
+const IPV4 = /^\d{1,3}(?:\.\d{1,3}){3}$/;
+
+/**
+ * The host an address or a URL points at, in lower case, without scheme,
+ * credentials, port or path: `postgres://u@db.lan:5432/app` → `db.lan`. `null`
+ * for anything that is not a host name or an IP address, and for the loopback
+ * (`localhost` is every machine).
+ */
+export function hostOf(text: string): string | null {
+	let s = text.trim().toLowerCase();
+	const scheme = s.indexOf('://');
+	if (scheme >= 0) s = s.slice(scheme + 3);
+	s = s.split(/[/?#]/)[0];
+	const at = s.lastIndexOf('@');
+	if (at >= 0) s = s.slice(at + 1);
+	let host: string;
+	if (s.startsWith('[')) host = s.slice(1, s.indexOf(']') > 0 ? s.indexOf(']') : undefined);
+	else if (s.split(':').length === 2) host = s.split(':')[0];
+	else host = s;
+	host = host.replace(/\.$/, '');
+	if (host === '') return null;
+	if (host.includes(':')) {
+		// IPv6.
+		if (!/^[0-9a-f:.]+$/.test(host) || host === '::1' || host === '::') return null;
+		return host;
+	}
+	if (IPV4.test(host)) return host.startsWith('127.') || host === '0.0.0.0' ? null : host;
+	if (!/^[a-z0-9_-]+(?:\.[a-z0-9_-]+)*$/.test(host)) return null;
+	if (host === 'localhost' || host.endsWith('.localhost')) return null;
+	return host;
+}
+
+const isIp = (host: string) => host.includes(':') || IPV4.test(host);
+
+/**
+ * Display-only parents: every monitor without a `parent_id` whose host (from
+ * its address) is the host of exactly one machine monitor of the same folder
+ * goes inside it. The machine's host is its address, or for an agent its name
+ * (the host name it reported). `db.lan` and a machine named `db` are the same
+ * host; two different domains are not. Among several machines at one host the
+ * surest kind wins (`HOST_RANK`): a ping beside a Proxmox VE goes inside it.
+ * A tie is no parent at all, rather than a wrong one.
+ *
+ * Returns the targets with the inferred `parent_id` filled in (the others
+ * untouched, same objects) and the ids that got one. A declared parent always
+ * stays; a monitor never lands under itself nor under one of its own
+ * sub-monitors.
+ */
+export function inferHosts(targets: Target[]): { targets: Target[]; inferred: Set<TargetId> } {
+	const byId = new Map(targets.map((t) => [t.id, t]));
+	const parentOf = new Map<TargetId, TargetId | null>(
+		targets.map((t) => [t.id, t.parent_id !== null && byId.has(t.parent_id) ? t.parent_id : null])
+	);
+	const hasChildren = new Set<TargetId>();
+	for (const parent of parentOf.values()) if (parent !== null) hasChildren.add(parent);
+	const folderOf = (t: Target): string => {
+		let current = t;
+		const seen = new Set<TargetId>([t.id]);
+		for (let up = parentOf.get(current.id); up != null && !seen.has(up); up = parentOf.get(current.id)) {
+			seen.add(up);
+			current = byId.get(up)!;
+		}
+		return current.group_name || '';
+	};
+	const rankOf = (t: Target): number =>
+		hasChildren.has(t.id) ? 0 : (HOST_RANK[t.kind] ?? Infinity);
+	const hostOfTarget = (t: Target): string | null =>
+		t.kind === 'agent' ? hostOf(t.name) : NOT_A_HOST.has(t.kind) ? null : hostOf(t.address);
+
+	// Machines by their host: exactly, and by the first label of a name.
+	const exact = new Map<string, Target[]>();
+	const bare = new Map<string, Target[]>();
+	const dotted = new Map<string, Target[]>();
+	const push = (map: Map<string, Target[]>, key: string, t: Target) => {
+		const list = map.get(key);
+		if (list) list.push(t);
+		else map.set(key, [t]);
+	};
+	for (const t of targets) {
+		if (rankOf(t) === Infinity) continue;
+		const host = hostOfTarget(t);
+		if (host === null) continue;
+		push(exact, host, t);
+		if (isIp(host)) continue;
+		const dot = host.indexOf('.');
+		if (dot < 0) push(bare, host, t);
+		else push(dotted, host.slice(0, dot), t);
+	}
+
+	const out = new Map<TargetId, Target>();
+	const inferred = new Set<TargetId>();
+	/** True when `id` sits under `ancestor`, declared or inferred so far. */
+	const isUnder = (id: TargetId, ancestor: TargetId): boolean => {
+		const seen = new Set<TargetId>();
+		for (let up: TargetId | null | undefined = id; up != null && !seen.has(up); up = parentOf.get(up)) {
+			if (up === ancestor) return true;
+			seen.add(up);
+		}
+		return false;
+	};
+	for (const t of [...targets].sort((a, b) => a.id - b.id)) {
+		if (parentOf.get(t.id) !== null) continue;
+		const host = hostOfTarget(t);
+		if (host === null) continue;
+		const found = new Set(exact.get(host) ?? []);
+		if (!isIp(host)) {
+			// `db.lan` is the machine named `db`, and the other way round.
+			const dot = host.indexOf('.');
+			for (const c of (dot < 0 ? dotted.get(host) : bare.get(host.slice(0, dot))) ?? []) found.add(c);
+		}
+		found.delete(t);
+		const own = rankOf(t);
+		const folder = t.group_name || '';
+		const fits = [...found].filter((c) => rankOf(c) < own && folderOf(c) === folder);
+		if (fits.length === 0) continue;
+		const best = Math.min(...fits.map(rankOf));
+		const top = fits.filter((c) => rankOf(c) === best);
+		if (top.length !== 1) continue;
+		const parent = top[0];
+		if (isUnder(parent.id, t.id)) continue;
+		parentOf.set(t.id, parent.id);
+		inferred.add(t.id);
+		out.set(t.id, { ...t, parent_id: parent.id });
+	}
+	return {
+		targets: inferred.size === 0 ? targets : targets.map((t) => out.get(t.id) ?? t),
+		inferred
+	};
+}
 
 /**
  * `ids` plus every ancestor of theirs, as long as the ancestor is `eligible`

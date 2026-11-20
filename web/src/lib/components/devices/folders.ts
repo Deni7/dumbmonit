@@ -74,9 +74,10 @@ export function compareFolderSections(a: FolderSection, b: FolderSection): numbe
 export function buildFolders(
 	targets: Target[],
 	stateOf: (target: Target) => TargetState,
-	visible: Set<TargetId>
+	visible: Set<TargetId>,
+	inferred?: ReadonlySet<TargetId>
 ): FolderSection[] {
-	const rows = buildRack(targets, stateOf, visible);
+	const rows = buildRack(targets, stateOf, visible, inferred);
 	const roots = rootOf(targets);
 
 	const buckets = new Map<string, RackRow[]>();

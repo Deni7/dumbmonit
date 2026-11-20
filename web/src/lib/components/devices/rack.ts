@@ -83,11 +83,16 @@ export function compareSiblings(
  * `visible` is the set kept by the current filters. A hidden parent does not
  * hide its children: they are promoted to the depth of the nearest visible
  * ancestor (or the top of the rack), so a filter never loses a device.
+ *
+ * `inferred` lists the units placed under a parent for display only
+ * (`inferHosts` in `nesting.ts`): the server does not suppress their alerts
+ * when that parent is unreachable, so they are not shadowed by it.
  */
 export function buildRack(
 	targets: Target[],
 	stateOf: (target: Target) => TargetState,
-	visible: Set<TargetId>
+	visible: Set<TargetId>,
+	inferred: ReadonlySet<TargetId> = new Set()
 ): RackRow[] {
 	const byId = new Map(targets.map((t) => [t.id, t]));
 	const children = new Map<TargetId | null, Target[]>();
@@ -112,8 +117,9 @@ export function buildRack(
 			seen.add(target.id);
 			const state = states.get(target.id)!;
 			const shown = visible.has(target.id);
-			if (shown) rows.push({ target, state, depth, shadowed });
-			walk(target.id, shown ? depth + 1 : depth, shadowed || state === 'offline');
+			const own = shadowed && !inferred.has(target.id);
+			if (shown) rows.push({ target, state, depth, shadowed: own });
+			walk(target.id, shown ? depth + 1 : depth, own || state === 'offline');
 		}
 	};
 	walk(null, 0, false);

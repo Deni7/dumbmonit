@@ -105,11 +105,11 @@
 		}}
 		aria-expanded={!collapsed}
 	>
-		<ChevronDown class={`size-4 shrink-0 text-ink-2 transition-transform duration-200 ${collapsed ? '-rotate-90' : ''}`} aria-hidden="true" />
+		<ChevronDown class={`size-4 shrink-0 text-ink-3 transition-transform duration-200 motion-reduce:transition-none ${collapsed ? '-rotate-90' : ''}`} aria-hidden="true" />
 		{#if renaming}
 			<span class="sr-only">{m.devices_folder_renaming()}</span>
 		{:else}
-			<span class="min-w-0 text-sm font-semibold break-words text-ink" title={label}>{label}</span>
+			<span class="min-w-0 text-[0.9375rem] font-semibold break-words text-ink" title={label}>{label}</span>
 		{/if}
 		<span class="tnum text-[0.8125rem] text-ink-3">{count}</span>
 	</button>
@@ -146,7 +146,7 @@
 			{#snippet trigger({ toggle, open })}
 				<button
 					type="button"
-					class="inline-flex size-10 items-center justify-center rounded-md text-ink-3 hover:bg-surface-2 hover:text-ink"
+					class="inline-flex size-10 items-center justify-center rounded-lg text-ink-3 hover:bg-surface-2 hover:text-ink"
 					onclick={toggle}
 					aria-haspopup="menu"
 					aria-expanded={open}

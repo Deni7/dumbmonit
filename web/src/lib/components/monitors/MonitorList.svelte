@@ -46,6 +46,7 @@
 	import { buildRack, nearestRow, needsAttention, type RackRow } from '#lib/components/devices/rack.js';
 	import {
 		foldRack,
+		inferHosts,
 		loadOpenChoices,
 		markContext,
 		nestSorted,
@@ -277,8 +278,13 @@
 	// parents, brought along as context (not counted, not in "select all").
 	// Unfiltered, nothing is added; the tiles stay flat.
 	const nested = $derived(view === 'compact');
-	const activeListed = $derived(nested ? withAncestors(effectiveTargets, activeVisible, split.active) : activeVisible);
-	const disabledListed = $derived(nested ? withAncestors(effectiveTargets, disabledVisible, split.disabled) : disabledVisible);
+	// A database or a web check aimed at a server of the list goes inside it,
+	// for display only (`inferHosts`): saves and bulk actions keep reading
+	// `effectiveTargets`, the order and the tree on screen read `shownTargets`.
+	const hosted = $derived(nested ? inferHosts(effectiveTargets) : { targets: effectiveTargets, inferred: new Set<TargetId>() });
+	const shownTargets = $derived(hosted.targets);
+	const activeListed = $derived(nested ? withAncestors(shownTargets, activeVisible, split.active) : activeVisible);
+	const disabledListed = $derived(nested ? withAncestors(shownTargets, disabledVisible, split.disabled) : disabledVisible);
 	const nest = (rows: RackRow[]): RackRow[] => (nested ? nestSorted(rows) : rows);
 	const kindText = (value: string) => kindLabels.get(value) ?? value;
 	const folderSections = $derived.by(() => {
@@ -286,7 +292,7 @@
 			const rows = markContext(
 				nest(
 					sortTargets(
-						effectiveTargets.filter((t) => activeListed.has(t.id)),
+						shownTargets.filter((t) => activeListed.has(t.id)),
 						stateOf,
 						kindText,
 						sort as Exclude<SortKey, 'default'>,
@@ -297,7 +303,7 @@
 			);
 			return rows.length > 0 ? [{ key: '', label: '', rows }] : [];
 		}
-		const base = buildFolders(effectiveTargets, stateOf, activeListed).map((section) => ({
+		const base = buildFolders(shownTargets, stateOf, activeListed, hosted.inferred).map((section) => ({
 			...section,
 			rows: markContext(section.rows, activeVisible)
 		}));
@@ -313,14 +319,14 @@
 			sorted
 				? nest(
 						sortTargets(
-							effectiveTargets.filter((t) => disabledListed.has(t.id)),
+							shownTargets.filter((t) => disabledListed.has(t.id)),
 							stateOf,
 							kindText,
 							sort as Exclude<SortKey, 'default'>,
 							sortDir
 						)
 					)
-				: buildRack(effectiveTargets, stateOf, disabledListed),
+				: buildRack(shownTargets, stateOf, disabledListed, hosted.inferred),
 			disabledVisible
 		)
 	);
@@ -388,8 +394,12 @@
 	// Sites (locations of the world map): a badge on each monitor and a filter.
 	let siteLocations = $state<MapLocation[]>([]);
 	const sites = $derived(new Map(siteLocations.map((l) => [l.id, { code: l.code, name: l.name }])));
-	/** Filtered to one site, every line would carry the same badge: none does. */
-	const showSite = $derived(site === '');
+	/**
+	 * The site badge and column only tell monitors apart with two locations or
+	 * more; filtered to one site, every line would carry the same badge. In
+	 * both cases the table has no site column at all.
+	 */
+	const showSite = $derived(site === '' && siteLocations.length >= 2);
 	$effect(() => {
 		const controller = new AbortController();
 		listLocations(controller.signal)
@@ -821,10 +831,10 @@
 	const dropBlockedHint = $derived.by(() => {
 		const slot = dropSlot;
 		if (dragging === null || !slot || slot.kind !== 'row' || slot.id === dragging) return false;
-		const dragged = effectiveTargets.find((t) => t.id === dragging);
+		const dragged = shownTargets.find((t) => t.id === dragging);
 		if (!dragged) return false;
-		if (!reorderScope(effectiveTargets, dragged).some((t) => t.id === slot.id)) return false;
-		return reorderByDrop(effectiveTargets, stateOf, dragging, slot.id) === null;
+		if (!reorderScope(shownTargets, dragged).some((t) => t.id === slot.id)) return false;
+		return reorderByDrop(shownTargets, stateOf, dragging, slot.id) === null;
 	});
 
 	const rowEls = new Map<TargetId, HTMLElement>();
@@ -947,11 +957,14 @@
 	}
 
 	async function applyDrop(draggedId: TargetId, slot: DropSlot) {
-		const dragged = effectiveTargets.find((t) => t.id === draggedId);
-		if (!dragged) return;
+		// The tree on screen decides the siblings (a hosted database is a child
+		// there); the saved monitor is the one sent back.
+		const dragged = shownTargets.find((t) => t.id === draggedId);
+		const saved = effectiveTargets.find((t) => t.id === draggedId);
+		if (!dragged || !saved) return;
 		if (slot.kind === 'row') {
 			if (slot.id === draggedId) return;
-			const order = reorderByDrop(effectiveTargets, stateOf, draggedId, slot.id);
+			const order = reorderByDrop(shownTargets, stateOf, draggedId, slot.id);
 			if (order) {
 				void persistOrder(order);
 				return;
@@ -960,14 +973,14 @@
 			// fall back to a folder-level move, root devices only — a child's
 			// folder is its parent's, dragging it onto another one is a no-op.
 			if (dragged.parent_id !== null) return;
-			const over = effectiveTargets.find((t) => t.id === slot.id);
+			const over = shownTargets.find((t) => t.id === slot.id);
 			if (!over) return;
-			const key = folderKeyOf(effectiveTargets, over);
-			if (key !== (dragged.group_name || '')) void moveToFolder(dragged, key);
+			const key = folderKeyOf(shownTargets, over);
+			if (key !== (saved.group_name || '')) void moveToFolder(saved, key);
 			return;
 		}
 		if (dragged.parent_id !== null) return;
-		if ((dragged.group_name || '') !== slot.key) void moveToFolder(dragged, slot.key);
+		if ((saved.group_name || '') !== slot.key) void moveToFolder(saved, slot.key);
 	}
 
 	let autoScrollRaf: number | null = null;
@@ -1026,7 +1039,8 @@
 
 	function onRowKeyDown(id: TargetId, event: KeyboardEvent) {
 		if (!canReorder) return;
-		const target = targets.find((t) => t.id === id);
+		// As on screen: a hosted database moves among its machine's sub-monitors.
+		const target = shownTargets.find((t) => t.id === id);
 		if (!target) return;
 		if (event.key === ' ' || event.key === 'Enter') {
 			event.preventDefault();
@@ -1036,7 +1050,7 @@
 				announce = m.devices_targets_announce_dropped({ name: target.name });
 			} else {
 				pickedUp = id;
-				pickedSnapshot = reorderScope(effectiveTargets, target).map((t) => t.id);
+				pickedSnapshot = reorderScope(shownTargets, target).map((t) => t.id);
 				announce = m.devices_targets_announce_picked({ name: target.name });
 			}
 			return;
@@ -1045,7 +1059,7 @@
 		if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
 			event.preventDefault();
 			const delta = event.key === 'ArrowUp' ? -1 : 1;
-			const order = moveWithinScope(effectiveTargets, stateOf, id, delta);
+			const order = moveWithinScope(shownTargets, stateOf, id, delta);
 			if (order) {
 				void persistOrder(order);
 				announce = m.devices_targets_announce_moved({ name: target.name, position: order.indexOf(id) + 1, total: order.length });
@@ -1345,7 +1359,7 @@
 	/>
 {:else if firstLoad}
 	<div class="flex flex-col gap-2" aria-busy="true" aria-label={m.devices_targets_loading()}>
-		<Skeleton class="h-[66px] w-full rounded-[var(--radius-card)]" rows={5} />
+		<Skeleton class="h-14 w-full rounded-[var(--radius-card)]" rows={5} />
 	</div>
 {:else if targets.length === 0}
 	<EmptyState
@@ -1542,56 +1556,59 @@
 			</ErrorNotice>
 		</div>
 	{/if}
-	<div class={`flex flex-col ${view === 'compact' ? 'gap-3' : 'gap-4'}`}>
+	<!-- Folders apart, each header close over its own rows (as the groups of the Alerts list). -->
+	<div class="flex flex-col gap-5">
 		{#each shownSections as section (section.key)}
 			{@const collapsed = collapsedFolders.has(section.key)}
-			{#if showFolderHeaders}
-				<FolderHeader
-					label={section.label}
-					folderKey={section.key}
-					count={matchCount(section.rows)}
-					worst={worstState(section.rows)}
-					{collapsed}
-					ontoggle={() => toggleFolder(section.key)}
-					canManage={auth.isAdmin && !filtered && section.key !== ''}
-					busy={moving}
-					onrename={(next) => renameFolder(section.key, next)}
-					ondelete={() => deleteFolder(section.key)}
-					dropActive={canReorder && dragging !== null}
-					dropHover={dragging !== null && dropSlot?.kind === 'folder' && dropSlot.key === section.key}
-					onheaderref={(el) => registerHeader(section.key, el)}
-				/>
-			{/if}
-			{#if !collapsed}
-				<RackList
-					rows={section.shown}
-					{sparklines}
-					{kindLabels}
-					{sites}
-					{showSite}
-					reorder={canReorder ? reorderControls() : null}
-					layout={view}
-					{names}
-					{security}
-					{alertCounts}
-					{selection}
-					{river}
-					ontoggle={toggleOpen}
-				/>
-			{/if}
+			<div class={`flex flex-col ${view === 'compact' ? 'gap-1' : 'gap-2'}`}>
+				{#if showFolderHeaders}
+					<FolderHeader
+						label={section.label}
+						folderKey={section.key}
+						count={matchCount(section.rows)}
+						worst={worstState(section.rows)}
+						{collapsed}
+						ontoggle={() => toggleFolder(section.key)}
+						canManage={auth.isAdmin && !filtered && section.key !== ''}
+						busy={moving}
+						onrename={(next) => renameFolder(section.key, next)}
+						ondelete={() => deleteFolder(section.key)}
+						dropActive={canReorder && dragging !== null}
+						dropHover={dragging !== null && dropSlot?.kind === 'folder' && dropSlot.key === section.key}
+						onheaderref={(el) => registerHeader(section.key, el)}
+					/>
+				{/if}
+				{#if !collapsed}
+					<RackList
+						rows={section.shown}
+						{sparklines}
+						{kindLabels}
+						{sites}
+						{showSite}
+						reorder={canReorder ? reorderControls() : null}
+						layout={view}
+						{names}
+						{security}
+						{alertCounts}
+						{selection}
+						{river}
+						ontoggle={toggleOpen}
+					/>
+				{/if}
+			</div>
 		{/each}
 		{#if disabledRows.length > 0}
-			<section aria-label={m.devices_list_disabled_section({ count: disabledCount })}>
+			<section class="flex flex-col gap-1" aria-label={m.devices_list_disabled_section({ count: disabledCount })}>
 				{#if segment === 'disabled'}
-					<h2 class="mb-2 text-sm font-semibold text-ink-2">{m.devices_list_disabled_section({ count: disabledCount })}</h2>
+					<h2 class="flex min-h-10 items-center px-1 text-[0.9375rem] font-semibold text-ink-2">{m.devices_list_disabled_section({ count: disabledCount })}</h2>
 				{:else}
 					<button
 						type="button"
-						class="mb-2 flex min-h-10 items-center gap-1.5 rounded-lg text-sm font-semibold text-ink-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-signal"
+						class="flex min-h-10 items-center gap-2 self-start rounded-lg px-1 text-[0.9375rem] font-semibold text-ink-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-signal"
 						aria-expanded={disabledOpen}
 						onclick={() => (disabledOpen = !disabledOpen)}
 					>
-						<ChevronRight class={`size-4 transition-transform motion-reduce:transition-none ${disabledOpen ? 'rotate-90' : ''}`} aria-hidden="true" />
+						<ChevronRight class={`size-4 shrink-0 text-ink-3 transition-transform motion-reduce:transition-none ${disabledOpen ? 'rotate-90' : ''}`} aria-hidden="true" />
 						{m.devices_list_disabled_section({ count: disabledCount })}
 					</button>
 				{/if}
