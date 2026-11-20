@@ -8905,6 +8905,7 @@
 	"wall_scene_world_title": "Ville derrière le tableau",
 	"wall_status_empty": "Rien à surveiller pour l’instant",
 	"wall_status_ok": "Tout va bien",
+	"wall_status_no_critical": "Rien de critique",
 	"wall_status_problem_one": "1 problème",
 	"wall_status_problems": "{count} problèmes",
 	"wall_status_waiting": "En attente de rapports",

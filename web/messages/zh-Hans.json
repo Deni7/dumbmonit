@@ -8814,6 +8814,7 @@
 	"wall_scene_world_title": "面板背后的城市",
 	"wall_status_empty": "暂无可监控内容",
 	"wall_status_ok": "一切正常",
+	"wall_status_no_critical": "没有严重问题",
 	"wall_status_problem_one": "1 个问题",
 	"wall_status_problems": "{count} 个问题",
 	"wall_status_waiting": "等待上报",

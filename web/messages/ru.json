@@ -9073,6 +9073,7 @@
 	"wall_scene_world_title": "Город за панелью",
 	"wall_status_empty": "Пока нечего отслеживать",
 	"wall_status_ok": "Всё в порядке",
+	"wall_status_no_critical": "Ничего критичного",
 	"wall_status_problem_one": "1 проблема",
 	"wall_status_problems": "Проблем: {count}",
 	"wall_status_waiting": "Ожидание данных",
