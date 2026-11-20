@@ -1,7 +1,7 @@
 <script lang="ts">
 	/**
-	 * The music dock of the wall: a quiet stack at the foot of the right-hand
-	 * column, under the clock and the rota, far from the problems. It shows
+	 * The music dock of the wall: a quiet stack in the bottom band, right of the
+	 * figures, clear of the scene and its pigeons. It shows
 	 * only what is there: what plays on the Spotify account (anywhere), the
 	 * embedded player of a shared link, and either the one-time "Enable sound"
 	 * gesture the browser needs before this display can be a Spotify speaker,
