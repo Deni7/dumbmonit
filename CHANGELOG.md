@@ -3,6 +3,34 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## Unreleased
+
+### Changed
+
+- **Monitors list in the style of Alerts.** A smaller toolbar (search, Filter, Compact/Tiles, a
+  folder button and Select), "Add a monitor" in the page header, one column header above the list,
+  folder headers like the Alerts groups (a quiet problem count only while folded), rows with the
+  name over `address · Kind`. Every state is the same circle, with a glyph inside when it is not up
+  (× down, ! misconfigured, a dot pending). The alert bell sits next to the name; the Response
+  column is gone; the Site column only shows with two sites or more.
+- **Sub-monitors inside their machine.** Services found by the agent (Docker, databases…) and
+  monitors on the same host as a machine fold under it, behind a chevron with their count; a
+  machine opens by itself when something under it needs attention. Under its machine a monitor
+  shows only its own part of the name.
+- **Wall: only what matters.** The headline and the pigeons' sign count only the red problems;
+  advisories are listed but not counted ("Nothing critical" when they are the only ones). Info
+  alerts, alerts building up and acknowledged alerts are never shown, and a monitor whose only alert
+  is one of those is no longer counted as down. The music player sits in the bottom band, level with
+  the figures, and no longer hides the pigeons.
+- **Wall weather in Settings.** The chosen city shows as a card (name, region, temperature, Remove);
+  the search says why it fails; the wall asks again after a minute when the weather service has not
+  answered yet.
+- **Monitor page.** Title, cards, paddings and sub-headings follow the rest of the console.
+
+### Fixed
+
+- **Last 24 h was empty in the monitors table.** The history was only loaded for the tiles view.
+
 ## 0.19.0 — 2026-11-19
 
 ### Added

@@ -119,6 +119,8 @@
 	const grid = $derived(gridFor(siteColumn));
 	/** Right under its parent, the parent's name is not repeated. */
 	const shownName = $derived(depth > 0 ? ownName(target.name, parentName) : target.name);
+	/** The kind says nothing more when the name already is the kind ("Databases" under its machine). */
+	const showTag = $derived(String(tag).trim().toLowerCase() !== shownName.trim().toLowerCase());
 </script>
 
 <div class={`relative transition-colors hover:bg-surface-2/60 ${shadowed ? 'opacity-60' : ''}`}>
@@ -165,9 +167,9 @@
 				{#if site}<SiteBadge code={site.code} name={site.name} class={siteColumn ? '@xl:hidden' : ''} />{/if}
 				{#if address}
 					<span class="min-w-0 truncate" title={address}>{address}</span>
-					<span class="shrink-0 text-ink-3" aria-hidden="true">·</span>
+					{#if showTag}<span class="shrink-0 text-ink-3" aria-hidden="true">·</span>{/if}
 				{/if}
-				<span class="max-w-40 shrink-0 truncate text-ink-3" title={kind}>{tag}</span>
+				{#if showTag}<span class="max-w-40 shrink-0 truncate text-ink-3" title={kind}>{tag}</span>{/if}
 			</span>
 		</span>
 
