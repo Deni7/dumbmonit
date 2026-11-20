@@ -248,5 +248,4 @@ nav:
       - Reproducible builds: development/reproducible-builds.md
       - Signing the agent binaries: development/agent-signing.md
       - PostgreSQL plan: development/postgres-plan.md
-      - Roadmap: development/roadmap.md
   - FAQ: faq.md
