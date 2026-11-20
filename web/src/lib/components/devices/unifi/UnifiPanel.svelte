@@ -143,7 +143,7 @@
 							<span class="shrink-0 sm:w-40"><Plate tone={stateTone(d.state)} label={stateWord(d.state)} /></span>
 							<span class="min-w-0 flex-1">
 								<span class="block truncate text-sm font-medium text-ink" title={d.key}>{d.name}</span>
-								<span class="block truncate text-[0.8rem] text-ink-3">{[typeWord(d.type), d.model].filter(Boolean).join(' · ')}</span>
+								<span class="block truncate text-[0.8125rem] text-ink-3">{[typeWord(d.type), d.model].filter(Boolean).join(' · ')}</span>
 							</span>
 							<span class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-2 tnum">
 								{#if d.clients !== null}<span>{d.clients === 1 ? m.devicesb_unifi_panel_client_count_one({ count: formatCount(d.clients) }) : m.devicesb_unifi_panel_client_count_other({ count: formatCount(d.clients) })}</span>{/if}

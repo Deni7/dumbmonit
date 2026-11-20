@@ -74,11 +74,11 @@
 </script>
 
 {#if loading && !ceph}
-	<section class="rounded-[var(--radius-card)] border border-line bg-surface px-5 py-4 shadow-lift" aria-busy="true" aria-label={m.devicesb_proxmox_ceph_loading()}>
+	<section class="rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 shadow-lift sm:px-5" aria-busy="true" aria-label={m.devicesb_proxmox_ceph_loading()}>
 		<Skeleton class="h-16 w-full" rows={1} />
 	</section>
 {:else if error}
-	<section class="rounded-[var(--radius-card)] border border-line bg-surface px-5 py-4 shadow-lift">
+	<section class="rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 shadow-lift sm:px-5">
 		<ErrorNotice {error} title={m.devicesb_proxmox_ceph_load_error()} onretry={() => void load()} />
 	</section>
 {:else if ceph?.available}

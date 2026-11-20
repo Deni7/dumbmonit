@@ -25,7 +25,7 @@
 <div
 	role="group"
 	aria-label={m.devices_targets_view_label()}
-	class="inline-flex shrink-0 items-center gap-0.5 rounded-lg border border-line-strong bg-surface-2 p-0.5 max-sm:gap-0 max-sm:p-0 shadow-[inset_0_1px_2px_rgb(0_0_0/0.04)]"
+	class="inline-flex shrink-0 items-center gap-0.5 rounded-lg border border-line-strong bg-surface-2 p-0.5 max-sm:gap-0 max-sm:p-0"
 >
 	{#each OPTIONS as option (option.id)}
 		{@const active = option.id === value}

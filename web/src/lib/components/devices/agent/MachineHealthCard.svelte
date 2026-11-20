@@ -281,7 +281,7 @@
 			<!-- One saturated core hides in the average -->
 			{#if heat.rows.length > 1 && heat.cols.length > 1}
 				<div class="mt-6">
-					<h3 class="text-sm font-medium text-ink">{m.devices_machine_cores_title()}</h3>
+					<h3 class="text-sm font-semibold text-ink">{m.devices_machine_cores_title()}</h3>
 					<p class="mb-2 text-sm text-ink-2">{m.devices_machine_cores_hint()}</p>
 					<Heatmap
 						rows={heat.rows}
@@ -303,7 +303,7 @@
 			<!-- Each real mount, with the day it fills up at the current pace -->
 			{#if fills.length > 0}
 				<div class="mt-6">
-					<h3 class="text-sm font-medium text-ink">{m.devices_machine_disks_title()}</h3>
+					<h3 class="text-sm font-semibold text-ink">{m.devices_machine_disks_title()}</h3>
 					<p class="mb-2 text-sm text-ink-2">{m.devices_machine_disks_hint()}</p>
 					<ul class="m-0 grid list-none gap-3 p-0 lg:grid-cols-2">
 						{#each fills as fill (fill.entity)}
@@ -332,14 +332,14 @@
 				<div class="mt-6 grid gap-6 lg:grid-cols-2">
 					{#if topCpu.length > 0}
 						<div class="min-w-0">
-							<h3 class="text-sm font-medium text-ink">{m.devices_machine_top_cpu()}</h3>
+							<h3 class="text-sm font-semibold text-ink">{m.devices_machine_top_cpu()}</h3>
 							<p class="mb-2 text-sm text-ink-2">{m.devices_machine_top_cpu_hint()}</p>
 							<TopN items={topCpu} limit={10} format={(v) => `${Math.round(v)} %`} label={m.devices_machine_top_cpu()} />
 						</div>
 					{/if}
 					{#if topMem.length > 0}
 						<div class="min-w-0">
-							<h3 class="text-sm font-medium text-ink">{m.devices_machine_top_mem()}</h3>
+							<h3 class="text-sm font-semibold text-ink">{m.devices_machine_top_mem()}</h3>
 							<p class="mb-2 text-sm text-ink-2">{m.devices_machine_top_mem_hint()}</p>
 							<TopN items={topMem} limit={10} format={formatBytes} label={m.devices_machine_top_mem()} />
 						</div>
