@@ -1,7 +1,7 @@
 // The outside weather beside the wall's date: icons, degrees. Run: npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { outdoorIcon, outdoorDegrees, OUTDOOR_REFRESH_MS } from '../src/lib/components/wall/outdoor.ts';
+import { outdoorIcon, outdoorDegrees, OUTDOOR_REFRESH_MS, OUTDOOR_RETRY_MS } from '../src/lib/components/wall/outdoor.ts';
 
 test('each condition has its icon, and the clear sky and the partial cloud turn to the moon at night', () => {
 	assert.equal(outdoorIcon('clear', true), 'sun');
@@ -25,4 +25,10 @@ test('the temperature is a whole number of degrees, minus sign included', () => 
 
 test('the wall asks no more often than the server refreshes', () => {
 	assert.ok(OUTDOOR_REFRESH_MS >= 10 * 60_000);
+});
+
+test('without a reading the wall retries sooner, never faster than the server retries', () => {
+	// `weather::RETRY_AFTER` on the server: one minute.
+	assert.ok(OUTDOOR_RETRY_MS >= 60_000);
+	assert.ok(OUTDOOR_RETRY_MS < OUTDOOR_REFRESH_MS);
 });

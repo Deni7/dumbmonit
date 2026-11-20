@@ -230,13 +230,21 @@ impl WeatherHub {
             ])
             .send()
             .await
-            .map_err(|error| tracing::debug!(%error, "Open-Meteo injoignable"))
+            .map_err(|error| {
+                tracing::warn!(error = %describe(error), "météo du mur : Open-Meteo injoignable");
+            })
             .ok()?;
         if !response.status().is_success() {
-            tracing::debug!(status = %response.status(), "Open-Meteo a refusé la demande");
+            tracing::warn!(status = %response.status(), "météo du mur : Open-Meteo a refusé");
             return None;
         }
-        let body: ForecastBody = response.json().await.ok()?;
+        let body: ForecastBody = response
+            .json()
+            .await
+            .map_err(|error| {
+                tracing::warn!(error = %describe(error), "météo du mur : réponse illisible");
+            })
+            .ok()?;
         let current = body.current?;
         Some(Reading {
             celsius: current.temperature_2m.filter(|t| t.is_finite())?,
@@ -245,9 +253,10 @@ impl WeatherHub {
         })
     }
 
-    /// Recherche de ville par nom (réglages du mur, administrateurs). `None`
-    /// quand Open-Meteo ne répond pas.
-    pub async fn search(&self, query: &str, language: &str) -> Option<Vec<Place>> {
+    /// Recherche de ville par nom (réglages du mur, administrateurs). En cas
+    /// d'échec, la raison en clair, sans l'adresse appelée, pour que la page
+    /// des réglages dise ce qui ne va pas au lieu de ne rien faire.
+    pub async fn search(&self, query: &str, language: &str) -> Result<Vec<Place>, String> {
         let url = format!("{}/v1/search", self.0.endpoints.geocoding.trim_end_matches('/'));
         let response = self
             .0
@@ -256,28 +265,59 @@ impl WeatherHub {
             .query(&[("name", query), ("count", "6"), ("language", language), ("format", "json")])
             .send()
             .await
-            .ok()?;
-        if !response.status().is_success() {
-            return None;
+            .map_err(describe)?;
+        let status = response.status();
+        if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+            return Err("the provider's rate limit was reached".into());
         }
-        let body: GeocodingBody = response.json().await.ok()?;
-        Some(
-            body.results
-                .unwrap_or_default()
-                .into_iter()
-                .filter_map(|hit| {
-                    let place = Place {
-                        name: hit.name?,
-                        region: hit.admin1,
-                        country: hit.country,
-                        latitude: hit.latitude?,
-                        longitude: hit.longitude?,
-                    };
-                    place.validate().is_ok().then_some(place)
-                })
-                .collect(),
-        )
+        if !status.is_success() {
+            return Err(format!("answered {}", status.as_u16()));
+        }
+        let body = response.bytes().await.map_err(describe)?;
+        parse_search(&body)
     }
+}
+
+/// Décrit une erreur réseau sans l'adresse, en 160 caractères au plus.
+fn describe(error: reqwest::Error) -> String {
+    if error.is_timeout() {
+        return "no answer in time".into();
+    }
+    let error = error.without_url();
+    let mut text = error.to_string();
+    let mut cause = std::error::Error::source(&error);
+    while let Some(inner) = cause {
+        text.push_str(": ");
+        text.push_str(&inner.to_string());
+        cause = inner.source();
+    }
+    if text.chars().count() <= 160 {
+        return text;
+    }
+    let cut: String = text.chars().take(159).collect();
+    format!("{}…", cut.trim_end())
+}
+
+/// Lit la réponse du géocodage : les lieux valides, dans l'ordre rendu. Une
+/// réponse sans `results` (rien trouvé) donne une liste vide.
+fn parse_search(body: &[u8]) -> Result<Vec<Place>, String> {
+    let body: GeocodingBody =
+        serde_json::from_slice(body).map_err(|error| format!("unexpected answer: {error}"))?;
+    Ok(body
+        .results
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|hit| {
+            let place = Place {
+                name: hit.name?,
+                region: hit.admin1.filter(|s| !s.trim().is_empty()),
+                country: hit.country.filter(|s| !s.trim().is_empty()),
+                latitude: hit.latitude?,
+                longitude: hit.longitude?,
+            };
+            place.validate().is_ok().then_some(place)
+        })
+        .collect())
 }
 
 fn shown(entry: &CacheEntry, unit: Unit) -> Option<Current> {
@@ -349,5 +389,25 @@ mod tests {
         assert!(Place { latitude: 91.0, ..ok.clone() }.validate().is_err());
         assert!(Place { name: "  ".into(), ..ok.clone() }.validate().is_err());
         assert!(Place { longitude: f64::NAN, ..ok }.validate().is_err());
+    }
+
+    #[test]
+    fn la_recherche_garde_les_lieux_valides_et_dit_pourquoi_elle_echoue() {
+        let body = br#"{"results":[
+            {"name":"Lyon","latitude":45.75,"longitude":4.85,
+             "admin1":"Auvergne-Rhône-Alpes","country":"France"},
+            {"name":"Hors carte","latitude":400.0,"longitude":4.85},
+            {"name":"Sans région","latitude":10.0,"longitude":20.0,"admin1":"  ","country":""}],
+            "generationtime_ms":0.4}"#;
+        let places = parse_search(body).unwrap();
+        assert_eq!(places.len(), 2, "le lieu hors limites est écarté");
+        assert_eq!(places[0].region.as_deref(), Some("Auvergne-Rhône-Alpes"));
+        assert_eq!(places[1].region, None);
+        assert_eq!(places[1].country, None);
+        // Rien trouvé : une liste vide, pas une erreur.
+        assert!(parse_search(br#"{"generationtime_ms":0.1}"#).unwrap().is_empty());
+        // Une réponse illisible dit pourquoi au lieu de rendre `None` en silence.
+        let why = parse_search(b"<html>oops</html>").unwrap_err();
+        assert!(why.starts_with("unexpected answer"), "{why}");
     }
 }

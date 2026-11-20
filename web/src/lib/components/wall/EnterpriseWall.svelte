@@ -58,7 +58,7 @@
 	import { Button, Skeleton, calmMotion } from '#lib/ui/index.js';
 	import WallBand, { type BandFigure } from '#lib/components/wall/WallBand.svelte';
 	import WallOutdoor from '#lib/components/wall/WallOutdoor.svelte';
-	import { OUTDOOR_REFRESH_MS } from '#lib/components/wall/outdoor.js';
+	import { OUTDOOR_REFRESH_MS, OUTDOOR_RETRY_MS } from '#lib/components/wall/outdoor.js';
 	import WallDevices from '#lib/components/wall/WallDevices.svelte';
 	import WallProblems from '#lib/components/wall/WallProblems.svelte';
 	import WallSceneControl from '#lib/components/wall/WallSceneControl.svelte';
@@ -90,7 +90,8 @@
 
 	// The weather outside, beside the date. The server asks Open-Meteo (browsers
 	// never do) and keeps the reading ten minutes; a failure, or no place chosen
-	// in Settings, leaves the wall without it, silently.
+	// in Settings, leaves the wall without it, silently, and the wall asks again
+	// after a minute rather than ten, so a city just chosen shows up quickly.
 	let outdoor = $state<OutdoorWeather | null>(null);
 	$effect(() => {
 		const controller = new AbortController();
@@ -107,7 +108,7 @@
 					if (cause instanceof ApiError && cause.missing) stopped = true;
 				}
 			}
-			if (!stopped && !controller.signal.aborted) timer = setTimeout(poll, OUTDOOR_REFRESH_MS);
+			if (!stopped && !controller.signal.aborted) timer = setTimeout(poll, outdoor?.current ? OUTDOOR_REFRESH_MS : OUTDOOR_RETRY_MS);
 		};
 		untrack(() => void poll());
 		return () => {
