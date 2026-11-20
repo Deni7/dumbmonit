@@ -3,7 +3,9 @@
 	/**
 	 * The rack itself, in one of two layouts (`view.ts`): one dense line each
 	 * with children indented under their parent, or plain tiles in a grid.
-	 * Ordering lives in `rack.ts`.
+	 * Ordering lives in `rack.ts`; which sub-monitors are folded inside their
+	 * parent is decided by the page (`nesting.ts`), this only draws the rows
+	 * it is given and reports the disclosure (`ontoggle`).
 	 *
 	 * `reorder`, when given, makes the row itself the drag surface — no
 	 * separate handle. Pointer-based (mouse and touch — HTML5 drag-and-drop
@@ -76,11 +78,11 @@
 		selection?: RowSelection | null;
 		/** id → the last 24 hours, one cell per hour, for the availability bar. */
 		river?: Map<TargetId, RiverCell[]>;
-		/** id → latest response time in milliseconds. */
-		latency?: Map<TargetId, number>;
+		/** Opens or closes a parent's sub-monitors; `open` is its current state. Compact layout only. */
+		ontoggle?: ((id: TargetId, open: boolean) => void) | null;
 	}
 
-	let { rows, sparklines, kindLabels, sites = new Map(), showSite = true, reorder = null, layout = 'compact', names = new Map(), security = new Map(), alertCounts = new Map(), selection = null, river = new Map(), latency = new Map() }: Props = $props();
+	let { rows, sparklines, kindLabels, sites = new Map(), showSite = true, reorder = null, layout = 'compact', names = new Map(), security = new Map(), alertCounts = new Map(), selection = null, river = new Map(), ontoggle = null }: Props = $props();
 
 	const LIST_CLASS: Record<RackView, string> = {
 		compact: 'flex flex-col divide-y divide-line',
@@ -107,7 +109,10 @@
 					security={security.get(row.target.id) ?? null}
 					alerts={alertCounts.get(row.target.id)}
 					river={river.get(row.target.id) ?? null}
-					latencyMs={latency.get(row.target.id) ?? null}
+					childCount={row.childCount ?? 0}
+					trouble={row.trouble ?? 0}
+					open={row.open ?? false}
+					ontoggle={ontoggle ? () => ontoggle?.(id, row.open ?? false) : undefined}
 				/>
 			{:else}
 				<RackTile
@@ -201,10 +206,8 @@
 					<span class="truncate">{m.devices_cols_name()}</span>
 					<span class={`${SHOW.site} justify-center truncate`}>{m.devices_cols_site()}</span>
 					<span class={`${SHOW.river} truncate`}>{m.devices_cols_last24h()}</span>
-					<span class={`${SHOW.response} truncate text-right`}>{m.devices_cols_response()}</span>
 					<span class={`${SHOW.security} justify-center truncate`}>{m.devices_cols_security()}</span>
 					<span class="truncate text-right">{m.devices_cols_checked()}</span>
-					<span></span>
 				</div>
 			</div>
 		</div>

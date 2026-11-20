@@ -1,24 +1,27 @@
 <script lang="ts">
 	import { withBase } from '#lib/paths.js';
 	/**
-	 * One monitor as a row of the table on /targets. Every piece of information
-	 * has a column of its own, the same width on every row whether the monitor
-	 * has an alert, a score or a site or not (an empty cell stays empty):
+	 * One monitor as a row of the table on /targets. Every column is the same
+	 * width on every row whether the monitor has a score or a site or not (an
+	 * empty cell stays empty):
 	 * status (a shape-coded mark, no word), name over its kind and address, site,
-	 * the last 24 hours as 24 hourly segments, response time, security grade,
-	 * age of the last check, alerts. `columns.ts` holds the grid shared with
-	 * the header line, and which columns fold when the list is narrow.
-	 * Opened through a stretched link on the name, so the security grade and
-	 * the alert count can link on their own.
+	 * the last 24 hours as 24 hourly segments, security grade, age of the last
+	 * check. The alert count sits on the name line, right after the name, and
+	 * so does the disclosure of a parent's sub-monitors (`nesting.ts`).
+	 * `columns.ts` holds the grid shared with the header line, and which
+	 * columns fold when the list is narrow.
+	 * Opened through a stretched link on the name, so the security grade, the
+	 * alert count and the disclosure act on their own.
 	 */
 	import type { Target } from '#lib/api/index.js';
 	import type { TargetState } from '#lib/format.js';
-	import { STATE_LABEL, STATE_TONE, formatAge, formatDateTime, formatLatency } from '#lib/format.js';
+	import { STATE_LABEL, STATE_TONE, formatAge, formatDateTime } from '#lib/format.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import SecurityBadge from './SecurityBadge.svelte';
 	import SiteBadge from './SiteBadge.svelte';
 	import { StatusMark } from '#lib/ui/index.js';
 	import AlertBell from './AlertBell.svelte';
+	import { AlertTriangle, ChevronRight } from 'lucide-svelte';
 	import { GRID, ROW_HEIGHT, SHOW, STATE_SHAPE } from './columns';
 	import type { RiverCell } from '#lib/components/enterprise/fleet.js';
 	import type { TargetAlertCounts } from '#lib/alerts-attention.js';
@@ -34,12 +37,18 @@
 		shadowed?: boolean;
 		/** Security grade, when the score is on and this kind is rated. */
 		security?: { grade: SecurityGrade | null; score: number | null } | null;
-		/** Active alerts of this monitor; an empty cell without any. */
+		/** Active alerts of this monitor, after its name; nothing without any. */
 		alerts?: TargetAlertCounts;
 		/** The last 24 hours, one cell per hour, oldest first; grey cells without data. */
 		river?: RiverCell[] | null;
-		/** Latest response time in milliseconds, when the monitor measures one. */
-		latencyMs?: number | null;
+		/** Direct sub-monitors listed under this one; no disclosure without any. */
+		childCount?: number;
+		/** Sub-monitors below, at any depth, that need attention. */
+		trouble?: number;
+		/** The sub-monitors are shown. */
+		open?: boolean;
+		/** Opens or closes the sub-monitors. */
+		ontoggle?: () => void;
 	}
 
 	let {
@@ -52,7 +61,10 @@
 		security = null,
 		alerts,
 		river = null,
-		latencyMs = null
+		childCount = 0,
+		trouble = 0,
+		open = false,
+		ontoggle
 	}: Props = $props();
 
 	const SLOTS = 24;
@@ -73,10 +85,13 @@
 			none: cells.filter((c) => c === 'none').length
 		})
 	);
-	/** A failed or paused monitor has no current response time worth showing. */
-	const showLatency = $derived(
-		latencyMs !== null && (state === 'online' || state === 'pending' || state === 'unknown')
+	const toggleLabel = $derived(
+		trouble > 0
+			? m.devices_rack_children_trouble({ name: target.name, count: childCount, trouble })
+			: m.devices_rack_children({ name: target.name, count: childCount })
 	);
+	/** A closed parent with trouble below says so, by an icon as well as the tone. */
+	const hiddenTrouble = $derived(!open && trouble > 0);
 	/** An address that only repeats the name tells nothing more. */
 	const address = $derived(target.address.trim().toLowerCase() === target.name.trim().toLowerCase() ? '' : target.address);
 	const kind = $derived(kindLabel ?? target.kind);
@@ -89,11 +104,36 @@
 		</span>
 
 		<span class="min-w-0" style={depth ? `padding-left: ${Math.min(depth, 3) * 1.25}rem` : undefined}>
-			<a
-				href={withBase(`/targets/${target.id}`)}
-				class="block min-w-0 truncate text-[0.875rem] font-semibold leading-5 text-ink after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-signal"
-				aria-label={`${target.name}, ${STATE_LABEL[state]}`}
-			>{target.name}</a>
+			<!-- The name line: the name, then its alert count and its sub-monitors, inline. -->
+			<span class="flex h-5 min-w-0 items-center gap-1">
+				<a
+					href={withBase(`/targets/${target.id}`)}
+					class="min-w-0 truncate text-[0.875rem] font-semibold leading-5 text-ink after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-signal"
+					aria-label={`${target.name}, ${STATE_LABEL[state]}`}
+				>{target.name}</a>
+				<!-- 40 px hit areas, pulled into the 20 px line so the row keeps its height. -->
+				<AlertBell quiet targetId={target.id} counts={alerts} class="-my-2.5" />
+				{#if childCount > 0 && ontoggle}
+					<button
+						type="button"
+						class="group relative z-[1] -my-2.5 inline-flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-[var(--radius-plate)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
+						aria-expanded={open}
+						aria-label={toggleLabel}
+						title={toggleLabel}
+						onclick={ontoggle}
+						onpointerdown={(e) => e.stopPropagation()}
+						onkeydown={(e) => e.stopPropagation()}
+					>
+						<span
+							class={`tnum inline-flex h-6 items-center gap-0.5 rounded-[var(--radius-plate)] border px-1 text-[0.75rem] font-semibold leading-none transition-colors group-hover:border-line-strong ${hiddenTrouble ? 'border-warning/35 bg-warning-soft text-warning-ink' : 'border-line text-ink-3'}`}
+						>
+							<ChevronRight class={`size-3.5 shrink-0 transition-transform motion-reduce:transition-none ${open ? 'rotate-90' : ''}`} aria-hidden="true" />
+							{#if hiddenTrouble}<AlertTriangle class="size-3 shrink-0" aria-hidden="true" />{/if}
+							<span aria-hidden="true">{childCount}</span>
+						</span>
+					</button>
+				{/if}
+			</span>
 			<span class="flex min-w-0 items-center gap-1.5 text-[0.75rem] leading-4 text-ink-3">
 				{#if site}<SiteBadge code={site.code} name={site.name} class="@xl:hidden" />{/if}
 				<span class="truncate" title={address || undefined}>{address ? `${kind} · ${address}` : kind}</span>
@@ -112,10 +152,6 @@
 			</span>
 		</span>
 
-		<span class={`${SHOW.response} tnum truncate text-right font-mono text-[0.75rem] text-ink-3`}>
-			{showLatency ? formatLatency((latencyMs ?? 0) / 1000) : '—'}
-		</span>
-
 		<span class={`${SHOW.security} items-center justify-center`}>
 			{#if security?.grade}
 				<SecurityBadge quiet grade={security.grade} score={security.score} href={`/targets/${target.id}#security`} class="relative z-[1] !min-w-10 justify-center" />
@@ -124,10 +160,6 @@
 
 		<span class="tnum truncate text-right text-[0.75rem] text-ink-3" title={target.last_probe_at ? formatDateTime(target.last_probe_at) : undefined}>
 			{formatAge(target.last_probe_at)}
-		</span>
-
-		<span class="flex items-center justify-center">
-			<AlertBell quiet targetId={target.id} counts={alerts} />
 		</span>
 	</div>
 </div>

@@ -14,6 +14,14 @@ export interface RackRow {
 	depth: number;
 	/** An ancestor is unreachable: this unit's alerts are suppressed. */
 	shadowed: boolean;
+	/** Listed only because a sub-monitor under it matches the filters (see `nesting.ts`). */
+	context?: boolean;
+	/** Direct sub-monitors listed under this row; set by `foldRack`. */
+	childCount?: number;
+	/** Sub-monitors under this row, at any depth, that need attention; set by `foldRack`. */
+	trouble?: number;
+	/** Its sub-monitors are shown; set by `foldRack`. */
+	open?: boolean;
 }
 
 /** A row's live screen position, read once when a drag starts (rows never reflow mid-drag). */

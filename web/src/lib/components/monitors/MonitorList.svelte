@@ -7,7 +7,7 @@
 	 *
 	 * One sober toolbar (search, Filter, List/Tiles, New folder, Select, Add);
 	 * the filters, the sort and the tags fold behind "Filter". Children are
-	 * listed under their parent, in folders.
+	 * folded inside their parent (`nesting.ts`), in folders.
 	 * Targets and probe states come from the shared store (polled app-wide by
 	 * the root layout, see `alertsStore`); this page only adds the sparklines,
 	 * from one batched query refreshed every 30 s.
@@ -27,7 +27,7 @@
 	} from '#lib/api/index.js';
 	import { displayState } from '#lib/format.js';
 	import { loadSparklines } from '#lib/metrics.js';
-	import { loadLatency, loadRiver, DAY_SECONDS, type RiverCell } from '#lib/components/enterprise/fleet.js';
+	import { loadRiver, DAY_SECONDS, type RiverCell } from '#lib/components/enterprise/fleet.js';
 	import { getSecuritySummary } from '#lib/api/security.js';
 	import type { SecurityGrade } from '#lib/api/index.js';
 	import type { Serie } from '#lib/components/Chart.svelte';
@@ -44,6 +44,14 @@
 	import ViewSwitcher from '#lib/components/devices/ViewSwitcher.svelte';
 	import { loadRackView, saveRackView, type RackView } from '#lib/components/devices/view.js';
 	import { buildRack, nearestRow, needsAttention, type RackRow } from '#lib/components/devices/rack.js';
+	import {
+		foldRack,
+		loadOpenChoices,
+		markContext,
+		nestSorted,
+		saveOpenChoices,
+		withAncestors
+	} from '#lib/components/devices/nesting.js';
 	import {
 		SORT_KEYS,
 		cveScanChanges,
@@ -98,9 +106,8 @@
 	/** One pass over the shared alert list, not a request per monitor. */
 	const alertCounts = $derived(countAlertsByTarget(alertsStore.alerts));
 	let sparklines = $state<Map<TargetId, Serie[]>>(new Map());
-	/** Last 24 hours per monitor, one cell per hour, and the latest response time (ms): the table's columns. */
+	/** Last 24 hours per monitor, one cell per hour: the table's bars. */
 	let river = $state<Map<TargetId, RiverCell[]>>(new Map());
-	let latency = $state<Map<TargetId, number>>(new Map());
 	/** Security badges: empty while the score is off in Settings, or for unrated kinds. */
 	let security = $state<Map<TargetId, { grade: SecurityGrade | null; score: number | null }>>(new Map());
 	let kindLabels = $state<Map<string, string>>(new Map());
@@ -266,19 +273,34 @@
 	const split = $derived(splitDisabled(targets, stateOf));
 	const activeVisible = $derived(new Set([...visible].filter((id) => split.active.has(id))));
 	const disabledVisible = $derived(new Set([...visible].filter((id) => split.disabled.has(id))));
+	// In the table, a sub-monitor that matches the filters is shown inside its
+	// parents, brought along as context (not counted, not in "select all").
+	// Unfiltered, nothing is added; the tiles stay flat.
+	const nested = $derived(view === 'compact');
+	const activeListed = $derived(nested ? withAncestors(effectiveTargets, activeVisible, split.active) : activeVisible);
+	const disabledListed = $derived(nested ? withAncestors(effectiveTargets, disabledVisible, split.disabled) : disabledVisible);
+	const nest = (rows: RackRow[]): RackRow[] => (nested ? nestSorted(rows) : rows);
 	const kindText = (value: string) => kindLabels.get(value) ?? value;
 	const folderSections = $derived.by(() => {
 		if (sorted) {
-			const rows = sortTargets(
-				effectiveTargets.filter((t) => activeVisible.has(t.id)),
-				stateOf,
-				kindText,
-				sort as Exclude<SortKey, 'default'>,
-				sortDir
+			const rows = markContext(
+				nest(
+					sortTargets(
+						effectiveTargets.filter((t) => activeListed.has(t.id)),
+						stateOf,
+						kindText,
+						sort as Exclude<SortKey, 'default'>,
+						sortDir
+					)
+				),
+				activeVisible
 			);
 			return rows.length > 0 ? [{ key: '', label: '', rows }] : [];
 		}
-		const base = buildFolders(effectiveTargets, stateOf, activeVisible);
+		const base = buildFolders(effectiveTargets, stateOf, activeListed).map((section) => ({
+			...section,
+			rows: markContext(section.rows, activeVisible)
+		}));
 		if (filtered || pendingEmptyFolders.size === 0) return base;
 		const extra = [...pendingEmptyFolders]
 			.filter((key) => !base.some((s) => s.key === key))
@@ -287,22 +309,63 @@
 		return [...base, ...extra].sort(compareFolderSections);
 	});
 	const disabledRows = $derived.by((): RackRow[] =>
-		sorted
-			? sortTargets(
-					effectiveTargets.filter((t) => disabledVisible.has(t.id)),
-					stateOf,
-					kindText,
-					sort as Exclude<SortKey, 'default'>,
-					sortDir
-				)
-			: buildRack(effectiveTargets, stateOf, disabledVisible)
+		markContext(
+			sorted
+				? nest(
+						sortTargets(
+							effectiveTargets.filter((t) => disabledListed.has(t.id)),
+							stateOf,
+							kindText,
+							sort as Exclude<SortKey, 'default'>,
+							sortDir
+						)
+					)
+				: buildRack(effectiveTargets, stateOf, disabledListed),
+			disabledVisible
+		)
 	);
+	/** Rows that match the filters, without the parents shown as context. */
+	const matchCount = (rows: RackRow[]) => rows.reduce((n, row) => n + (row.context ? 0 : 1), 0);
+	const disabledCount = $derived(matchCount(disabledRows));
 	let disabledOpen = $state(false);
 	/** The "Disabled" segment is about nothing else: no point folding it. */
 	const disabledExpanded = $derived(segment === 'disabled' || disabledOpen);
-	const totalRows = $derived(folderSections.reduce((n, s) => n + s.rows.length, 0) + disabledRows.length);
+	const totalRows = $derived(folderSections.reduce((n, s) => n + matchCount(s.rows), 0) + disabledCount);
 	/** A single, group-less section looks exactly like the old flat list — no header shown. */
 	const showFolderHeaders = $derived(folderSections.length > 1 || (folderSections[0]?.key ?? '') !== '');
+
+	// --- Sub-monitors folded inside their parent (compact layout; the tiles
+	// stay flat). Unfiltered, a parent opens by itself when something below it
+	// needs attention, and a parent opened or closed by hand stays so for this
+	// viewer. Filtered, every parent of a match opens; a toggle then lasts
+	// until the filters change. ---
+	let openChoices = $state<Map<TargetId, boolean>>(untrack(() => loadOpenChoices()));
+	let filterOpenChoices = $state<Map<TargetId, boolean>>(new Map());
+	const listNarrowed = $derived(filtered || site !== '');
+	$effect(() => {
+		void urlSearch;
+		untrack(() => {
+			if (filterOpenChoices.size > 0) filterOpenChoices = new Map();
+		});
+	});
+	function isOpen(id: TargetId, trouble: number): boolean {
+		if (listNarrowed) return filterOpenChoices.get(id) ?? true;
+		return openChoices.get(id) ?? trouble > 0;
+	}
+	function toggleOpen(id: TargetId, open: boolean) {
+		if (listNarrowed) {
+			filterOpenChoices = new Map(filterOpenChoices).set(id, !open);
+			return;
+		}
+		const next = new Map(openChoices).set(id, !open);
+		openChoices = next;
+		// Monitors deleted since are forgotten rather than kept for ever.
+		saveOpenChoices(new Map([...next].filter(([key]) => names.has(key))));
+	}
+	const fold = (rows: RackRow[]): RackRow[] => (nested ? foldRack(rows, isOpen) : rows);
+	/** What is drawn: each section's rows with closed parents' sub-monitors left out. */
+	const shownSections = $derived(folderSections.map((section) => ({ ...section, shown: fold(section.rows) })));
+	const shownDisabledRows = $derived(fold(disabledRows));
 
 	function clearFilters() {
 		search = '';
@@ -529,14 +592,18 @@
 	let bulkReport = $state<{ failed: { name: string; error: unknown }[]; total: number } | null>(null);
 	let bulkFolderDraft = $state('');
 
-	/** Ids on screen in an unfolded list: what "select all" and the bulk actions can reach. */
+	/**
+	 * Ids on screen in an unfolded list, inside open parents: what "select all"
+	 * and the bulk actions can reach. A parent shown only as the context of a
+	 * matching sub-monitor is left out.
+	 */
 	const shownIds = $derived.by(() => {
 		const ids: TargetId[] = [];
-		for (const section of folderSections) {
+		for (const section of shownSections) {
 			if (showFolderHeaders && collapsedFolders.has(section.key)) continue;
-			for (const row of section.rows) ids.push(row.target.id);
+			for (const row of section.shown) if (!row.context) ids.push(row.target.id);
 		}
-		if (disabledExpanded) for (const row of disabledRows) ids.push(row.target.id);
+		if (disabledExpanded) for (const row of shownDisabledRows) if (!row.context) ids.push(row.target.id);
 		return ids;
 	});
 	const shownSet = $derived(new Set(shownIds));
@@ -1013,12 +1080,12 @@
 		// failure here must not take the rack down with it.
 		const next = await loadSparklines(24 * 3600, signal).catch(() => null);
 		if (next) sparklines = next;
-		const [cells, times] = await Promise.all([
-			loadRiver(DAY_SECONDS, signal, 24).catch(() => null),
-			loadLatency(1800, signal).catch(() => null)
-		]);
+	}
+
+	/** The table's 24 hourly segments: one aggregated query for the whole fleet. */
+	async function loadBars(signal?: AbortSignal) {
+		const cells = await loadRiver(DAY_SECONDS, signal, 24).catch(() => null);
 		if (cells) river = cells;
-		if (times) latency = new Map([...times].filter(([, v]) => v.length > 0).map(([id, v]) => [id, v[v.length - 1]]));
 	}
 
 	async function loadSecurity(signal?: AbortSignal) {
@@ -1049,6 +1116,21 @@
 		return () => {
 			controller.abort();
 			clearInterval(securityTimer);
+		};
+	});
+
+	// The "Last 24 h" bars are drawn by the compact table (the default): they
+	// were once fetched with the sparklines below, which only the tiles load,
+	// so the table never received any. One `min by (target)` query, refreshed
+	// every minute (a slot is an hour).
+	$effect(() => {
+		if (view !== 'compact') return;
+		const controller = new AbortController();
+		void loadBars(controller.signal);
+		const timer = setInterval(() => void loadBars(controller.signal), 60_000);
+		return () => {
+			controller.abort();
+			clearInterval(timer);
 		};
 	});
 
@@ -1461,13 +1543,13 @@
 		</div>
 	{/if}
 	<div class={`flex flex-col ${view === 'compact' ? 'gap-3' : 'gap-4'}`}>
-		{#each folderSections as section (section.key)}
+		{#each shownSections as section (section.key)}
 			{@const collapsed = collapsedFolders.has(section.key)}
 			{#if showFolderHeaders}
 				<FolderHeader
 					label={section.label}
 					folderKey={section.key}
-					count={section.rows.length}
+					count={matchCount(section.rows)}
 					worst={worstState(section.rows)}
 					{collapsed}
 					ontoggle={() => toggleFolder(section.key)}
@@ -1482,7 +1564,7 @@
 			{/if}
 			{#if !collapsed}
 				<RackList
-					rows={section.rows}
+					rows={section.shown}
 					{sparklines}
 					{kindLabels}
 					{sites}
@@ -1494,14 +1576,14 @@
 					{alertCounts}
 					{selection}
 					{river}
-					{latency}
+					ontoggle={toggleOpen}
 				/>
 			{/if}
 		{/each}
 		{#if disabledRows.length > 0}
-			<section aria-label={m.devices_list_disabled_section({ count: disabledRows.length })}>
+			<section aria-label={m.devices_list_disabled_section({ count: disabledCount })}>
 				{#if segment === 'disabled'}
-					<h2 class="mb-2 text-sm font-semibold text-ink-2">{m.devices_list_disabled_section({ count: disabledRows.length })}</h2>
+					<h2 class="mb-2 text-sm font-semibold text-ink-2">{m.devices_list_disabled_section({ count: disabledCount })}</h2>
 				{:else}
 					<button
 						type="button"
@@ -1510,11 +1592,11 @@
 						onclick={() => (disabledOpen = !disabledOpen)}
 					>
 						<ChevronRight class={`size-4 transition-transform motion-reduce:transition-none ${disabledOpen ? 'rotate-90' : ''}`} aria-hidden="true" />
-						{m.devices_list_disabled_section({ count: disabledRows.length })}
+						{m.devices_list_disabled_section({ count: disabledCount })}
 					</button>
 				{/if}
 				{#if disabledExpanded}
-					<RackList rows={disabledRows} {sparklines} {kindLabels} {sites} {showSite} layout={view} {names} {alertCounts} {selection} {river} {latency} />
+					<RackList rows={shownDisabledRows} {sparklines} {kindLabels} {sites} {showSite} layout={view} {names} {alertCounts} {selection} {river} ontoggle={toggleOpen} />
 				{/if}
 			</section>
 		{/if}
