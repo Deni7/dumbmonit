@@ -160,16 +160,13 @@ export const test = base.extend<Fixtures, { env: Env }>({
 			reducedMotion,
 			ignoreHTTPSErrors
 		});
-		// Playwright's own `trace` option may already record every new context: then keep its trace.
-		await context.tracing.start({ screenshots: true, snapshots: true }).catch(() => {});
+		// No tracing of our own: the config's `trace: 'retain-on-failure'` already records this
+		// context, and a second start/stop pair breaks its close.
 		const page = await context.newPage();
 		guard.watch(page);
 		await use(page);
 		if (testInfo.status !== testInfo.expectedStatus) {
 			await page.screenshot({ path: testInfo.outputPath('visitor.png'), fullPage: true }).catch(() => {});
-			await context.tracing.stop({ path: testInfo.outputPath('visitor-trace.zip') }).catch(() => {});
-		} else {
-			await context.tracing.stop().catch(() => {});
 		}
 		await context.close();
 	}
