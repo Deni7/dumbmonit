@@ -5,8 +5,8 @@
 	 * clients and alarms. Read from the latest stored measurement — opening the
 	 * page never connects to the controller.
 	 */
-	import { untrack } from 'svelte';
 	import { queryInstant, type Target } from '#lib/api/index.js';
+	import { startPolling } from '#lib/poll.js';
 	import { ErrorNotice, Panel, Plate } from '#lib/ui/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import ClientDevicesTable from '../ClientDevicesTable.svelte';
@@ -72,13 +72,7 @@
 		void target.id;
 		loading = true;
 		view = emptyView();
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 
 	const down = $derived(view.devices.filter((d) => d.up === false).length);

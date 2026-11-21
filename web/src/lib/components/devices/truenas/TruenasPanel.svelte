@@ -7,8 +7,8 @@
 	 * machine. Three reads of what the probe stored, refreshed every minute;
 	 * the NAS is never asked because a page was opened.
 	 */
-	import { untrack } from 'svelte';
 	import { getTruenasHealth, getTruenasProtection, getTruenasStorage } from '#lib/api/truenas.js';
+	import { startPolling } from '#lib/poll.js';
 	import type { Target, TruenasHealth, TruenasProtection, TruenasStorage } from '#lib/api/index.js';
 	import { ErrorNotice, Panel, Plate, Skeleton } from '#lib/ui/index.js';
 	import { m } from '#lib/paraglide/messages.js';
@@ -73,13 +73,7 @@
 		storage = null;
 		protection = null;
 		health = null;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 </script>
 

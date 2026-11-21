@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { m } from '#lib/paraglide/messages.js';
+	import { startPolling } from '#lib/poll.js';
 	/**
 	 * MDaemon Email Server and SecurityGateway: the mail services as seen from
 	 * outside, the version, and (SecurityGateway 12.5+) the REST API's
@@ -17,7 +18,6 @@
 	 * setting; a banner says so when there is none or it is silent (see
 	 * `queues.ts` for how an agent without the setting is found).
 	 */
-	import { untrack } from 'svelte';
 	import { listTargets, queryInstant, type Target } from '#lib/api/index.js';
 	import { ErrorNotice, Panel, Plate } from '#lib/ui/index.js';
 	import MailAgentBanner from './MailAgentBanner.svelte';
@@ -201,13 +201,7 @@
 		void target.id;
 		loading = true;
 		reading = EMPTY;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 
 	function label(name: string): string {

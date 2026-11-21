@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { withBase } from '#lib/paths.js';
+	import { startPolling } from '#lib/poll.js';
 	/**
 	 * Compact status view for an iframe — `/s/<slug>/embed`. The overall state
 	 * and one line per service (state word + label, a short history bar when
@@ -40,14 +41,8 @@
 	$effect(() => {
 		const current = slug;
 		if (!current) return;
-		const controller = new AbortController();
 		status = null;
-		void load(controller.signal);
-		const timer = setInterval(() => void load(controller.signal), REFRESH_MS);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, REFRESH_MS);
 	});
 
 	$effect(() => {

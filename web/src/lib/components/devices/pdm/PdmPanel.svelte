@@ -6,8 +6,8 @@
 	 * Three reads of what the probe stored, refreshed every minute; neither the
 	 * console nor the clusters it manages are queried when the page opens.
 	 */
-	import { untrack } from 'svelte';
 	import { getPdmHealth, getPdmRemotes, listPdmFailures } from '#lib/api/pdm.js';
+	import { startPolling } from '#lib/poll.js';
 	import type { PdmFailure, PdmHealth, PdmRemotes, Target } from '#lib/api/index.js';
 	import { ErrorNotice, Panel, Plate, Skeleton } from '#lib/ui/index.js';
 	import { m } from '#lib/paraglide/messages.js';
@@ -62,13 +62,7 @@
 		remotes = null;
 		failures = [];
 		health = null;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 </script>
 

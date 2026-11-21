@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { m } from '#lib/paraglide/messages.js';
+	import { startPolling } from '#lib/poll.js';
 	/**
 	 * WireGuard tunnels seen by the agent (`wg show all dump`): one block per
 	 * interface, one line per peer with the time since its last handshake.
@@ -12,7 +13,6 @@
 	 * persistent keepalive are expected to stay up; the others (a phone, a
 	 * laptop) are idle, not broken.
 	 */
-	import { untrack } from 'svelte';
 	import { queryInstant, type Target } from '#lib/api/index.js';
 	import { ErrorNotice, Panel, Plate, type Tone } from '#lib/ui/index.js';
 	import { formatAge, formatBytes } from '../docker/api';
@@ -128,13 +128,7 @@
 		void target.id;
 		loading = true;
 		interfaces = [];
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 
 	const silent = $derived(

@@ -6,6 +6,7 @@
 	 * its first alert, kept on the instance only.
 	 */
 	import { BookOpen } from 'lucide-svelte';
+	import { startPolling } from '#lib/poll.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { getHealth, getOnboarding, type ComponentHealth, type FirstRunTimings, type Health } from '#lib/api/index.js';
 	import { formatDateTime, formatDuration, parseServerDate } from '#lib/format.js';
@@ -34,13 +35,7 @@
 	}
 
 	$effect(() => {
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void load(controller.signal), 15_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 15_000);
 	});
 
 	// The configuration changes an update asked for (administrators): the list

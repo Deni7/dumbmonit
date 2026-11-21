@@ -13,6 +13,7 @@
 	 * Rows come from `GET /api/targets/{id}/proxmox/ceph`.
 	 */
 	import { readProxmoxCeph } from '#lib/api/proxmox.js';
+	import { startPolling } from '#lib/poll.js';
 	import type { ProxmoxCeph, Target } from '#lib/api/index.js';
 	import { ErrorNotice, Led, Plate, Skeleton } from '#lib/ui/index.js';
 	import { m } from '#lib/paraglide/messages.js';
@@ -42,14 +43,8 @@
 	}
 
 	$effect(() => {
-		const controller = new AbortController();
 		loading = true;
-		void load(controller.signal);
-		const timer = setInterval(() => void load(controller.signal), 30_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 30_000);
 	});
 
 	const health = $derived(cephHealth(ceph?.health ?? null, ceph?.health_status ?? null));

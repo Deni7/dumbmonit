@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { m } from '#lib/paraglide/messages.js';
+	import { startPolling } from '#lib/poll.js';
 	/**
 	 * Home Assistant: whether the core runs, then what needs a hand — low
 	 * batteries, updates, open repairs, unavailable entities — then the
 	 * entities by domain. Read from the latest stored measurement; opening the
 	 * page never connects to Home Assistant.
 	 */
-	import { untrack } from 'svelte';
 	import { queryInstant, type Target } from '#lib/api/index.js';
 	import { ErrorNotice, Panel, Plate, type Tone } from '#lib/ui/index.js';
 	import ClientDevicesTable from '../ClientDevicesTable.svelte';
@@ -155,13 +155,7 @@
 		void target.id;
 		loading = true;
 		view = EMPTY;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 
 	function severityTone(severity: string): Tone {

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { withBase } from '#lib/paths.js';
+	import { startPolling } from '#lib/poll.js';
 	/**
 	 * Mail server reputation and IP range blocklist: the last check as the
 	 * probe stored it, list by list, then every listing with its lookup and
@@ -8,7 +9,6 @@
 	 * they publish no blocklist that can be queried. Refreshed every minute;
 	 * opening the page never queries a blocklist.
 	 */
-	import { untrack } from 'svelte';
 	import { ExternalLink } from 'lucide-svelte';
 	import { getBlacklistOverview } from '#lib/api/blacklist.js';
 	import type { BlacklistAddress, BlacklistCheck, BlacklistList, BlacklistOverview, Target } from '#lib/api/index.js';
@@ -45,13 +45,7 @@
 		void target.id;
 		loading = true;
 		view = null;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 
 	const isMail = $derived(target.kind === 'mail_blacklist');
