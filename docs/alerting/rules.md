@@ -20,6 +20,12 @@ below is shipped enabled on every instance.
 | Disk almost full | Filesystem 90% full or more, per mount point (SNMP, Proxmox storages and root filesystems); clears below 88 %. | ≥ 90 % | 15 min | Advisory (`warning`), escalates after 24 h | 6 h |
 | Filesystem almost full | At this rate, the filesystem will be full within four days (`predict_linear` over 6 h; rising filesystems only). | ≥ 100 % | 30 min | Advisory (`warning`) | 6 h |
 
+### Service level objectives
+
+| Rule | What | Default threshold | Hold | Severity | Reminder |
+|---|---|---|---|---|---|
+| Error budget burning | An [SLO](../using/slos.md) spends its error budget too fast: 6× the sustainable rate over 6 h and 30 min (slow burn, value 1), or 14.4× over 1 h and 5 min (fast burn, value 2, raised to Warning). One alert per SLO, attached to no monitor. | ≥ 1 | 1 min | Advisory (`warning`), Warning (`critical`) on a fast burn | 6 h |
+
 ### UPS
 
 | Rule | What | Default threshold | Hold | Severity | Reminder |

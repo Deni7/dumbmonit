@@ -32,13 +32,14 @@ pub(crate) mod access;
 mod badges;
 pub(crate) mod branding;
 pub mod delivery;
+mod postmortem;
 mod subscribers;
 mod timeline;
 use crate::auth::teams::TeamAccess;
 use crate::db::status_pages::{
     DEFAULT_SCENE, GroupLabel, Incident, IncidentInput, IncidentUpdate, LEGACY_SCENES, PageItem,
-    PageItemInput, SCENE_ROTATIONS, SCENES, StatusPage, StatusPageInput, canonical_scene,
-    split_scenes,
+    PageItemInput, Postmortem, SCENE_ROTATIONS, SCENES, StatusPage, StatusPageInput,
+    canonical_scene, split_scenes,
 };
 use crate::db::targets::TargetStatus;
 use crate::state::AppState;
@@ -118,6 +119,12 @@ pub fn routes() -> Router<AppState> {
         .route("/incidents", get(list_incidents).post(create_incident))
         .route("/incidents/{id}", put(update_incident).delete(delete_incident))
         .route("/incidents/{id}/updates", get(list_updates).post(add_update))
+        .route(
+            "/incidents/{id}/postmortem",
+            get(postmortem::get_postmortem)
+                .put(postmortem::put_postmortem)
+                .delete(postmortem::delete_postmortem),
+        )
 }
 
 /// Routes publiques, sans authentification.
@@ -167,6 +174,8 @@ pub struct IncidentView {
     pub updates: Vec<IncidentUpdate>,
     /// Équipements touchés (ceux que suivent les abonnés) ; vide : toute la page.
     pub components: Vec<i64>,
+    /// Post-mortem, brouillon ou publié ; `null` tant qu'il n'est pas écrit.
+    pub postmortem: Option<Postmortem>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1011,12 +1020,14 @@ async fn incident_views(
     for (incident, target) in db::status_pages::incident_component_rows(&state.pool).await? {
         components.entry(incident).or_default().push(target);
     }
+    let mut postmortems = db::status_pages::postmortems_for(&state.pool, &ids).await?;
     Ok(incidents
         .into_iter()
         .map(|incident| {
             let updates = updates.remove(&incident.id).unwrap_or_default();
             let components = components.remove(&incident.id).unwrap_or_default();
-            IncidentView { incident, updates, components }
+            let postmortem = postmortems.remove(&incident.id);
+            IncidentView { incident, updates, components, postmortem }
         })
         .collect())
 }
@@ -1460,6 +1471,9 @@ struct PublicIncident {
     starts_at: String,
     ends_at: Option<String>,
     updates: Vec<PublicUpdate>,
+    /// Post-mortem publié d'un incident résolu ; absent sinon.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    postmortem: Option<postmortem::PublicPostmortem>,
 }
 
 #[derive(Debug, Serialize)]
@@ -1976,7 +1990,12 @@ fn item_state(
     if now - last > tolerance { "down" } else { "up" }
 }
 
-fn to_public_incident(incident: Incident, updates: Vec<IncidentUpdate>) -> PublicIncident {
+fn to_public_incident(
+    incident: Incident,
+    updates: Vec<IncidentUpdate>,
+    postmortem: Option<Postmortem>,
+) -> PublicIncident {
+    let postmortem = postmortem::public(postmortem, &incident.status);
     PublicIncident {
         title: incident.title,
         kind: incident.kind,
@@ -1992,6 +2011,7 @@ fn to_public_incident(incident: Incident, updates: Vec<IncidentUpdate>) -> Publi
                 created_at: update.created_at,
             })
             .collect(),
+        postmortem,
     }
 }
 
@@ -2119,6 +2139,8 @@ async fn build_public(
     for update in db::status_pages::list_updates_for(&state.pool, &ids).await? {
         updates.entry(update.incident_id).or_default().push(update);
     }
+    // Post-mortems publiés : une seule lecture, le filtre par incident suit.
+    let mut postmortems = db::status_pages::published_postmortems(&state.pool).await?;
 
     // Fenêtres d'annonces, telles que vues maintenant.
     let mut maintenance_active = false;
@@ -2295,7 +2317,8 @@ async fn build_public(
         })
         .map(|incident| {
             let updates = updates.remove(&incident.id).unwrap_or_default();
-            to_public_incident(incident, updates)
+            let postmortem = postmortems.remove(&incident.id);
+            to_public_incident(incident, updates, postmortem)
         })
         .collect();
     let public_maintenance = maintenance
@@ -2306,7 +2329,8 @@ async fn build_public(
         })
         .map(|incident| {
             let updates = updates.remove(&incident.id).unwrap_or_default();
-            to_public_incident(incident, updates)
+            let postmortem = postmortems.remove(&incident.id);
+            to_public_incident(incident, updates, postmortem)
         })
         .collect();
 

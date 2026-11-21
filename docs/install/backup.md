@@ -66,7 +66,8 @@ recovery**: a bundle whose passphrase is lost is lost.
 | `notify_policy` | The global notification policy (grouping, hourly cap, flapping, public URL). |
 | `silences` | Maintenance windows. |
 | `status_pages` | Public status pages and the services each one lists. |
-| `incidents` | Incidents and maintenance announcements, with their updates. |
+| `incidents` | Incidents and maintenance announcements, with their updates and post-mortems. |
+| `slos` | Service level objectives: target, window, alerting on or off, and the monitors and folders they cover. |
 | `users` | Accounts: username, display name, role, SSO link, enabled or not. |
 | `agent_tokens` | Agent enrolment tokens, as hashes. Installed agents keep pushing after a restore. Tokens from an older backup are renamed to opaque `tok_…` identifiers. |
 | `agent_update_rollout` | The rollout waves of the automatic agent updates: waves, delay, failure threshold and pause. |

@@ -2,13 +2,16 @@
 	/**
 	 * One announcement — incident or maintenance window — with its timeline.
 	 * The latest message comes first; the earlier ones fold under "Earlier
-	 * updates" so a long incident does not push the services off screen.
+	 * updates" so a long incident does not push the services off screen. A
+	 * resolved incident with a published post-mortem ends with it, folded:
+	 * plain text by paragraphs, never markup.
 	 */
 	import { m } from '#lib/paraglide/messages.js';
 	import type { PublicIncident } from '#lib/api/index.js';
 	import { formatDateTime, formatRelative } from '#lib/format.js';
 	import { Plate, Tilt } from '#lib/ui/index.js';
 	import { INCIDENT_STATUS, KIND_LABEL, isClosed } from './words';
+	import { paragraphs } from './postmortem';
 
 	interface Props {
 		incident: PublicIncident;
@@ -25,6 +28,16 @@
 	const latest = $derived(updates[0] ?? null);
 	const earlier = $derived(updates.slice(1));
 	const isMaintenance = $derived(incident.kind === 'maintenance');
+	const postmortem = $derived(closed ? (incident.postmortem ?? null) : null);
+	const sections = $derived(
+		postmortem
+			? [
+					{ title: m.status_postmortem_public_summary(), text: postmortem.summary },
+					{ title: m.status_postmortem_public_impact(), text: postmortem.impact },
+					{ title: m.status_postmortem_public_root_cause(), text: postmortem.root_cause }
+				].filter((section) => section.text.trim() !== '')
+			: []
+	);
 </script>
 
 <Tilt tag="article" maxTilt={2.5} class={`rounded-[var(--radius-card)] border bg-surface ${closed || compact ? 'border-line' : isMaintenance ? 'border-info/40' : incident.severity === 'major' ? 'border-warning/40' : 'border-advisory/40'} ${compact ? 'px-4 py-3' : 'px-4 py-4 shadow-lift sm:px-5'}`}>
@@ -76,6 +89,55 @@
 					</li>
 				{/each}
 			</ol>
+		</details>
+	{/if}
+
+	{#if postmortem}
+		<details class="mt-3 border-t border-line pt-3">
+			<summary class="flex min-h-10 cursor-pointer items-center text-sm font-semibold text-ink hover:text-ink-2">
+				{m.status_postmortem_public_heading()}
+				{#if postmortem.published_at}
+					<span class="ml-2 font-normal text-[0.8125rem] text-ink-2">
+						{m.status_postmortem_public_published({ date: formatDateTime(postmortem.published_at) })}
+					</span>
+				{/if}
+			</summary>
+			<div class="mt-2 grid gap-4">
+				{#each sections as section (section.title)}
+					<section>
+						<h4 class="text-[0.8125rem] font-semibold text-ink-2">{section.title}</h4>
+						{#each paragraphs(section.text) as paragraph, index (index)}
+							<p class="mt-1.5 max-w-prose text-sm whitespace-pre-line text-ink">{paragraph}</p>
+						{/each}
+					</section>
+				{/each}
+				{#if postmortem.timeline.length > 0}
+					<section>
+						<h4 class="text-[0.8125rem] font-semibold text-ink-2">{m.status_postmortem_public_timeline()}</h4>
+						<ol class="mt-1.5 space-y-2 border-l-2 border-line pl-3">
+							{#each postmortem.timeline as entry, index (index)}
+								<li>
+									<time class="tnum text-[0.75rem] text-ink-2" datetime={entry.at}>{formatDateTime(entry.at)}</time>
+									<p class="text-sm whitespace-pre-line text-ink">{entry.text}</p>
+								</li>
+							{/each}
+						</ol>
+					</section>
+				{/if}
+				{#if postmortem.actions.length > 0}
+					<section>
+						<h4 class="text-[0.8125rem] font-semibold text-ink-2">{m.status_postmortem_public_actions()}</h4>
+						<ul class="mt-1.5 space-y-1.5">
+							{#each postmortem.actions as item, index (index)}
+								<li class="flex flex-wrap items-baseline gap-x-2 text-sm text-ink">
+									<Plate tone={item.done ? 'signal' : 'ghost'} label={item.done ? m.status_postmortem_public_done() : m.status_postmortem_public_planned()} />
+									<span class="min-w-0 break-words">{item.text}</span>
+								</li>
+							{/each}
+						</ul>
+					</section>
+				{/if}
+			</div>
 		</details>
 	{/if}
 </Tilt>
