@@ -5,6 +5,15 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- **HTTP scenario monitor.** A new service check plays 1 to 10 requests in a row: log in, keep the
+  session cookie or a token, open a protected page and check what it shows. Each step has its
+  method, URL, headers, body, accepted status codes, text and JSON checks, and extractions (JSON
+  path, header or regular expression) that later steps use as `{{name}}`. Credentials stay
+  encrypted and are written only where a step says `{{secret.password}}`. The monitor page lists
+  the last run step by step; see the [HTTP scenario](docs/devices/http-scenario.md) guide.
+
 ### Changed
 
 - **Monitors list in the style of Alerts.** A smaller toolbar (search, Filter, Compact/Tiles, a

@@ -477,12 +477,37 @@ pub fn reader_tags(tags: &BTreeMap<String, String>) -> BTreeMap<String, String> 
             let shown = if dumbmonit_proto::looks_secret(key) || key.eq_ignore_ascii_case("headers")
             {
                 REDACTED.to_string()
+            } else if key == "steps" {
+                reader_steps(value)
             } else {
                 redact_userinfo(value)
             };
             (key.clone(), shown)
         })
         .collect()
+}
+
+/// Les étapes d'un scénario HTTP (`http_steps`) telles qu'un lecteur les voit :
+/// le nom, la méthode et l'URL de chacune, de quoi suivre le dernier passage sur
+/// la page du moniteur. En-têtes, corps, vérifications et extractions sont
+/// retirés : un jeton ou un mot de passe s'y glisse vite. Un texte illisible est
+/// masqué en entier.
+fn reader_steps(value: &str) -> String {
+    let Ok(steps) = serde_json::from_str::<Vec<serde_json::Value>>(value) else {
+        return REDACTED.to_string();
+    };
+    let shown: Vec<serde_json::Value> = steps
+        .iter()
+        .map(|step| {
+            let field = |key: &str| step.get(key).and_then(|v| v.as_str()).unwrap_or_default();
+            serde_json::json!({
+                "name": field("name"),
+                "method": field("method"),
+                "url": redact_userinfo(field("url")),
+            })
+        })
+        .collect();
+    serde_json::Value::Array(shown).to_string()
 }
 
 /// Masque le mot de passe d'une URL `schéma://user:pass@hôte…`, sans toucher au
@@ -695,8 +720,10 @@ async fn check_client_links(
 }
 
 /// Étiquettes qui changent l'endroit (ou la manière) dont le secret est envoyé.
+/// `steps` : les étapes d'un scénario HTTP disent elles-mêmes où partent les
+/// secrets qu'elles citent (`{{secret.…}}`).
 const DESTINATION_TAGS: &[&str] =
-    &["scheme", "port", "insecure_tls", "tls", "path", "base_path", "url", "host"];
+    &["scheme", "port", "insecure_tls", "tls", "path", "base_path", "url", "host", "steps"];
 
 /// Un secret enregistré ne part jamais vers une destination qu'il n'a pas
 /// connue sans être ressaisi.
@@ -1459,5 +1486,30 @@ mod public_tests {
         assert!(!is_short_public("-----BEGIN CERTIFICATE-----MIIB"));
         assert!(!is_short_public("a\nb"));
         assert!(!is_short_public(&"x".repeat(MAX_PUBLIC_LEN + 1)));
+    }
+}
+
+#[cfg(test)]
+mod reader_tests {
+    use super::*;
+
+    /// Un lecteur voit le nom, la méthode et l'URL de chaque étape, jamais ses
+    /// en-têtes ni son corps.
+    #[test]
+    fn un_lecteur_ne_voit_que_le_squelette_des_etapes() {
+        let steps = r#"[{"name":"Login","method":"POST","url":"https://u:motdepasse@app.test/login",
+            "headers":[{"name":"Authorization","value":"Bearer JETON"}],"body":"p=SECRET"}]"#;
+        let tags = BTreeMap::from([("steps".to_string(), steps.to_string())]);
+        let reader = reader_tags(&tags);
+        let shown = &reader["steps"];
+        for hidden in ["JETON", "SECRET", "motdepasse", "headers", "body"] {
+            assert!(!shown.contains(hidden), "{hidden} : {shown}");
+        }
+        let parsed: serde_json::Value = serde_json::from_str(shown).unwrap();
+        assert_eq!(parsed[0]["name"], "Login");
+        assert_eq!(parsed[0]["method"], "POST");
+        assert!(parsed[0]["url"].as_str().unwrap().ends_with("@app.test/login"), "{shown}");
+        let illisible = BTreeMap::from([("steps".to_string(), "pas du json".to_string())]);
+        assert_eq!(reader_tags(&illisible)["steps"], REDACTED);
     }
 }

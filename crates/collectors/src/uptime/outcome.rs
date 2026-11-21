@@ -118,6 +118,10 @@ pub enum Failure {
     /// Le service répond mais dit ne pas être en état de servir : `NOT_SERVING`,
     /// `SERVICE_UNKNOWN`, `UNAVAILABLE` (sonde gRPC).
     Unhealthy,
+    /// Une étape d'un scénario HTTP n'a pas trouvé la valeur à extraire (chemin
+    /// JSON, en-tête ou motif absent de la réponse), ou cette valeur ne peut pas
+    /// servir là où l'étape suivante la place.
+    Extract,
 }
 
 impl Failure {
@@ -145,6 +149,7 @@ impl Failure {
             Self::NotFound => "not_found",
             Self::BadSecret => "bad_secret",
             Self::Unhealthy => "unhealthy",
+            Self::Extract => "extract",
         }
     }
 }
@@ -350,6 +355,7 @@ mod tests {
             Failure::NotFound,
             Failure::BadSecret,
             Failure::Unhealthy,
+            Failure::Extract,
         ];
         let mut vus: Vec<&str> = Vec::new();
         for raison in toutes {

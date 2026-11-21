@@ -18,6 +18,7 @@ read the server's clock without a session.
 | You want to check | Type | Section |
 |---|---|---|
 | A web page answers with the right code or text | HTTP | [HTTP](#http) |
+| A login or a journey of several requests works | HTTP scenario | [HTTP scenario](http-scenario.md) |
 | A TCP port accepts connections | TCP | [TCP](#tcp) |
 | A name resolves to the right answer | DNS | [DNS](#dns) |
 | A host answers ping | Ping | [Ping](#ping) |
