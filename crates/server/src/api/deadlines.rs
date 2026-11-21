@@ -7,7 +7,7 @@
 //! réinterrogé : la date d'expiration est l'horodatage du dernier point plus le
 //! temps restant qu'il portait, donc elle reste juste même si la sonde n'a pas
 //! tourné depuis. Les alertes à 30, 14 et 7 jours restent celles de chaque
-//! famille (`alerting/rules.rs`) ; l'interface colorie les mêmes paliers.
+//! famille (`alerting/rules/`) ; l'interface colorie les mêmes paliers.
 //!
 //! Paramètres : `target` (une seule cible, pour sa page de détail),
 //! `max_days` (horizon, 366 par défaut) et `upcoming` : avec `upcoming=true`, la

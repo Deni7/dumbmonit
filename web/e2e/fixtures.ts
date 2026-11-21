@@ -160,7 +160,8 @@ export const test = base.extend<Fixtures, { env: Env }>({
 			reducedMotion,
 			ignoreHTTPSErrors
 		});
-		await context.tracing.start({ screenshots: true, snapshots: true });
+		// Playwright's own `trace` option may already record every new context: then keep its trace.
+		await context.tracing.start({ screenshots: true, snapshots: true }).catch(() => {});
 		const page = await context.newPage();
 		guard.watch(page);
 		await use(page);

@@ -17,9 +17,9 @@ Déjà fait, mais pour mémoire :
 * `crates/server/src/collectors/mod.rs` : la réexportation et `pmg_history` ;
 * `crates/server/src/main.rs` :
   `registry.register(Arc::new(collectors::PmgCollector::new().with_observer(…)))` ;
-* `crates/server/src/api/collectors.rs` : la notice de mise en route et
+* `crates/server/src/api/collectors/` : la notice de mise en route et
   `PMG_OPTIONS` ;
-* `crates/server/src/alerting/rules.rs` : les règles `pmg_*` ;
+* `crates/server/src/alerting/rules/` : les règles `pmg_*` ;
 * `crates/server/src/api/pmg.rs` : les panneaux de la page d'équipement.
 
 Les cibles de type `pmg` sont alors interrogées par le planificateur.

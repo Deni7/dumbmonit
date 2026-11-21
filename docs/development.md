@@ -212,14 +212,14 @@ fits.
 2. Read your options from `Target::tags` in an `options.rs`, with defaults.
 3. Register it in `crates/server/src/main.rs` with `registry.register(...)`.
    The scheduler and the API never know concrete types.
-4. Describe it in `crates/server/src/api/collectors.rs`: label, summary,
+4. Describe it in `crates/server/src/api/collectors/`: label, summary,
    examples, credential types, address hint, setup notice and the `options`
    list (key, label, help, placeholder, default, input, choices). The UI builds
    its form from this; a test there checks every registered kind has a notice
    and that the option keys match what the collector reads.
 5. Name metrics `<what>_<unit>` without the `dumbmonit_` prefix (the writer
    adds it) and add any new metric a built-in rule targets to the list in
-   `alerting/rules.rs` tests.
+   `alerting/rules/` tests.
 6. Add a page under `docs/devices/`.
 
 Samples are `Sample::new(name, value, MetricKind::Gauge | Counter,
@@ -227,7 +227,7 @@ timestamp_ms)` with `.with_label(k, v)`; identity labels (`target`, `host`,
 `tag_*`) are added by the registry. Do not emit them yourself: name a per-object
 label after the object (`proxy_host`, `esxi`, `ceph_host`). A colliding label is
 kept as `exported_<name>`, and the options listed for the kind in
-`api/collectors.rs` are not copied as `tag_*`.
+`api/collectors/` are not copied as `tag_*`.
 
 ## Adding a notification channel
 

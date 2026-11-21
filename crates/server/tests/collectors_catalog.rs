@@ -1,7 +1,7 @@
 //! Instantané de `GET /api/collectors`, octet pour octet.
 //!
 //! Le catalogue des types est un contrat avec l'interface : il ne doit changer
-//! qu'avec une modification voulue de ses tables (`api/collectors.rs`), jamais en
+//! qu'avec une modification voulue de ses tables (`api/collectors/`), jamais en
 //! passant, à l'occasion d'un remaniement de la façon dont il est construit.
 //!
 //! Le registre est celui de `main.rs` (`collectors::builtin` : les collecteurs
