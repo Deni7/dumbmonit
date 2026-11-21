@@ -1272,13 +1272,12 @@ fn un_jeton_proxmox_se_saisit_en_deux_champs() {
         assert_eq!(keys, ["token_id", "secret"], "« {kind} »");
         assert!(token.fields[0].placeholder.contains('!'), "l'exemple montre user@realm!nom");
         assert_eq!(token.fields[1].input, "password");
-        let credential: dumbmonit_proto::Credential =
-            serde_json::from_value(serde_json::json!({
-                "type": "api_token",
-                "token_id": token.fields[0].placeholder,
-                "secret": "8f3a1c9e-0000-4444-8888-aaaabbbbcccc",
-            }))
-            .unwrap();
+        let credential: dumbmonit_proto::Credential = serde_json::from_value(serde_json::json!({
+            "type": "api_token",
+            "token_id": token.fields[0].placeholder,
+            "secret": "8f3a1c9e-0000-4444-8888-aaaabbbbcccc",
+        }))
+        .unwrap();
         assert_eq!(
             credential,
             dumbmonit_proto::Credential::ApiToken {
@@ -1443,8 +1442,7 @@ fn les_notices_font_creer_un_compte_dedie_et_ne_citent_jamais_le_compte_racine()
 /// option le demande (« Only with … »).
 #[test]
 fn les_ports_des_notices_sont_complets() {
-    for kind in
-        KINDS_ENREGISTRES.iter().filter(|kind| !matches!(**kind, "dummy" | "ping" | "tcp"))
+    for kind in KINDS_ENREGISTRES.iter().filter(|kind| !matches!(**kind, "dummy" | "ping" | "tcp"))
     {
         let view = describe(kind);
         assert!(!view.setup.ports.is_empty(), "« {kind} » ne déclare aucun port");
