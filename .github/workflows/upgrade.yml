@@ -57,6 +57,12 @@ jobs:
       # Same build arguments as release.yml: same cache keys.
       - name: Commit date
         run: echo "SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)" >> "$GITHUB_ENV"
+      # More swap: a memory peak of the build then slows down instead of killing the runner.
+      - name: Swap
+        run: |
+          sudo swapoff -a && sudo rm -f /mnt/swapfile /swapfile
+          sudo fallocate -l 10G /swapfile && sudo chmod 600 /swapfile
+          sudo mkswap /swapfile >/dev/null && sudo swapon /swapfile && free -h
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       # One cache scope per image: two builds exporting to the same scope
       # overwrite each other's index. On dev release.yml writes the cache, here
@@ -68,7 +74,11 @@ jobs:
           load: true
           push: false
           tags: dumbmonit-candidate:ci
-          build-args: DUMBMONIT_BUILD=${{ github.sha }}
+          # The agents (four targets, fat LTO) build beside the server on a 16 GB runner:
+          # unbridled, the two together ran it out of memory and the runner was shut down.
+          build-args: |
+            DUMBMONIT_BUILD=${{ github.sha }}
+            CARGO_BUILD_JOBS=2
           cache-from: |
             type=gha,scope=server
             type=gha,scope=agent
