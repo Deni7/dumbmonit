@@ -8,8 +8,8 @@
 	 * about, whether or not they are currently installed — a tunnel that never
 	 * came up is "down", not invisible.
 	 */
-	import { untrack } from 'svelte';
 	import { m } from '#lib/paraglide/messages.js';
+	import { startPolling } from '#lib/poll.js';
 	import { queryInstant, type Target } from '#lib/api/index.js';
 	import { ErrorNotice, Panel, Plate } from '#lib/ui/index.js';
 	import { formatAge, formatBytes } from '../docker/api';
@@ -75,13 +75,7 @@
 		void target.id;
 		loading = true;
 		tunnels = [];
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 
 	const down = $derived(tunnels.filter((t) => !t.up).length);

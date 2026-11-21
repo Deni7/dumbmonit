@@ -7,7 +7,8 @@
 	 * up in `Target.tags`. A blank value is never sent: the server then applies
 	 * its own default. Two list-shaped inputs are drawn generically from the
 	 * description: `checklist` (tick boxes from `items`) and `rows` (lines
-	 * with the `columns` the server names, stored as JSON).
+	 * with the `columns` the server names, stored as JSON). The steps of an HTTP
+	 * scenario (`steps`) have their own editor.
 	 *
 	 * Switches are the bulk of a long list (a hypervisor has twenty): they are
 	 * pulled together into one compact panel, two columns on a wide screen,
@@ -17,6 +18,7 @@
 	import type { CollectorOption } from '#lib/api/index.js';
 	import { Button, Field, Toggle } from '#lib/ui/index.js';
 	import { checkedValues, emptyRow, encodeChecked, parseRows, rowErrors, serializeRows, type Row } from './option-values';
+	import StepsEditor from './StepsEditor.svelte';
 
 	interface Props {
 		options: CollectorOption[];
@@ -41,7 +43,7 @@
 
 	/** Text inputs get the full row: they often hold lists or long values. */
 	function span(option: CollectorOption): string {
-		return option.input === 'text' || option.input === 'checklist' || option.input === 'rows' ? 'sm:col-span-2' : '';
+		return ['text', 'checklist', 'rows', 'steps'].includes(option.input) ? 'sm:col-span-2' : '';
 	}
 
 	const switches = $derived(options.filter((option) => option.input === 'boolean'));
@@ -216,6 +218,8 @@
 						</div>
 					{/each}
 				</fieldset>
+			{:else if option.input === 'steps'}
+				<StepsEditor {option} value={values[option.key]} error={errors[option.key]} onchange={(value) => set(option.key, value)} />
 			{:else if option.input === 'select'}
 				<Field label={option.label} for={id} help={option.help} required={option.required} error={errors[option.key]}>
 					<select

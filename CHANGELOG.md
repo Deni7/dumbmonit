@@ -5,6 +5,27 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- **SLOs and error budgets.** Status › SLOs: a target availability (99.9 %…) over 7, 28, 30 or 90
+  rolling days for a monitor, several or whole folders. Each row shows the availability attained,
+  the error budget left (bar and words) and the current burn rate; a row opens on the budget
+  burn-down over the window and the burn rate over 5 min, 30 min, 1 h and 6 h. The new built-in rule
+  *Error budget burning* raises an advisory on a slow burn (6× over 6 h and 30 min) and a warning on
+  a fast burn (14.4× over 1 h and 5 min), through the usual notification pipeline. `/api/slos`, in
+  the backup.
+- **Post-mortems on status pages.** An incident takes a post-mortem: summary, impact, root cause, a
+  timeline started from its updates and action items with a done box. A draft at any time; once the
+  incident is resolved it can be published, and visitors read it under the resolved incident.
+  Plain text, in the backup with its incident.
+
+- **HTTP scenario monitor.** A new service check plays 1 to 10 requests in a row: log in, keep the
+  session cookie or a token, open a protected page and check what it shows. Each step has its
+  method, URL, headers, body, accepted status codes, text and JSON checks, and extractions (JSON
+  path, header or regular expression) that later steps use as `{{name}}`. Credentials stay
+  encrypted and are written only where a step says `{{secret.password}}`. The monitor page lists
+  the last run step by step; see the [HTTP scenario](docs/devices/http-scenario.md) guide.
+
 ### Changed
 
 - **Monitors list in the style of Alerts.** A smaller toolbar (search, Filter, Compact/Tiles, a

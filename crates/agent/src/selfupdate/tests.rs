@@ -110,8 +110,11 @@ async fn a_binary_still_open_for_writing_is_tried_again_rather_than_refused() {
     let binary = dir.path().join("dumbmonit-agent.new");
     stage(&binary, NEW_BINARY.as_bytes()).unwrap();
     let writer = std::fs::OpenOptions::new().write(true).open(&binary).unwrap();
+    // Le test tourne sur un seul fil : cette tâche ne passe qu'à la première
+    // pause de l'essai, c'est-à-dire après un premier lancement refusé, et
+    // rend le descripteur sans dépendre de l'heure (une attente fixe pouvait
+    // dépasser, sur une machine chargée, les essais que l'agent s'accorde).
     let release = tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_millis(200)).await;
         drop(writer);
     });
     assert_eq!(preflight(&binary, "9.9.9").await, Ok(()));

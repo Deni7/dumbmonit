@@ -84,7 +84,8 @@
 		packs: m.settings_backup_section_packs,
 		netconfig_host_keys: m.settings_backup_section_netconfig_host_keys,
 		netconfig_versions: m.settings_backup_section_netconfig_versions,
-		netscan_schedules: m.settings_backup_section_netscan_schedules
+		netscan_schedules: m.settings_backup_section_netscan_schedules,
+		slos: m.settings_backup_section_slos
 	};
 	function sectionText(key: string, fallback: string): string {
 		return SECTION_TEXT[key]?.() ?? fallback;

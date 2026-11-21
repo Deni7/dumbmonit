@@ -38,6 +38,7 @@ pub mod scheduler;
 pub mod security;
 pub mod selfmon;
 pub mod single_port;
+pub mod slo;
 pub mod state;
 pub mod stats;
 pub mod status_host;

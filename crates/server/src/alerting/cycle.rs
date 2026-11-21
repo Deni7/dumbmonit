@@ -495,7 +495,9 @@ pub fn plan_cycle(input: CycleInput, baselines: &mut BaselineStore) -> CycleOutc
             });
             // Une prévision qui franchit un palier (14 puis 7 jours) reparle sous
             // la même identité, avec sa nouvelle sévérité.
-            let tier_rose = rule.kind == model::RuleKind::Forecast
+            // Une consommation de budget qui passe de lente à rapide aussi.
+            let tiered = matches!(rule.kind, model::RuleKind::Forecast | model::RuleKind::SloBurn);
+            let tier_rose = tiered
                 && transition.is_none()
                 && state.phase == Phase::Firing
                 && alert_severity(rule, Some(point.value)) > alert_severity(rule, before.value);
@@ -510,6 +512,8 @@ pub fn plan_cycle(input: CycleInput, baselines: &mut BaselineStore) -> CycleOutc
             let target_name = target
                 .map(|t| t.name.clone())
                 .or_else(|| TARGET_NAME_LABELS.iter().find_map(|l| point.labels.get(*l).cloned()))
+                // Une série de SLO ne parle d'aucun équipement : son nom en tient lieu.
+                .or_else(|| point.labels.get(model::SLO_LABEL).cloned())
                 .unwrap_or_else(|| UNKNOWN_TARGET.to_string());
 
             evaluated.push(Evaluated {
@@ -557,6 +561,7 @@ pub fn plan_cycle(input: CycleInput, baselines: &mut BaselineStore) -> CycleOutc
                     .target_id
                     .and_then(|id| index.by_id.get(&id))
                     .map(|t| t.name.clone())
+                    .or_else(|| stored.labels.get(model::SLO_LABEL).cloned())
                     .unwrap_or_else(|| UNKNOWN_TARGET.to_string()),
                 series_key: stored.series_key.clone(),
                 labels: stored.labels.clone(),
@@ -727,12 +732,18 @@ fn history_reason(state: &AlertState, dismissed_by: Option<&str>, now: DateTime<
 }
 
 /// Sévérité d'une alerte : celle de la règle, relevée par les paliers de jours
-/// restants pour une prévision (voir [`crate::alerting::forecast::tier`]).
+/// restants pour une prévision (voir [`crate::alerting::forecast::tier`]), et
+/// critique (« Warning » à l'écran) pour une consommation rapide de budget
+/// d'erreur (valeur 2, voir [`crate::slo::Burn::level`]).
 fn alert_severity(rule: &Rule, value: Option<f64>) -> crate::alerting::model::Severity {
-    if rule.kind == model::RuleKind::Forecast {
-        crate::alerting::forecast::tier(rule.severity, value, &rule.params)
-    } else {
-        rule.severity
+    match rule.kind {
+        model::RuleKind::Forecast => {
+            crate::alerting::forecast::tier(rule.severity, value, &rule.params)
+        }
+        model::RuleKind::SloBurn if value.is_some_and(|v| v >= 2.0) => {
+            rule.severity.max(crate::alerting::model::Severity::Critical)
+        }
+        _ => rule.severity,
     }
 }
 
@@ -756,7 +767,11 @@ fn evaluate_point(
         // Une règle prédictive n'est qu'un seuil sur une requête `predict_linear` :
         // c'est VictoriaMetrics qui extrapole, pas nous. Une règle de prévision
         // est un seuil sur un nombre de jours déjà calculé (`derived`).
-        RuleKind::Threshold | RuleKind::Predict | RuleKind::LogPattern | RuleKind::Forecast => (
+        RuleKind::Threshold
+        | RuleKind::Predict
+        | RuleKind::LogPattern
+        | RuleKind::Forecast
+        | RuleKind::SloBurn => (
             rule.operator.holds(
                 point.value,
                 effective.threshold,

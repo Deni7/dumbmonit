@@ -5,8 +5,8 @@
 	 * the way to replace the URL. Refreshed every thirty seconds — a call can
 	 * land any time.
 	 */
-	import { untrack } from 'svelte';
 	import { getPushMonitor, regeneratePushToken } from '#lib/api/push.js';
+	import { startPolling } from '#lib/poll.js';
 	import type { PushMonitor, Target } from '#lib/api/index.js';
 	import { formatDateTime, formatDuration, formatRelative } from '#lib/format.js';
 	import { m } from '#lib/paraglide/messages.js';
@@ -53,13 +53,7 @@
 		void target.id;
 		loading = true;
 		monitor = null;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 30_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 30_000);
 	});
 
 	/** Full URL, from the origin the browser sees: the server does not know its public address. */

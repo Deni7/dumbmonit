@@ -40,6 +40,11 @@ monitor. Nothing is written when a probe fails: the series simply stops, and the
 of each monitor (`bottomk by (target) (1, …)`): a series no longer written after
 a tag or label change stays in the 7-day window and must not count.
 
+The monitor list's "Last 24 h" bars read that silence the same way: for a
+device checked at least twice an hour, an hour without any `dumbmonit_up`
+sample after its first measurement of the day is shown as down, not as "no
+data".
+
 For services (`http`, `tcp`, `dns`, `ping`, `tls`), `dumbmonit_up = 1` means
 "the monitor ran", and `dumbmonit_probe_success` says whether the service is
 fine. The two signals are kept apart on purpose: a `probe_success` of 0 says

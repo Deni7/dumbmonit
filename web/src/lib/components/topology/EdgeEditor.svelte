@@ -33,7 +33,7 @@
 	const origin = $derived(edge.origin ?? 'deduced');
 
 	const chip =
-		'inline-flex min-h-10 max-w-full items-center rounded-lg border border-line bg-surface-2 px-2.5 text-left text-sm text-ink hover:border-line-strong focus-visible:outline-2 focus-visible:outline-signal';
+		'inline-flex min-h-10 max-w-full items-center rounded-lg border border-line bg-surface-2 px-2.5 text-left text-sm text-ink hover:border-line-strong focus-visible:outline-2 focus-visible:outline-focus';
 </script>
 
 <header class="flex items-start gap-3 border-b border-line px-4 py-3">
@@ -43,7 +43,7 @@
 	</div>
 	<button
 		type="button"
-		class="-mt-1 -mr-2 inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-ink-2 hover:bg-surface-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-signal"
+		class="-mt-1 -mr-2 inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-ink-2 hover:bg-surface-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
 		aria-label={m.topology_panel_close()}
 		title={m.topology_panel_close()}
 		onclick={onclose}

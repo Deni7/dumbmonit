@@ -67,7 +67,10 @@
 mod check;
 pub(crate) mod options;
 mod phases;
+mod scenario;
 pub mod security_headers;
+
+pub use scenario::HttpStepsCollector;
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};

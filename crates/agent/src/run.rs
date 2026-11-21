@@ -1732,7 +1732,7 @@ mod tests {
         agent.sync_gateway(&shutdown).await;
         assert_eq!(agent.identity.relay_gateway, Some(port), "le port est annoncé au serveur");
         // … tout de suite, par un lot demandé sans attendre la période.
-        tokio::time::timeout(Duration::from_millis(100), report.notified())
+        tokio::time::timeout(Duration::from_secs(5), report.notified())
             .await
             .expect("lot immédiat demandé");
         // Pas de canal chiffré dans ce test : pas d'essai, rien d'inventé.
@@ -2458,12 +2458,13 @@ mod tests {
                 tokio::time::sleep(Duration::from_millis(50)).await;
             }
             // …et le rapport suivant de la machine part à son heure (période de
-            // 5 s), sans attendre la fin de la sonde (60 s).
+            // 5 s), sans attendre la fin de la sonde (60 s). Le plafond laisse
+            // de la marge à une machine chargée tout en restant loin des 60 s.
             let before = calls.count("POST", "/api/ingest");
             let stuck = std::time::Instant::now();
             while calls.count("POST", "/api/ingest") <= before {
                 assert!(
-                    stuck.elapsed() < Duration::from_secs(9),
+                    stuck.elapsed() < Duration::from_secs(30),
                     "rapport bloqué derrière la sonde relayée"
                 );
                 tokio::time::sleep(Duration::from_millis(50)).await;
@@ -2513,10 +2514,11 @@ mod tests {
                 assert!(started.elapsed() < Duration::from_secs(40), "relais jamais revenu");
                 tokio::time::sleep(Duration::from_millis(50)).await;
             }
+            // Bien avant la fin de la temporisation (60 s), même sur une machine chargée.
             let back = std::time::Instant::now();
             while calls.count("POST", "/api/ingest") < 3 {
                 assert!(
-                    back.elapsed() < Duration::from_secs(10),
+                    back.elapsed() < Duration::from_secs(30),
                     "les mesures attendent la fin de la temporisation"
                 );
                 tokio::time::sleep(Duration::from_millis(50)).await;

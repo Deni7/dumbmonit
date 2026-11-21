@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { withBase } from '#lib/paths.js';
+	import { startPolling } from '#lib/poll.js';
 	import { kindLabel } from '#lib/kind-label.js';
 	import { m } from '#lib/paraglide/messages.js';
 	/**
@@ -1098,7 +1099,10 @@
 
 	/** The table's 24 hourly segments: one aggregated query for the whole fleet. */
 	async function loadBars(signal?: AbortSignal) {
-		const cells = await loadRiver(DAY_SECONDS, signal, 24).catch(() => null);
+		// The monitors tell a device's silent hour (down) from an empty one; read
+		// untracked, so that each refresh of the store does not restart the timer.
+		const monitors = untrack(() => targets);
+		const cells = await loadRiver(DAY_SECONDS, signal, 24, monitors).catch(() => null);
 		if (cells) river = cells;
 	}
 
@@ -1153,13 +1157,7 @@
 	// device's series every 30 s — several megabytes with a few hundred devices.
 	$effect(() => {
 		if (view !== 'tiles') return;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void load(controller.signal), 30_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 30_000);
 	});
 </script>
 

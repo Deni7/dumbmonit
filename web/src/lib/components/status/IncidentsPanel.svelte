@@ -4,10 +4,11 @@
 	 * announcements first, with an inline "Post update" form (status + message)
 	 * and a one-click close; closed ones fold under "Past". A new announcement
 	 * is created inline too: title, kind, severity or window, page, first
-	 * message.
+	 * message. An incident also takes a post-mortem (`PostmortemEditor`): a
+	 * draft at any time, published once the incident is resolved.
 	 */
 	import { m } from '#lib/paraglide/messages.js';
-	import { Megaphone, Pencil, Plus, Send, X } from 'lucide-svelte';
+	import { FileText, Megaphone, Pencil, Plus, Send, X } from 'lucide-svelte';
 	import {
 		addIncidentUpdate,
 		createIncident,
@@ -22,6 +23,7 @@
 	import { formatDateTime, formatRelative, parseServerDate } from '#lib/format.js';
 	import { Button, Confirm, DateTimeField, EmptyState, ErrorNotice, Field, Plate } from '#lib/ui/index.js';
 	import { INCIDENT_STATUS, KIND_LABEL, STATUSES_FOR, isClosed } from './words';
+	import PostmortemEditor from './PostmortemEditor.svelte';
 	import { dateToLocal, localToIso, updatesPayload, validateDates, validateHistory, type DraftUpdate, type HistoryError } from './incident-history';
 
 	interface Props {
@@ -153,6 +155,7 @@
 	function startUpdate(incident: Incident) {
 		updating = incident.id;
 		editing = null;
+		writing = null;
 		updateStatus = incident.status;
 		updateBody = '';
 		updateAt = '';
@@ -183,6 +186,17 @@
 		}
 	}
 
+	// --- Post-mortem ----------------------------------------------------------------
+
+	/** Incident whose post-mortem is open. */
+	let writing = $state<number | null>(null);
+
+	function startPostmortem(incident: Incident) {
+		writing = writing === incident.id ? null : incident.id;
+		updating = null;
+		editing = null;
+	}
+
 	// --- Dates of an existing announcement ---------------------------------------
 
 	let editing = $state<number | null>(null);
@@ -206,6 +220,7 @@
 		editError = null;
 		editFailure = null;
 		updating = null;
+		writing = null;
 	}
 
 	async function saveDates(event: SubmitEvent, incident: Incident) {
@@ -289,6 +304,12 @@
 				</p>
 			</div>
 			<div class="flex flex-wrap items-center gap-1.5">
+				{#if incident.kind === 'incident'}
+					<Button variant="ghost" size="sm" onclick={() => startPostmortem(incident)} aria-expanded={writing === incident.id}>
+						<FileText class="size-4" aria-hidden="true" />
+						{incident.postmortem ? m.status_postmortem_open() : m.status_postmortem_write()}
+					</Button>
+				{/if}
 				<Button variant="ghost" size="sm" onclick={() => (editing === incident.id ? (editing = null) : startEdit(incident))}>
 					<Pencil class="size-4" aria-hidden="true" />
 					{editing === incident.id ? m.status_incidents_cancel() : m.status_incidents_edit_dates()}
@@ -330,6 +351,9 @@
 					<div class="sm:col-span-3"><ErrorNotice error={editFailure} title={m.status_incidents_update_error()} /></div>
 				{/if}
 			</form>
+		{/if}
+		{#if writing === incident.id}
+			<PostmortemEditor {incident} onchange={replace} onclose={() => (writing = null)} />
 		{/if}
 		{#if updating === incident.id}
 			<form class="mt-3 grid gap-3 rounded-lg border border-line bg-surface p-3 sm:grid-cols-[10rem_minmax(0,1fr)_auto] sm:items-start" onsubmit={(event) => postUpdate(event, incident)} novalidate>

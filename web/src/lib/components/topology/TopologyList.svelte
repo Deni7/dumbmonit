@@ -52,7 +52,7 @@
 						<svelte:element
 							this={link ? 'a' : 'div'}
 							href={link}
-							class={`flex min-h-11 items-center gap-2.5 px-3 py-1.5 ${link ? 'hover:bg-surface-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-signal' : ''}`}
+							class={`flex min-h-11 items-center gap-2.5 px-3 py-1.5 ${link ? 'hover:bg-surface-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus' : ''}`}
 						>
 							{#if row.depth > 0}
 								<span class="text-ink-3" aria-hidden="true">└</span>

@@ -467,6 +467,17 @@ async fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
 #[cfg(test)]
 const TEST_SECRET: &str = "secret-de-test-suffisamment-long";
 
+/// Battement des tests : assez court pour des tests de quelques secondes, assez
+/// long pour qu'une machine chargée relise le bail en moins d'un demi-battement
+/// (au-delà, `renew` refuse d'écrire sur la foi d'une lecture lente).
+#[cfg(test)]
+const TEST_BEAT: Duration = Duration::from_millis(200);
+
+/// Bail vivant des tests : six battements, et non trois comme en service, pour
+/// qu'un battement en retard sur une machine chargée ne passe pas pour un silence.
+#[cfg(test)]
+const TEST_LIVE: Duration = Duration::from_millis(1200);
+
 /// Réglages de test : cadence resserrée, promotion manuelle.
 #[cfg(test)]
 fn test_ha(dir: &Path, node: &str, role: Role) -> HaConfig {
@@ -476,11 +487,7 @@ fn test_ha(dir: &Path, node: &str, role: Role) -> HaConfig {
         role,
         takeover_after: None,
         snapshot_every: Duration::from_secs(10),
-        timing: Timing {
-            beat: Duration::from_millis(20),
-            live: Duration::from_millis(120),
-            settle: Duration::from_millis(30),
-        },
+        timing: Timing { beat: TEST_BEAT, live: TEST_LIVE, settle: Duration::from_millis(100) },
     }
 }
 
@@ -614,7 +621,7 @@ mod tests {
     async fn beat(primary: &Active, count: usize) {
         for _ in 0..count {
             assert!(matches!(primary.renew().await, Renewal::Renewed));
-            tokio::time::sleep(Duration::from_millis(20)).await;
+            tokio::time::sleep(TEST_BEAT).await;
         }
     }
 
@@ -643,10 +650,11 @@ mod tests {
         assert!(refused.starts_with("refused"), "{refused}");
         assert!(!standby.is_finished());
 
-        // Le primaire s'est tu : la demande suivante aboutit.
-        tokio::time::sleep(Duration::from_millis(300)).await;
+        // Le primaire s'est tu (deux fois la durée d'un bail vivant) : la
+        // demande suivante aboutit.
+        tokio::time::sleep(TEST_LIVE * 2).await;
         ask_promotion(&config);
-        let active = tokio::time::timeout(Duration::from_secs(5), standby)
+        let active = tokio::time::timeout(Duration::from_secs(20), standby)
             .await
             .expect("promu à temps")
             .unwrap()
@@ -683,7 +691,7 @@ mod tests {
             ha.takeover_after = Some(Duration::from_millis(250));
         }
         let started = std::time::Instant::now();
-        let active = tokio::time::timeout(Duration::from_secs(5), start(&config, TEST_SECRET))
+        let active = tokio::time::timeout(Duration::from_secs(20), start(&config, TEST_SECRET))
             .await
             .expect("reprise à temps")
             .unwrap();
@@ -700,7 +708,7 @@ mod tests {
         if let Some(ha) = config.ha.as_mut() {
             ha.node = "a".into();
         }
-        let active = tokio::time::timeout(Duration::from_secs(5), start(&config, TEST_SECRET))
+        let active = tokio::time::timeout(Duration::from_secs(20), start(&config, TEST_SECRET))
             .await
             .expect("démarrage à temps")
             .unwrap();

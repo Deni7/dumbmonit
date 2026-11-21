@@ -6,8 +6,8 @@
 	 * failed tasks). Read from the latest stored measurement and refreshed
 	 * every minute — opening the page never calls the application.
 	 */
-	import { untrack } from 'svelte';
 	import { queryInstant, type Target } from '#lib/api/index.js';
+	import { startPolling } from '#lib/poll.js';
 	import { ErrorNotice, Panel, Plate, Skeleton, type Tone } from '#lib/ui/index.js';
 	import ClientDevicesTable from '../ClientDevicesTable.svelte';
 	import Figure from '../Figure.svelte';
@@ -44,13 +44,7 @@
 		void target.id;
 		loading = true;
 		view = null;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 
 	function tone(level: CheckState | null | undefined): Tone {

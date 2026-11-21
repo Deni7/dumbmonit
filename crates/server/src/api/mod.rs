@@ -74,6 +74,7 @@ mod security;
 mod self_monitoring;
 mod seo_files;
 mod skipped_features;
+mod slos;
 pub(crate) mod spa;
 pub(crate) mod status_pages;
 pub use status_pages::delivery::spawn as spawn_status_deliveries;
@@ -313,6 +314,8 @@ pub fn router_with_hubs(
         .merge(reports::routes())
         // Pages de statut et incidents (`status_pages.rs`).
         .merge(status_pages::routes())
+        // Objectifs de niveau de service et budgets d'erreur (`slos.rs`).
+        .merge(slos::routes())
         // Jeton du calendrier iCal privé des maintenances (`ical.rs`).
         .merge(ical::routes())
         // Calendrier des sauvegardes et travaux d'un Proxmox Backup Server (`pbs.rs`).

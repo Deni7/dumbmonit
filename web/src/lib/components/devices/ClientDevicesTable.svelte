@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { m } from '#lib/paraglide/messages.js';
+	import { startPolling } from '#lib/poll.js';
 	/**
 	 * Devices (phones, tablets, desktops) signed in to an account, with each
 	 * one's last connection and last backup — generic across every collector
@@ -7,7 +8,6 @@
 	 * only knows the metric family `dumbmonit_client_device_*`, never a
 	 * product name. A panel embeds it with nothing beyond the target.
 	 */
-	import { untrack } from 'svelte';
 	import { queryInstant, type Target } from '#lib/api/index.js';
 	import { EmptyState, ErrorNotice, Panel, Plate, Skeleton } from '#lib/ui/index.js';
 	import { buildClientDevices, type ClientDevice } from './clientDevices';
@@ -40,13 +40,7 @@
 		void target.id;
 		loading = true;
 		devices = null;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 </script>
 

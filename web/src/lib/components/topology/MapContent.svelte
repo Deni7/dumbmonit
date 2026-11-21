@@ -170,8 +170,8 @@
 
 	type Tone = 'warning' | 'signal' | 'ink-2' | 'ink-3';
 	/** Whole class names, so Tailwind sees them. */
-	const STROKE: Record<Tone, string> = { warning: 'stroke-warning', signal: 'stroke-signal', 'ink-2': 'stroke-ink-2', 'ink-3': 'stroke-ink-3' };
-	const FILL: Record<Tone, string> = { warning: 'fill-warning', signal: 'fill-signal', 'ink-2': 'fill-ink-2', 'ink-3': 'fill-ink-3' };
+	const STROKE: Record<Tone, string> = { warning: 'stroke-warning', signal: 'stroke-primary', 'ink-2': 'stroke-ink-2', 'ink-3': 'stroke-ink-3' };
+	const FILL: Record<Tone, string> = { warning: 'fill-warning', signal: 'fill-primary', 'ink-2': 'fill-ink-2', 'ink-3': 'fill-ink-3' };
 
 	function edgeTone(impacted: boolean, lit: boolean, dependency: boolean): Tone {
 		return impacted ? 'warning' : lit ? 'signal' : dependency ? 'ink-2' : 'ink-3';
@@ -320,7 +320,7 @@
 			/>
 		{/if}
 		{#if selectedEdge === edge.key || (w && selectedLink === edge.key)}
-			<path d={edge.path} fill="none" class="stroke-signal" stroke-width={(w?.load.width ?? 1) + 4} stroke-linecap="round" opacity="0.35" />
+			<path d={edge.path} fill="none" class="stroke-primary" stroke-width={(w?.load.width ?? 1) + 4} stroke-linecap="round" opacity="0.35" />
 		{/if}
 	</g>
 {/each}
@@ -414,10 +414,10 @@
 			<circle r={p.r + 11} class={`fill-warning ${interactive ? 'topo-pulse' : ''}`} opacity="0.16" />
 		{/if}
 		{#if selected === p.node.id}
-			<circle r={p.r + 6} fill="none" class="stroke-signal" stroke-width="2.5" />
+			<circle r={p.r + 6} fill="none" class="stroke-primary" stroke-width="2.5" />
 		{/if}
 		{#if dropTarget === p.node.id}
-			<circle r={p.r + 10} fill="none" class="stroke-signal" stroke-width="2.5" stroke-dasharray="5 4" />
+			<circle r={p.r + 10} fill="none" class="stroke-primary" stroke-width="2.5" stroke-dasharray="5 4" />
 		{/if}
 		<!-- A wider invisible disc: an easier target for a finger. -->
 		<circle r={p.r + 8} fill="transparent" />

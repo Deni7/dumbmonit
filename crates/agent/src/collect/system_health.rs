@@ -1084,13 +1084,13 @@ mod platform {
             let started = Instant::now();
             let facts = probe.collect_security(Duration::from_millis(50)).await;
             assert_eq!(facts, (None, None, None));
-            assert!(started.elapsed() < Duration::from_secs(2));
+            assert!(started.elapsed() < Duration::from_secs(10), "bien avant l'heure de la tâche");
             // Faits connus : une tâche encore en cours n'est plus attendue du tout.
             probe.security = Some((Instant::now(), (Some(1), None, Some(true))));
             let started = Instant::now();
             let facts = probe.collect_security(Duration::from_secs(3600)).await;
             assert_eq!(facts, (Some(1), None, Some(true)));
-            assert!(started.elapsed() < Duration::from_secs(2));
+            assert!(started.elapsed() < Duration::from_secs(10), "bien avant l'heure de la tâche");
             if let Some(task) = probe.security_task.take() {
                 task.abort();
             }

@@ -82,6 +82,7 @@ import type {
 	Incident,
 	IncidentPayload,
 	IncidentUpdatePayload,
+	PostmortemPayload,
 	PublicDayDetail,
 	PublicStatus,
 	StatusSubscriber,
@@ -97,6 +98,7 @@ export { onMutation } from './mutations';
 export * from './teams';
 export * from './clients';
 export * from './mail_server';
+export * from './slos';
 export {
 	ApiError,
 	toApiError,
@@ -944,6 +946,15 @@ export function deleteIncident(id: number): Promise<void> {
 /** Posts a message and moves the incident to `status` (or keeps it). */
 export function addIncidentUpdate(id: number, payload: IncidentUpdatePayload): Promise<Incident> {
 	return request<Incident>(`/incidents/${id}/updates`, { method: 'POST', body: payload });
+}
+
+/** Writes or replaces the post-mortem; returns the whole incident. */
+export function saveIncidentPostmortem(id: number, payload: PostmortemPayload): Promise<Incident> {
+	return request<Incident>(`/incidents/${id}/postmortem`, { method: 'PUT', body: payload });
+}
+
+export function deleteIncidentPostmortem(id: number): Promise<void> {
+	return request<void>(`/incidents/${id}/postmortem`, { method: 'DELETE' });
 }
 
 /** Uploads a logo (PNG, JPEG or WebP, as a base64 or `data:` URL). */

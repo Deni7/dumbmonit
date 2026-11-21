@@ -10,6 +10,7 @@ use std::time::Duration;
 use crate::alerting::model::{
     AnomalyParams, Operator, RULE_HOST_DOWN, Rule, RuleKind, Severity, TargetSelector,
 };
+use crate::slo::RULE_SLO_BURN;
 
 mod adguard;
 mod cloud;
@@ -295,6 +296,22 @@ pub fn builtin_rules() -> Vec<Rule> {
                 ..AnomalyParams::default()
             },
             ..base("http_5xx_drift", "5xx errors drifting", RuleKind::Drift, HTTP_5XX_PERCENT)
+        },
+        // Consommation du budget d'erreur des SLO (voir `crate::slo`) : 14,4×
+        // sur une heure et cinq minutes, critique (« Warning » à l'écran) ; 6×
+        // sur six heures et trente minutes, `warning` (« Advisory »). Sans SLO
+        // défini, la règle ne rend aucune série.
+        Rule {
+            description: "A service level objective is spending its error budget too fast: \
+                          14.4 times the sustainable rate over the last hour and 5 minutes \
+                          (warning), or 6 times over the last 6 hours and 30 minutes \
+                          (advisory)."
+                .to_string(),
+            operator: Operator::Ge,
+            threshold: 1.0,
+            for_duration: Duration::from_secs(60),
+            severity: Severity::Warning,
+            ..base(RULE_SLO_BURN, "Error budget burning", RuleKind::SloBurn, "*")
         },
         // Batterie d'onduleur en fin de vie ou déchargée. Distincte de « sur
         // batterie » : une coupure brève est normale, une batterie basse annonce un
@@ -9359,6 +9376,11 @@ mod tests {
             crate::alerting::capacity::select(&forecast.query),
             crate::alerting::capacity::Selection::Families(ref all) if all.len() > 20
         ));
+
+        let burn = rules.iter().find(|r| r.uid == RULE_SLO_BURN).unwrap();
+        assert_eq!(burn.kind, RuleKind::SloBurn);
+        assert_eq!((burn.operator, burn.threshold), (Operator::Ge, 1.0), "slow burn opens it");
+        assert_eq!(burn.severity, Severity::Warning, "slow burn: an advisory on screen");
 
         for uid in ["latency_drift", "http_5xx_drift"] {
             let drift = rules.iter().find(|r| r.uid == uid).unwrap();

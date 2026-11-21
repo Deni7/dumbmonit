@@ -538,6 +538,25 @@ const HTTP_LOGIN: CredentialView = CredentialView {
     ],
 };
 
+/// Les identifiants d'un scénario : rien n'est envoyé d'office, chaque étape les
+/// place elle-même avec `{{secret.…}}`.
+const HTTP_STEPS_LOGIN: CredentialView = CredentialView {
+    kind: "username_password",
+    label: "Username / password",
+    help: "Written where a step says {{secret.username}} and {{secret.password}}, for example in a login form or a JSON body.",
+    fields: &[
+        cred_text("username", "User name", "", ""),
+        cred_secret("password", "Password", "Stored encrypted, never shown again.", "", true),
+    ],
+};
+
+const HTTP_STEPS_TOKEN: CredentialView = CredentialView {
+    kind: "api_token",
+    label: "Token",
+    help: "Written where a step says {{secret.token}}, for example in an \"Authorization: Bearer {{secret.token}}\" header.",
+    fields: &[cred_secret("token", "Token", "Stored encrypted, never shown again.", "", true)],
+};
+
 /// Champ texte libre.
 const fn text(
     key: &'static str,
@@ -780,6 +799,72 @@ const HTTP_OPTIONS: &[OptionView] = &[
         concat!("DumbMonit/", env!("CARGO_PKG_VERSION")),
     ),
     PROBE_TIMEOUT,
+];
+
+/// Les étapes d'un scénario HTTP : un tableau JSON que l'interface saisit dans
+/// son éditeur d'étapes (`input: steps`), lu par
+/// `collectors/uptime/http/scenario/model.rs`.
+const HTTP_STEPS_LIST: OptionView = OptionView {
+    key: "steps",
+    label: "Steps",
+    help: "The requests played in order, from 1 to 10. Each step checks the status code and, optionally, a text or a JSON value; it can keep a value from the response (JSON path, header or regular expression) under a name that later steps write as {{name}}. Cookies set by a response are sent with the following requests to the same site.",
+    placeholder: "",
+    default: "",
+    required: true,
+    input: "steps",
+    choices: &[],
+    group: "",
+    items: no_items,
+    columns: no_columns,
+};
+
+/// Options lues par `collectors/uptime/http/scenario/mod.rs`.
+const HTTP_STEPS_OPTIONS: &[OptionView] = &[
+    HTTP_STEPS_LIST,
+    boolean(
+        "follow_redirects",
+        "Follow redirects",
+        "Disable to check the redirect a step receives instead of the page it leads to.",
+        true,
+    ),
+    number(
+        "max_redirects",
+        "Maximum redirects per step",
+        "Between 1 and 20. No effect if redirects are not followed.",
+        "10",
+        "10",
+    ),
+    insecure_tls(
+        "The steps no longer fail on a self-signed certificate or one issued by a private authority.",
+    ),
+    ALLOW_PRIVATE_TARGETS,
+    boolean(
+        "check_certificate",
+        "Read the certificate",
+        "Over HTTPS, also records the certificate expiry date of the address so you can be warned before it expires.",
+        true,
+    ),
+    number(
+        "max_body_bytes",
+        "Maximum bytes read per step",
+        "Beyond this, the rest of a response is not downloaded. Checks and extractions only see this part.",
+        "524288",
+        "524288",
+    ),
+    text(
+        "user_agent",
+        "Announced identity (User-Agent)",
+        "Name the steps give to the server. Change it if the server filters robots.",
+        "DumbMonit/1.0",
+        concat!("DumbMonit/", env!("CARGO_PKG_VERSION")),
+    ),
+    number(
+        "timeout_seconds",
+        "Timeout (seconds)",
+        "Time allowed for the whole scenario, every step included, before it is reported down. Between 1 and 60.",
+        "5",
+        "5",
+    ),
 ];
 
 /// Options lues par `collectors/uptime/tcp.rs`.
@@ -5325,6 +5410,41 @@ fn compiled(kind: &str) -> Option<CollectorView> {
             },
             options: HTTP_OPTIONS,
         },
+        // Le scénario reprend le client de la sonde HTTP ; ses identifiants ne
+        // partent que là où une étape place `{{secret.…}}`.
+        "http_steps" => CollectorView {
+            kind: "http_steps",
+            label: "HTTP scenario",
+            summary: "Plays several requests in a row, the way a user would: log in, keep the session cookie or the token, open a protected page and check what it shows.",
+            examples: &[
+                "Login then dashboard",
+                "API token then protected endpoint",
+                "Search then result page",
+                "Multi-step health check",
+            ],
+            credential_types: &["none", "username_password", "api_token"],
+            credentials: &[NO_AUTH, HTTP_STEPS_LOGIN, HTTP_STEPS_TOKEN],
+            address_hint: "https://app.example.com",
+            default_port: 443,
+            setup: Setup {
+                title: "Monitor a user journey",
+                steps: &[
+                    "In the address, paste the base URL of the service: steps can then use paths such as /login.",
+                    "Add the steps in order: method, URL, headers, body and the status codes accepted.",
+                    "To reuse a value from a response, add an extraction (JSON path, header or regular expression) and write its name as {{name}} in a later step.",
+                    "If a step logs in, choose a credential and write {{secret.username}}, {{secret.password}} or {{secret.token}} where it belongs.",
+                ],
+                ports: &[
+                    to_device!(443, "tcp", "Web pages or API over HTTPS (default port)"),
+                    to_device_optional!(80, "tcp", "Only with http:// URLs (default port)"),
+                ],
+                permissions: &[
+                    "A test account on the service\nOnly if a step logs in: give it the fewest rights possible",
+                ],
+                warning: "Never write a password or a token in the steps themselves: use the credential and its {{secret.…}} placeholders, which are stored encrypted.",
+            },
+            options: HTTP_STEPS_OPTIONS,
+        },
         "tcp" => CollectorView {
             kind: "tcp",
             label: "Network port (TCP)",
@@ -7964,6 +8084,7 @@ fn guide_url(kind: &str) -> String {
     let page = match kind {
         "victorialogs" | "victoriametrics" => "victoriametrics",
         "agent" | "agent_service" => "agent",
+        "http_steps" => "http-scenario",
         "http" | "tcp" | "dns" | "ping" | "tls" | "ntp" | "smtp" | "mysql" | "mqtt"
         | "websocket" | "udp" | "ssh" | "imap" | "pop3" | "snmp_oid" | "radius" | "grpc" => {
             "services"
@@ -8181,6 +8302,7 @@ mod tests {
         "agent",
         "agent_service",
         "http",
+        "http_steps",
         "tcp",
         "dns",
         "ping",
@@ -8273,6 +8395,20 @@ mod tests {
                     "json_expect",
                     "headers",
                     "body",
+                    "follow_redirects",
+                    "max_redirects",
+                    "insecure_tls",
+                    "allow_private_targets",
+                    "check_certificate",
+                    "max_body_bytes",
+                    "user_agent",
+                    "timeout_seconds",
+                ],
+            ),
+            (
+                "http_steps",
+                &[
+                    "steps",
                     "follow_redirects",
                     "max_redirects",
                     "insecure_tls",
@@ -8955,6 +9091,10 @@ mod tests {
                     }
                     "rows" => {
                         assert!(!(option.columns)().is_empty(), "{contexte} : lignes sans colonne")
+                    }
+                    // L'éditeur d'étapes d'un scénario HTTP : un tableau JSON, sans défaut.
+                    "steps" => {
+                        assert!(option.default.is_empty(), "{contexte} : défaut sur des étapes")
                     }
                     other => panic!("{contexte} : type de champ inconnu « {other} »"),
                 }
@@ -9726,6 +9866,7 @@ mod tests {
             ("snmp_oid", include_str!("../../../../docs/devices/services.md")),
             ("radius", include_str!("../../../../docs/devices/services.md")),
             ("grpc", include_str!("../../../../docs/devices/services.md")),
+            ("http_steps", include_str!("../../../../docs/devices/http-scenario.md")),
         ];
         fn flatten(text: &str) -> String {
             text.replace('`', "").split_whitespace().collect::<Vec<_>>().join(" ")
@@ -9935,6 +10076,10 @@ mod tests {
         );
         assert_eq!(describe("radius").credential_types, &["radius"]);
         assert_eq!(describe("grpc").credential_types, &["none"]);
+        assert_eq!(
+            describe("http_steps").credential_types,
+            &["none", "username_password", "api_token"]
+        );
         assert_eq!(describe("snmp_oid").credential_types, &["snmp_community", "snmp_v3"]);
     }
 

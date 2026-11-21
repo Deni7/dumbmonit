@@ -815,6 +815,9 @@ tokens need the `write` scope for changes. See [Email reports](../using/reports.
 | `DELETE` | `/api/incidents/{id}` | admin | `204`. |
 | `GET` | `/api/incidents/{id}/updates` | session | The timeline: `id`, `incident_id`, `status`, `body`, `created_at`. |
 | `POST` | `/api/incidents/{id}/updates` | admin | `{"status": "monitoring", "body": "…"}`. Appends an update and moves the incident to `status`. `201`. |
+| `GET` | `/api/incidents/{id}/postmortem` | session | The post-mortem: `summary`, `impact`, `root_cause`, `timeline` (`[{"at", "text"}]`, oldest first), `actions` (`[{"text", "done"}]`), `published`, `published_at`. `404` until one is written. The incident view also carries it as `postmortem` (`null` without one). |
+| `PUT` | `/api/incidents/{id}/postmortem` | admin | The same fields, a full replacement. A draft can be saved at any time; `"published": true` needs a resolved incident and a summary (`400` otherwise), and maintenance windows have none. `published_at` is set on first publication and kept while it stays published. Returns the incident. The public document then shows it as `postmortem` on the resolved incident. See [Post-mortems](../using/status-pages.md#postmortems). |
+| `DELETE` | `/api/incidents/{id}/postmortem` | admin | `204`. |
 | `GET` | `/api/public/status/{slug}` | public | The JSON document a published page is built from (also `badge.svg` and `rss` under the same path). In `page`, `show_uptime_days` is the configured maximum and `history_days` the window actually shown (the age of the page's data, from 7 days up to that maximum) and `simple` mirrors simple mode. See [Status pages](../using/status-pages.md). On a page's custom domain (`Host` equal to its `domain`), only this page's `/api/public/status/{slug}/…` routes answer; every other route of this reference is `404` there. |
 | `GET` | `/api/public/status/{slug}/uptime.svg`, `/response.svg` | public | Page badges: mean uptime over `?days=` `1`, `7`, `30` (default) or `90` — `400` beyond the page's history — and mean response time. SVG, `Cache-Control: public, max-age=60`. |
 | `GET` | `/api/public/status/{slug}/components/{key}/badge.svg`, `/uptime.svg`, `/response.svg` | public | The same three badges for one service; `key` is the service's `key` in the public document (its label in URL form). `404` for an unknown key. |
@@ -825,6 +828,16 @@ tokens need the `write` scope for changes. See [Email reports](../using/reports.
 | `POST` | `/api/public/status/{slug}/subscribe` | public | `{"email": "…"}`. Mails a confirmation link through the page's SMTP channel. Always `202` with the same message, whatever the address's state; `400` for an invalid address; `404` when the page offers no email subscription; `409` when the page cannot take more subscribers; `429` with `Retry-After` beyond five requests per client and sixty in all per 15 minutes. |
 | `POST` | `/api/public/status/{slug}/confirm?token=…` | public | Confirms a subscription (the link of the confirmation email opens `/s/{slug}/confirm`, whose button posts here). `404` for an unknown or expired token. |
 | `POST` | `/api/public/status/{slug}/unsubscribe?token=…` | public | Removes a subscription; the body is ignored, so it is also the RFC 8058 one-click target of `List-Unsubscribe`. Always `200`. |
+
+## SLOs
+
+| Method | Route | Auth | Purpose |
+|---|---|---|---|
+| `GET` | `/api/slos` | session | Every SLO: `id`, `name`, `description`, `objective` (percent), `window_days`, `scope` (`targets`, `groups`), `enabled`, and `status`: `measured`, `monitors`, `attained`, `budget` (`total_minutes`, `consumed_minutes`, `remaining_minutes`, `remaining_percent`), `burn` (`m5`, `m30`, `h1`, `h6`) and `verdict` (`none`, `slow`, `fast`). See [SLOs](../using/slos.md). |
+| `POST` | `/api/slos` | admin | `{"name", "description", "objective", "window_days", "scope", "enabled"}`. `objective` strictly between 0 and 100; `window_days` 7, 28, 30 or 90. `201`; `409` on a name already taken. |
+| `GET` | `/api/slos/{id}` | session | One SLO, plus `members` (monitor ids covered) and `burndown` (`[unix seconds, % of the budget left]`). |
+| `PUT` | `/api/slos/{id}` | admin | Full replacement. |
+| `DELETE` | `/api/slos/{id}` | admin | `204`. |
 
 ## Agent tokens and ingest
 

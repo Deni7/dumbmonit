@@ -915,7 +915,9 @@ mod tests {
         // relais pendant un envoi) : la demande est gardée.
         client.clone().request_report();
         client.request_report();
-        tokio::time::timeout(Duration::from_millis(100), signal.notified())
+        // La demande est déjà là : l'attente rend la main aussitôt, le plafond
+        // ne sert qu'à ne pas pendre si elle s'était perdue.
+        tokio::time::timeout(Duration::from_secs(5), signal.notified())
             .await
             .expect("demande gardée");
         let again = tokio::time::timeout(Duration::from_millis(50), signal.notified()).await;

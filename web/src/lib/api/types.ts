@@ -429,7 +429,7 @@ export type AlertEffectivePhase = AlertPhase | 'suppressed';
  * families or a custom expression) against `threshold`; `drift`: how many
  * times the usual value the measurement is, against `threshold`.
  */
-export type RuleKind = 'threshold' | 'anomaly' | 'predict' | 'log_pattern' | 'forecast' | 'drift';
+export type RuleKind = 'threshold' | 'anomaly' | 'predict' | 'log_pattern' | 'forecast' | 'drift' | 'slo_burn';
 
 /** Direction a `drift` rule watches. */
 export type DriftDirection = 'up' | 'down' | 'both';
@@ -811,7 +811,8 @@ export interface CollectorRequirement {
 }
 
 /** Input shapes a collector option can ask for. */
-export type CollectorOptionInput = 'text' | 'number' | 'boolean' | 'select' | 'checklist' | 'rows' | 'agent';
+/** `steps`: the requests of an HTTP scenario, a JSON array edited by `StepsEditor`. */
+export type CollectorOptionInput = 'text' | 'number' | 'boolean' | 'select' | 'checklist' | 'rows' | 'agent' | 'steps';
 
 /** One tick box of a `checklist` option. */
 export interface CollectorOptionItem {
@@ -2384,6 +2385,8 @@ export interface Incident {
 	updates: IncidentUpdate[];
 	/** Device ids the announcement concerns; empty: the whole page. */
 	components: number[];
+	/** Draft or published; `null` until one is written. */
+	postmortem: Postmortem | null;
 }
 
 export interface IncidentPayload {
@@ -2421,6 +2424,126 @@ export interface IncidentUpdatePayload {
 	body: string;
 	/** Past date of the message, to complete a history; omitted: now, and subscribers are notified. */
 	at?: string;
+}
+
+/** One step of a post-mortem timeline. Mirrors `db::status_pages::TimelineEntry`. */
+export interface PostmortemTimelineEntry {
+	/** UTC, `YYYY-MM-DDTHH:MM:SSZ`. */
+	at: string;
+	text: string;
+}
+
+/** Mirrors `db::status_pages::ActionItem`. */
+export interface PostmortemAction {
+	text: string;
+	done: boolean;
+}
+
+/** Post-mortem of an incident. Mirrors `db::status_pages::Postmortem`. */
+export interface Postmortem {
+	incident_id: number;
+	summary: string;
+	impact: string;
+	root_cause: string;
+	/** Oldest first. */
+	timeline: PostmortemTimelineEntry[];
+	actions: PostmortemAction[];
+	published: boolean;
+	/** First publication; `null` while a draft. */
+	published_at: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+/** Body of `PUT /api/incidents/{id}/postmortem`: a full replacement. Publishing needs a resolved incident. */
+export interface PostmortemPayload {
+	summary: string;
+	impact: string;
+	root_cause: string;
+	/** Any order; `at` is RFC 3339 (UTC). */
+	timeline: PostmortemTimelineEntry[];
+	actions: PostmortemAction[];
+	published: boolean;
+}
+
+/** What a public page shows of a published post-mortem. Mirrors `PublicPostmortem`. */
+export interface PublicPostmortem {
+	summary: string;
+	impact: string;
+	root_cause: string;
+	timeline: PostmortemTimelineEntry[];
+	actions: PostmortemAction[];
+	published_at: string | null;
+}
+
+// --- Service level objectives (`/api/slos`, mirrors `crates/server/src/slo`) ---
+
+/** Rolling windows an SLO can use, in days. Mirrors `slo::WINDOW_DAYS`. */
+export const SLO_WINDOWS = [7, 28, 30, 90] as const;
+export type SloWindow = (typeof SLO_WINDOWS)[number];
+
+/** Mirrors `slo::Budget`. Remaining values turn negative once the target is missed. */
+export interface SloBudget {
+	total_minutes: number;
+	consumed_minutes: number;
+	remaining_minutes: number;
+	remaining_percent: number;
+}
+
+/** Burn rates over 5 min, 30 min, 1 h and 6 h; `null` without measurements. Mirrors `slo::BurnRates`. */
+export interface SloBurnRates {
+	m5: number | null;
+	m30: number | null;
+	h1: number | null;
+	h6: number | null;
+}
+
+/** `fast`: 14.4× over 1 h and 5 min; `slow`: 6× over 6 h and 30 min. Mirrors `slo::Burn`. */
+export type SloVerdict = 'none' | 'slow' | 'fast';
+
+/** Mirrors `slo::SloStatus`. */
+export interface SloStatus {
+	/** False when VictoriaMetrics did not answer. */
+	measured: boolean;
+	monitors: number;
+	/** Availability over the window, in percent. */
+	attained: number | null;
+	budget: SloBudget | null;
+	burn: SloBurnRates;
+	verdict: SloVerdict;
+}
+
+/** Mirrors `api::slos::SloView`. */
+export interface Slo {
+	id: number;
+	name: string;
+	description: string;
+	/** Availability target in percent, strictly between 0 and 100. */
+	objective: number;
+	window_days: number;
+	/** Same shape as an SLA report scope; empty: every monitor. */
+	scope: { targets: number[]; groups: string[] };
+	enabled: boolean;
+	created_at: string;
+	updated_at: string;
+	status: SloStatus;
+}
+
+/** Mirrors `api::slos::SloDetail`. */
+export interface SloDetail extends Slo {
+	members: number[];
+	/** `[unix seconds, % of the budget left]`, starting at 100. */
+	burndown: [number, number][];
+}
+
+/** Body of `POST` and `PUT /api/slos`. */
+export interface SloPayload {
+	name: string;
+	description: string;
+	objective: number;
+	window_days: number;
+	scope: { targets: number[]; groups: string[] };
+	enabled: boolean;
 }
 
 // Public document of `GET /api/public/status/{slug}`: no ids, no addresses.
@@ -2509,6 +2632,8 @@ export interface PublicIncident {
 	starts_at: string;
 	ends_at: string | null;
 	updates: PublicIncidentUpdate[];
+	/** Published post-mortem of a resolved incident; absent otherwise. */
+	postmortem?: PublicPostmortem;
 }
 
 export interface PublicStatus {

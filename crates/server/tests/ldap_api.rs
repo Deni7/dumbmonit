@@ -216,12 +216,17 @@ async fn the_stored_password_only_goes_to_its_own_server() {
     assert_eq!(report.body["ok"], false);
     let report = app.post("/api/auth/ldap/test", json!({ "config": saved }), Some(&admin)).await;
     assert_eq!(report.body["ok"], false);
-    tokio::time::sleep(Duration::from_millis(200)).await;
 
-    assert!(
-        contains(&saved_seen.lock().unwrap(), SERVICE_PASSWORD),
-        "témoin : le serveur enregistré reçoit bien la liaison du compte de service"
-    );
+    // Les faux serveurs lisent dans leur propre tâche : attendre que le témoin
+    // arrive plutôt qu'un délai fixe, qu'une machine chargée peut dépasser.
+    let started = std::time::Instant::now();
+    while !contains(&saved_seen.lock().unwrap(), SERVICE_PASSWORD) {
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "témoin : le serveur enregistré reçoit bien la liaison du compte de service"
+        );
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
     assert!(
         !contains(&other_seen.lock().unwrap(), SERVICE_PASSWORD),
         "le mot de passe enregistré est parti vers un autre serveur"

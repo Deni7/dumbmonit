@@ -35,6 +35,11 @@ pub const TARGET_ID_LABELS: [&str; 2] = ["target", "target_id"];
 pub const TARGET_NAME_LABELS: [&str; 2] = ["host", "hostname"];
 pub const TARGET_ADDRESS_LABELS: [&str; 2] = ["instance", "address"];
 
+/// Étiquette qui porte le nom d'un SLO sur les séries de la règle de
+/// consommation (voir [`crate::slo`]). Elle ne rattache la série à aucune
+/// cible : elle donne seulement un nom à afficher à la place de l'équipement.
+pub const SLO_LABEL: &str = "slo";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
@@ -101,6 +106,11 @@ pub enum RuleKind {
     /// [`crate::alerting::drift`]. La valeur comparée au seuil est le rapport
     /// entre la mesure et sa normale.
     Drift,
+    /// Consommation du budget d'erreur des SLO, calculée par [`crate::slo`] :
+    /// une série par SLO, de valeur 0 (rien), 1 (consommation lente) ou 2
+    /// (consommation rapide). La requête n'est pas lue.
+    #[serde(rename = "slo_burn")]
+    SloBurn,
 }
 
 impl RuleKind {
@@ -112,6 +122,7 @@ impl RuleKind {
             Self::LogPattern => "log_pattern",
             Self::Forecast => "forecast",
             Self::Drift => "drift",
+            Self::SloBurn => "slo_burn",
         }
     }
 
@@ -122,6 +133,7 @@ impl RuleKind {
             "log_pattern" => Self::LogPattern,
             "forecast" => Self::Forecast,
             "drift" => Self::Drift,
+            "slo_burn" => Self::SloBurn,
             _ => Self::Threshold,
         }
     }

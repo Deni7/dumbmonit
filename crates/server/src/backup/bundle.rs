@@ -236,6 +236,10 @@ pub struct Bundle {
     /// logo propre aux rapports, et l'instance restaurée garde le sien.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub report_logo: Option<BundleReportLogo>,
+    /// Objectifs de niveau de service (migration 0260), leur périmètre
+    /// désigné par référence comme celui des rapports SLA.
+    #[serde(default)]
+    pub slos: Vec<BundleSlo>,
 }
 
 /// Serveur de courriel enregistré et son mot de passe.
@@ -279,6 +283,7 @@ impl Bundle {
             ("netscan_schedules".to_string(), self.netscan_schedules.len()),
             ("lun_links".to_string(), self.lun_links.len()),
             ("upgrade_notes_closed".to_string(), self.upgrade_notes_closed.len()),
+            ("slos".to_string(), self.slos.len()),
         ])
     }
 }
@@ -815,6 +820,38 @@ pub struct BundleIncident {
     pub ends_at: Option<String>,
     #[serde(default)]
     pub updates: Vec<BundleIncidentUpdate>,
+    /// Post-mortem de l'incident (migration 0261), brouillon ou publié.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub postmortem: Option<BundlePostmortem>,
+}
+
+/// Post-mortem d'un incident, tel qu'enregistré.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct BundlePostmortem {
+    pub summary: String,
+    pub impact: String,
+    pub root_cause: String,
+    pub timeline: Vec<crate::db::status_pages::TimelineEntry>,
+    pub actions: Vec<crate::db::status_pages::ActionItem>,
+    pub published: bool,
+    pub published_at: Option<String>,
+}
+
+/// Un SLO : son périmètre désigne les moniteurs par référence (`kind|address`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct BundleSlo {
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    pub objective: f64,
+    pub window_days: u32,
+    #[serde(default = "yes")]
+    pub enabled: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scope_targets: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scope_groups: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

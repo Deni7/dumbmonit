@@ -7,8 +7,8 @@
 	 * or shard. One read of what the probe stored, refreshed every minute; the
 	 * server itself is never asked, and none of its data is ever read.
 	 */
-	import { untrack } from 'svelte';
 	import { getObservabilityOverview } from '#lib/api/observability.js';
+	import { startPolling } from '#lib/poll.js';
 	import type { ObservabilityOverview, Target } from '#lib/api/index.js';
 	import { ErrorNotice, Panel, Plate, Skeleton } from '#lib/ui/index.js';
 	import Figure from '../Figure.svelte';
@@ -44,13 +44,7 @@
 		void target.id;
 		loading = true;
 		view = null;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 
 	const title = $derived(m.devicesb_observability_panel_title({ name: kindTitle(target.kind) }));
