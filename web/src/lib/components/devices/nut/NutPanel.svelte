@@ -5,8 +5,8 @@
 	 * latest stored measurement — opening the page never connects to upsd.
 	 * UPS in trouble come first; every state is a word as well as a colour.
 	 */
-	import { untrack } from 'svelte';
 	import { queryInstant, type Target } from '#lib/api/index.js';
+	import { startPolling } from '#lib/poll.js';
 	import { ErrorNotice, Panel, Plate, Skeleton } from '#lib/ui/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import Figure from '../Figure.svelte';
@@ -39,13 +39,7 @@
 		void target.id;
 		loading = true;
 		readings = [];
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 
 	const troubled = $derived(readings.filter((r) => !['signal', 'info'].includes(verdict(r).tone)).length);

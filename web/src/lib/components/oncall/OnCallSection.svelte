@@ -18,6 +18,7 @@
 		type Schedule
 	} from '#lib/api/index.js';
 	import { ErrorNotice, Skeleton } from '#lib/ui/index.js';
+	import { startPolling } from '#lib/poll.js';
 	import Segmented from '#lib/components/devices/Segmented.svelte';
 	import NowPanel from './NowPanel.svelte';
 	import SchedulesPanel from './SchedulesPanel.svelte';
@@ -75,14 +76,8 @@
 	}
 
 	$effect(() => {
-		const controller = new AbortController();
-		void load(controller.signal);
 		// "Now" moves on its own at each handoff.
-		const timer = setInterval(() => void load(controller.signal), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 </script>
 

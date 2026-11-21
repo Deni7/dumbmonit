@@ -36,7 +36,7 @@
 				<li>
 					<button
 						type="button"
-						class="inline-flex min-h-10 w-full items-center gap-2 rounded-lg border border-line bg-surface-2 px-2.5 text-left text-sm text-ink hover:border-line-strong focus-visible:outline-2 focus-visible:outline-signal"
+						class="inline-flex min-h-10 w-full items-center gap-2 rounded-lg border border-line bg-surface-2 px-2.5 text-left text-sm text-ink hover:border-line-strong focus-visible:outline-2 focus-visible:outline-focus"
 						onclick={() => {
 							onpick(node.id);
 							query = '';

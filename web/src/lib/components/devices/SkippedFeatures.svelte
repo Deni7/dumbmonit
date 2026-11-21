@@ -6,8 +6,8 @@
 	 * user why a piece of data is missing. Renders nothing when nothing was
 	 * skipped, and nothing if the read fails.
 	 */
-	import { untrack } from 'svelte';
 	import { Info } from 'lucide-svelte';
+	import { startPolling } from '#lib/poll.js';
 	import { getSkippedFeatures } from '#lib/api/skipped-features.js';
 	import type { SkippedFeature, Target } from '#lib/api/index.js';
 	import { m } from '#lib/paraglide/messages.js';
@@ -53,13 +53,7 @@
 	$effect(() => {
 		void target.id;
 		features = [];
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 </script>
 

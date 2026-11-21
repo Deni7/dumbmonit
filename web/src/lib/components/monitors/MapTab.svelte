@@ -492,7 +492,7 @@
 				{#if graph.down.size > 0}
 					<button
 						type="button"
-						class="-my-2 inline-flex min-h-10 items-center rounded-lg px-1.5 font-semibold text-warning-ink underline decoration-dotted underline-offset-4 hover:bg-warning-soft focus-visible:outline-2 focus-visible:outline-signal"
+						class="-my-2 inline-flex min-h-10 items-center rounded-lg px-1.5 font-semibold text-warning-ink underline decoration-dotted underline-offset-4 hover:bg-warning-soft focus-visible:outline-2 focus-visible:outline-focus"
 						onclick={showDown}
 					>
 						{m.topology_summary_down({ count: graph.down.size })}
@@ -522,7 +522,7 @@
 							</Button>
 						{/snippet}
 						{#snippet children({ close })}
-							{@const item = 'flex min-h-10 w-full items-center rounded-lg px-3 text-left text-sm text-ink hover:bg-surface focus-visible:outline-2 focus-visible:outline-signal'}
+							{@const item = 'flex min-h-10 w-full items-center rounded-lg px-3 text-left text-sm text-ink hover:bg-surface focus-visible:outline-2 focus-visible:outline-focus'}
 							<button type="button" role="menuitem" class={item} onclick={() => { close(); void run('svg'); }}>{m.topology_export_svg()}</button>
 							<button type="button" role="menuitem" class={item} onclick={() => { close(); void run('png'); }}>{m.topology_export_png()}</button>
 							<button type="button" role="menuitem" class={item} onclick={() => { close(); void print('A4'); }}>{m.topology_print_a4()}</button>
@@ -544,7 +544,7 @@
 		{/if}
 
 		{#if view === 'map' && editing}
-			<div class="mb-3 flex flex-col gap-2 rounded-[var(--radius-card)] border border-signal/50 bg-surface px-4 py-3 sm:flex-row sm:items-center sm:gap-4">
+			<div class="mb-3 flex flex-col gap-2 rounded-[var(--radius-card)] border border-primary/50 bg-surface px-4 py-3 sm:flex-row sm:items-center sm:gap-4">
 				<p class="min-w-0 flex-1 text-sm text-ink-2">{m.topology_edit_banner()}</p>
 				<div class="flex shrink-0 items-center gap-2">
 					<Button variant="secondary" size="sm" disabled={!canUndo || busy} onclick={undo} title={m.topology_edit_undo_hint()}>

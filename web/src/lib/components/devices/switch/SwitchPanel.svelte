@@ -11,6 +11,7 @@
 	 * nothing at all.
 	 */
 	import { untrack } from 'svelte';
+	import { startPolling } from '#lib/poll.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { getLocale } from '#lib/paraglide/runtime.js';
 	import { queryInstant, queryRange, type Target } from '#lib/api/index.js';
@@ -78,13 +79,7 @@
 		units = [];
 		unitKey = null;
 		selected = null;
-		const controller = new AbortController();
-		void untrack(() => load(controller.signal));
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 
 	// Heatmap of the unit on screen: one row per port, half-hour columns.

@@ -20,6 +20,7 @@
 	 * server-side from the last probe.
 	 */
 	import { listProxmoxNodes } from '#lib/api/proxmox.js';
+	import { startPolling } from '#lib/poll.js';
 	import type { ProxmoxNode, ProxmoxNodes, Target } from '#lib/api/index.js';
 	import { formatDuration } from '#lib/format.js';
 	import { EmptyState, ErrorNotice, Led, Plate, Skeleton, type Tone } from '#lib/ui/index.js';
@@ -51,14 +52,8 @@
 	}
 
 	$effect(() => {
-		const controller = new AbortController();
 		loading = true;
-		void load(controller.signal);
-		const timer = setInterval(() => void load(controller.signal), 30_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 30_000);
 	});
 
 	/** How many nodes have something the reader should act on. */

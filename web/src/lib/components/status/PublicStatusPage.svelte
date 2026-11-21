@@ -13,6 +13,7 @@
 	 * logo as icon or none, never the product's.
 	 */
 	import { m } from '#lib/paraglide/messages.js';
+	import { startPolling } from '#lib/poll.js';
 	import { FileQuestion } from 'lucide-svelte';
 	import { getPublicStatus, getPublicStatusDay, toApiError, type PublicDayDetail, type PublicStatus } from '#lib/api/index.js';
 	import { theme } from '#lib/stores/theme.svelte.js';
@@ -58,15 +59,9 @@
 	$effect(() => {
 		const current = slug;
 		if (!current) return;
-		const controller = new AbortController();
 		loading = true;
 		status = null;
-		void load(controller.signal);
-		const timer = setInterval(() => void load(controller.signal), REFRESH_MS);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, REFRESH_MS);
 	});
 
 	// The page decides its light: a fixed theme overrides whatever the visitor
