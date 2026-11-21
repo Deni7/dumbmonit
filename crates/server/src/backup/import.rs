@@ -1913,7 +1913,9 @@ async fn restore_incidents(
             // celui que l'instance a déjà écrit n'est jamais remplacé.
             let id: i64 = row.try_get("id")?;
             let added = match &incident.postmortem {
-                Some(postmortem) => restore_postmortem(tx, id, &incident.status, postmortem).await?,
+                Some(postmortem) => {
+                    restore_postmortem(tx, id, &incident.status, postmortem).await?
+                }
                 None => false,
             };
             if added {

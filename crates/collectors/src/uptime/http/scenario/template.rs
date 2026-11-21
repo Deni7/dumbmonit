@@ -102,9 +102,8 @@ impl Template {
                 parts.push(Part::Text(rest[..open].to_string()));
             }
             let after = &rest[open + 2..];
-            let close = after
-                .find("}}")
-                .ok_or_else(|| "a \"{{\" is never closed by \"}}\"".to_string())?;
+            let close =
+                after.find("}}").ok_or_else(|| "a \"{{\" is never closed by \"}}\"".to_string())?;
             parts.push(parse_mark(after[..close].trim())?);
             rest = &after[close + 2..];
         }

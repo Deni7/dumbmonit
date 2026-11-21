@@ -1339,11 +1339,12 @@ fn postmortem_from_row(row: &sqlx::sqlite::SqliteRow) -> Result<Postmortem> {
 }
 
 pub async fn get_postmortem(pool: &SqlitePool, incident_id: i64) -> Result<Option<Postmortem>> {
-    let row = sqlx::query(sqlx::AssertSqlSafe(format!("{SELECT_POSTMORTEM} WHERE incident_id = ?")))
-        .bind(incident_id)
-        .fetch_optional(pool)
-        .await
-        .context("lecture d'un post-mortem")?;
+    let row =
+        sqlx::query(sqlx::AssertSqlSafe(format!("{SELECT_POSTMORTEM} WHERE incident_id = ?")))
+            .bind(incident_id)
+            .fetch_optional(pool)
+            .await
+            .context("lecture d'un post-mortem")?;
     row.as_ref().map(postmortem_from_row).transpose()
 }
 

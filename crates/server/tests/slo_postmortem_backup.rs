@@ -6,7 +6,9 @@
 
 use dumbmonit_server::backup::{ExportOptions, collect, restore};
 use dumbmonit_server::db;
-use dumbmonit_server::db::status_pages::{ActionItem, IncidentInput, PostmortemInput, TimelineEntry};
+use dumbmonit_server::db::status_pages::{
+    ActionItem, IncidentInput, PostmortemInput, TimelineEntry,
+};
 use dumbmonit_server::reports::layout::Scope;
 use dumbmonit_server::slo::{self, SloInput};
 

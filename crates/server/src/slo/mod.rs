@@ -261,9 +261,7 @@ impl Burn {
 /// Verdict multi-fenêtres : la fenêtre longue dit que la consommation compte,
 /// la courte qu'elle dure encore. Il faut les deux.
 pub fn verdict(rates: &BurnRates) -> Burn {
-    let both = |long: Option<f64>, short: Option<f64>, limit: f64| {
-        matches!((long, short), (Some(l), Some(s)) if l >= limit && s >= limit)
-    };
+    let both = |long: Option<f64>, short: Option<f64>, limit: f64| matches!((long, short), (Some(l), Some(s)) if l >= limit && s >= limit);
     if both(rates.h1, rates.m5, FAST_BURN) {
         Burn::Fast
     } else if both(rates.h6, rates.m30, SLOW_BURN) {

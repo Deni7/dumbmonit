@@ -340,10 +340,12 @@ pub async fn evaluate_once(
             }
             // Consommation des budgets d'erreur : une série par SLO, calculée
             // par `crate::slo` à partir des disponibilités récentes.
-            RuleKind::SloBurn => crate::slo::burn_rule(pool, source, &rule, now).await.map(|found| {
-                annotations.extend(found.annotations);
-                found.series
-            }),
+            RuleKind::SloBurn => {
+                crate::slo::burn_rule(pool, source, &rule, now).await.map(|found| {
+                    annotations.extend(found.annotations);
+                    found.series
+                })
+            }
             RuleKind::Threshold | RuleKind::Anomaly | RuleKind::Predict => {
                 source.instant(&rule.query).await
             }
