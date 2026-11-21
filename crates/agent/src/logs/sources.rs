@@ -429,13 +429,32 @@ mod tests {
         let (tx, mut rx) = tokio::sync::mpsc::channel(100);
         let pattern = format!("{}/*.log", dir.path().display());
         let task = tokio::spawn(run_files(tx, vec![pattern], "debug".to_string()));
-        tokio::time::sleep(Duration::from_millis(300)).await;
-        std::fs::write(&path, "old line\nnew error here\n").unwrap();
-        let line = tokio::time::timeout(Duration::from_secs(6), rx.recv()).await.unwrap().unwrap();
+        // Le premier passage retient la fin du fichier (l'historique n'est pas
+        // rejoué) : une ligne écrite avant lui passe pour de l'historique. Sur
+        // une machine chargée, il peut venir tard : la ligne est donc ajoutée
+        // de nouveau à chaque attente vaine, jusqu'à ce qu'elle arrive.
+        let started = std::time::Instant::now();
+        let line = loop {
+            let mut file = std::fs::OpenOptions::new().append(true).open(&path).unwrap();
+            std::io::Write::write_all(&mut file, b"new error here\n").unwrap();
+            drop(file);
+            match tokio::time::timeout(FILE_POLL * 3, rx.recv()).await {
+                Ok(line) => break line.expect("flux ouvert"),
+                Err(_) => assert!(started.elapsed() < Duration::from_secs(60), "ligne jamais lue"),
+            }
+        };
         assert_eq!(line.message, "new error here");
         assert_eq!(line.level, "error");
         std::fs::write(&path, "again\n").unwrap();
-        let line = tokio::time::timeout(Duration::from_secs(6), rx.recv()).await.unwrap().unwrap();
+        // Une ligne ajoutée en double peut encore précéder la relecture du
+        // fichier tronqué.
+        let line = loop {
+            let line =
+                tokio::time::timeout(Duration::from_secs(30), rx.recv()).await.unwrap().unwrap();
+            if line.message != "new error here" {
+                break line;
+            }
+        };
         assert_eq!(line.message, "again");
         task.abort();
     }

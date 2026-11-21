@@ -566,7 +566,9 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    // Horloge de tokio arrêtée : la sonde (300 ms) et les délais (100 ms, 1 s)
+    // se départagent sur le temps simulé, pas sur la charge de la machine.
+    #[tokio::test(start_paused = true)]
     async fn le_delai_propre_a_la_cible_releve_celui_du_registre() {
         let mut registry = Registry::new();
         registry.register(Arc::new(Lent));

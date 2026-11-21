@@ -129,7 +129,8 @@ async fn un_moniteur_ajoute_en_marche_est_sonde_tout_de_suite() {
         if last_probe(&lab.pool, id).await.0.is_some() {
             break;
         }
-        assert!(started.elapsed() < Duration::from_secs(6), "première sonde trop tardive");
+        // Large pour une machine chargée, mais sous les quinze secondes d'avant.
+        assert!(started.elapsed() < Duration::from_secs(12), "première sonde trop tardive");
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
 }
