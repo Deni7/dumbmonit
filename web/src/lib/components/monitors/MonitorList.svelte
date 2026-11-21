@@ -1098,7 +1098,10 @@
 
 	/** The table's 24 hourly segments: one aggregated query for the whole fleet. */
 	async function loadBars(signal?: AbortSignal) {
-		const cells = await loadRiver(DAY_SECONDS, signal, 24).catch(() => null);
+		// The monitors tell a device's silent hour (down) from an empty one; read
+		// untracked, so that each refresh of the store does not restart the timer.
+		const monitors = untrack(() => targets);
+		const cells = await loadRiver(DAY_SECONDS, signal, 24, monitors).catch(() => null);
 		if (cells) river = cells;
 	}
 
