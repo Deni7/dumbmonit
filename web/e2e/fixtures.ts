@@ -84,6 +84,10 @@ export const test = base.extend<Fixtures, { env: Env }>({
 						setupCode,
 						hostName
 					});
+			// Starting the container adds a network interface on the runner; Chromium, already
+			// running, then aborts its in-flight loads once with ERR_NETWORK_CHANGED. Let that
+			// happen before the first page is opened.
+			if (!external) await new Promise((resolve) => setTimeout(resolve, 5_000));
 			const env: Env = {
 				baseURL: instance.baseURL,
 				hostName,
