@@ -8816,6 +8816,8 @@
 	"upgrade_notice_keep": "Le garder",
 	"upgrade_notice_title": "Changements de configuration à faire",
 	"upgrade_notice_view": "Voir",
+	"wall_band_problems": "Problèmes",
+	"wall_band_problems_note": "Alertes critiques et surveillances hors service",
 	"wall_devices_aria": "Surveillances",
 	"wall_devices_more": "{count} autres surveillances, toutes en ligne",
 	"wall_devices_more_trouble": "{count} autres surveillances (à voir : {trouble})",

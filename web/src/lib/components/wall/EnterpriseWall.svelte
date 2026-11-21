@@ -42,7 +42,7 @@
 	import { parseMusicLink } from '#lib/wall/music.js';
 	import { cardVisible, displaySpeakerName, pickPlaying, progressAt } from '#lib/wall/spotify.js';
 	import { WallSpeaker } from '#lib/wall/speaker.svelte.js';
-	import { countAlertsByTarget, countsAsProblem, criticalCount, quietedOnWall, visibleOnWall } from '#lib/alerts-attention.js';
+	import { countAlertsByTarget, criticalCount, quietedOnWall, visibleOnWall } from '#lib/alerts-attention.js';
 	import { readSky } from '#lib/components/overview/sky.js';
 	import { fleetStore } from '#lib/components/enterprise/fleet.svelte.js';
 	import { mean } from '#lib/components/enterprise/fleet.js';
@@ -209,8 +209,6 @@
 	const up = $derived(statuses.filter((r) => r.status === 'up' || r.status === 'degraded').length);
 	const down = $derived(statuses.filter((r) => r.status === 'down').length);
 	const paused = $derived(statuses.filter((r) => r.status === 'paused').length);
-	const firing = $derived(wallAlerts.filter(countsAsProblem));
-	const criticalAlerts = $derived(firing.filter((a) => a.severity === 'critical').length);
 	const availability = $derived(mean(fleetStore.figures.uptime30.values()));
 
 	const figures = $derived<BandFigure[]>([
@@ -231,12 +229,15 @@
 			tone: 'text-ink-2'
 		},
 		{
-			id: 'alerts',
-			label: m.console_kpi_alerts(),
-			value: String(firing.length),
+			// The headline's own number (critical alerts and monitors down): a count of
+			// open alerts alone would leave out a monitor down with no alert, and the
+			// foot of the screen would contradict its head.
+			id: 'problems',
+			label: m.wall_band_problems(),
+			value: String(critical),
 			unit: '',
-			note: m.console_kpi_alerts_note({ critical: criticalAlerts, warning: firing.length - criticalAlerts }),
-			tone: criticalAlerts > 0 ? 'text-warning-ink' : firing.length > 0 ? 'text-advisory-ink' : 'text-ink-2'
+			note: m.wall_band_problems_note(),
+			tone: critical > 0 ? 'text-warning-ink' : 'text-ink-2'
 		}
 	]);
 

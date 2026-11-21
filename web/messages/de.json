@@ -8816,6 +8816,8 @@
 	"upgrade_notice_keep": "Behalten",
 	"upgrade_notice_title": "Konfigurationsänderungen erforderlich",
 	"upgrade_notice_view": "Ansehen",
+	"wall_band_problems": "Probleme",
+	"wall_band_problems_note": "Kritische Alarme und ausgefallene Monitore",
 	"wall_devices_aria": "Monitore",
 	"wall_devices_more": "{count} weitere Monitore, alle melden sich",
 	"wall_devices_more_trouble": "{count} weitere Überwachungen (zu prüfen: {trouble})",

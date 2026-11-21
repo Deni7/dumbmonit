@@ -8816,6 +8816,8 @@
 	"upgrade_notice_keep": "Manter",
 	"upgrade_notice_title": "Alterações de configuração a aplicar",
 	"upgrade_notice_view": "Ver",
+	"wall_band_problems": "Problemas",
+	"wall_band_problems_note": "Alertas críticos e monitorizações em baixo",
 	"wall_devices_aria": "Monitores",
 	"wall_devices_more": "Mais {count} monitores, todos a reportar",
 	"wall_devices_more_trouble": "Mais {count} monitorizações (a verificar: {trouble})",

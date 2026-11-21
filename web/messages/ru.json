@@ -8982,6 +8982,8 @@
 	"upgrade_notice_keep": "Оставить",
 	"upgrade_notice_title": "Нужно изменить конфигурацию",
 	"upgrade_notice_view": "Открыть",
+	"wall_band_problems": "Проблемы",
+	"wall_band_problems_note": "Критические оповещения и недоступные мониторы",
 	"wall_devices_aria": "Мониторы",
 	"wall_devices_more": "Ещё мониторов: {count}, все на связи",
 	"wall_devices_more_trouble": "Ещё мониторов: {count} (требуют внимания: {trouble})",
