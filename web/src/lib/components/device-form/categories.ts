@@ -37,7 +37,7 @@ export const CATEGORY_KINDS: Record<Exclude<CategoryId, 'packs' | 'other'>, stri
 	virtualization: ['proxmox', 'pdm', 'vsphere', 'xcpng', 'nutanix', 'kubernetes'],
 	storage: ['synology', 'truenas', 'unraid', 'qnap', 'ceph', 'minio', 'pbs', 'veeam', 'kopia', 'duplicati'],
 	databases: ['postgres', 'mysql', 'mssql', 'oracle', 'mongodb', 'redis', 'elasticsearch', 'influxdb', 'rabbitmq', 'kafka', 'mqtt'],
-	web: ['http', 'website', 'webchange', 'tls', 'websocket', 'grpc', 'nginx', 'apache', 'traefik', 'caddy', 'npm'],
+	web: ['http', 'http_steps', 'website', 'webchange', 'tls', 'websocket', 'grpc', 'nginx', 'apache', 'traefik', 'caddy', 'npm'],
 	checks: ['ping', 'tcp', 'udp', 'dns', 'ntp', 'ssh', 'push', 'snmp_oid', 'radius', 'ip_blacklist'],
 	mail: ['smtp', 'imap', 'pop3', 'mailcow', 'mdaemon', 'securitygateway', 'pmg', 'mail_blacklist'],
 	observability: ['victoriametrics', 'victorialogs', 'loki', 'graylog', 'prometheus', 'otlp'],

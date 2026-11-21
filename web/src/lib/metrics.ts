@@ -9,6 +9,7 @@ import { queryInstant, queryRange, type MetricSeries, type TargetId } from '#lib
 import type { Serie } from '#lib/components/Chart.svelte';
 import type { ProbeStatus } from '#lib/format.js';
 import { m } from '#lib/paraglide/messages.js';
+import type { StepSample } from '#lib/components/device-form/scenario-steps.js';
 
 /** Ranges offered in the selector of a device's detail page. */
 export const RANGES = [
@@ -229,6 +230,43 @@ export interface UptimeSummary {
 	certExpiryDays: number | null;
 	/** Negotiated TLS version, for example "TLSv1.3". */
 	tlsVersion: string | null;
+}
+
+/** Per-step series of the last check of an HTTP scenario (`http_steps`). */
+export interface ScenarioSamples {
+	results: StepSample[];
+	statuses: StepSample[];
+	durations: StepSample[];
+}
+
+/**
+ * The per-step series of an HTTP scenario over the state window: the last
+ * value of each, and for results and statuses the time of that sample, which
+ * tells the latest run apart from older ones (see `lastRun`).
+ */
+export async function loadScenarioSamples(targetId: TargetId, signal?: AbortSignal): Promise<ScenarioSamples> {
+	const target = `target="${targetId}"`;
+	const last = (metric: string) => queryInstant(`last_over_time(dumbmonit_${metric}{${target}}[${STATE_WINDOW}])`, signal);
+	const when = (metric: string) => queryInstant(`tlast_over_time(dumbmonit_${metric}{${target}}[${STATE_WINDOW}])`, signal);
+	const [results, resultsAt, statuses, statusesAt, durations] = await Promise.all([
+		last('probe_step_result'),
+		when('probe_step_result'),
+		last('probe_step_status_code'),
+		when('probe_step_status_code'),
+		last('probe_step_duration_seconds')
+	]);
+	const samples = (values: MetricSeries[], times: MetricSeries[] | null): StepSample[] =>
+		values.flatMap((serie) => {
+			const step = Number(serie.metric?.step);
+			const value = instantValue(serie);
+			const at = times ? instantValue(times.find((other) => other.metric?.step === serie.metric?.step)) : 0;
+			return Number.isInteger(step) && step > 0 && value !== null && at !== null ? [{ step, value, at }] : [];
+		});
+	return {
+		results: samples(results, resultsAt),
+		statuses: samples(statuses, statusesAt),
+		durations: samples(durations, null)
+	};
 }
 
 /** Number of slots in the history bar. */

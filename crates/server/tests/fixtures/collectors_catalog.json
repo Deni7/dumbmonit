@@ -7651,6 +7651,316 @@
     ]
   },
   {
+    "kind": "http_steps",
+    "label": "HTTP scenario",
+    "summary": "Plays several requests in a row, the way a user would: log in, keep the session cookie or the token, open a protected page and check what it shows.",
+    "examples": [
+      "Login then dashboard",
+      "API token then protected endpoint",
+      "Search then result page",
+      "Multi-step health check"
+    ],
+    "credential_types": [
+      "none",
+      "username_password",
+      "api_token"
+    ],
+    "credentials": [
+      {
+        "kind": "none",
+        "label": "No authentication",
+        "help": "Nothing is sent: the monitor answers without credentials.",
+        "fields": []
+      },
+      {
+        "kind": "username_password",
+        "label": "Username / password",
+        "help": "Written where a step says {{secret.username}} and {{secret.password}}, for example in a login form or a JSON body.",
+        "fields": [
+          {
+            "key": "username",
+            "label": "User name",
+            "help": "",
+            "placeholder": "",
+            "input": "text",
+            "choices": [],
+            "required": true
+          },
+          {
+            "key": "password",
+            "label": "Password",
+            "help": "Stored encrypted, never shown again.",
+            "placeholder": "",
+            "input": "password",
+            "choices": [],
+            "required": true
+          }
+        ]
+      },
+      {
+        "kind": "api_token",
+        "label": "Token",
+        "help": "Written where a step says {{secret.token}}, for example in an \"Authorization: Bearer {{secret.token}}\" header.",
+        "fields": [
+          {
+            "key": "token",
+            "label": "Token",
+            "help": "Stored encrypted, never shown again.",
+            "placeholder": "",
+            "input": "password",
+            "choices": [],
+            "required": true
+          }
+        ]
+      }
+    ],
+    "address_hint": "https://app.example.com",
+    "default_port": 443,
+    "setup": {
+      "title": "Monitor a user journey",
+      "steps": [
+        "In the address, paste the base URL of the service: steps can then use paths such as /login.",
+        "Add the steps in order: method, URL, headers, body and the status codes accepted.",
+        "To reuse a value from a response, add an extraction (JSON path, header or regular expression) and write its name as {{name}} in a later step.",
+        "If a step logs in, choose a credential and write {{secret.username}}, {{secret.password}} or {{secret.token}} where it belongs."
+      ],
+      "ports": [
+        {
+          "port": 443,
+          "protocol": "tcp",
+          "direction": "to_device",
+          "purpose": "Web pages or API over HTTPS (default port)",
+          "optional": false
+        },
+        {
+          "port": 80,
+          "protocol": "tcp",
+          "direction": "to_device",
+          "purpose": "Only with http:// URLs (default port)",
+          "optional": true
+        }
+      ],
+      "permissions": [
+        "A test account on the service\nOnly if a step logs in: give it the fewest rights possible"
+      ],
+      "warning": "Never write a password or a token in the steps themselves: use the credential and its {{secret.…}} placeholders, which are stored encrypted.",
+      "doc_url": "https://dumbmonit.selfhostr.io/docs/devices/http-scenario/"
+    },
+    "options": [
+      {
+        "key": "steps",
+        "label": "Steps",
+        "help": "The requests played in order, from 1 to 10. Each step checks the status code and, optionally, a text or a JSON value; it can keep a value from the response (JSON path, header or regular expression) under a name that later steps write as {{name}}. Cookies set by a response are sent with the following requests to the same site.",
+        "placeholder": "",
+        "default": "",
+        "required": true,
+        "input": "steps",
+        "choices": [],
+        "group": ""
+      },
+      {
+        "key": "follow_redirects",
+        "label": "Follow redirects",
+        "help": "Disable to check the redirect a step receives instead of the page it leads to.",
+        "placeholder": "",
+        "default": "true",
+        "required": false,
+        "input": "boolean",
+        "choices": [],
+        "group": ""
+      },
+      {
+        "key": "max_redirects",
+        "label": "Maximum redirects per step",
+        "help": "Between 1 and 20. No effect if redirects are not followed.",
+        "placeholder": "10",
+        "default": "10",
+        "required": false,
+        "input": "number",
+        "choices": [],
+        "group": ""
+      },
+      {
+        "key": "insecure_tls",
+        "label": "Accept an unverifiable certificate",
+        "help": "The steps no longer fail on a self-signed certificate or one issued by a private authority.",
+        "placeholder": "",
+        "default": "false",
+        "required": false,
+        "input": "boolean",
+        "choices": [],
+        "group": ""
+      },
+      {
+        "key": "allow_private_targets",
+        "label": "Allow loopback and link-local targets",
+        "help": "By default the check refuses addresses only the DumbMonit host itself can reach (127.0.0.1, ::1, 169.254.x.x). Enable this to monitor a service running on the DumbMonit host. Private LAN addresses (10.x, 192.168.x) are always allowed.",
+        "placeholder": "",
+        "default": "false",
+        "required": false,
+        "input": "boolean",
+        "choices": [],
+        "group": ""
+      },
+      {
+        "key": "check_certificate",
+        "label": "Read the certificate",
+        "help": "Over HTTPS, also records the certificate expiry date of the address so you can be warned before it expires.",
+        "placeholder": "",
+        "default": "true",
+        "required": false,
+        "input": "boolean",
+        "choices": [],
+        "group": ""
+      },
+      {
+        "key": "max_body_bytes",
+        "label": "Maximum bytes read per step",
+        "help": "Beyond this, the rest of a response is not downloaded. Checks and extractions only see this part.",
+        "placeholder": "524288",
+        "default": "524288",
+        "required": false,
+        "input": "number",
+        "choices": [],
+        "group": ""
+      },
+      {
+        "key": "user_agent",
+        "label": "Announced identity (User-Agent)",
+        "help": "Name the steps give to the server. Change it if the server filters robots.",
+        "placeholder": "DumbMonit/1.0",
+        "default": "DumbMonit/<version>",
+        "required": false,
+        "input": "text",
+        "choices": [],
+        "group": ""
+      },
+      {
+        "key": "timeout_seconds",
+        "label": "Timeout (seconds)",
+        "help": "Time allowed for the whole scenario, every step included, before it is reported down. Between 1 and 60.",
+        "placeholder": "5",
+        "default": "5",
+        "required": false,
+        "input": "number",
+        "choices": [],
+        "group": ""
+      }
+    ],
+    "metrics": [
+      {
+        "name": "probe_success",
+        "label": "Up",
+        "unit": "bool",
+        "kind": "gauge"
+      },
+      {
+        "name": "probe_duration_seconds",
+        "label": "Scenario duration",
+        "unit": "s",
+        "kind": "gauge",
+        "better": "lower"
+      },
+      {
+        "name": "probe_failure_info",
+        "label": "Failure reason",
+        "kind": "info"
+      },
+      {
+        "name": "probe_step_duration_seconds",
+        "label": "Step duration",
+        "unit": "s",
+        "kind": "gauge",
+        "better": "lower",
+        "entity": "step"
+      },
+      {
+        "name": "probe_step_status_code",
+        "label": "Step HTTP status",
+        "kind": "gauge",
+        "entity": "step"
+      },
+      {
+        "name": "probe_step_result",
+        "label": "Step result",
+        "kind": "state",
+        "entity": "step",
+        "states": [
+          {
+            "value": 1.0,
+            "label": "Passed",
+            "tone": "ok"
+          },
+          {
+            "value": 0.0,
+            "label": "Failed",
+            "tone": "critical"
+          },
+          {
+            "value": 2.0,
+            "label": "Not run",
+            "tone": "neutral"
+          }
+        ]
+      },
+      {
+        "name": "probe_connect_seconds",
+        "label": "Connect time",
+        "unit": "s",
+        "kind": "gauge",
+        "better": "lower"
+      },
+      {
+        "name": "probe_tls_handshake_seconds",
+        "label": "TLS handshake",
+        "unit": "s",
+        "kind": "gauge",
+        "better": "lower"
+      },
+      {
+        "name": "probe_tls_version_info",
+        "label": "TLS version",
+        "kind": "info"
+      },
+      {
+        "name": "probe_ssl_cert_expiry_days",
+        "label": "Certificate expires in",
+        "unit": "days",
+        "kind": "gauge"
+      },
+      {
+        "name": "probe_ssl_cert_valid",
+        "label": "Certificate trusted",
+        "unit": "bool",
+        "kind": "gauge"
+      },
+      {
+        "name": "probe_ssl_cert_issuer_info",
+        "label": "Certificate issuer",
+        "kind": "info"
+      }
+    ],
+    "views": [
+      {
+        "view": "stat",
+        "title": "Current values",
+        "metrics": [
+          "probe_tls_version_info",
+          "probe_ssl_cert_expiry_days",
+          "probe_ssl_cert_valid"
+        ]
+      },
+      {
+        "view": "timeseries",
+        "title": "Response time",
+        "metrics": [
+          "probe_duration_seconds",
+          "probe_step_duration_seconds"
+        ]
+      }
+    ]
+  },
+  {
     "kind": "imap",
     "label": "Mailbox (IMAP)",
     "summary": "An IMAP server greets, offers TLS and accepts a login, like a real mail client.",

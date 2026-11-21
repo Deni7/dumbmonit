@@ -18,10 +18,10 @@ use crate::uptime::tags;
 /// Le corps n'est lu que pour y chercher un mot-clé ou une valeur JSON : ramener
 /// une page de plusieurs mégaoctets à chaque interrogation coûterait bien plus
 /// cher que la surveillance elle-même.
-const DEFAULT_MAX_BODY_BYTES: u32 = 512 * 1024;
+pub(super) const DEFAULT_MAX_BODY_BYTES: u32 = 512 * 1024;
 
 /// Nombre de redirections suivies quand elles sont autorisées.
-const DEFAULT_MAX_REDIRECTS: u32 = 10;
+pub(super) const DEFAULT_MAX_REDIRECTS: u32 = 10;
 
 /// Attente sur une valeur extraite du document JSON de la réponse.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -120,7 +120,7 @@ impl Options {
 /// Le schéma est facultatif : sans lui, `https` est retenu. C'est le choix sûr —
 /// une sonde qui remonterait un service en clair alors qu'il est servi en TLS
 /// donnerait une fausse assurance —, et le cas se corrige en une saisie.
-fn parse_url(address: &str) -> Result<Url, ProbeError> {
+pub(super) fn parse_url(address: &str) -> Result<Url, ProbeError> {
     let address = address.trim();
     if address.is_empty() {
         return Err(ProbeError::Config(
@@ -147,7 +147,7 @@ fn parse_url(address: &str) -> Result<Url, ProbeError> {
     Ok(url)
 }
 
-fn parse_method(raw: Option<&str>) -> Result<Method, ProbeError> {
+pub(super) fn parse_method(raw: Option<&str>) -> Result<Method, ProbeError> {
     let Some(raw) = raw else { return Ok(Method::GET) };
     Method::from_bytes(raw.trim().to_ascii_uppercase().as_bytes())
         .map_err(|_| ProbeError::Config(format!("invalid HTTP method: \"{raw}\"")))

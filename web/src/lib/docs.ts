@@ -14,6 +14,7 @@ export function docsUrl(page: string): string {
 /** Kinds without a page of their own: the closest page of the documentation. */
 const KIND_DOCS: Record<string, string> = {
 	http: 'website',
+	http_steps: 'http-scenario',
 	snmp_oid: 'snmp',
 	victorialogs: 'victoriametrics',
 	agent_service: 'agent',

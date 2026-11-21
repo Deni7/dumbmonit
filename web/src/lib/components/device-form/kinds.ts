@@ -71,6 +71,7 @@ import {
 	FileDiff,
 	PanelsTopLeft,
 	MailX,
+	ListChecks,
 	ListX,
 	Mailbox,
 	Send,
@@ -196,7 +197,8 @@ const KIND_ICON: Record<string, typeof LucideIcon> = {
 	netconfig: FileDiff,
 	snmp_oid: Gauge,
 	radius: KeyRound,
-	grpc: Workflow
+	grpc: Workflow,
+	http_steps: ListChecks
 };
 
 export function kindIcon(kind: string): typeof LucideIcon {
@@ -315,7 +317,8 @@ const KIND_KEYWORDS: Record<string, string> = {
 	push: 'heartbeat cron job script backup scheduled task dead man switch',
 	snmp_oid: 'snmp oid mib sensor temperature humidity ups battery value threshold',
 	radius: 'aaa authentication login freeradius nps 802.1x wpa enterprise wifi vpn eap access-request',
-	grpc: 'rpc protobuf health check http2 microservice etcd envoy istio mesh'
+	grpc: 'rpc protobuf health check http2 microservice etcd envoy istio mesh',
+	http_steps: 'scenario journey flow multi step login session cookie token api transaction synthetic browser checkly'
 };
 
 /**

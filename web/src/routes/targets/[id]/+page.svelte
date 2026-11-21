@@ -55,11 +55,15 @@
 		PHASE_TOKENS,
 		loadUptimeHistory,
 		loadUptimeSummary,
+		loadScenarioSamples,
 		RANGES,
 		type HistorySlot,
 		type RangeId,
+		type ScenarioSamples,
 		type UptimeSummary
 	} from '#lib/metrics.js';
+	import { lastRun, parseSteps } from '#lib/components/device-form/scenario-steps.js';
+	import ScenarioSteps from '#lib/components/devices/ScenarioSteps.svelte';
 	import Chart, { type Serie } from '#lib/components/Chart.svelte';
 	import { eventsFromHistory, eventsFromRestarts, thresholdsFor } from '#lib/chart-context.js';
 	import { CONTAINER_RESTART_METRIC, UPTIME_METRIC, restartEvents, type RestartEvent } from '#lib/restart-events.js';
@@ -288,6 +292,13 @@
 	let history = $state<HistorySlot[]>([]);
 	let responseTimes = $state<Serie[]>([]);
 	let phaseTimes = $state<Serie[]>([]);
+	/** Per-step series of an HTTP scenario; `null` for any other kind. */
+	let scenarioSamples = $state<ScenarioSamples | null>(null);
+	const scenarioRuns = $derived(
+		scenarioSamples && target
+			? lastRun(scenarioSamples.results, scenarioSamples.statuses, scenarioSamples.durations, parseSteps(target.tags.steps))
+			: []
+	);
 	let checks = $state<number | null>(null);
 	let loadingUptime = $state(true);
 	let uptimeError = $state<unknown>(null);
@@ -557,7 +568,8 @@
 	async function loadUptime(signal?: AbortSignal) {
 		uptimeError = null;
 		try {
-			const [s, h, r, c, p] = await Promise.all([
+			const scenario = target?.kind === 'http_steps';
+			const [s, h, r, c, p, steps] = await Promise.all([
 				loadUptimeSummary(id, signal),
 				loadUptimeHistory(id, rangeSeconds, signal),
 				loadResponseTimes(id, rangeSeconds, signal),
@@ -566,12 +578,20 @@
 				loadHttpPhases(id, rangeSeconds, signal).catch((cause) => {
 					if (cause instanceof DOMException && cause.name === 'AbortError') throw cause;
 					return [] as Serie[];
-				})
+				}),
+				// Same for the steps of a scenario.
+				scenario
+					? loadScenarioSamples(id, signal).catch((cause) => {
+							if (cause instanceof DOMException && cause.name === 'AbortError') throw cause;
+							return null;
+						})
+					: Promise.resolve(null)
 			]);
 			summary = s;
 			history = h;
 			responseTimes = r;
 			phaseTimes = p;
+			scenarioSamples = steps;
 			const count = Number(c[0]?.values?.[0]?.[1]);
 			checks = Number.isFinite(count) ? count : 0;
 		} catch (cause) {
@@ -596,6 +616,7 @@
 		history = [];
 		responseTimes = [];
 		phaseTimes = [];
+		scenarioSamples = null;
 		alerts = [];
 		osInfo = null;
 		probeResult = null;
@@ -931,6 +952,12 @@
 						<div class="mt-4 border-t border-line pt-4">
 							<PhaseBreakdown series={phaseTimes} />
 						</div>
+					</Panel>
+				{/if}
+
+				{#if scenarioRuns.length > 0}
+					<Panel title={m.monitor_steps_title()} description={m.monitor_steps_desc()} class="mt-4">
+						<ScenarioSteps runs={scenarioRuns} reason={summary?.status?.reason ?? null} />
 					</Panel>
 				{/if}
 			{/if}

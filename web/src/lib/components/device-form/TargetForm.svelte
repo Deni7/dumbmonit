@@ -41,6 +41,7 @@
 	import AgentLink from './AgentLink.svelte';
 	import OptionsFields from './OptionsFields.svelte';
 	import { firstRowError, parseRows, rowErrors, seedChecklists } from './option-values';
+	import { parseSteps, stepIssues } from './scenario-steps';
 	import TagsEditor from './TagsEditor.svelte';
 	import RequirementNotice from './RequirementNotice.svelte';
 	import MonitoredRules from './MonitoredRules.svelte';
@@ -226,7 +227,7 @@
 	 * address, the relay or how the device is reached (these settings) means
 	 * typing the credential again. Mirrors `DESTINATION_TAGS` in `api/targets.rs`.
 	 */
-	const DESTINATION_TAGS = ['scheme', 'port', 'insecure_tls', 'tls', 'path', 'base_path', 'url', 'host'];
+	const DESTINATION_TAGS = ['scheme', 'port', 'insecure_tls', 'tls', 'path', 'base_path', 'url', 'host', 'steps'];
 	const destinationChanged = $derived.by(() => {
 		if (!target || target.credential_kind === 'None') return false;
 		const sentTag = (key: string) => (tags[key] ?? '').trim() || undefined;
@@ -263,6 +264,10 @@
 				);
 				// Shown line by line under the rows; here it only keeps the form from being sent.
 				if (problem) errors[option.key] = problem;
+			}
+			// Same for the steps of a scenario: each problem is said under its step.
+			if (option.input === 'steps' && stepIssues(parseSteps(tags[option.key])).size > 0) {
+				errors[option.key] = m.deviceform_steps_invalid();
 			}
 			if (!option.required) continue;
 			if ((tags[option.key] ?? '').trim() || option.default.trim()) continue;

@@ -811,7 +811,8 @@ export interface CollectorRequirement {
 }
 
 /** Input shapes a collector option can ask for. */
-export type CollectorOptionInput = 'text' | 'number' | 'boolean' | 'select' | 'checklist' | 'rows' | 'agent';
+/** `steps`: the requests of an HTTP scenario, a JSON array edited by `StepsEditor`. */
+export type CollectorOptionInput = 'text' | 'number' | 'boolean' | 'select' | 'checklist' | 'rows' | 'agent' | 'steps';
 
 /** One tick box of a `checklist` option. */
 export interface CollectorOptionItem {
