@@ -164,7 +164,7 @@ pub fn builtin(
 }
 
 /// Déclare au registre les options de chacun de ses types compilés, d'après les
-/// tables de `api/collectors.rs` : elles ne seront pas recopiées en étiquettes.
+/// tables de `api/collectors/` : elles ne seront pas recopiées en étiquettes.
 /// Clé par type : remplacer un collecteur (démonstration) garde ses options.
 fn declare_options(registry: &mut Registry) {
     for kind in registry.kinds() {

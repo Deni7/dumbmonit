@@ -1,6 +1,6 @@
 //! Notices des intégrations en nuage (Microsoft 365, Entra ID, Azure, AWS,
 //! Cloudflare, Hetzner Cloud, OVHcloud, Infomaniak) : un fichier par produit,
-//! même forme que les tables de `api/collectors.rs`.
+//! même forme que les tables de `api/collectors/`.
 
 use super::CollectorView;
 

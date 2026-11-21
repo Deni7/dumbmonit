@@ -182,7 +182,7 @@ dummy sources before the real ones.
 2. Return `ProbeError` carefully: `ProbeError::means_down()` decides whether a
    failure counts as "monitor unreachable" (an alert) or a configuration error
    (shown in the UI, never notified).
-3. Describe the kind for the UI in `crates/server/src/api/collectors.rs`
+3. Describe the kind for the UI in `crates/server/src/api/collectors/`
    (`CollectorView`): label, examples, accepted credential types, the setup
    notice, and typed `options` (stored as `Target.tags[key]`). This is what
    `GET /api/collectors` returns; the "Add a monitor" form is generated from it,

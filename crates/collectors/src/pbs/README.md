@@ -13,8 +13,8 @@ Déjà fait, mais pour mémoire :
 
 * `crates/server/src/collectors/mod.rs` : `mod pbs;` et `pub use pbs::PbsCollector;` ;
 * `crates/server/src/main.rs` : `registry.register(Arc::new(collectors::PbsCollector::new()));` ;
-* `crates/server/src/api/collectors.rs` : la notice de mise en route et `PBS_OPTIONS` ;
-* `crates/server/src/alerting/rules.rs` : les règles `pbs_*`.
+* `crates/server/src/api/collectors/` : la notice de mise en route et `PBS_OPTIONS` ;
+* `crates/server/src/alerting/rules/` : les règles `pbs_*`.
 
 Les cibles de type `pbs` sont alors interrogées par le planificateur.
 
@@ -175,7 +175,7 @@ Une tâche terminée en `WARNINGS: n` compte comme réussie.
 | `pbs_zpool_degraded` | `node_zfs_pool_degraded > 0` | 5 min | critical |
 
 Les deux dernières sont écrites par le coordinateur d'après le contrat de
-métriques ; leurs seuils et gravités sont dans `alerting/rules.rs`.
+métriques ; leurs seuils et gravités sont dans `alerting/rules/`.
 
 ## Organisation
 

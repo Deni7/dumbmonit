@@ -221,7 +221,7 @@ const EMBEDDED: &[(&str, &str)] = &[
 ];
 
 /// Identifiants des profils livrés, dans l'ordre du catalogue : la liste de
-/// choix du formulaire (`api/collectors.rs`) doit la reprendre.
+/// choix du formulaire (`api/collectors/`) doit la reprendre.
 pub const PROFILE_IDS: &[&str] = &[
     "cisco_ios",
     "cisco_nxos",
