@@ -146,6 +146,8 @@ tags:
     description: Periodic availability reports sent by email.
   - name: Incidents
     description: Incidents and maintenance announcements shown on status pages.
+  - name: SLOs
+    description: Service level objectives, their error budget and burn rates.
   - name: Public status
     description: What a published status page exposes, without authentication.
   - name: Agents
@@ -4653,6 +4655,150 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/IncidentView" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/incidents/{id}/postmortem:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      operationId: getIncidentPostmortem
+      tags: [Incidents]
+      summary: The post-mortem of an incident, draft or published
+      x-token-scope: read
+      responses:
+        "200":
+          description: The post-mortem.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Postmortem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      operationId: saveIncidentPostmortem
+      tags: [Incidents]
+      summary: Write or replace the post-mortem of an incident
+      description: >-
+        A full replacement: an omitted field is empty. A draft can be written at
+        any time; `published: true` needs a resolved incident and a summary.
+        `published_at` is set on the first publication, kept while it stays
+        published and cleared when it goes back to draft. The text is plain
+        text, shown by paragraphs. Maintenance windows have no post-mortem.
+      x-token-scope: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PostmortemPayload" }
+      responses:
+        "200":
+          description: The incident, with its post-mortem.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IncidentView" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteIncidentPostmortem
+      tags: [Incidents]
+      summary: Delete the post-mortem of an incident
+      x-token-scope: write
+      responses:
+        "204": { description: Post-mortem deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/slos:
+    get:
+      operationId: listSlos
+      tags: [SLOs]
+      summary: Every service level objective, with its current state
+      description: >-
+        Availability over the window, error budget and burn rates come from
+        VictoriaMetrics; when it does not answer, the list is still served with
+        `status.measured: false`.
+      x-token-scope: read
+      responses:
+        "200":
+          description: SLOs, by name.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Slo" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      operationId: createSlo
+      tags: [SLOs]
+      summary: Create a service level objective
+      x-token-scope: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SloPayload" }
+      responses:
+        "201":
+          description: The SLO.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SloDetail" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/slos/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      operationId: getSlo
+      tags: [SLOs]
+      summary: One SLO, the monitors it covers and its error budget burn-down
+      x-token-scope: read
+      responses:
+        "200":
+          description: The SLO.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SloDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      operationId: updateSlo
+      tags: [SLOs]
+      summary: Replace a service level objective
+      x-token-scope: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SloPayload" }
+      responses:
+        "200":
+          description: The SLO.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SloDetail" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      operationId: deleteSlo
+      tags: [SLOs]
+      summary: Delete a service level objective
+      x-token-scope: write
+      responses:
+        "204": { description: SLO deleted. }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -13109,7 +13255,7 @@ components:
         uid: { type: string }
         name: { type: string }
         description: { type: string }
-        kind: { type: string, enum: [threshold, anomaly, predict, log_pattern, forecast, drift], description: "`log_pattern` counts the log lines that match `query` (a LogsQL filter, no pipes) over `params.log_window_secs` and compares the count to `threshold`. `forecast` compares the days before full to `threshold` (`query`: `*`, comma-separated capacity families, or a custom expression full at `params.forecast_limit`); the severity rises to warning and critical below `params.forecast_warning_days` and `params.forecast_critical_days`. `drift` compares how many times the usual value (same hour over the previous weeks, or the 7-day median) the measurement of `query` is to `threshold`, once its robust score reaches `params.k`." }
+        kind: { type: string, enum: [threshold, anomaly, predict, log_pattern, forecast, drift, slo_burn], description: "`log_pattern` counts the log lines that match `query` (a LogsQL filter, no pipes) over `params.log_window_secs` and compares the count to `threshold`. `forecast` compares the days before full to `threshold` (`query`: `*`, comma-separated capacity families, or a custom expression full at `params.forecast_limit`); the severity rises to warning and critical below `params.forecast_warning_days` and `params.forecast_critical_days`. `drift` compares how many times the usual value (same hour over the previous weeks, or the 7-day median) the measurement of `query` is to `threshold`, once its robust score reaches `params.k`. `slo_burn` ignores `query`: it reads every enabled SLO and is worth 1 on a slow burn (6× over 6 h and 30 min) and 2 on a fast burn (14.4× over 1 h and 5 min), the severity rising to at least `critical` on a fast burn." }
         query: { type: string }
         operator: { $ref: "#/components/schemas/Operator" }
         threshold: { type: number }
@@ -13137,7 +13283,7 @@ components:
         uid: { type: string, description: Derived from the name when absent. }
         name: { type: string }
         description: { type: string }
-        kind: { type: string, enum: [threshold, anomaly, predict, log_pattern, forecast, drift], description: "`log_pattern` counts the log lines that match `query` (a LogsQL filter, no pipes) over `params.log_window_secs` and compares the count to `threshold`. `forecast` compares the days before full to `threshold` (`query`: `*`, comma-separated capacity families, or a custom expression full at `params.forecast_limit`); the severity rises to warning and critical below `params.forecast_warning_days` and `params.forecast_critical_days`. `drift` compares how many times the usual value (same hour over the previous weeks, or the 7-day median) the measurement of `query` is to `threshold`, once its robust score reaches `params.k`." }
+        kind: { type: string, enum: [threshold, anomaly, predict, log_pattern, forecast, drift, slo_burn], description: "`log_pattern` counts the log lines that match `query` (a LogsQL filter, no pipes) over `params.log_window_secs` and compares the count to `threshold`. `forecast` compares the days before full to `threshold` (`query`: `*`, comma-separated capacity families, or a custom expression full at `params.forecast_limit`); the severity rises to warning and critical below `params.forecast_warning_days` and `params.forecast_critical_days`. `drift` compares how many times the usual value (same hour over the previous weeks, or the 7-day median) the measurement of `query` is to `threshold`, once its robust score reaches `params.k`. `slo_burn` ignores `query`: it reads every enabled SLO and is worth 1 on a slow burn (6× over 6 h and 30 min) and 2 on a fast burn (14.4× over 1 h and 5 min), the severity rising to at least `critical` on a fast burn." }
         query: { type: string }
         operator: { $ref: "#/components/schemas/Operator" }
         threshold: { type: number }
@@ -13884,6 +14030,142 @@ components:
               type: array
               items: { type: integer, format: int64 }
               description: Devices the announcement concerns; empty means the whole page.
+            postmortem:
+              description: The post-mortem, draft or published; null until one is written.
+              oneOf:
+                - $ref: "#/components/schemas/Postmortem"
+                - type: "null"
+    PostmortemTimelineEntry:
+      type: object
+      required: [at, text]
+      properties:
+        at: { type: string, description: "UTC, `YYYY-MM-DDTHH:MM:SSZ`." }
+        text: { type: string, maxLength: 2000 }
+    PostmortemAction:
+      type: object
+      required: [text]
+      properties:
+        text: { type: string, maxLength: 500 }
+        done: { type: boolean, default: false }
+    Postmortem:
+      type: object
+      required: [incident_id, summary, impact, root_cause, timeline, actions, published, created_at, updated_at]
+      properties:
+        incident_id: { type: integer, format: int64 }
+        summary: { type: string }
+        impact: { type: string }
+        root_cause: { type: string }
+        timeline:
+          type: array
+          description: Oldest first.
+          items: { $ref: "#/components/schemas/PostmortemTimelineEntry" }
+        actions:
+          type: array
+          items: { $ref: "#/components/schemas/PostmortemAction" }
+        published: { type: boolean }
+        published_at: { type: [string, "null"], description: "First publication; null while a draft." }
+        created_at: { type: string }
+        updated_at: { type: string }
+    PostmortemPayload:
+      type: object
+      properties:
+        summary: { type: string, maxLength: 20000, description: Required to publish. }
+        impact: { type: string, maxLength: 20000 }
+        root_cause: { type: string, maxLength: 20000 }
+        timeline:
+          type: array
+          maxItems: 100
+          description: "Any order: stored sorted by time. `at` accepts RFC 3339 or `YYYY-MM-DDTHH:MM` (UTC)."
+          items: { $ref: "#/components/schemas/PostmortemTimelineEntry" }
+        actions:
+          type: array
+          maxItems: 50
+          items: { $ref: "#/components/schemas/PostmortemAction" }
+        published: { type: boolean, default: false, description: Only once the incident is resolved. }
+    PublicPostmortem:
+      type: object
+      required: [summary, impact, root_cause, timeline, actions]
+      properties:
+        summary: { type: string }
+        impact: { type: string }
+        root_cause: { type: string }
+        timeline:
+          type: array
+          items: { $ref: "#/components/schemas/PostmortemTimelineEntry" }
+        actions:
+          type: array
+          items: { $ref: "#/components/schemas/PostmortemAction" }
+        published_at: { type: [string, "null"] }
+    SloPayload:
+      type: object
+      required: [name, objective, window_days]
+      properties:
+        name: { type: string, maxLength: 80, description: Unique. }
+        description: { type: string, maxLength: 500, default: "" }
+        objective: { type: number, exclusiveMinimum: 0, exclusiveMaximum: 100, example: 99.9, description: Availability target in percent. }
+        window_days: { type: integer, enum: [7, 28, 30, 90], description: Rolling window. }
+        scope: { $ref: "#/components/schemas/ReportScope" }
+        enabled: { type: boolean, default: true, description: "A disabled SLO is still shown but raises no burn-rate alert." }
+    SloBudget:
+      type: object
+      required: [total_minutes, consumed_minutes, remaining_minutes, remaining_percent]
+      properties:
+        total_minutes: { type: number, description: Downtime the target allows over the window. }
+        consumed_minutes: { type: number }
+        remaining_minutes: { type: number, description: Negative once the target is missed. }
+        remaining_percent: { type: number, description: Negative once the target is missed. }
+    SloStatus:
+      type: object
+      required: [measured, monitors, burn, verdict]
+      properties:
+        measured: { type: boolean, description: False when VictoriaMetrics did not answer. }
+        monitors: { type: integer, description: Enabled monitors the SLO covers. }
+        attained: { type: [number, "null"], description: Availability over the window, in percent. }
+        budget:
+          oneOf:
+            - $ref: "#/components/schemas/SloBudget"
+            - type: "null"
+        burn:
+          type: object
+          description: "Burn rates: downtime over the window divided by the downtime the target allows. 1 spends the budget exactly by the end of the window."
+          properties:
+            m5: { type: [number, "null"] }
+            m30: { type: [number, "null"] }
+            h1: { type: [number, "null"] }
+            h6: { type: [number, "null"] }
+        verdict:
+          type: string
+          enum: [none, slow, fast]
+          description: "`fast`: at least 14.4× over 1 h and 5 min. `slow`: at least 6× over 6 h and 30 min."
+    Slo:
+      type: object
+      required: [id, name, description, objective, window_days, scope, enabled, created_at, updated_at, status]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        description: { type: string }
+        objective: { type: number }
+        window_days: { type: integer }
+        scope: { $ref: "#/components/schemas/ReportScope" }
+        enabled: { type: boolean }
+        created_at: { type: string }
+        updated_at: { type: string }
+        status: { $ref: "#/components/schemas/SloStatus" }
+    SloDetail:
+      allOf:
+        - $ref: "#/components/schemas/Slo"
+        - type: object
+          required: [members, burndown]
+          properties:
+            members: { type: array, items: { type: integer, format: int64 } }
+            burndown:
+              type: array
+              description: "`[unix seconds, % of the budget left]` over the window, starting at 100; empty without measurements."
+              items:
+                type: array
+                minItems: 2
+                maxItems: 2
+                items: { type: number }
     IncidentPayload:
       type: object
       required: [title]
@@ -14021,6 +14303,9 @@ components:
               status: { type: string }
               body: { type: string }
               created_at: { type: string }
+        postmortem:
+          $ref: "#/components/schemas/PublicPostmortem"
+          description: The published post-mortem of a resolved incident; absent otherwise.
 
     # ------------------------------------------------------- agents, conteneurs
     Relay:

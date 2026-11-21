@@ -90,7 +90,8 @@ export function alertDetail(alert: Alert, rule: AlertRule | undefined): string {
 		if (!isDistinctiveLabel(key)) continue;
 		parts.push(value);
 	}
-	if (alert.value !== null && Number.isFinite(alert.value)) {
+	// An SLO burn alert is worth 1 or 2 (slow or fast burn): a level, not a measurement.
+	if (alert.value !== null && Number.isFinite(alert.value) && rule?.kind !== 'slo_burn') {
 		parts.push(formatAlertValue(alert.value, rule?.unit));
 	}
 	return parts.join(' · ');

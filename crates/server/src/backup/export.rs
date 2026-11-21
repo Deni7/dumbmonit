@@ -114,7 +114,31 @@ pub async fn collect(pool: &SqlitePool, cipher: &Cipher, options: ExportOptions)
         report_logo: crate::reports::logo::stored(pool)
             .await?
             .map(|(logo_type, bytes)| BundleReportLogo { logo_type, data: BASE64.encode(bytes) }),
+        slos: slos(pool, &refs).await?,
     })
+}
+
+/// Les SLO ; un moniteur supprimé depuis n'a pas de référence et sort du
+/// périmètre.
+async fn slos(pool: &SqlitePool, refs: &HashMap<i64, String>) -> Result<Vec<BundleSlo>> {
+    Ok(crate::slo::store::list(pool)
+        .await?
+        .into_iter()
+        .map(|slo| BundleSlo {
+            name: slo.name,
+            description: slo.description,
+            objective: slo.objective,
+            window_days: slo.window_days,
+            enabled: slo.enabled,
+            scope_targets: slo
+                .scope
+                .targets
+                .iter()
+                .filter_map(|id| refs.get(id).cloned())
+                .collect(),
+            scope_groups: slo.scope.groups,
+        })
+        .collect())
 }
 
 /// Serveur de courriel enregistré, mot de passe déchiffré : il repart chiffré
@@ -930,6 +954,7 @@ async fn incidents(pool: &SqlitePool) -> Result<Vec<BundleIncident>> {
         .fetch_all(pool)
         .await
         .context("lecture du fil d'un incident")?;
+        let postmortem = crate::db::status_pages::get_postmortem(pool, id).await?;
 
         out.push(BundleIncident {
             page: row.try_get::<Option<i64>, _>("page_id")?.and_then(|p| slugs.get(&p).cloned()),
@@ -949,9 +974,22 @@ async fn incidents(pool: &SqlitePool) -> Result<Vec<BundleIncident>> {
                     })
                 })
                 .collect::<Result<_>>()?,
+            postmortem: postmortem.map(bundle_postmortem),
         });
     }
     Ok(out)
+}
+
+fn bundle_postmortem(p: crate::db::status_pages::Postmortem) -> BundlePostmortem {
+    BundlePostmortem {
+        summary: p.summary,
+        impact: p.impact,
+        root_cause: p.root_cause,
+        timeline: p.timeline,
+        actions: p.actions,
+        published: p.published,
+        published_at: p.published_at,
+    }
 }
 
 async fn users(
@@ -1128,7 +1166,8 @@ pub fn sections() -> BTreeMap<&'static str, &'static str> {
         ("channels", "Notification channels and their secrets."),
         ("silences", "Maintenance windows."),
         ("status_pages", "Public status pages and the services they list."),
-        ("incidents", "Incidents and maintenance announcements."),
+        ("incidents", "Incidents and maintenance announcements, with their post-mortems."),
+        ("slos", "Service level objectives: target, window and the monitors they cover."),
         ("users", "Accounts, their role and their SSO link."),
         ("agent_tokens", "Agent enrolment tokens, as hashes: installed agents keep working."),
         ("api_tokens", "API tokens, as hashes: existing tokens keep working."),

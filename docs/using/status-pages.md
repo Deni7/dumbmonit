@@ -196,6 +196,31 @@ existing incident, **Date and time** works the same way: empty means now (and
 subscribers are told); a past date completes the history without notifying
 anyone. Times are stored in UTC.
 
+### Post-mortems {#postmortems}
+
+An incident can carry a post-mortem: in **Incidents and maintenance**, open the
+incident and choose **Write post-mortem**. It has a **summary**, the
+**impact**, the **root cause**, a **timeline** and **action items**:
+
+- The timeline starts from the incident's updates, oldest first. Change, add or
+  remove steps freely; times are typed in your local time and stored in UTC.
+- Each action item has a text and a **done** box, so the list doubles as a
+  follow-up checklist.
+- The text is plain text: a blank line starts a new paragraph, and nothing is
+  read as HTML or Markdown.
+
+A post-mortem is a **draft** until you turn on **Publish on the status page**.
+You can write the draft while the incident is still open; publishing needs the
+incident to be **resolved** and a summary. Once published, visitors see a
+folded **Post-mortem** section under the resolved incident, with the date it was
+first published (later edits keep that date). Turning the switch off, or
+deleting the post-mortem, removes it from the page. If the incident is
+reopened, the post-mortem stays saved but is hidden until the incident is
+resolved again.
+
+Maintenance windows have no post-mortem. Post-mortems are part of the
+[configuration backup](../install/backup.md), with their incident.
+
 ### Email subscribers
 
 Turn on **Let visitors subscribe by email** in the editor (under **Subscribers

@@ -278,6 +278,8 @@
 			);
 		} else if (rule.kind === 'drift') {
 			parts.push(m.alerts_rules_drift_summary({ ratio: rule.threshold }));
+		} else if (rule.kind === 'slo_burn') {
+			parts.push(m.alerts_rules_slo_burn_summary());
 		} else {
 			// Seconds read better as a duration: "above 7 d", not "above 604800 s".
 			const amount =

@@ -926,9 +926,10 @@ fn parse_kind(raw: Option<&str>) -> ApiResult<RuleKind> {
         Some("log_pattern") => Ok(RuleKind::LogPattern),
         Some("forecast") => Ok(RuleKind::Forecast),
         Some("drift") => Ok(RuleKind::Drift),
+        Some("slo_burn") => Ok(RuleKind::SloBurn),
         Some(other) => Err(ApiError::BadRequest(format!(
             "Unknown rule type \"{other}\" (expected: threshold, anomaly, predict, log_pattern, \
-             forecast, drift)."
+             forecast, drift, slo_burn)."
         ))),
     }
 }
@@ -1939,6 +1940,7 @@ mod tests {
     fn les_regles_de_prevision_et_de_derive_sont_reconnues() {
         assert_eq!(accepte(parse_kind(Some("forecast"))), RuleKind::Forecast);
         assert_eq!(accepte(parse_kind(Some("drift"))), RuleKind::Drift);
+        assert_eq!(accepte(parse_kind(Some("slo_burn"))), RuleKind::SloBurn);
 
         let params = accepte(parse_params(Some(serde_json::json!({
             "forecast_warning_days": 21,
