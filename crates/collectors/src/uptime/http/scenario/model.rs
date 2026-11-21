@@ -283,7 +283,7 @@ fn parse_step(index: usize, spec: StepSpec, base: &Url) -> Result<Step, ProbeErr
     let assertions = spec
         .assertions
         .into_iter()
-        .map(|assertion| parse_assertion(assertion).map_err(&fail))
+        .map(|assertion| parse_assertion(assertion).map_err(fail))
         .collect::<Result<Vec<_>, _>>()?;
 
     if spec.extract.len() > MAX_PER_STEP {
@@ -292,7 +292,7 @@ fn parse_step(index: usize, spec: StepSpec, base: &Url) -> Result<Step, ProbeErr
     let extractions = spec
         .extract
         .into_iter()
-        .map(|extraction| parse_extraction(extraction).map_err(&fail))
+        .map(|extraction| parse_extraction(extraction).map_err(fail))
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(Step {
