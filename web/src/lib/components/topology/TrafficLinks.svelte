@@ -39,7 +39,7 @@
 				<li class="border-b border-line last:border-b-0">
 					<button
 						type="button"
-						class="flex min-h-14 w-full flex-col gap-1.5 px-3 py-2 text-left hover:bg-surface-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-signal"
+						class="flex min-h-14 w-full flex-col gap-1.5 px-3 py-2 text-left hover:bg-surface-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
 						aria-expanded={open === edge.key}
 						onclick={() => (open = open === edge.key ? null : edge.key)}
 					>

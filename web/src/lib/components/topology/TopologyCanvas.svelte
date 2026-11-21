@@ -296,7 +296,7 @@
 	}
 
 	const controlClass =
-		'inline-flex size-10 items-center justify-center rounded-lg border border-line-strong bg-surface text-ink-2 shadow-lift hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-signal';
+		'inline-flex size-10 items-center justify-center rounded-lg border border-line-strong bg-surface text-ink-2 shadow-lift hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus';
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
@@ -304,7 +304,7 @@
 	bind:this={host}
 	bind:clientWidth={width}
 	bind:clientHeight={height}
-	class={`topo-canvas relative touch-none overflow-hidden rounded-[var(--radius-card)] border bg-canvas select-none focus-visible:outline-2 focus-visible:outline-signal ${editing ? 'topo-editing border-signal' : 'border-line'} ${className}`}
+	class={`topo-canvas relative touch-none overflow-hidden rounded-[var(--radius-card)] border bg-canvas select-none focus-visible:outline-2 focus-visible:outline-focus ${editing ? 'topo-editing border-primary' : 'border-line'} ${className}`}
 	role="group"
 	aria-label={m.topology_canvas_label()}
 	tabindex="0"
@@ -344,8 +344,8 @@
 			/>
 			{#if drag?.active && dragFrom}
 				<!-- The node follows the pointer; a dashed line says where it came from. -->
-				<line x1={dragFrom.x} y1={dragFrom.y} x2={drag.x} y2={drag.y} class="stroke-signal" stroke-width="1.6" stroke-dasharray="4 4" />
-				<circle cx={drag.x} cy={drag.y} r={dragFrom.r} class="fill-surface stroke-signal" stroke-width="2.5" opacity="0.9" />
+				<line x1={dragFrom.x} y1={dragFrom.y} x2={drag.x} y2={drag.y} class="stroke-primary" stroke-width="1.6" stroke-dasharray="4 4" />
+				<circle cx={drag.x} cy={drag.y} r={dragFrom.r} class="fill-surface stroke-primary" stroke-width="2.5" opacity="0.9" />
 			{/if}
 		</g>
 	</svg>
@@ -376,7 +376,7 @@
 		>
 			<header class="flex items-center justify-between gap-2 border-b border-line px-4 py-2">
 				<h2 class="text-sm font-bold text-ink">{m.topology_traffic_panel_label()}</h2>
-				<button type="button" class="inline-flex size-10 items-center justify-center rounded-lg text-ink-2 hover:bg-surface-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-signal" aria-label={m.topology_traffic_close()} onclick={() => (selectedLink = null)}>
+				<button type="button" class="inline-flex size-10 items-center justify-center rounded-lg text-ink-2 hover:bg-surface-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-focus" aria-label={m.topology_traffic_close()} onclick={() => (selectedLink = null)}>
 					<X class="size-4" aria-hidden="true" />
 				</button>
 			</header>
