@@ -878,6 +878,134 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
 
+  /api/auth/totp/recovery-codes:
+    post:
+      operationId: regenerateRecoveryCodes
+      tags: [Accounts]
+      summary: Replace the recovery codes
+      description: >-
+        Keeps two-factor authentication on and invalidates every previous recovery
+        code. Needs a current code from the authenticator app (`code`) or the
+        account password (`password`). Returns the new codes — shown once.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RecoveryCodesConfirm" }
+      responses:
+        "200":
+          description: The new recovery codes.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RecoveryCodes" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/auth/sessions:
+    get:
+      operationId: listSessions
+      tags: [Accounts]
+      summary: Open sessions of the signed-in account
+      description: Most recently active first. `current` marks the session making the request.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "200":
+          description: Sessions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Session" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/auth/sessions/revoke-others:
+    post:
+      operationId: revokeOtherSessions
+      tags: [Accounts]
+      summary: Sign out every other session of the signed-in account
+      description: The session making the request stays open.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "200":
+          description: Number of sessions closed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SessionsClosed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/auth/sessions/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Public identifier of the session, from the list.
+        schema: { type: string }
+    delete:
+      operationId: revokeSession
+      tags: [Accounts]
+      summary: Sign out one of your other sessions
+      description: "`404` for a session that is not yours; `409` for the current one (sign out instead)."
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "204": { description: Session closed. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/auth/policy:
+    get:
+      operationId: getAuthPolicy
+      tags: [Accounts]
+      summary: Authentication policy of the instance
+      description: Administrator session only.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "200":
+          description: The policy.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthPolicy" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    put:
+      operationId: putAuthPolicy
+      tags: [Accounts]
+      summary: Change the authentication policy
+      description: >-
+        Administrator session only. An omitted field takes its default (off). With
+        `require_totp`, admins and operators who sign in with a local password and
+        have no second factor get `403` with `code: "totp_setup_required"` on every
+        route but `GET /api/auth/me`, `GET /api/auth/totp`, the enrolment routes and
+        logout. Single sign-on (OIDC, SAML), LDAP and passkey sessions are exempt.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AuthPolicy" }
+      responses:
+        "200":
+          description: The policy now in force.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthPolicy" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /api/auth/audit:
     get:
       operationId: listAuditLog
@@ -1947,6 +2075,26 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/users/{id}/sessions:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    delete:
+      operationId: signOutUser
+      tags: [Accounts]
+      summary: Sign an account out everywhere
+      description: Administrator session only. For your own account, the session making the request stays open.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "200":
+          description: Number of sessions closed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SessionsClosed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   # ---------------------------------------------------------- jetons d'API
   /api/tokens:
     get:
@@ -2008,6 +2156,35 @@ paths:
   /api/tokens/{id}:
     parameters:
       - $ref: "#/components/parameters/Id"
+    patch:
+      operationId: updateApiToken
+      tags: [API tokens]
+      summary: Rename an API token, change its networks or its expiry
+      description: >-
+        Administrator session only. An omitted field keeps its value; the secret
+        and the scope never change. `expires_in_days` counts from now (1 to 3650),
+        `null` makes the token never expire. `404` when unknown or revoked.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ApiTokenUpdate" }
+            example:
+              name: Grafana (NAS)
+              expires_in_days: 365
+              allowed_networks: ["192.168.1.0/24", "10.8.0.5"]
+      responses:
+        "200":
+          description: The token.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiToken" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
     delete:
       operationId: revokeApiToken
       tags: [API tokens]
@@ -12061,6 +12238,7 @@ components:
         totp_enabled: { type: boolean }
         created_at: { type: string }
         last_login_at: { type: [string, "null"] }
+        email: { type: [string, "null"], description: Optional contact address; never used to sign in. }
     AuthStatus:
       type: object
       required: [configured, authenticated, oidc, demo]
@@ -12088,6 +12266,7 @@ components:
             label: { type: string, description: Button label. }
         passkeys: { type: boolean, description: "At least one passkey is registered: the sign-in screen offers to use one." }
         demo: { type: boolean }
+        totp_setup_required: { type: boolean, description: "The instance policy holds this session at two-factor enrolment until it is done." }
         https:
           type: object
           description: HTTPS of the web port, for the "session in clear" banner. Nothing secret.
@@ -12201,6 +12380,35 @@ components:
       required: [code]
       properties:
         code: { type: string }
+    RecoveryCodesConfirm:
+      type: object
+      description: A current code from the authenticator app, or the account password.
+      properties:
+        code: { type: string, writeOnly: true }
+        password: { type: string, writeOnly: true }
+    Session:
+      type: object
+      required: [id, created_at, expires_at, current]
+      properties:
+        id: { type: string, description: Public part of the session cookie; it cannot open the session. }
+        created_at: { type: string, format: date-time }
+        last_seen_at: { type: [string, "null"], format: date-time, description: Updated at most every five minutes. }
+        expires_at: { type: string, format: date-time }
+        ip: { type: [string, "null"], description: Last client address seen. }
+        user_agent: { type: [string, "null"], description: "`User-Agent` at sign-in, truncated to 256 characters." }
+        browser: { type: [string, "null"], examples: [Firefox] }
+        os: { type: [string, "null"], examples: [Linux] }
+        via: { type: [string, "null"], enum: [password, passkey, ldap, oidc, saml, null] }
+        current: { type: boolean }
+    SessionsClosed:
+      type: object
+      required: [closed]
+      properties:
+        closed: { type: integer }
+    AuthPolicy:
+      type: object
+      properties:
+        require_totp: { type: boolean, default: false, description: Require two-factor authentication from admins and operators who sign in with a local password. }
     RecoveryCodes:
       type: object
       required: [recovery_codes]
@@ -12411,10 +12619,12 @@ components:
         display_name: { type: string }
         role: { $ref: "#/components/schemas/Role" }
         password: { type: string, writeOnly: true }
+        email: { type: string, maxLength: 254, description: Optional; blank means none. }
     UserUpdate:
       type: object
       properties:
         display_name: { type: string }
+        email: { type: string, maxLength: 254, description: Blank clears it. }
         role: { $ref: "#/components/schemas/Role" }
         disabled: { type: boolean }
         password: { type: string, writeOnly: true }
@@ -12457,6 +12667,20 @@ components:
           type: array
           maxItems: 32
           description: CIDR networks or single addresses; absent or empty means anywhere.
+          items: { type: string }
+    ApiTokenUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        expires_in_days:
+          type: [integer, "null"]
+          minimum: 1
+          maximum: 3650
+          description: 'New expiry counted from now; `null`: never expires.'
+        allowed_networks:
+          type: array
+          maxItems: 32
+          description: Replaces the list; empty means anywhere.
           items: { type: string }
     CreatedApiToken:
       allOf:

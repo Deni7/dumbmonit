@@ -743,6 +743,11 @@
 	"auth_setup_title": "Erstellen wir Ihr Konto.",
 	"auth_setup_username_required": "Wählen Sie einen Benutzernamen.",
 	"auth_setup_username_spaces": "Der Benutzername darf keine Leerzeichen enthalten.",
+	"auth_totp_gate_intro": "Diese Instanz verlangt für Administratoren und Operatoren eine Zwei-Faktor-Authentifizierung. Richten Sie sie ein, um fortzufahren.",
+	"auth_totp_gate_intro_user": "Diese Instanz verlangt für Administratoren und Operatoren eine Zwei-Faktor-Authentifizierung. Richten Sie sie für {username} ein, um fortzufahren.",
+	"auth_totp_gate_later": "Nicht jetzt? Melden Sie sich ab und kommen Sie mit Ihrem Telefon zurück.",
+	"auth_totp_gate_sign_out": "Abmelden",
+	"auth_totp_gate_title": "Zwei-Faktor-Authentifizierung einrichten",
 	"backup_history_description": "Eine Zeile pro Auftrag, ein Feld pro Tag der letzten {days} Tage, aus den gespeicherten Messwerten rekonstruiert.",
 	"backup_history_err": "Der Sicherungsverlauf konnte nicht geladen werden",
 	"backup_history_title": "Sicherungsverlauf",
@@ -6489,6 +6494,8 @@
 	"settings_2fa_cancel": "Abbrechen",
 	"settings_2fa_cant_scan": "Scannen nicht möglich? Geben Sie stattdessen den Schlüssel ein",
 	"settings_2fa_code_label": "Code aus der App",
+	"settings_2fa_codes_file_header": "DumbMonit-Wiederherstellungscodes für {account}. Jeder Code meldet Sie einmal an, falls Ihr Telefon verloren geht. Bewahren Sie sie sicher auf.",
+	"settings_2fa_codes_note": "Speichern Sie diese Codes jetzt: Sie werden nur einmal angezeigt, und jeder meldet Sie einmal an, falls Ihr Telefon verloren geht.",
 	"settings_2fa_col_event": "Ereignis",
 	"settings_2fa_col_from": "Von",
 	"settings_2fa_col_subject": "Betroffene",
@@ -6502,9 +6509,11 @@
 	"settings_2fa_copy_key": "Schlüssel kopieren",
 	"settings_2fa_disable": "Deaktivieren",
 	"settings_2fa_disable_button": "Zwei-Faktor-Authentifizierung deaktivieren",
+	"settings_2fa_download_codes": "Als .txt herunterladen",
 	"settings_2fa_enabled": "Aktiviert",
 	"settings_2fa_err_code": "Geben Sie den von der App angezeigten Code ein.",
 	"settings_2fa_err_password": "Geben Sie Ihr Passwort ein, um sich zu bestätigen.",
+	"settings_2fa_err_wrong_code": "Dieser Code ist ungültig. Warten Sie auf den nächsten und versuchen Sie es erneut.",
 	"settings_2fa_err_wrong_password": "Falsches Passwort.",
 	"settings_2fa_hide_log": "Sicherheitsprotokoll ausblenden",
 	"settings_2fa_is_on": "Die Zwei-Faktor-Authentifizierung ist aktiv",
@@ -6532,6 +6541,15 @@
 		}
 	],
 	"settings_2fa_recovery_none": "Deaktivieren und erneut einrichten, um neue zu erhalten.",
+	"settings_2fa_recovery_none_replace": "Ersetzen Sie sie, um neue zu erhalten.",
+	"settings_2fa_regenerate": "Wiederherstellungscodes ersetzen",
+	"settings_2fa_regenerate_code_label": "Code aus Ihrer Authenticator-App",
+	"settings_2fa_regenerate_confirm": "Codes ersetzen",
+	"settings_2fa_regenerate_error": "Die Wiederherstellungscodes konnten nicht ersetzt werden",
+	"settings_2fa_regenerate_intro": "Sie erhalten neue Wiederherstellungscodes; die alten werden sofort ungültig. Die Zwei-Faktor-Authentifizierung bleibt aktiv.",
+	"settings_2fa_regenerate_password_label": "Ihr Passwort",
+	"settings_2fa_regenerate_use_code": "Stattdessen einen Code aus der App verwenden",
+	"settings_2fa_regenerate_use_password": "Stattdessen mein Passwort verwenden",
 	"settings_2fa_saved": "Ich habe sie gespeichert",
 	"settings_2fa_setup": "Einrichten",
 	"settings_2fa_show_log": "Sicherheitsprotokoll anzeigen",
@@ -6885,6 +6903,22 @@
 	"settings_assistant_created_never": "Läuft nie ab.",
 	"settings_assistant_created_note": "Die Beispiele unten enthalten nun dieses Token. Behandeln Sie es wie ein Passwort.",
 	"settings_assistant_created_title": "Token „{name}“ erstellt",
+	"settings_assistant_edit": "Bearbeiten",
+	"settings_assistant_edit_aria": "Token {name} bearbeiten",
+	"settings_assistant_edit_cancel": "Abbrechen",
+	"settings_assistant_edit_err_name": "Geben Sie einen Namen für das Token ein.",
+	"settings_assistant_edit_error": "Das Token konnte nicht aktualisiert werden",
+	"settings_assistant_edit_expiry": "Ablauf",
+	"settings_assistant_edit_expiry_30": "30 Tage ab heute",
+	"settings_assistant_edit_expiry_365": "1 Jahr ab heute",
+	"settings_assistant_edit_expiry_90": "90 Tage ab heute",
+	"settings_assistant_edit_expiry_help": "Läuft derzeit am {date} ab. Ein neuer Ablauf zählt ab heute.",
+	"settings_assistant_edit_expiry_help_never": "Läuft derzeit nie ab. Ein neuer Ablauf zählt ab heute.",
+	"settings_assistant_edit_expiry_keep": "Aktuellen Ablauf behalten",
+	"settings_assistant_edit_expiry_never": "Läuft nie ab",
+	"settings_assistant_edit_name": "Name",
+	"settings_assistant_edit_save": "Speichern",
+	"settings_assistant_edit_saved": "Token aktualisiert",
 	"settings_assistant_empty_description": "Erstellen Sie oben eines und fügen Sie dann das Beispiel in Ihren Assistenten oder Ihr Skript ein.",
 	"settings_assistant_empty_title": "Noch kein Token.",
 	"settings_assistant_expired": "Abgelaufen",
@@ -7974,6 +8008,36 @@
 	"settings_selfmon_url_required": "Geben Sie zuerst die aufzurufende URL ein.",
 	"settings_selfmon_url_saved": "Eine URL für {host} ist gespeichert. Lassen Sie das Feld leer, um sie zu behalten, oder geben Sie eine neue ein, um sie zu ersetzen.",
 	"settings_selfmon_vm_restarts": "Neustarts der Metrikdatenbank seit dem Start",
+	"settings_sessions_current": "Dieses Gerät",
+	"settings_sessions_device": "{browser} unter {os}",
+	"settings_sessions_device_unknown": "Unbekanntes Gerät",
+	"settings_sessions_hint": "Alle Browser, in denen Ihr Konto angemeldet ist. Melden Sie die ab, die Sie nicht kennen.",
+	"settings_sessions_last_active": "zuletzt aktiv {when}",
+	"settings_sessions_load_error": "Ihre Sitzungen konnten nicht gelesen werden",
+	"settings_sessions_revoke": "Abmelden",
+	"settings_sessions_revoke_confirm": "Dieses Gerät abmelden?",
+	"settings_sessions_revoke_error": "Die Sitzung konnte nicht abgemeldet werden",
+	"settings_sessions_revoke_others": "Meine anderen Sitzungen abmelden",
+	"settings_sessions_revoke_others_confirm": "Überall sonst abmelden?",
+	"settings_sessions_revoked_others": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} andere Sitzung abgemeldet.",
+				"countPlural=other": "{count} andere Sitzungen abgemeldet."
+			}
+		}
+	],
+	"settings_sessions_signed_in": "Angemeldet {when}",
+	"settings_sessions_title": "Angemeldete Geräte",
+	"settings_sessions_via_passkey": "Passkey",
+	"settings_sessions_via_password": "Passwort",
 	"settings_sla_format_csv": "CSV, Monitore",
 	"settings_sla_format_incidents": "CSV, Vorfälle",
 	"settings_sla_period_help": "Beide Tage sind eingeschlossen, in der unten gewählten Zeitzone. Höchstens ein Jahr.",
@@ -8203,12 +8267,16 @@
 	"settings_users_done": "Fertig",
 	"settings_users_edit": "Bearbeiten",
 	"settings_users_edit_aria": "{username} bearbeiten",
+	"settings_users_email": "E-Mail-Adresse",
+	"settings_users_email_help": "Optional. Um zu wissen, wen man erreicht; nie zum Anmelden verwendet.",
 	"settings_users_empty_description": "Fügen Sie das erste Konto zum Anmelden hinzu.",
 	"settings_users_empty_title": "Keine Benutzer.",
 	"settings_users_enabled": "Aktiviert",
+	"settings_users_err_email": "Geben Sie eine E-Mail-Adresse wie jane@example.org ein oder lassen Sie das Feld leer.",
 	"settings_users_err_password": "Legen Sie ein Passwort fest: Single Sign-on ist nicht aktiviert, sonst könnte sich dieser Benutzer nicht anmelden.",
 	"settings_users_err_spaces": "Der Benutzername darf keine Leerzeichen enthalten.",
 	"settings_users_err_username": "Geben Sie einen Benutzernamen ein.",
+	"settings_users_filter_without_2fa": "Ohne 2FA",
 	"settings_users_generate": "Generieren",
 	"settings_users_generate_title": "Zufälliges Passwort generieren",
 	"settings_users_last_seen": "Letzte Anmeldung {last} · Erstellt {created}",
@@ -8219,10 +8287,29 @@
 	"settings_users_no_delete_self": "Sie können Ihr eigenes Konto nicht löschen.",
 	"settings_users_no_disable_last": "Der letzte Admin kann nicht deaktiviert werden. Befördern Sie zuerst einen anderen Benutzer.",
 	"settings_users_no_disable_self": "Sie können Ihr eigenes Konto nicht deaktivieren.",
+	"settings_users_no_match": "Kein Benutzer entspricht dieser Suche.",
 	"settings_users_password": "Passwort",
 	"settings_users_password_help": "Mindestens {min} Zeichen. Wird nach der Erstellung einmal angezeigt.",
 	"settings_users_password_help_ldap": "Mindestens {min} Zeichen. Leer lassen für einen Benutzer, der sich nur über das Verzeichnis (LDAP) anmeldet.",
 	"settings_users_password_help_sso": "Mindestens {min} Zeichen. Leer lassen für Benutzer, die sich nur mit {provider} anmelden.",
+	"settings_users_policy_error": "Die Zwei-Faktor-Richtlinie konnte nicht geändert werden",
+	"settings_users_policy_help": "Wer sich mit Passwort anmeldet und keinen zweiten Faktor hat, muss einen einrichten, bevor DumbMonit nutzbar ist. Anmeldungen per Single Sign-On, LDAP oder Passkey sind ausgenommen: Identitätsanbieter oder Passkey decken das bereits ab.",
+	"settings_users_policy_pending": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} Administrator oder Operator muss ihn bei der nächsten Anmeldung einrichten.",
+				"countPlural=other": "{count} Administratoren oder Operatoren müssen ihn bei der nächsten Anmeldung einrichten."
+			}
+		}
+	],
+	"settings_users_policy_title": "Zwei-Faktor-Authentifizierung für Administratoren und Operatoren verlangen",
 	"settings_users_promote_first": "Befördern Sie zuerst einen anderen Benutzer.",
 	"settings_users_reset2fa": "2FA zurücksetzen",
 	"settings_users_reset2fa_confirm": "Zwei-Faktor zurücksetzen?",
@@ -8243,6 +8330,31 @@
 	"settings_users_role_viewer_option": "Betrachter – nur lesen",
 	"settings_users_save": "Änderungen speichern",
 	"settings_users_save_error": "Benutzer konnte nicht gespeichert werden",
+	"settings_users_search_label": "Benutzer suchen",
+	"settings_users_search_placeholder": "Name, Benutzername oder E-Mail",
+	"settings_users_sign_out": "Überall abmelden",
+	"settings_users_sign_out_confirm": "Überall abmelden?",
+	"settings_users_sign_out_self_title": "Beendet Ihre anderen Sitzungen; diese bleibt geöffnet.",
+	"settings_users_sign_out_title": "Beendet alle Sitzungen dieses Benutzers. Er muss sich erneut anmelden.",
+	"settings_users_signed_out": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} Sitzung beendet.",
+				"countPlural=other": "{count} Sitzungen beendet."
+			}
+		}
+	],
+	"settings_users_sort_label": "Sortieren nach",
+	"settings_users_sort_last_login": "Letzte Anmeldung",
+	"settings_users_sort_name": "Name",
+	"settings_users_sort_role": "Rolle",
 	"settings_users_title": "Benutzer",
 	"settings_users_update_error": "Benutzer konnte nicht aktualisiert werden",
 	"settings_users_username": "Benutzername",
@@ -9711,6 +9823,12 @@
 	"w2ops_backup_save": "Plan speichern",
 	"w2ops_backup_save_error": "Der Plan konnte nicht gespeichert werden",
 	"w2ops_backup_saved": "Plan gespeichert",
+	"w3audit_action_alert_rule_reset": "Warnregel auf Standard zurückgesetzt",
+	"w3audit_action_session_revoked": "Sitzung abgemeldet",
+	"w3audit_action_session_revoked_others": "Andere Sitzungen abgemeldet",
+	"w3audit_action_token_updated": "API-Token geändert",
+	"w3audit_action_totp_recovery_regenerated": "Wiederherstellungscodes ersetzt",
+	"w3audit_action_user_signed_out": "Konto überall abgemeldet",
 	"w3tech_alerts_detail_slo": "SLO",
 	"wall_band_problems": "Probleme",
 	"wall_band_problems_note": "Kritische Warnungen und ausgefallene Monitore",

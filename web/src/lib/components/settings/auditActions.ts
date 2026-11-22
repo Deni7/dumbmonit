@@ -5,6 +5,12 @@
 import { m } from '#lib/paraglide/messages.js';
 
 export const AUDIT_ACTION_LABEL: Record<string, () => string> = {
+	'alert_rule.reset': () => m.w3audit_action_alert_rule_reset(),
+	'session.revoked': () => m.w3audit_action_session_revoked(),
+	'session.revoked_others': () => m.w3audit_action_session_revoked_others(),
+	'token.updated': () => m.w3audit_action_token_updated(),
+	'totp.recovery_regenerated': () => m.w3audit_action_totp_recovery_regenerated(),
+	'user.signed_out': () => m.w3audit_action_user_signed_out(),
 	'action.created': () => m.w2ops_audit_action_action_created(),
 	'action.deleted': () => m.w2ops_audit_action_action_deleted(),
 	'action.updated': () => m.w2ops_audit_action_action_updated(),

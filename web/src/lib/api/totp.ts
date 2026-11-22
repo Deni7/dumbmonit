@@ -28,6 +28,20 @@ export async function verifyTotp(code: string): Promise<string[]> {
 	return reply.recovery_codes;
 }
 
+/**
+ * Replaces the recovery codes without turning two-factor off. Confirmed by a
+ * current code from the app, or by the password; old codes stop working.
+ * A 401 means "wrong code or password", never "session expired".
+ */
+export async function regenerateRecoveryCodes(confirm: { code?: string; password?: string }): Promise<string[]> {
+	const reply = await request<{ recovery_codes: string[] }>('/auth/totp/recovery-codes', {
+		method: 'POST',
+		body: confirm,
+		allowUnauthorized: true
+	});
+	return reply.recovery_codes;
+}
+
 export function disableTotp(password: string): Promise<void> {
 	return request<void>('/auth/totp', { method: 'DELETE', body: { password }, allowUnauthorized: true });
 }

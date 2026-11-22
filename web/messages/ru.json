@@ -741,6 +741,11 @@
 	"auth_setup_title": "Создадим вашу учётную запись.",
 	"auth_setup_username_required": "Выберите имя пользователя.",
 	"auth_setup_username_spaces": "Имя пользователя не может содержать пробелы.",
+	"auth_totp_gate_intro": "На этом экземпляре администраторы и операторы обязаны использовать двухфакторную аутентификацию. Настройте её, чтобы продолжить.",
+	"auth_totp_gate_intro_user": "На этом экземпляре администраторы и операторы обязаны использовать двухфакторную аутентификацию. Настройте её для {username}, чтобы продолжить.",
+	"auth_totp_gate_later": "Не сейчас? Выйдите и вернитесь, когда телефон будет под рукой.",
+	"auth_totp_gate_sign_out": "Выйти",
+	"auth_totp_gate_title": "Настройте двухфакторную аутентификацию",
 	"backup_history_description": "Одна строка на задачу, одна ячейка на день за последние {days} дн., восстановлена по сохранённым измерениям.",
 	"backup_history_err": "Не удалось загрузить историю резервных копий",
 	"backup_history_title": "История резервных копий",
@@ -6607,6 +6612,8 @@
 	"settings_2fa_cancel": "Отмена",
 	"settings_2fa_cant_scan": "Не получается отсканировать? Введите ключ вручную",
 	"settings_2fa_code_label": "Код из приложения",
+	"settings_2fa_codes_file_header": "Коды восстановления DumbMonit для {account}. Каждый код позволяет войти один раз, если телефон потерян. Храните их в надёжном месте.",
+	"settings_2fa_codes_note": "Сохраните эти коды сейчас: они показываются только один раз, и каждый позволяет войти однократно, если телефон потерян.",
 	"settings_2fa_col_event": "Событие",
 	"settings_2fa_col_from": "Откуда",
 	"settings_2fa_col_subject": "Объект",
@@ -6620,9 +6627,11 @@
 	"settings_2fa_copy_key": "Скопировать ключ",
 	"settings_2fa_disable": "Отключить",
 	"settings_2fa_disable_button": "Отключить двухфакторную аутентификацию",
+	"settings_2fa_download_codes": "Скачать .txt",
 	"settings_2fa_enabled": "Включена",
 	"settings_2fa_err_code": "Введите код, показанный в приложении.",
 	"settings_2fa_err_password": "Введите пароль, чтобы подтвердить, что это вы.",
+	"settings_2fa_err_wrong_code": "Этот код недействителен. Дождитесь следующего и попробуйте снова.",
 	"settings_2fa_err_wrong_password": "Неверный пароль.",
 	"settings_2fa_hide_log": "Скрыть журнал безопасности",
 	"settings_2fa_is_on": "Двухфакторная аутентификация включена",
@@ -6652,6 +6661,15 @@
 		}
 	],
 	"settings_2fa_recovery_none": "Отключите и настройте заново, чтобы получить новые.",
+	"settings_2fa_recovery_none_replace": "Замените их, чтобы получить новый набор.",
+	"settings_2fa_regenerate": "Заменить коды восстановления",
+	"settings_2fa_regenerate_code_label": "Код из приложения-аутентификатора",
+	"settings_2fa_regenerate_confirm": "Заменить коды",
+	"settings_2fa_regenerate_error": "Не удалось заменить коды восстановления",
+	"settings_2fa_regenerate_intro": "Вы получите новый набор кодов восстановления, старые сразу перестанут действовать. Двухфакторная аутентификация останется включённой.",
+	"settings_2fa_regenerate_password_label": "Ваш пароль",
+	"settings_2fa_regenerate_use_code": "Использовать код из приложения",
+	"settings_2fa_regenerate_use_password": "Использовать пароль",
 	"settings_2fa_saved": "Коды сохранены",
 	"settings_2fa_setup": "Настроить",
 	"settings_2fa_show_log": "Показать журнал безопасности",
@@ -7007,6 +7025,22 @@
 	"settings_assistant_created_never": "Бессрочный.",
 	"settings_assistant_created_note": "Приведённые ниже фрагменты теперь содержат этот токен. Обращайтесь с ним как с паролем.",
 	"settings_assistant_created_title": "Токен «{name}» создан",
+	"settings_assistant_edit": "Изменить",
+	"settings_assistant_edit_aria": "Изменить токен {name}",
+	"settings_assistant_edit_cancel": "Отмена",
+	"settings_assistant_edit_err_name": "Введите название токена.",
+	"settings_assistant_edit_error": "Не удалось обновить токен",
+	"settings_assistant_edit_expiry": "Срок действия",
+	"settings_assistant_edit_expiry_30": "30 дней с сегодняшнего дня",
+	"settings_assistant_edit_expiry_365": "1 год с сегодняшнего дня",
+	"settings_assistant_edit_expiry_90": "90 дней с сегодняшнего дня",
+	"settings_assistant_edit_expiry_help": "Сейчас истекает {date}. Новый срок отсчитывается от сегодняшнего дня.",
+	"settings_assistant_edit_expiry_help_never": "Сейчас бессрочный. Новый срок отсчитывается от сегодняшнего дня.",
+	"settings_assistant_edit_expiry_keep": "Оставить текущий срок",
+	"settings_assistant_edit_expiry_never": "Бессрочно",
+	"settings_assistant_edit_name": "Название",
+	"settings_assistant_edit_save": "Сохранить",
+	"settings_assistant_edit_saved": "Токен обновлён",
 	"settings_assistant_empty_description": "Создайте токен выше, затем вставьте фрагмент в ассистента или скрипт.",
 	"settings_assistant_empty_title": "Токенов пока нет.",
 	"settings_assistant_expired": "Истёк",
@@ -8122,6 +8156,38 @@
 	"settings_selfmon_url_required": "Сначала введите URL для вызова.",
 	"settings_selfmon_url_saved": "Сохранён URL для {host}. Оставьте поле пустым, чтобы сохранить его, или введите новый, чтобы заменить.",
 	"settings_selfmon_vm_restarts": "Перезапуски базы метрик с момента старта",
+	"settings_sessions_current": "Это устройство",
+	"settings_sessions_device": "{browser} на {os}",
+	"settings_sessions_device_unknown": "Неизвестное устройство",
+	"settings_sessions_hint": "Все браузеры, в которых выполнен вход в вашу учётную запись. Завершите сеансы, которые вам незнакомы.",
+	"settings_sessions_last_active": "последняя активность: {when}",
+	"settings_sessions_load_error": "Не удалось получить список сеансов",
+	"settings_sessions_revoke": "Завершить",
+	"settings_sessions_revoke_confirm": "Завершить сеанс на этом устройстве?",
+	"settings_sessions_revoke_error": "Не удалось завершить сеанс",
+	"settings_sessions_revoke_others": "Завершить другие сеансы",
+	"settings_sessions_revoke_others_confirm": "Выйти на всех остальных устройствах?",
+	"settings_sessions_revoked_others": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Завершён {count} другой сеанс.",
+				"countPlural=few": "Завершено {count} других сеанса.",
+				"countPlural=many": "Завершено {count} других сеансов.",
+				"countPlural=other": "Завершено {count} других сеанса."
+			}
+		}
+	],
+	"settings_sessions_signed_in": "Вход: {when}",
+	"settings_sessions_title": "Устройства со входом",
+	"settings_sessions_via_passkey": "Ключ доступа",
+	"settings_sessions_via_password": "Пароль",
 	"settings_sla_format_csv": "CSV, мониторы",
 	"settings_sla_format_incidents": "CSV, инциденты",
 	"settings_sla_period_help": "Оба дня включены, в часовом поясе, выбранном ниже. Не более года.",
@@ -8357,12 +8423,16 @@
 	"settings_users_done": "Готово",
 	"settings_users_edit": "Изменить",
 	"settings_users_edit_aria": "Изменить {username}",
+	"settings_users_email": "Адрес электронной почты",
+	"settings_users_email_help": "Необязательно. Чтобы знать, с кем связаться; для входа не используется.",
 	"settings_users_empty_description": "Добавьте первую учётную запись для входа.",
 	"settings_users_empty_title": "Нет пользователей.",
 	"settings_users_enabled": "Включён",
+	"settings_users_err_email": "Введите адрес вида jane@example.org или оставьте поле пустым.",
 	"settings_users_err_password": "Задайте пароль: единый вход не включён, иначе этот пользователь не сможет войти.",
 	"settings_users_err_spaces": "Имя пользователя не может содержать пробелы.",
 	"settings_users_err_username": "Введите имя пользователя.",
+	"settings_users_filter_without_2fa": "Без 2FA",
 	"settings_users_generate": "Сгенерировать",
 	"settings_users_generate_title": "Сгенерировать случайный пароль",
 	"settings_users_last_seen": "Последний вход: {last} · Создан: {created}",
@@ -8373,10 +8443,31 @@
 	"settings_users_no_delete_self": "Нельзя удалить собственную учётную запись.",
 	"settings_users_no_disable_last": "Последнего администратора нельзя отключить. Сначала повысьте другого пользователя.",
 	"settings_users_no_disable_self": "Нельзя отключить собственную учётную запись.",
+	"settings_users_no_match": "Нет пользователей, подходящих под этот поиск.",
 	"settings_users_password": "Пароль",
 	"settings_users_password_help": "Не менее {min} символов. Показывается один раз после создания.",
 	"settings_users_password_help_ldap": "Не менее {min} символов. Оставьте пустым для пользователя, который входит только через каталог (LDAP).",
 	"settings_users_password_help_sso": "Не менее {min} символов. Оставьте пустым для пользователя, который входит только через {provider}.",
+	"settings_users_policy_error": "Не удалось изменить политику двухфакторной аутентификации",
+	"settings_users_policy_help": "Те, кто входит по паролю без второго фактора, должны настроить его, прежде чем пользоваться DumbMonit. Вход через SSO, LDAP или ключ доступа освобождён: это уже обеспечивает поставщик удостоверений или ключ.",
+	"settings_users_policy_pending": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} администратор или оператор должен будет настроить его при следующем входе.",
+				"countPlural=few": "{count} администратора или оператора должны будут настроить его при следующем входе.",
+				"countPlural=many": "{count} администраторов или операторов должны будут настроить его при следующем входе.",
+				"countPlural=other": "{count} администратора или оператора должны будут настроить его при следующем входе."
+			}
+		}
+	],
+	"settings_users_policy_title": "Требовать двухфакторную аутентификацию от администраторов и операторов",
 	"settings_users_promote_first": "Сначала повысьте другого пользователя.",
 	"settings_users_reset2fa": "Сбросить 2FA",
 	"settings_users_reset2fa_confirm": "Сбросить 2FA?",
@@ -8397,6 +8488,33 @@
 	"settings_users_role_viewer_option": "Наблюдатель — только чтение",
 	"settings_users_save": "Сохранить изменения",
 	"settings_users_save_error": "Не удалось сохранить пользователя",
+	"settings_users_search_label": "Поиск пользователей",
+	"settings_users_search_placeholder": "Имя, логин или почта",
+	"settings_users_sign_out": "Выйти везде",
+	"settings_users_sign_out_confirm": "Выйти везде?",
+	"settings_users_sign_out_self_title": "Завершает другие ваши сеансы; текущий остаётся открытым.",
+	"settings_users_sign_out_title": "Завершает все сеансы этого пользователя. Ему придётся войти заново.",
+	"settings_users_signed_out": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Завершён {count} сеанс.",
+				"countPlural=few": "Завершено {count} сеанса.",
+				"countPlural=many": "Завершено {count} сеансов.",
+				"countPlural=other": "Завершено {count} сеанса."
+			}
+		}
+	],
+	"settings_users_sort_label": "Сортировка",
+	"settings_users_sort_last_login": "Последний вход",
+	"settings_users_sort_name": "Имя",
+	"settings_users_sort_role": "Роль",
 	"settings_users_title": "Пользователи",
 	"settings_users_update_error": "Не удалось обновить пользователя",
 	"settings_users_username": "Имя пользователя",
@@ -9877,6 +9995,12 @@
 	"w2ops_backup_save": "Сохранить расписание",
 	"w2ops_backup_save_error": "Не удалось сохранить расписание",
 	"w2ops_backup_saved": "Расписание сохранено",
+	"w3audit_action_alert_rule_reset": "Правило тревоги сброшено",
+	"w3audit_action_session_revoked": "Сеанс завершён",
+	"w3audit_action_session_revoked_others": "Другие сеансы завершены",
+	"w3audit_action_token_updated": "API-токен изменён",
+	"w3audit_action_totp_recovery_regenerated": "Коды восстановления заменены",
+	"w3audit_action_user_signed_out": "Учётная запись вышла везде",
 	"w3tech_alerts_detail_slo": "SLO",
 	"wall_band_problems": "Проблемы",
 	"wall_band_problems_note": "Критические оповещения и недоступные мониторы",

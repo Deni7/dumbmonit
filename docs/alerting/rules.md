@@ -1107,6 +1107,7 @@ Raised from the scheduled network scans and their inventory (see [Scheduled scan
 | DumbMonit polls running late | Monitors stay overdue after every scheduling round (`min_over_time(dumbmonit_instance_scheduler_backlog[15m])`). | > 0 | 15 min | Advisory (`warning`) | 24 h |
 | DumbMonit metric writes failing | Batches refused by VictoriaMetrics or samples dropped in the last 15 minutes (`dumbmonit_instance_sample_writes_failed_total`, `dumbmonit_instance_samples_dropped_total`). | > 0 | 5 min | Advisory (`warning`) | 6 h |
 | DumbMonit database growing fast | `dumbmonit.db` more than doubled in a day and is over 100 MB (`dumbmonit_instance_database_bytes`). | > 2× | 1 h | Advisory (`warning`) | 24 h |
+| DumbMonit API token expiring soon | An API token expires within 7 days; extend it in **Settings → API & assistants** (`dumbmonit_instance_api_tokens_expiring`). | > 0 | 5 min | Advisory (`warning`) | 24 h |
 
 These rules and the outgoing heartbeat are explained in [Watching DumbMonit itself](../install/self-monitoring.md).
 

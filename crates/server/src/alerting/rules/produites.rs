@@ -96,6 +96,7 @@ pub(crate) const PRODUITES: &[&str] = &[
     "dumbmonit_instance_sample_writes_failed_total",
     "dumbmonit_instance_samples_dropped_total",
     "dumbmonit_instance_database_bytes",
+    "dumbmonit_instance_api_tokens_expiring",
     // Proxmox VE, parité avec Pulse (`collectors/proxmox/{metrics,ha,
     // snapshots,replication,ceph}.rs`).
     "dumbmonit_proxmox_guest_running",

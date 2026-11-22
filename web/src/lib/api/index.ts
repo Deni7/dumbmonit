@@ -104,6 +104,8 @@ export {
 	ApiError,
 	toApiError,
 	setUnauthorizedHandler,
+	setTotpSetupHandler,
+	TOTP_SETUP_REQUIRED,
 	setDemoRefusalHandler,
 	setClientView,
 	getClientView
@@ -573,12 +575,13 @@ export async function getAuthStatus(signal?: AbortSignal): Promise<AuthState> {
 			saml: { enabled: Boolean(status?.saml?.enabled), label: status?.saml?.label || 'SAML' },
 			passkeys: Boolean(status?.passkeys),
 			demo: Boolean(status?.demo),
-			https: status?.https ?? null
+			https: status?.https ?? null,
+			totpSetupRequired: status?.totp_setup_required === true
 		};
 	} catch (cause) {
 		if (cause instanceof DOMException && cause.name === 'AbortError') throw cause;
 		if (cause instanceof ApiError && cause.missing) {
-			return { available: false, configured: false, authenticated: true, user: null, oidc: NO_OIDC, ldap: { enabled: false }, saml: { enabled: false, label: 'SAML' }, passkeys: false, demo: false, https: null };
+			return { available: false, configured: false, authenticated: true, user: null, oidc: NO_OIDC, ldap: { enabled: false }, saml: { enabled: false, label: 'SAML' }, passkeys: false, demo: false, https: null, totpSetupRequired: false };
 		}
 		throw cause;
 	}

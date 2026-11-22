@@ -544,6 +544,7 @@ fn les_regles_livrees_couvrent_les_cas_annonces() {
         "instance_scheduler_behind",
         "instance_write_errors",
         "instance_database_growth",
+        "instance_api_token_expiring",
         // Note de sécurité (`security/`).
         "security_score_drop",
         "security_score_low",

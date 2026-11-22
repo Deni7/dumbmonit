@@ -723,6 +723,11 @@
 	"auth_setup_title": "来创建你的账户吧。",
 	"auth_setup_username_required": "请选择一个用户名。",
 	"auth_setup_username_spaces": "用户名不能包含空格。",
+	"auth_totp_gate_intro": "此实例要求管理员和操作员启用双因素认证。请先完成设置再继续。",
+	"auth_totp_gate_intro_user": "此实例要求管理员和操作员启用双因素认证。请为 {username} 完成设置后继续。",
+	"auth_totp_gate_later": "现在不方便？先退出，等手机在身边时再回来。",
+	"auth_totp_gate_sign_out": "退出登录",
+	"auth_totp_gate_title": "设置双因素认证",
 	"backup_history_description": "每个任务一行，最近 {days} 天每天一格，根据已保存的测量数据重建。",
 	"backup_history_err": "无法加载备份历史",
 	"backup_history_title": "备份历史",
@@ -6416,6 +6421,8 @@
 	"settings_2fa_cancel": "取消",
 	"settings_2fa_cant_scan": "无法扫描？请改为输入密钥",
 	"settings_2fa_code_label": "应用中的代码",
+	"settings_2fa_codes_file_header": "{account} 的 DumbMonit 恢复码。手机丢失时，每个码可登录一次。请妥善保管。",
+	"settings_2fa_codes_note": "请立即保存这些码：它们只显示一次，手机丢失时每个码可登录一次。",
 	"settings_2fa_col_event": "事件",
 	"settings_2fa_col_from": "来源",
 	"settings_2fa_col_subject": "对象",
@@ -6429,9 +6436,11 @@
 	"settings_2fa_copy_key": "复制密钥",
 	"settings_2fa_disable": "停用",
 	"settings_2fa_disable_button": "停用双重身份验证",
+	"settings_2fa_download_codes": "下载 .txt",
 	"settings_2fa_enabled": "已启用",
 	"settings_2fa_err_code": "请输入应用显示的代码。",
 	"settings_2fa_err_password": "请输入密码以确认是你本人。",
+	"settings_2fa_err_wrong_code": "该验证码无效。请等待下一个后重试。",
 	"settings_2fa_err_wrong_password": "密码错误。",
 	"settings_2fa_hide_log": "隐藏安全日志",
 	"settings_2fa_is_on": "双重身份验证已开启",
@@ -6458,6 +6467,15 @@
 		}
 	],
 	"settings_2fa_recovery_none": "停用后重新设置即可获得新的恢复码。",
+	"settings_2fa_recovery_none_replace": "替换它们以获取一组新码。",
+	"settings_2fa_regenerate": "替换恢复码",
+	"settings_2fa_regenerate_code_label": "身份验证器应用中的验证码",
+	"settings_2fa_regenerate_confirm": "替换恢复码",
+	"settings_2fa_regenerate_error": "无法替换恢复码",
+	"settings_2fa_regenerate_intro": "你将获得一组新的恢复码，旧码立即失效。双因素认证保持开启。",
+	"settings_2fa_regenerate_password_label": "你的密码",
+	"settings_2fa_regenerate_use_code": "改用应用中的验证码",
+	"settings_2fa_regenerate_use_password": "改用我的密码",
 	"settings_2fa_saved": "我已保存",
 	"settings_2fa_setup": "设置",
 	"settings_2fa_show_log": "显示安全日志",
@@ -6810,6 +6828,22 @@
 	"settings_assistant_created_never": "永不过期。",
 	"settings_assistant_created_note": "下方的代码片段现已包含此令牌。请像对待密码一样对待它。",
 	"settings_assistant_created_title": "令牌“{name}”已创建",
+	"settings_assistant_edit": "编辑",
+	"settings_assistant_edit_aria": "编辑令牌 {name}",
+	"settings_assistant_edit_cancel": "取消",
+	"settings_assistant_edit_err_name": "请输入令牌名称。",
+	"settings_assistant_edit_error": "无法更新令牌",
+	"settings_assistant_edit_expiry": "有效期",
+	"settings_assistant_edit_expiry_30": "从今天起 30 天",
+	"settings_assistant_edit_expiry_365": "从今天起 1 年",
+	"settings_assistant_edit_expiry_90": "从今天起 90 天",
+	"settings_assistant_edit_expiry_help": "当前将于 {date} 过期。新的有效期从今天起算。",
+	"settings_assistant_edit_expiry_help_never": "当前永不过期。新的有效期从今天起算。",
+	"settings_assistant_edit_expiry_keep": "保留当前有效期",
+	"settings_assistant_edit_expiry_never": "永不过期",
+	"settings_assistant_edit_name": "名称",
+	"settings_assistant_edit_save": "保存",
+	"settings_assistant_edit_saved": "令牌已更新",
 	"settings_assistant_empty_description": "请先在上方创建一个，然后将代码片段粘贴到你的助手或脚本中。",
 	"settings_assistant_empty_title": "暂无令牌。",
 	"settings_assistant_expired": "已过期",
@@ -7890,6 +7924,35 @@
 	"settings_selfmon_url_required": "请先输入要调用的 URL。",
 	"settings_selfmon_url_saved": "已保存指向 {host} 的 URL。留空即保留，输入新的 URL 即替换。",
 	"settings_selfmon_vm_restarts": "启动以来指标数据库的重启次数",
+	"settings_sessions_current": "此设备",
+	"settings_sessions_device": "{os} 上的 {browser}",
+	"settings_sessions_device_unknown": "未知设备",
+	"settings_sessions_hint": "你的账户已登录的所有浏览器。退出你不认识的设备。",
+	"settings_sessions_last_active": "最近活动于{when}",
+	"settings_sessions_load_error": "无法读取你的会话",
+	"settings_sessions_revoke": "退出",
+	"settings_sessions_revoke_confirm": "让此设备退出？",
+	"settings_sessions_revoke_error": "无法退出该会话",
+	"settings_sessions_revoke_others": "退出我的其他会话",
+	"settings_sessions_revoke_others_confirm": "在其他所有地方退出？",
+	"settings_sessions_revoked_others": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "已退出 {count} 个其他会话。"
+			}
+		}
+	],
+	"settings_sessions_signed_in": "登录于{when}",
+	"settings_sessions_title": "已登录的设备",
+	"settings_sessions_via_passkey": "通行密钥",
+	"settings_sessions_via_password": "密码",
 	"settings_sla_format_csv": "CSV，监控项",
 	"settings_sla_format_incidents": "CSV，事件",
 	"settings_sla_period_help": "起止两天均包含在内，按下方所选时区计算。最长一年。",
@@ -8119,12 +8182,16 @@
 	"settings_users_done": "完成",
 	"settings_users_edit": "编辑",
 	"settings_users_edit_aria": "编辑 {username}",
+	"settings_users_email": "电子邮件地址",
+	"settings_users_email_help": "可选。用于知道该联系谁，从不用于登录。",
 	"settings_users_empty_description": "添加第一个账户以登录。",
 	"settings_users_empty_title": "没有用户。",
 	"settings_users_enabled": "已启用",
+	"settings_users_err_email": "请输入类似 jane@example.org 的地址，或留空。",
 	"settings_users_err_password": "请设置密码：未启用单点登录，否则该用户无法登录。",
 	"settings_users_err_spaces": "用户名不能包含空格。",
 	"settings_users_err_username": "请输入用户名。",
+	"settings_users_filter_without_2fa": "未启用 2FA",
 	"settings_users_generate": "生成",
 	"settings_users_generate_title": "生成随机密码",
 	"settings_users_last_seen": "上次登录 {last} · 创建于 {created}",
@@ -8135,10 +8202,28 @@
 	"settings_users_no_delete_self": "你不能删除自己的账户。",
 	"settings_users_no_disable_last": "最后一位管理员无法停用。请先提升另一位用户。",
 	"settings_users_no_disable_self": "你不能停用自己的账户。",
+	"settings_users_no_match": "没有符合此搜索的用户。",
 	"settings_users_password": "密码",
 	"settings_users_password_help": "至少 {min} 个字符。创建后只显示一次。",
 	"settings_users_password_help_ldap": "至少 {min} 个字符。若该用户仅通过目录（LDAP）登录，请留空。",
 	"settings_users_password_help_sso": "至少 {min} 个字符。若用户仅通过 {provider} 登录，请留空。",
+	"settings_users_policy_error": "无法更改双因素策略",
+	"settings_users_policy_help": "使用密码登录且未启用第二因素的用户，必须先设置才能使用 DumbMonit。单点登录、LDAP 和通行密钥登录不受此限：身份提供方或通行密钥已经覆盖。",
+	"settings_users_policy_pending": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 名管理员或操作员需在下次登录时完成设置。"
+			}
+		}
+	],
+	"settings_users_policy_title": "要求管理员和操作员启用双因素认证",
 	"settings_users_promote_first": "请先提升另一位用户。",
 	"settings_users_reset2fa": "重置 2FA",
 	"settings_users_reset2fa_confirm": "重置双重身份验证？",
@@ -8159,6 +8244,30 @@
 	"settings_users_role_viewer_option": "查看者——只读",
 	"settings_users_save": "保存更改",
 	"settings_users_save_error": "无法保存用户",
+	"settings_users_search_label": "搜索用户",
+	"settings_users_search_placeholder": "姓名、用户名或邮箱",
+	"settings_users_sign_out": "在所有设备退出",
+	"settings_users_sign_out_confirm": "在所有设备退出？",
+	"settings_users_sign_out_self_title": "关闭你的其他会话，当前会话保持打开。",
+	"settings_users_sign_out_title": "关闭该用户的所有会话，对方需要重新登录。",
+	"settings_users_signed_out": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "已关闭 {count} 个会话。"
+			}
+		}
+	],
+	"settings_users_sort_label": "排序方式",
+	"settings_users_sort_last_login": "最近登录",
+	"settings_users_sort_name": "名称",
+	"settings_users_sort_role": "角色",
 	"settings_users_title": "用户",
 	"settings_users_update_error": "无法更新用户",
 	"settings_users_username": "用户名",
@@ -9621,6 +9730,12 @@
 	"w2ops_backup_save": "保存计划",
 	"w2ops_backup_save_error": "无法保存计划",
 	"w2ops_backup_saved": "计划已保存",
+	"w3audit_action_alert_rule_reset": "告警规则已恢复默认",
+	"w3audit_action_session_revoked": "会话已退出",
+	"w3audit_action_session_revoked_others": "其他会话已退出",
+	"w3audit_action_token_updated": "API 令牌已修改",
+	"w3audit_action_totp_recovery_regenerated": "恢复码已更换",
+	"w3audit_action_user_signed_out": "账户已在所有设备退出",
 	"w3tech_alerts_detail_slo": "SLO",
 	"wall_band_problems": "问题",
 	"wall_band_problems_note": "严重告警和宕机的监控项",

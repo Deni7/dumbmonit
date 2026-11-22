@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use crate::api::auth::{guard_attempt, limiter_keys, open_session};
 use crate::auth::client_ip::ClientIp;
 use crate::auth::middleware::{AdminUser, Authenticated};
+use crate::auth::session::{SignIn, UserAgent, Via};
 use crate::auth::totp_login::Outcome;
 use crate::auth::users::{self, User};
 use crate::auth::{AuthError, AuthResult, AuthState, audit, password, session, totp};
@@ -32,6 +33,7 @@ pub fn routes() -> Router<AppState> {
         .route("/auth/totp", get(status).delete(disable))
         .route("/auth/totp/enroll", post(enroll))
         .route("/auth/totp/verify", post(verify))
+        .route("/auth/totp/recovery-codes", post(regenerate_recovery_codes))
         .route("/users/{id}/totp", delete(admin_reset))
         .route("/auth/audit", get(audit_log))
         .route("/auth/audit/export", get(audit_export))
@@ -166,6 +168,72 @@ pub async fn verify(
     Ok(Json(RecoveryCodes { recovery_codes: codes }))
 }
 
+/// Corps de la régénération des codes de secours : un code de l'application,
+/// ou à défaut le mot de passe.
+#[derive(Deserialize)]
+pub struct ConfirmPayload {
+    #[serde(default)]
+    code: Option<String>,
+    #[serde(default)]
+    password: Option<String>,
+}
+
+impl std::fmt::Debug for ConfirmPayload {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ConfirmPayload { code: <redacted>, password: <redacted> }")
+    }
+}
+
+/// `POST /api/auth/totp/recovery-codes` — remplace les codes de secours sans
+/// toucher au second facteur. Exige un code de l'application (ou le mot de
+/// passe) : une session laissée ouverte ne suffit pas à récupérer de quoi
+/// entrer sans téléphone. Les anciens codes cessent aussitôt de valoir.
+pub async fn regenerate_recovery_codes(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthState>,
+    Authenticated(user): Authenticated,
+    ClientIp(ip): ClientIp,
+    Json(payload): Json<ConfirmPayload>,
+) -> AuthResult<Json<RecoveryCodes>> {
+    let Some(encrypted) = user.totp_secret.as_deref().filter(|_| user.totp_enabled) else {
+        return Err(AuthError::Conflict("Two-factor authentication is not enabled.".into()));
+    };
+    let code = payload.code.as_deref().map(str::trim).filter(|code| !code.is_empty());
+    match (code, payload.password) {
+        (Some(code), _) => {
+            let keys = limiter_keys(ip, Some(&user.username));
+            guard_attempt(&auth, &keys).await?;
+            let secret = state.cipher.decrypt(encrypted)?;
+            // Comme à la connexion : un code déjà servi vaut un code faux.
+            let accepted = match totp::matching_step(&secret, code) {
+                Some(step) => auth.totp_replay().lock().await.accept(user.id, step),
+                None => false,
+            };
+            if !accepted {
+                auth.limiter().lock().await.record_failure(&keys, Instant::now());
+                audit::record(&state.pool, Some(&user.username), "totp.failed", None, ip).await;
+                return Err(AuthError::Unauthorized("Wrong code.".into()));
+            }
+            auth.limiter().lock().await.record_success(&keys);
+        }
+        (None, Some(password)) if !password.is_empty() => {
+            check_password(&auth, &user, ip, password).await?;
+        }
+        _ => {
+            return Err(AuthError::Invalid(
+                "Enter a code from your authenticator app, or your password.".into(),
+            ));
+        }
+    }
+
+    let codes = totp::generate_recovery_codes();
+    let hashes: Vec<Vec<u8>> = codes.iter().map(|code| totp::hash_recovery_code(code)).collect();
+    users::replace_recovery_codes(&state.pool, user.id, &hashes).await?;
+    audit::record(&state.pool, Some(&user.username), "totp.recovery_regenerated", None, ip).await;
+    tracing::info!(user = %user.username, "recovery codes regenerated");
+    Ok(Json(RecoveryCodes { recovery_codes: codes }))
+}
+
 /// `DELETE /api/auth/totp` — retire le second facteur, contre le mot de passe.
 pub async fn disable(
     State(state): State<AppState>,
@@ -246,6 +314,7 @@ pub async fn login_step(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthState>,
     ClientIp(ip): ClientIp,
+    UserAgent(user_agent): UserAgent,
     Json(payload): Json<LoginStepPayload>,
 ) -> AuthResult<Response> {
     let expired = || {
@@ -298,7 +367,15 @@ pub async fn login_step(
     auth.limiter().lock().await.record_success(&keys);
     auth.pending_totp().lock().await.finish(&payload.pending);
 
-    open_session(&state, &user, ip).await
+    // Le premier temps a été le mot de passe local, ou l'annuaire pour un compte
+    // qui n'en a pas.
+    let via = if user.password_hash.is_none() && user.ldap_id.is_some() {
+        Via::Ldap
+    } else {
+        Via::Password
+    };
+    let origin = SignIn { via, ip, user_agent: user_agent.as_deref() };
+    open_session(&state, &user, &origin).await
 }
 
 /// `GET /api/auth/audit` — les derniers gestes de sécurité, filtrables et
@@ -399,10 +476,12 @@ mod tests {
     #[test]
     fn debug_never_leaks_a_secret() {
         let rendered = format!(
-            "{:?} {:?}",
+            "{:?} {:?} {:?}",
             PasswordPayload { password: "s3cr3t".into() },
             LoginStepPayload { pending: "jeton-en-attente".into(), code: "123456".into() },
+            ConfirmPayload { code: Some("654321".into()), password: Some("s3cr3t".into()) },
         );
+        assert!(!rendered.contains("654321"), "{rendered}");
         assert!(!rendered.contains("s3cr3t"), "{rendered}");
         assert!(!rendered.contains("jeton-en-attente"), "{rendered}");
         assert!(!rendered.contains("123456"), "{rendered}");

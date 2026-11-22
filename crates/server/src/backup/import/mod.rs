@@ -138,6 +138,7 @@ pub async fn restore(
     report.push(restore_agent_enrolment(&mut tx, bundle).await?);
     report.push(restore_backup_schedule(&mut tx, bundle).await?);
     report.push(restore_wall_weather(&mut tx, bundle).await?);
+    report.push(restore_auth_policy(&mut tx, bundle).await?);
     report.push(restore_agent_update_rollout(&mut tx, bundle).await?);
     report.push(restore_mail_server(&mut tx, cipher, bundle).await?);
     report.push(restore_instance(&mut tx, bundle).await?);

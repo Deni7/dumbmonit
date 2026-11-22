@@ -743,6 +743,11 @@
 	"auth_setup_title": "Créons votre compte.",
 	"auth_setup_username_required": "Choisissez un nom d’utilisateur.",
 	"auth_setup_username_spaces": "Le nom d’utilisateur ne peut pas contenir d’espaces.",
+	"auth_totp_gate_intro": "Cette instance exige l’authentification à deux facteurs pour les administrateurs et les opérateurs. Configurez-la pour continuer.",
+	"auth_totp_gate_intro_user": "Cette instance exige l’authentification à deux facteurs pour les administrateurs et les opérateurs. Configurez-la pour {username} afin de continuer.",
+	"auth_totp_gate_later": "Pas maintenant ? Déconnectez-vous et revenez quand vous aurez votre téléphone.",
+	"auth_totp_gate_sign_out": "Se déconnecter",
+	"auth_totp_gate_title": "Configurez l’authentification à deux facteurs",
 	"backup_history_description": "Une ligne par tâche, une case par jour sur les {days} derniers jours, reconstituée à partir des mesures enregistrées.",
 	"backup_history_err": "Impossible de charger l'historique des sauvegardes",
 	"backup_history_title": "Historique des sauvegardes",
@@ -6489,6 +6494,8 @@
 	"settings_2fa_cancel": "Annuler",
 	"settings_2fa_cant_scan": "Impossible de scanner ? Saisissez la clé",
 	"settings_2fa_code_label": "Code de l’application",
+	"settings_2fa_codes_file_header": "Codes de secours DumbMonit pour {account}. Chaque code vous connecte une fois si votre téléphone est perdu. Rangez-les en lieu sûr.",
+	"settings_2fa_codes_note": "Enregistrez ces codes maintenant : ils ne s’affichent qu’une fois, et chacun vous connecte une seule fois si votre téléphone est perdu.",
 	"settings_2fa_col_event": "Événement",
 	"settings_2fa_col_from": "Depuis",
 	"settings_2fa_col_subject": "Sujet",
@@ -6502,9 +6509,11 @@
 	"settings_2fa_copy_key": "Copier la clé",
 	"settings_2fa_disable": "Désactiver",
 	"settings_2fa_disable_button": "Désactiver l’authentification à deux facteurs",
+	"settings_2fa_download_codes": "Télécharger en .txt",
 	"settings_2fa_enabled": "Activée",
 	"settings_2fa_err_code": "Saisissez le code affiché par l’application.",
 	"settings_2fa_err_password": "Saisissez votre mot de passe pour prouver que c’est vous.",
+	"settings_2fa_err_wrong_code": "Ce code n’est pas valide. Attendez le suivant et réessayez.",
 	"settings_2fa_err_wrong_password": "Mot de passe incorrect.",
 	"settings_2fa_hide_log": "Masquer le journal de sécurité",
 	"settings_2fa_is_on": "L’authentification à deux facteurs est activée",
@@ -6532,6 +6541,15 @@
 		}
 	],
 	"settings_2fa_recovery_none": "Désactivez puis reconfigurez pour en obtenir de nouveaux.",
+	"settings_2fa_recovery_none_replace": "Remplacez-les pour en obtenir de nouveaux.",
+	"settings_2fa_regenerate": "Remplacer les codes de secours",
+	"settings_2fa_regenerate_code_label": "Code de votre application d’authentification",
+	"settings_2fa_regenerate_confirm": "Remplacer les codes",
+	"settings_2fa_regenerate_error": "Impossible de remplacer les codes de secours",
+	"settings_2fa_regenerate_intro": "Vous recevez un nouveau jeu de codes de secours ; les anciens cessent aussitôt de fonctionner. L’authentification à deux facteurs reste active.",
+	"settings_2fa_regenerate_password_label": "Votre mot de passe",
+	"settings_2fa_regenerate_use_code": "Utiliser plutôt un code de l’application",
+	"settings_2fa_regenerate_use_password": "Utiliser plutôt mon mot de passe",
 	"settings_2fa_saved": "Je les ai enregistrés",
 	"settings_2fa_setup": "Configurer",
 	"settings_2fa_show_log": "Afficher le journal de sécurité",
@@ -6885,6 +6903,22 @@
 	"settings_assistant_created_never": "N’expire jamais.",
 	"settings_assistant_created_note": "Les extraits ci-dessous contiennent désormais ce jeton. Traitez-le comme un mot de passe.",
 	"settings_assistant_created_title": "Jeton « {name} » créé",
+	"settings_assistant_edit": "Modifier",
+	"settings_assistant_edit_aria": "Modifier le jeton {name}",
+	"settings_assistant_edit_cancel": "Annuler",
+	"settings_assistant_edit_err_name": "Saisissez un nom pour le jeton.",
+	"settings_assistant_edit_error": "Impossible de mettre à jour le jeton",
+	"settings_assistant_edit_expiry": "Échéance",
+	"settings_assistant_edit_expiry_30": "30 jours à partir d’aujourd’hui",
+	"settings_assistant_edit_expiry_365": "1 an à partir d’aujourd’hui",
+	"settings_assistant_edit_expiry_90": "90 jours à partir d’aujourd’hui",
+	"settings_assistant_edit_expiry_help": "Expire actuellement le {date}. Une nouvelle échéance se compte à partir d’aujourd’hui.",
+	"settings_assistant_edit_expiry_help_never": "N’expire jamais actuellement. Une nouvelle échéance se compte à partir d’aujourd’hui.",
+	"settings_assistant_edit_expiry_keep": "Garder l’échéance actuelle",
+	"settings_assistant_edit_expiry_never": "N’expire jamais",
+	"settings_assistant_edit_name": "Nom",
+	"settings_assistant_edit_save": "Enregistrer",
+	"settings_assistant_edit_saved": "Jeton mis à jour",
 	"settings_assistant_empty_description": "Créez-en un ci-dessus, puis collez l’extrait dans votre assistant ou votre script.",
 	"settings_assistant_empty_title": "Aucun jeton pour l’instant.",
 	"settings_assistant_expired": "Expiré",
@@ -7974,6 +8008,36 @@
 	"settings_selfmon_url_required": "Saisissez d’abord l’URL à appeler.",
 	"settings_selfmon_url_saved": "Une URL vers {host} est enregistrée. Laissez le champ vide pour la garder, ou saisissez-en une autre pour la remplacer.",
 	"settings_selfmon_vm_restarts": "Redémarrages de la base de métriques depuis le lancement",
+	"settings_sessions_current": "Cet appareil",
+	"settings_sessions_device": "{browser} sous {os}",
+	"settings_sessions_device_unknown": "Appareil inconnu",
+	"settings_sessions_hint": "Chaque navigateur où votre compte est connecté. Déconnectez ceux que vous ne reconnaissez pas.",
+	"settings_sessions_last_active": "dernière activité {when}",
+	"settings_sessions_load_error": "Impossible de lire vos sessions",
+	"settings_sessions_revoke": "Déconnecter",
+	"settings_sessions_revoke_confirm": "Déconnecter cet appareil ?",
+	"settings_sessions_revoke_error": "Impossible de fermer la session",
+	"settings_sessions_revoke_others": "Déconnecter mes autres sessions",
+	"settings_sessions_revoke_others_confirm": "Déconnecter partout ailleurs ?",
+	"settings_sessions_revoked_others": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} autre session déconnectée.",
+				"countPlural=other": "{count} autres sessions déconnectées."
+			}
+		}
+	],
+	"settings_sessions_signed_in": "Connecté {when}",
+	"settings_sessions_title": "Appareils connectés",
+	"settings_sessions_via_passkey": "Clé d’accès",
+	"settings_sessions_via_password": "Mot de passe",
 	"settings_sla_format_csv": "CSV, moniteurs",
 	"settings_sla_format_incidents": "CSV, incidents",
 	"settings_sla_period_help": "Les deux jours sont inclus, dans le fuseau choisi ci-dessous. Un an au plus.",
@@ -8203,12 +8267,16 @@
 	"settings_users_done": "Terminé",
 	"settings_users_edit": "Modifier",
 	"settings_users_edit_aria": "Modifier {username}",
+	"settings_users_email": "Adresse e-mail",
+	"settings_users_email_help": "Facultatif. Pour savoir qui joindre ; ne sert jamais à se connecter.",
 	"settings_users_empty_description": "Ajoutez le premier compte pour vous connecter.",
 	"settings_users_empty_title": "Aucun utilisateur.",
 	"settings_users_enabled": "Activé",
+	"settings_users_err_email": "Saisissez une adresse comme jane@example.org, ou laissez le champ vide.",
 	"settings_users_err_password": "Définissez un mot de passe : l’authentification unique n’est pas activée, cet utilisateur ne pourrait pas se connecter autrement.",
 	"settings_users_err_spaces": "Le nom d’utilisateur ne peut pas contenir d’espaces.",
 	"settings_users_err_username": "Saisissez un nom d’utilisateur.",
+	"settings_users_filter_without_2fa": "Sans 2FA",
 	"settings_users_generate": "Générer",
 	"settings_users_generate_title": "Générer un mot de passe aléatoire",
 	"settings_users_last_seen": "Dernière connexion {last} · Créé {created}",
@@ -8219,10 +8287,29 @@
 	"settings_users_no_delete_self": "Vous ne pouvez pas supprimer votre propre compte.",
 	"settings_users_no_disable_last": "Le dernier admin ne peut pas être désactivé. Promouvez d’abord un autre utilisateur.",
 	"settings_users_no_disable_self": "Vous ne pouvez pas désactiver votre propre compte.",
+	"settings_users_no_match": "Aucun utilisateur ne correspond à cette recherche.",
 	"settings_users_password": "Mot de passe",
 	"settings_users_password_help": "Au moins {min} caractères. Affiché une seule fois après la création.",
 	"settings_users_password_help_ldap": "Au moins {min} caractères. Laisser vide pour un utilisateur qui se connecte seulement par l’annuaire (LDAP).",
 	"settings_users_password_help_sso": "Au moins {min} caractères. Laissez vide pour un utilisateur qui se connecte uniquement avec {provider}.",
+	"settings_users_policy_error": "Impossible de modifier la règle de double authentification",
+	"settings_users_policy_help": "Ceux qui se connectent par mot de passe sans second facteur doivent en configurer un avant de pouvoir utiliser DumbMonit. Les connexions par SSO, LDAP ou clé d’accès sont exemptées : le fournisseur d’identité ou la clé s’en chargent déjà.",
+	"settings_users_policy_pending": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} administrateur ou opérateur devra le configurer à sa prochaine connexion.",
+				"countPlural=other": "{count} administrateurs ou opérateurs devront le configurer à leur prochaine connexion."
+			}
+		}
+	],
+	"settings_users_policy_title": "Exiger l’authentification à deux facteurs des administrateurs et opérateurs",
 	"settings_users_promote_first": "Promouvez d’abord un autre utilisateur.",
 	"settings_users_reset2fa": "Réinit. 2FA",
 	"settings_users_reset2fa_confirm": "Réinitialiser la double authentification ?",
@@ -8243,6 +8330,31 @@
 	"settings_users_role_viewer_option": "Lecteur — lecture seule",
 	"settings_users_save": "Enregistrer les modifications",
 	"settings_users_save_error": "Impossible d’enregistrer l’utilisateur",
+	"settings_users_search_label": "Rechercher des utilisateurs",
+	"settings_users_search_placeholder": "Nom, identifiant ou e-mail",
+	"settings_users_sign_out": "Déconnecter partout",
+	"settings_users_sign_out_confirm": "Déconnecter partout ?",
+	"settings_users_sign_out_self_title": "Ferme vos autres sessions ; celle-ci reste ouverte.",
+	"settings_users_sign_out_title": "Ferme toutes les sessions de cet utilisateur. Il devra se reconnecter.",
+	"settings_users_signed_out": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} session fermée.",
+				"countPlural=other": "{count} sessions fermées."
+			}
+		}
+	],
+	"settings_users_sort_label": "Trier par",
+	"settings_users_sort_last_login": "Dernière connexion",
+	"settings_users_sort_name": "Nom",
+	"settings_users_sort_role": "Rôle",
 	"settings_users_title": "Utilisateurs",
 	"settings_users_update_error": "Impossible de mettre à jour l’utilisateur",
 	"settings_users_username": "Nom d’utilisateur",
@@ -9711,6 +9823,12 @@
 	"w2ops_backup_save": "Enregistrer la planification",
 	"w2ops_backup_save_error": "Impossible d’enregistrer la planification",
 	"w2ops_backup_saved": "Planification enregistrée",
+	"w3audit_action_alert_rule_reset": "Règle d’alerte remise par défaut",
+	"w3audit_action_session_revoked": "Session déconnectée",
+	"w3audit_action_session_revoked_others": "Autres sessions déconnectées",
+	"w3audit_action_token_updated": "Jeton d’API modifié",
+	"w3audit_action_totp_recovery_regenerated": "Codes de secours remplacés",
+	"w3audit_action_user_signed_out": "Compte déconnecté partout",
 	"w3tech_alerts_detail_slo": "SLO",
 	"wall_band_problems": "Problèmes",
 	"wall_band_problems_note": "Alertes critiques et surveillances hors service",

@@ -24,6 +24,9 @@ pub struct CreatePayload {
     role: Role,
     #[serde(default)]
     password: Option<String>,
+    /// Facultative ; vide : aucune.
+    #[serde(default)]
+    email: Option<String>,
 }
 
 impl std::fmt::Debug for CreatePayload {
@@ -46,6 +49,9 @@ pub struct UpdatePayload {
     disabled: Option<bool>,
     #[serde(default)]
     password: Option<String>,
+    /// Absente : inchangée ; vide : effacée.
+    #[serde(default)]
+    email: Option<String>,
 }
 
 impl std::fmt::Debug for UpdatePayload {
@@ -74,6 +80,8 @@ pub async fn create(
 ) -> AuthResult<(StatusCode, Json<UserView>)> {
     let username = payload.username.trim();
     users::validate_username(username).map_err(AuthError::Invalid)?;
+    let email =
+        users::normalize_email(payload.email.as_deref().unwrap_or("")).map_err(AuthError::Invalid)?;
 
     let password = payload.password.filter(|password| !password.is_empty());
     let hash = match password {
@@ -111,6 +119,9 @@ pub async fn create(
     let Some(id) = created else {
         return Err(AuthError::Conflict(format!("A user named \"{username}\" already exists.")));
     };
+    if email.is_some() {
+        users::set_email(&state.pool, id, email.as_deref()).await?;
+    }
     let user = load(&state, id).await?;
     audit::record(&state.pool, Some(&me.username), "user.created", Some(&user.username), ip).await;
     tracing::info!(user = %user.username, role = user.role.as_str(), "user created");
@@ -150,9 +161,16 @@ pub async fn update(
         }
         None => None,
     };
+    let email = payload
+        .email
+        .as_deref()
+        .map(users::normalize_email)
+        .transpose()
+        .map_err(AuthError::Invalid)?;
     let disabled = payload.disabled.filter(|disabled| *disabled != user.disabled);
     let changes = users::AccountChanges {
         display_name: payload.display_name.as_deref().map(str::trim),
+        email: email.as_ref().map(Option::as_deref),
         role: payload.role.filter(|role| *role != user.role),
         // Un mot de passe remis par un administrateur ferme les sessions du compte :
         // c'est le geste qu'on fait quand on croit le compte compromis. Désactiver

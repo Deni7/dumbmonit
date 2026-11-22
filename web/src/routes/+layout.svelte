@@ -34,6 +34,7 @@
 	import { createSequenceMatcher, isTypingTarget } from '#lib/palette/logic.js';
 	import { hostedStatusSlug } from '#lib/status-host.js';
 	import PublicStatusPage from '#lib/components/status/PublicStatusPage.svelte';
+	import TotpSetupGate from '#lib/components/security/TotpSetupGate.svelte';
 
 	let { children } = $props();
 
@@ -152,7 +153,7 @@
 	// Asked once per page load; "Skip" or the last step marks it done on the server.
 	let wizardOffered = false;
 	$effect(() => {
-		if (!auth.canUseApi || !auth.isAdmin || auth.demo || instanceStore.setupCompleted !== false) return;
+		if (!auth.canUseApi || auth.totpSetupRequired || !auth.isAdmin || auth.demo || instanceStore.setupCompleted !== false) return;
 		if (wizardOffered || onWelcome || onWall || isPublicRoute(routePath(page.url))) return;
 		wizardOffered = true;
 		void goto('/welcome', { replace: true });
@@ -167,7 +168,7 @@
 
 	const publicPath = $derived(isPublicRoute(routePath(page.url)));
 	// The branch below that renders `EnterpriseShell`.
-	const inShell = $derived(!statusHost && !publicPath && auth.canUseApi && !onWelcome);
+	const inShell = $derived(!statusHost && !publicPath && auth.canUseApi && !auth.totpSetupRequired && !onWelcome);
 
 	// Three situations: fresh instance, no session, valid session.
 	$effect(() => {
@@ -250,7 +251,8 @@
 
 	// The alert count is shared by the whole app; it only polls once a session exists.
 	$effect(() => {
-		if (statusHost || !auth.canUseApi) return;
+		// Held at two-factor enrolment, every other route answers 403: nothing to poll.
+		if (statusHost || !auth.canUseApi || auth.totpSetupRequired) return;
 		return alertsStore.startPolling();
 	});
 </script>
@@ -281,6 +283,10 @@
 				{auth.checked ? m.app_layout_signing_in() : m.app_layout_checking()}
 			</p>
 		</main>
+	{:else if auth.totpSetupRequired}
+		<!-- The instance policy requires two-factor first: the server refuses everything else. -->
+		<CleartextBanner />
+		<TotpSetupGate />
 	{:else}
 		{#snippet banners()}
 			{#if auth.demo}

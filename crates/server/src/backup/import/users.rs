@@ -98,13 +98,26 @@ pub(super) async fn restore_users(
             .and_then(|raw| BASE64.decode(raw).ok())
             .map(|plain| cipher.encrypt(&plain))
             .transpose()?;
+        // Une adresse illisible (lot édité à la main) est laissée de côté, pas
+        // le compte.
+        let email = match user.email.as_deref().map(crate::auth::users::normalize_email) {
+            Some(Ok(email)) => email,
+            Some(Err(_)) => {
+                report.notes.push(format!(
+                    "Account \"{}\": its email address is not valid and was not restored.",
+                    user.username
+                ));
+                None
+            }
+            None => None,
+        };
 
         let row = sqlx::query(
             "INSERT INTO users (username, display_name, role, password_hash, oidc_subject,
                                 oidc_issuer, saml_subject, saml_issuer, disabled, totp_secret,
                                 totp_enabled, scim_id, scim_external_id, scim_email,
-                                disabled_by_scim)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+                                disabled_by_scim, email)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
         )
         .bind(&user.username)
         .bind(&user.display_name)
@@ -121,6 +134,7 @@ pub(super) async fn restore_users(
         .bind(scim_id.as_ref().and(user.scim_external_id.as_ref()))
         .bind(scim_id.as_ref().and(user.scim_email.as_ref()))
         .bind(i64::from(user.disabled && user.disabled_by_scim))
+        .bind(email)
         .fetch_one(&mut **tx)
         .await
         .context("création du compte")?;

@@ -81,6 +81,10 @@ pub const METRIC_SCHEDULER_BACKLOG: &str = "instance_scheduler_backlog";
 pub const METRIC_WRITES_FAILED: &str = "instance_sample_writes_failed_total";
 pub const METRIC_SAMPLES_DROPPED: &str = "instance_samples_dropped_total";
 pub const METRIC_VM_RESTARTS: &str = "instance_vm_restarts_total";
+/// Jetons d'API encore valides qui expirent dans les sept jours.
+pub const METRIC_TOKENS_EXPIRING: &str = "instance_api_tokens_expiring";
+/// Horizon de [`METRIC_TOKENS_EXPIRING`], en jours.
+pub const TOKENS_EXPIRING_DAYS: i64 = 7;
 
 /// Réveille la boucle du battement après un changement de réglage.
 static WAKE: LazyLock<Notify> = LazyLock::new(Notify::new);
@@ -391,6 +395,10 @@ pub async fn samples(state: &AppState) -> Vec<dumbmonit_proto::Sample> {
     }
     if state.config.vm_embedded() {
         samples.push(counter(METRIC_VM_RESTARTS, stats().vm_restarts() as f64));
+    }
+    match crate::auth::token::expiring_within(&state.pool, TOKENS_EXPIRING_DAYS).await {
+        Ok(count) => samples.push(gauge(METRIC_TOKENS_EXPIRING, count as f64)),
+        Err(error) => warn!(?error, "API token expiries not read"),
     }
     samples
 }

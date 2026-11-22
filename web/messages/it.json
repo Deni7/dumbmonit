@@ -743,6 +743,11 @@
 	"auth_setup_title": "Creiamo il tuo account.",
 	"auth_setup_username_required": "Scegli un nome utente.",
 	"auth_setup_username_spaces": "Il nome utente non può contenere spazi.",
+	"auth_totp_gate_intro": "Questa istanza richiede l’autenticazione a due fattori per amministratori e operatori. Configurala per continuare.",
+	"auth_totp_gate_intro_user": "Questa istanza richiede l’autenticazione a due fattori per amministratori e operatori. Configurala per {username} per continuare.",
+	"auth_totp_gate_later": "Non ora? Esci e torna quando hai il telefono a portata di mano.",
+	"auth_totp_gate_sign_out": "Esci",
+	"auth_totp_gate_title": "Configura l’autenticazione a due fattori",
 	"backup_history_description": "Una riga per attività, una cella per giorno negli ultimi {days} giorni, ricostruita dalle misure registrate.",
 	"backup_history_err": "Impossibile caricare la cronologia dei backup",
 	"backup_history_title": "Cronologia dei backup",
@@ -6489,6 +6494,8 @@
 	"settings_2fa_cancel": "Annulla",
 	"settings_2fa_cant_scan": "Non riesci a scansionare? Digita la chiave",
 	"settings_2fa_code_label": "Codice dell'app",
+	"settings_2fa_codes_file_header": "Codici di recupero DumbMonit per {account}. Ogni codice ti fa accedere una volta se perdi il telefono. Conservali in un posto sicuro.",
+	"settings_2fa_codes_note": "Salva subito questi codici: vengono mostrati una sola volta e ognuno ti fa accedere una volta se perdi il telefono.",
 	"settings_2fa_col_event": "Evento",
 	"settings_2fa_col_from": "Da",
 	"settings_2fa_col_subject": "Soggetto",
@@ -6502,9 +6509,11 @@
 	"settings_2fa_copy_key": "Copia chiave",
 	"settings_2fa_disable": "Disattiva",
 	"settings_2fa_disable_button": "Disattiva l'autenticazione a due fattori",
+	"settings_2fa_download_codes": "Scarica .txt",
 	"settings_2fa_enabled": "Attiva",
 	"settings_2fa_err_code": "Inserisci il codice mostrato dall'app.",
 	"settings_2fa_err_password": "Inserisci la tua password per dimostrare che sei tu.",
+	"settings_2fa_err_wrong_code": "Questo codice non è valido. Attendi il successivo e riprova.",
 	"settings_2fa_err_wrong_password": "Password errata.",
 	"settings_2fa_hide_log": "Nascondi il registro di sicurezza",
 	"settings_2fa_is_on": "L'autenticazione a due fattori è attiva",
@@ -6532,6 +6541,15 @@
 		}
 	],
 	"settings_2fa_recovery_none": "Disattiva e configura di nuovo per ottenerne di nuovi.",
+	"settings_2fa_recovery_none_replace": "Sostituiscili per ottenerne di nuovi.",
+	"settings_2fa_regenerate": "Sostituisci i codici di recupero",
+	"settings_2fa_regenerate_code_label": "Codice della tua app di autenticazione",
+	"settings_2fa_regenerate_confirm": "Sostituisci i codici",
+	"settings_2fa_regenerate_error": "Impossibile sostituire i codici di recupero",
+	"settings_2fa_regenerate_intro": "Ricevi un nuovo set di codici di recupero; quelli vecchi smettono subito di funzionare. L’autenticazione a due fattori resta attiva.",
+	"settings_2fa_regenerate_password_label": "La tua password",
+	"settings_2fa_regenerate_use_code": "Usa invece un codice dell’app",
+	"settings_2fa_regenerate_use_password": "Usa invece la mia password",
 	"settings_2fa_saved": "Li ho salvati",
 	"settings_2fa_setup": "Configura",
 	"settings_2fa_show_log": "Mostra il registro di sicurezza",
@@ -6885,6 +6903,22 @@
 	"settings_assistant_created_never": "Non scade mai.",
 	"settings_assistant_created_note": "Gli snippet qui sotto contengono ora questo token. Trattalo come una password.",
 	"settings_assistant_created_title": "Token «{name}» creato",
+	"settings_assistant_edit": "Modifica",
+	"settings_assistant_edit_aria": "Modifica il token {name}",
+	"settings_assistant_edit_cancel": "Annulla",
+	"settings_assistant_edit_err_name": "Inserisci un nome per il token.",
+	"settings_assistant_edit_error": "Impossibile aggiornare il token",
+	"settings_assistant_edit_expiry": "Scadenza",
+	"settings_assistant_edit_expiry_30": "30 giorni da oggi",
+	"settings_assistant_edit_expiry_365": "1 anno da oggi",
+	"settings_assistant_edit_expiry_90": "90 giorni da oggi",
+	"settings_assistant_edit_expiry_help": "Ora scade il {date}. Una nuova scadenza parte da oggi.",
+	"settings_assistant_edit_expiry_help_never": "Ora non scade mai. Una nuova scadenza parte da oggi.",
+	"settings_assistant_edit_expiry_keep": "Mantieni la scadenza attuale",
+	"settings_assistant_edit_expiry_never": "Non scade mai",
+	"settings_assistant_edit_name": "Nome",
+	"settings_assistant_edit_save": "Salva",
+	"settings_assistant_edit_saved": "Token aggiornato",
 	"settings_assistant_empty_description": "Creane uno qui sopra, poi incolla lo snippet nel tuo assistente o script.",
 	"settings_assistant_empty_title": "Ancora nessun token.",
 	"settings_assistant_expired": "Scaduto",
@@ -7974,6 +8008,36 @@
 	"settings_selfmon_url_required": "Inserisci prima l'URL da chiamare.",
 	"settings_selfmon_url_saved": "È salvato un URL verso {host}. Lascia il campo vuoto per mantenerlo, o scrivine uno nuovo per sostituirlo.",
 	"settings_selfmon_vm_restarts": "Riavvii del database delle metriche dall'avvio",
+	"settings_sessions_current": "Questo dispositivo",
+	"settings_sessions_device": "{browser} su {os}",
+	"settings_sessions_device_unknown": "Dispositivo sconosciuto",
+	"settings_sessions_hint": "Ogni browser in cui il tuo account ha effettuato l’accesso. Disconnetti quelli che non riconosci.",
+	"settings_sessions_last_active": "ultima attività {when}",
+	"settings_sessions_load_error": "Impossibile leggere le tue sessioni",
+	"settings_sessions_revoke": "Disconnetti",
+	"settings_sessions_revoke_confirm": "Disconnettere questo dispositivo?",
+	"settings_sessions_revoke_error": "Impossibile chiudere la sessione",
+	"settings_sessions_revoke_others": "Disconnetti le mie altre sessioni",
+	"settings_sessions_revoke_others_confirm": "Disconnettere ovunque altrove?",
+	"settings_sessions_revoked_others": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} altra sessione disconnessa.",
+				"countPlural=other": "{count} altre sessioni disconnesse."
+			}
+		}
+	],
+	"settings_sessions_signed_in": "Accesso {when}",
+	"settings_sessions_title": "Dispositivi connessi",
+	"settings_sessions_via_passkey": "Passkey",
+	"settings_sessions_via_password": "Password",
 	"settings_sla_format_csv": "CSV, monitor",
 	"settings_sla_format_incidents": "CSV, incidenti",
 	"settings_sla_period_help": "Entrambi i giorni sono inclusi, nel fuso orario scelto sotto. Al massimo un anno.",
@@ -8203,12 +8267,16 @@
 	"settings_users_done": "Fatto",
 	"settings_users_edit": "Modifica",
 	"settings_users_edit_aria": "Modifica {username}",
+	"settings_users_email": "Indirizzo email",
+	"settings_users_email_help": "Facoltativo. Per sapere chi contattare; mai usato per accedere.",
 	"settings_users_empty_description": "Aggiungi il primo account per accedere.",
 	"settings_users_empty_title": "Nessun utente.",
 	"settings_users_enabled": "Attivato",
+	"settings_users_err_email": "Inserisci un indirizzo come jane@example.org oppure lascia vuoto il campo.",
 	"settings_users_err_password": "Imposta una password: il single sign-on non è attivo, quindi altrimenti questo utente non potrebbe accedere.",
 	"settings_users_err_spaces": "Il nome utente non può contenere spazi.",
 	"settings_users_err_username": "Inserisci un nome utente.",
+	"settings_users_filter_without_2fa": "Senza 2FA",
 	"settings_users_generate": "Genera",
 	"settings_users_generate_title": "Genera una password casuale",
 	"settings_users_last_seen": "Ultimo accesso {last} · Creato {created}",
@@ -8219,10 +8287,29 @@
 	"settings_users_no_delete_self": "Non puoi eliminare il tuo account.",
 	"settings_users_no_disable_last": "L'ultimo amministratore non può essere disattivato. Promuovi prima un altro utente.",
 	"settings_users_no_disable_self": "Non puoi disattivare il tuo account.",
+	"settings_users_no_match": "Nessun utente corrisponde a questa ricerca.",
 	"settings_users_password": "Password",
 	"settings_users_password_help": "Almeno {min} caratteri. Mostrata una sola volta dopo la creazione.",
 	"settings_users_password_help_ldap": "Almeno {min} caratteri. Lascia vuoto per un utente che accede solo tramite la directory (LDAP).",
 	"settings_users_password_help_sso": "Almeno {min} caratteri. Lascia vuoto per un utente che accede solo con {provider}.",
+	"settings_users_policy_error": "Impossibile modificare il criterio a due fattori",
+	"settings_users_policy_help": "Chi accede con password e non ha un secondo fattore deve configurarne uno prima di usare DumbMonit. Gli accessi con single sign-on, LDAP o passkey sono esenti: il provider di identità o la passkey se ne occupano già.",
+	"settings_users_policy_pending": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} amministratore o operatore dovrà configurarlo al prossimo accesso.",
+				"countPlural=other": "{count} amministratori o operatori dovranno configurarlo al prossimo accesso."
+			}
+		}
+	],
+	"settings_users_policy_title": "Richiedi l’autenticazione a due fattori ad amministratori e operatori",
 	"settings_users_promote_first": "Promuovi prima un altro utente.",
 	"settings_users_reset2fa": "Reimposta 2FA",
 	"settings_users_reset2fa_confirm": "Reimpostare i due fattori?",
@@ -8243,6 +8330,31 @@
 	"settings_users_role_viewer_option": "Osservatore — sola lettura",
 	"settings_users_save": "Salva modifiche",
 	"settings_users_save_error": "Impossibile salvare l'utente",
+	"settings_users_search_label": "Cerca utenti",
+	"settings_users_search_placeholder": "Nome, nome utente o email",
+	"settings_users_sign_out": "Disconnetti ovunque",
+	"settings_users_sign_out_confirm": "Disconnettere ovunque?",
+	"settings_users_sign_out_self_title": "Chiude le tue altre sessioni; questa resta aperta.",
+	"settings_users_sign_out_title": "Chiude tutte le sessioni di questo utente. Dovrà accedere di nuovo.",
+	"settings_users_signed_out": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} sessione chiusa.",
+				"countPlural=other": "{count} sessioni chiuse."
+			}
+		}
+	],
+	"settings_users_sort_label": "Ordina per",
+	"settings_users_sort_last_login": "Ultimo accesso",
+	"settings_users_sort_name": "Nome",
+	"settings_users_sort_role": "Ruolo",
 	"settings_users_title": "Utenti",
 	"settings_users_update_error": "Impossibile aggiornare l'utente",
 	"settings_users_username": "Nome utente",
@@ -9711,6 +9823,12 @@
 	"w2ops_backup_save": "Salva pianificazione",
 	"w2ops_backup_save_error": "Impossibile salvare la pianificazione",
 	"w2ops_backup_saved": "Pianificazione salvata",
+	"w3audit_action_alert_rule_reset": "Regola di allarme ripristinata",
+	"w3audit_action_session_revoked": "Sessione disconnessa",
+	"w3audit_action_session_revoked_others": "Altre sessioni disconnesse",
+	"w3audit_action_token_updated": "Token API modificato",
+	"w3audit_action_totp_recovery_regenerated": "Codici di recupero sostituiti",
+	"w3audit_action_user_signed_out": "Account disconnesso ovunque",
 	"w3tech_alerts_detail_slo": "SLO",
 	"wall_band_problems": "Problemi",
 	"wall_band_problems_note": "Avvisi critici e monitor non attivi",

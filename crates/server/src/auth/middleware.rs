@@ -34,7 +34,7 @@ use sqlx::SqlitePool;
 use crate::auth::session::SessionToken;
 use crate::auth::token::{self, ApiToken, Scope};
 use crate::auth::users::{self, User};
-use crate::auth::{AuthError, AuthState, clients, cookie, session, teams};
+use crate::auth::{AuthError, AuthState, clients, cookie, policy, session, teams};
 use crate::state::AppState;
 
 /// Session validée, déposée dans la requête pour les gestionnaires qui en ont
@@ -107,6 +107,8 @@ const SELF_SERVICE: &[&str] = &[
     "/auth/totp/verify",
     "/auth/passkeys/register/begin",
     "/auth/passkeys/register/finish",
+    "/auth/sessions/revoke-others",
+    "/auth/totp/recovery-codes",
     "/music/speaker/report",
     "/music/speaker/play",
     "/music/spotify/playback",
@@ -260,13 +262,34 @@ pub async fn require_session(
         return response;
     }
 
-    let (token, user) = match current_session(&state.pool, request.headers()).await {
+    let found = current_session_details(&state.pool, request.headers()).await;
+    let (token, user, verified) = match found {
         Ok(Some(found)) => found,
         Ok(None) => {
             return AuthError::Unauthorized("Authentication required.".into()).into_response();
         }
         Err(error) => return error.into_response(),
     };
+
+    // Dernière activité, pour la liste « mes sessions » : au plus une écriture
+    // toutes les quelques minutes. Un échec ne coûte que l'horodatage.
+    if verified.needs_touch(chrono::Utc::now()) {
+        let ip = token::request_ip(request.extensions(), request.headers());
+        if let Err(error) = session::touch(&state.pool, token.id(), ip).await {
+            tracing::warn!(?error, "activité de la session non notée");
+        }
+    }
+
+    // Politique « second facteur obligatoire » : un administrateur ou un
+    // opérateur qui n'en a pas ne peut plus que l'enrôler. Le réglage n'est lu
+    // que pour les comptes qu'il pourrait viser.
+    if !policy::allowed_while_blocked(request.method(), request.uri().path()) {
+        match policy::setup_required(&state.pool, &user, verified.via).await {
+            Ok(false) => {}
+            Ok(true) => return AuthError::totp_setup_required().into_response(),
+            Err(error) => return AuthError::from(error).into_response(),
+        }
+    }
 
     let access = match teams::access_for_user(&state.pool, &user).await {
         Ok(access) => access,
@@ -402,6 +425,14 @@ fn is_self_service(path: &str) -> bool {
         || is_own_push_device(path)
         || is_own_oncall_profile(path)
         || is_own_passkey(path)
+        || is_own_session(path)
+}
+
+/// Sessions : chacun ferme *les siennes* (`api::sessions` filtre par compte).
+/// L'identifiant est la partie publique du cookie, en hexadécimal.
+fn is_own_session(path: &str) -> bool {
+    path.strip_prefix("/auth/sessions/")
+        .is_some_and(|id| !id.is_empty() && id.bytes().all(|b| b.is_ascii_hexdigit()))
 }
 
 /// Contacts, heures calmes et lien de calendrier d'astreinte : chacun gère les
@@ -465,10 +496,19 @@ pub async fn current_session(
     pool: &SqlitePool,
     headers: &HeaderMap,
 ) -> Result<Option<(SessionToken, User)>, AuthError> {
+    Ok(current_session_details(pool, headers).await?.map(|(token, user, _)| (token, user)))
+}
+
+/// Comme [`current_session`], avec ce que la base dit de la session : façon
+/// dont elle a été ouverte, dernière activité notée.
+pub async fn current_session_details(
+    pool: &SqlitePool,
+    headers: &HeaderMap,
+) -> Result<Option<(SessionToken, User, session::Verified)>, AuthError> {
     let Some(token) = cookie::extract(headers) else { return Ok(None) };
-    let Some(user_id) = session::authenticate(pool, &token).await? else { return Ok(None) };
-    match users::get(pool, user_id).await? {
-        Some(user) if !user.disabled => Ok(Some((token, user))),
+    let Some(verified) = session::authenticate(pool, &token).await? else { return Ok(None) };
+    match users::get(pool, verified.user_id).await? {
+        Some(user) if !user.disabled => Ok(Some((token, user, verified))),
         _ => {
             session::delete(pool, token.id()).await?;
             Ok(None)
@@ -587,6 +627,13 @@ mod tests {
         assert!(is_self_service("/music/spotify/playback"));
         assert!(!is_self_service("/music/spotify/authorize"));
         assert!(!is_self_service("/music/link"));
+        assert!(is_self_service("/api/auth/sessions/revoke-others"));
+        assert!(is_self_service("/auth/sessions/0123abcdef"));
+        assert!(!is_self_service("/auth/sessions/"));
+        assert!(!is_self_service("/auth/sessions/12/../../users"));
+        assert!(is_self_service("/auth/totp/recovery-codes"));
+        assert!(!is_self_service("/auth/policy"));
+        assert!(!is_self_service("/users/3/sessions"));
     }
 
     #[test]

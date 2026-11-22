@@ -245,6 +245,11 @@ pub struct Bundle {
     /// désigné par référence comme celui des rapports SLA.
     #[serde(default)]
     pub slos: Vec<BundleSlo>,
+    /// Politique d'authentification : second facteur exigé des administrateurs
+    /// et des opérateurs (clé `auth.policy` de `settings`). Absente tant
+    /// qu'elle n'a jamais été réglée.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth_policy: Option<Value>,
 }
 
 /// Serveur de courriel enregistré et son mot de passe.
@@ -912,6 +917,9 @@ pub struct BundleUser {
     /// Désactivé par le fournisseur (SCIM), pas par un administrateur.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub disabled_by_scim: bool,
+    /// Adresse électronique facultative du compte (migration 0275).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub email: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

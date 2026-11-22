@@ -743,6 +743,11 @@
 	"auth_setup_title": "Vamos criar a sua conta.",
 	"auth_setup_username_required": "Escolha um nome de utilizador.",
 	"auth_setup_username_spaces": "O nome de utilizador não pode conter espaços.",
+	"auth_totp_gate_intro": "Esta instância exige a autenticação de dois fatores para administradores e operadores. Configure-a para continuar.",
+	"auth_totp_gate_intro_user": "Esta instância exige a autenticação de dois fatores para administradores e operadores. Configure-a para {username} para continuar.",
+	"auth_totp_gate_later": "Agora não? Termine a sessão e volte quando tiver o telemóvel à mão.",
+	"auth_totp_gate_sign_out": "Terminar sessão",
+	"auth_totp_gate_title": "Configure a autenticação de dois fatores",
 	"backup_history_description": "Uma linha por tarefa, uma célula por dia nos últimos {days} dias, reconstruída a partir das medições guardadas.",
 	"backup_history_err": "Não foi possível carregar o histórico de cópias de segurança",
 	"backup_history_title": "Histórico de cópias de segurança",
@@ -6489,6 +6494,8 @@
 	"settings_2fa_cancel": "Cancelar",
 	"settings_2fa_cant_scan": "Não consegue ler? Escreva a chave",
 	"settings_2fa_code_label": "Código da aplicação",
+	"settings_2fa_codes_file_header": "Códigos de recuperação do DumbMonit para {account}. Cada código permite iniciar sessão uma vez se perder o telemóvel. Guarde-os num local seguro.",
+	"settings_2fa_codes_note": "Guarde estes códigos agora: só são apresentados uma vez e cada um permite iniciar sessão uma única vez se perder o telemóvel.",
 	"settings_2fa_col_event": "Evento",
 	"settings_2fa_col_from": "De",
 	"settings_2fa_col_subject": "Alvo",
@@ -6502,9 +6509,11 @@
 	"settings_2fa_copy_key": "Copiar chave",
 	"settings_2fa_disable": "Desativar",
 	"settings_2fa_disable_button": "Desativar a autenticação de dois fatores",
+	"settings_2fa_download_codes": "Transferir .txt",
 	"settings_2fa_enabled": "Ativada",
 	"settings_2fa_err_code": "Introduza o código apresentado pela aplicação.",
 	"settings_2fa_err_password": "Introduza a sua palavra-passe para confirmar a sua identidade.",
+	"settings_2fa_err_wrong_code": "Esse código não é válido. Aguarde pelo seguinte e tente novamente.",
 	"settings_2fa_err_wrong_password": "Palavra-passe errada.",
 	"settings_2fa_hide_log": "Ocultar o registo de segurança",
 	"settings_2fa_is_on": "A autenticação de dois fatores está ativada",
@@ -6532,6 +6541,15 @@
 		}
 	],
 	"settings_2fa_recovery_none": "Desative e configure novamente para obter novos.",
+	"settings_2fa_recovery_none_replace": "Substitua-os para obter um novo conjunto.",
+	"settings_2fa_regenerate": "Substituir códigos de recuperação",
+	"settings_2fa_regenerate_code_label": "Código da sua aplicação de autenticação",
+	"settings_2fa_regenerate_confirm": "Substituir os códigos",
+	"settings_2fa_regenerate_error": "Não foi possível substituir os códigos de recuperação",
+	"settings_2fa_regenerate_intro": "Recebe um novo conjunto de códigos de recuperação; os antigos deixam de funcionar de imediato. A autenticação de dois fatores mantém-se ativa.",
+	"settings_2fa_regenerate_password_label": "A sua palavra-passe",
+	"settings_2fa_regenerate_use_code": "Usar antes um código da aplicação",
+	"settings_2fa_regenerate_use_password": "Usar antes a minha palavra-passe",
 	"settings_2fa_saved": "Já os guardei",
 	"settings_2fa_setup": "Configurar",
 	"settings_2fa_show_log": "Mostrar o registo de segurança",
@@ -6885,6 +6903,22 @@
 	"settings_assistant_created_never": "Nunca expira.",
 	"settings_assistant_created_note": "Os excertos abaixo contêm agora este token. Trate-o como uma palavra-passe.",
 	"settings_assistant_created_title": "Token «{name}» criado",
+	"settings_assistant_edit": "Editar",
+	"settings_assistant_edit_aria": "Editar o token {name}",
+	"settings_assistant_edit_cancel": "Cancelar",
+	"settings_assistant_edit_err_name": "Introduza um nome para o token.",
+	"settings_assistant_edit_error": "Não foi possível atualizar o token",
+	"settings_assistant_edit_expiry": "Validade",
+	"settings_assistant_edit_expiry_30": "30 dias a partir de hoje",
+	"settings_assistant_edit_expiry_365": "1 ano a partir de hoje",
+	"settings_assistant_edit_expiry_90": "90 dias a partir de hoje",
+	"settings_assistant_edit_expiry_help": "Expira atualmente a {date}. Uma nova validade conta a partir de hoje.",
+	"settings_assistant_edit_expiry_help_never": "Atualmente nunca expira. Uma nova validade conta a partir de hoje.",
+	"settings_assistant_edit_expiry_keep": "Manter a validade atual",
+	"settings_assistant_edit_expiry_never": "Nunca expira",
+	"settings_assistant_edit_name": "Nome",
+	"settings_assistant_edit_save": "Guardar",
+	"settings_assistant_edit_saved": "Token atualizado",
 	"settings_assistant_empty_description": "Crie um acima e cole depois o excerto no seu assistente ou script.",
 	"settings_assistant_empty_title": "Ainda não há tokens.",
 	"settings_assistant_expired": "Expirado",
@@ -7974,6 +8008,36 @@
 	"settings_selfmon_url_required": "Introduza primeiro o URL a chamar.",
 	"settings_selfmon_url_saved": "Está guardado um URL para {host}. Deixe o campo vazio para o manter, ou escreva outro para o substituir.",
 	"settings_selfmon_vm_restarts": "Reinícios da base de métricas desde o arranque",
+	"settings_sessions_current": "Este dispositivo",
+	"settings_sessions_device": "{browser} em {os}",
+	"settings_sessions_device_unknown": "Dispositivo desconhecido",
+	"settings_sessions_hint": "Cada navegador onde a sua conta tem sessão iniciada. Termine as que não reconhecer.",
+	"settings_sessions_last_active": "última atividade {when}",
+	"settings_sessions_load_error": "Não foi possível ler as suas sessões",
+	"settings_sessions_revoke": "Terminar sessão",
+	"settings_sessions_revoke_confirm": "Terminar a sessão deste dispositivo?",
+	"settings_sessions_revoke_error": "Não foi possível terminar a sessão",
+	"settings_sessions_revoke_others": "Terminar as minhas outras sessões",
+	"settings_sessions_revoke_others_confirm": "Terminar a sessão em todos os outros locais?",
+	"settings_sessions_revoked_others": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} outra sessão terminada.",
+				"countPlural=other": "{count} outras sessões terminadas."
+			}
+		}
+	],
+	"settings_sessions_signed_in": "Sessão iniciada {when}",
+	"settings_sessions_title": "Dispositivos com sessão iniciada",
+	"settings_sessions_via_passkey": "Chave de acesso",
+	"settings_sessions_via_password": "Palavra-passe",
 	"settings_sla_format_csv": "CSV, monitores",
 	"settings_sla_format_incidents": "CSV, incidentes",
 	"settings_sla_period_help": "Ambos os dias estão incluídos, no fuso horário escolhido abaixo. No máximo um ano.",
@@ -8203,12 +8267,16 @@
 	"settings_users_done": "Concluído",
 	"settings_users_edit": "Editar",
 	"settings_users_edit_aria": "Editar {username}",
+	"settings_users_email": "Endereço de email",
+	"settings_users_email_help": "Opcional. Para saber a quem recorrer; nunca é usado para iniciar sessão.",
 	"settings_users_empty_description": "Adicione a primeira conta para iniciar sessão.",
 	"settings_users_empty_title": "Sem utilizadores.",
 	"settings_users_enabled": "Ativado",
+	"settings_users_err_email": "Introduza um endereço como jane@example.org ou deixe o campo vazio.",
 	"settings_users_err_password": "Defina uma palavra-passe: o início de sessão único não está ativado, por isso este utilizador não conseguiria iniciar sessão.",
 	"settings_users_err_spaces": "O nome de utilizador não pode conter espaços.",
 	"settings_users_err_username": "Introduza um nome de utilizador.",
+	"settings_users_filter_without_2fa": "Sem 2FA",
 	"settings_users_generate": "Gerar",
 	"settings_users_generate_title": "Gerar uma palavra-passe aleatória",
 	"settings_users_last_seen": "Último início de sessão {last} · Criado {created}",
@@ -8219,10 +8287,29 @@
 	"settings_users_no_delete_self": "Não pode eliminar a sua própria conta.",
 	"settings_users_no_disable_last": "O último administrador não pode ser desativado. Promova primeiro outro utilizador.",
 	"settings_users_no_disable_self": "Não pode desativar a sua própria conta.",
+	"settings_users_no_match": "Nenhum utilizador corresponde a esta pesquisa.",
 	"settings_users_password": "Palavra-passe",
 	"settings_users_password_help": "Pelo menos {min} caracteres. Mostrada uma só vez após a criação.",
 	"settings_users_password_help_ldap": "Pelo menos {min} caracteres. Deixe vazio para um utilizador que só entra pelo diretório (LDAP).",
 	"settings_users_password_help_sso": "Pelo menos {min} caracteres. Deixe vazio para um utilizador que só inicia sessão com {provider}.",
+	"settings_users_policy_error": "Não foi possível alterar a política de dois fatores",
+	"settings_users_policy_help": "Quem inicia sessão com palavra-passe e não tem segundo fator tem de configurar um antes de usar o DumbMonit. O início de sessão único, o LDAP e as chaves de acesso estão isentos: o fornecedor de identidade ou a chave já o garantem.",
+	"settings_users_policy_pending": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} administrador ou operador terá de o configurar no próximo início de sessão.",
+				"countPlural=other": "{count} administradores ou operadores terão de o configurar no próximo início de sessão."
+			}
+		}
+	],
+	"settings_users_policy_title": "Exigir autenticação de dois fatores a administradores e operadores",
 	"settings_users_promote_first": "Promova primeiro outro utilizador.",
 	"settings_users_reset2fa": "Repor 2FA",
 	"settings_users_reset2fa_confirm": "Repor os dois fatores?",
@@ -8243,6 +8330,31 @@
 	"settings_users_role_viewer_option": "Leitor — só de leitura",
 	"settings_users_save": "Guardar alterações",
 	"settings_users_save_error": "Não foi possível guardar o utilizador",
+	"settings_users_search_label": "Pesquisar utilizadores",
+	"settings_users_search_placeholder": "Nome, utilizador ou email",
+	"settings_users_sign_out": "Terminar todas as sessões",
+	"settings_users_sign_out_confirm": "Terminar todas as sessões?",
+	"settings_users_sign_out_self_title": "Termina as suas outras sessões; esta continua aberta.",
+	"settings_users_sign_out_title": "Termina todas as sessões deste utilizador. Terá de iniciar sessão novamente.",
+	"settings_users_signed_out": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} sessão terminada.",
+				"countPlural=other": "{count} sessões terminadas."
+			}
+		}
+	],
+	"settings_users_sort_label": "Ordenar por",
+	"settings_users_sort_last_login": "Último início de sessão",
+	"settings_users_sort_name": "Nome",
+	"settings_users_sort_role": "Função",
 	"settings_users_title": "Utilizadores",
 	"settings_users_update_error": "Não foi possível atualizar o utilizador",
 	"settings_users_username": "Nome de utilizador",
@@ -9711,6 +9823,12 @@
 	"w2ops_backup_save": "Guardar agendamento",
 	"w2ops_backup_save_error": "Não foi possível guardar o agendamento",
 	"w2ops_backup_saved": "Agendamento guardado",
+	"w3audit_action_alert_rule_reset": "Regra de alerta reposta",
+	"w3audit_action_session_revoked": "Sessão terminada",
+	"w3audit_action_session_revoked_others": "Outras sessões terminadas",
+	"w3audit_action_token_updated": "Token de API alterado",
+	"w3audit_action_totp_recovery_regenerated": "Códigos de recuperação substituídos",
+	"w3audit_action_user_signed_out": "Conta terminada em todo o lado",
 	"w3tech_alerts_detail_slo": "SLO",
 	"wall_band_problems": "Problemas",
 	"wall_band_problems_note": "Alertas críticos e monitores em baixo",

@@ -1257,6 +1257,8 @@ export interface User {
 	totp_enabled: boolean;
 	created_at: string;
 	last_login_at: string | null;
+	/** Optional contact address; never used to sign in. */
+	email?: string | null;
 	/** What the account may reach, when the server tells (`/api/auth/me`). */
 	access?: AccessInfo;
 }
@@ -1311,6 +1313,8 @@ export interface AuthStatus {
 	demo: boolean;
 	/** HTTPS on the web port, for the "session in clear" banner. */
 	https?: HttpsStatus;
+	/** The instance policy holds this session at two-factor enrolment. */
+	totp_setup_required?: boolean;
 }
 
 /** `AuthStatus.https`: nothing secret, the fingerprint is what every client receives. */
@@ -1419,6 +1423,8 @@ export interface CreateUserPayload {
 	role: Role;
 	/** Optional only while single sign-on is enabled. */
 	password?: string;
+	/** Optional contact address; blank means none. */
+	email?: string;
 }
 
 export interface UpdateUserPayload {
@@ -1427,6 +1433,8 @@ export interface UpdateUserPayload {
 	disabled?: boolean;
 	/** Resets the password and closes the account's sessions. */
 	password?: string;
+	/** Blank clears it; absent keeps it. */
+	email?: string;
 }
 
 /** Where the effective OIDC configuration comes from. */
@@ -1590,6 +1598,8 @@ export interface AuthState {
 	demo: boolean;
 	/** HTTPS on the web port; `null` for a server that does not say. */
 	https: HttpsStatus | null;
+	/** The instance policy asks this session to set up two-factor first. */
+	totpSetupRequired: boolean;
 }
 
 /** A passkey (WebAuthn credential) of the current account. Mirrors `auth::passkeys::PasskeyView`. */
@@ -3379,6 +3389,32 @@ export interface TotpEnrolment {
 	otpauth_uri: string;
 	issuer: string;
 	account: string;
+}
+
+/** How a session was opened. Mirrors `auth::session::Via`. */
+export type SessionVia = 'password' | 'passkey' | 'ldap' | 'oidc' | 'saml';
+
+/** One open session of the current account. Mirrors `auth::session::SessionView`. */
+export interface Session {
+	/** Public part of the session cookie: it names the session, it cannot open it. */
+	id: string;
+	created_at: string;
+	/** Updated at most every five minutes. */
+	last_seen_at: string | null;
+	expires_at: string;
+	ip: string | null;
+	user_agent: string | null;
+	browser: string | null;
+	os: string | null;
+	via: SessionVia | null;
+	/** The session making the request: it is closed by signing out. */
+	current: boolean;
+}
+
+/** Mirrors `auth::policy::Policy`. */
+export interface AuthPolicy {
+	/** Admins and operators signing in with a local password must use two-factor. */
+	require_totp: boolean;
 }
 
 /** Mirrors `auth::audit::Entry`. */
