@@ -188,7 +188,7 @@ pub async fn backtest(
     let mut candidates = candidates(&rule, &ranges, &targets, &overrides, grid);
     view.series_total = candidates.len();
     if candidates.len() > MAX_SERIES {
-        candidates.sort_by(|a, b| b.violations.cmp(&a.violations));
+        candidates.sort_by_key(|c| std::cmp::Reverse(c.violations));
         candidates.truncate(MAX_SERIES);
         view.truncated = true;
     }

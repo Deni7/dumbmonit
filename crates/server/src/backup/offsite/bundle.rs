@@ -82,6 +82,10 @@ fn checked(saved: &BundleBackupDestination) -> Result<(Settings, Secrets), Strin
 }
 
 /// Crée ou met à jour chaque destination par son nom ; rien n'est supprimé.
+/// Une destination déjà en base : id, kind, enabled, keep, include_key,
+/// réglages en JSON, secrets scellés.
+type StoredRow = (i64, String, i64, i64, i64, String, Option<Vec<u8>>);
+
 pub async fn restore(
     tx: &mut Transaction<'_, Sqlite>,
     cipher: &Cipher,
@@ -102,15 +106,14 @@ pub async fn restore(
         let what = format!("Destination \"{name}\"");
         let keep = i64::from(saved.keep.clamp(1, MAX_KEEP));
         let raw = settings.to_value().to_string();
-        let existing: Option<(i64, String, i64, i64, i64, String, Option<Vec<u8>>)> =
-            sqlx::query_as(
-                "SELECT id, kind, enabled, keep, include_key, settings, secrets
-                 FROM backup_destinations WHERE name = ? COLLATE NOCASE",
-            )
-            .bind(name)
-            .fetch_optional(&mut **tx)
-            .await
-            .context("recherche d'une destination de sauvegarde")?;
+        let existing: Option<StoredRow> = sqlx::query_as(
+            "SELECT id, kind, enabled, keep, include_key, settings, secrets
+             FROM backup_destinations WHERE name = ? COLLATE NOCASE",
+        )
+        .bind(name)
+        .fetch_optional(&mut **tx)
+        .await
+        .context("recherche d'une destination de sauvegarde")?;
 
         if let Some((id, kind, enabled, stored_keep, include_key, stored, sealed)) = &existing {
             let stored_secrets = store::unseal(cipher, sealed.as_deref()).ok();
