@@ -21,6 +21,7 @@ pub mod mail_server;
 pub mod message;
 pub mod messaging;
 pub mod oncall;
+pub mod personal;
 pub mod policy_store;
 pub mod push;
 pub mod secret;
