@@ -54,6 +54,20 @@ info:
     Each operation carries `x-token-scope`: `public` (no authentication),
     `read`, `write` or `none` (session only).
 
+    ## Quick start
+
+    Create a token in Settings → *API & assistants*, keep it in a variable, and
+    send it on every call:
+
+    ```sh
+    export DUMBMONIT_TOKEN=dmt_…
+    curl -sk -H "Authorization: Bearer $DUMBMONIT_TOKEN" https://dumbmonit.example:8080/api/targets
+    ```
+
+    The token is shown once, when it is created. A missing, wrong, revoked or
+    expired token answers `401`; a `read` token on a write route answers `403`.
+    The operations below carry a `curl` example (`x-codeSamples`).
+
     ## Roles
 
     Accounts have one of three roles. **`viewer`** reads every `GET`.
@@ -208,9 +222,17 @@ paths:
   /api/health:
     get:
       operationId: getHealth
+      x-codeSamples:
+        - lang: Shell
+          label: curl
+          source: |
+            # No token. Liveness: always 200.
+            curl -sk https://dumbmonit.example:8080/api/health
       tags: [Health]
       summary: Server version and state of its dependencies
-      description: Always `200`; a failing component is reported in the body and `status` is then `degraded`.
+      description: >-
+        Liveness probe. Always `200`; a failing component is reported in the body and `status` is
+        then `degraded`. For a readiness probe, use `/api/ready`.
       security: []
       x-token-scope: public
       responses:
@@ -219,6 +241,35 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Health" }
+
+  /api/ready:
+    get:
+      operationId: getReady
+      x-codeSamples:
+        - lang: Shell
+          label: curl
+          source: |
+            # No token. Readiness: 200, or 503 when the database or VictoriaMetrics is down.
+            curl -sk -o /dev/null -w "%{http_code}\n" https://dumbmonit.example:8080/api/ready
+      tags: [Health]
+      summary: Readiness probe
+      description: >-
+        `200` when the database and VictoriaMetrics both answer, `503` otherwise. Public and without
+        failure details: only the status code and three booleans. Use it as the Kubernetes
+        `readinessProbe`; keep `/api/health` for liveness.
+      security: []
+      x-token-scope: public
+      responses:
+        "200":
+          description: Ready.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ready" }
+        "503":
+          description: Not ready; the body says which dependency is down.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ready" }
 
   /api/integrations/wordpress.zip:
     get:
@@ -832,13 +883,39 @@ paths:
       operationId: listAuditLog
       tags: [Accounts]
       summary: The latest security events
-      description: Administrator session only.
+      description: |
+        Administrator session only. Filters combine with "and". For the next
+        page, pass the `id` of the last event received as `before`.
       security: [{ cookieAuth: [] }]
       x-token-scope: none
       parameters:
         - name: limit
           in: query
-          schema: { type: integer, minimum: 1, default: 200 }
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 200 }
+        - name: actor
+          in: query
+          description: Part of the account name.
+          schema: { type: string }
+        - name: action
+          in: query
+          description: Exact event, for example `login.failed`.
+          schema: { type: string }
+        - name: ip
+          in: query
+          description: Exact client address.
+          schema: { type: string }
+        - name: since
+          in: query
+          description: Oldest event, UTC, `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS`.
+          schema: { type: string }
+        - name: until
+          in: query
+          description: Newest event, UTC. A bare day covers the whole day.
+          schema: { type: string }
+        - name: before
+          in: query
+          description: Cursor. Only events with an `id` below this one.
+          schema: { type: integer, format: int64 }
       responses:
         "200":
           description: Events, most recent first.
@@ -847,6 +924,41 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/AuditEntry" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/auth/audit/export:
+    get:
+      operationId: exportAuditLog
+      tags: [Accounts]
+      summary: Download the security events as CSV or JSON
+      description: |
+        Administrator session only, recorded in the audit log. Same filters as
+        the list, up to 100 000 events. Cells of the CSV that a spreadsheet
+        could read as a formula are prefixed with an apostrophe.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      parameters:
+        - name: format
+          in: query
+          schema: { type: string, enum: [csv, json], default: csv }
+        - { name: actor, in: query, schema: { type: string } }
+        - { name: action, in: query, schema: { type: string } }
+        - { name: ip, in: query, schema: { type: string } }
+        - { name: since, in: query, schema: { type: string } }
+        - { name: until, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: The file.
+          content:
+            text/csv:
+              schema: { type: string }
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AuditEntry" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
@@ -1839,6 +1951,16 @@ paths:
   /api/tokens:
     get:
       operationId: listApiTokens
+      x-codeSamples:
+        - lang: Shell
+          label: curl
+          source: |
+            # Session only: a token cannot list tokens.
+            curl -sk -c jar -X POST -H "X-Requested-With: DumbMonit" \
+              -H "Content-Type: application/json" \
+              -d '{"username":"admin","password":"…"}' \
+              https://dumbmonit.example:8080/api/auth/login
+            curl -sk -b jar https://dumbmonit.example:8080/api/tokens
       tags: [API tokens]
       summary: Every API token, revoked ones included
       description: Admin only. The secret is never listed.
@@ -2423,6 +2545,33 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/PublicInstance" }
 
+  /api/instance/effective-config:
+    get:
+      operationId: getEffectiveConfig
+      tags: [Onboarding]
+      summary: The effective configuration, without secrets
+      description: >-
+        Administrator only. What the server runs with: data directory, ports, VictoriaMetrics
+        (embedded or external, host only), backup schedule, log filter, and so on. The instance
+        secret, passwords, tokens and URL credentials are never listed.
+      x-token-scope: write
+      responses:
+        "200":
+          description: One entry per setting.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [key, value]
+                  properties:
+                    key: { type: string, examples: [data_dir] }
+                    value: { type: string }
+                    env: { type: [string, "null"], description: The environment variable that sets it. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /api/instance/settings:
     get:
       operationId: getInstanceSettings
@@ -2461,6 +2610,12 @@ paths:
   /api/targets:
     get:
       operationId: listTargets
+      x-codeSamples:
+        - lang: Shell
+          label: curl
+          source: |
+            curl -sk -H "Authorization: Bearer $DUMBMONIT_TOKEN" \
+              https://dumbmonit.example:8080/api/targets
       tags: [Devices]
       summary: Every device
       x-token-scope: read
@@ -2477,6 +2632,14 @@ paths:
         "429": { $ref: "#/components/responses/TooManyRequests" }
     post:
       operationId: createTarget
+      x-codeSamples:
+        - lang: Shell
+          label: curl
+          source: |
+            curl -sk -X POST -H "Authorization: Bearer $DUMBMONIT_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d '{"name":"Core switch","address":"192.168.1.10","kind":"snmp","interval_secs":60,"tags":{},"credential":{"type":"snmp_community","community":"public"}}' \
+              https://dumbmonit.example:8080/api/targets
       tags: [Devices]
       summary: Add a device
       description: Profile detection starts in the background for SNMP.
@@ -2945,6 +3108,12 @@ paths:
       - $ref: "#/components/parameters/TargetId"
     get:
       operationId: getTarget
+      x-codeSamples:
+        - lang: Shell
+          label: curl
+          source: |
+            curl -sk -H "Authorization: Bearer $DUMBMONIT_TOKEN" \
+              https://dumbmonit.example:8080/api/targets/12
       tags: [Devices]
       summary: One device
       x-token-scope: read
@@ -3177,6 +3346,12 @@ paths:
   /api/alerts:
     get:
       operationId: listActiveAlerts
+      x-codeSamples:
+        - lang: Shell
+          label: curl
+          source: |
+            curl -sk -H "Authorization: Bearer $DUMBMONIT_TOKEN" \
+              https://dumbmonit.example:8080/api/alerts
       tags: [Alerts]
       summary: Active alerts
       description: >-
@@ -3292,6 +3467,14 @@ paths:
         schema: { type: string }
     post:
       operationId: acknowledgeAlert
+      x-codeSamples:
+        - lang: Shell
+          label: curl
+          source: |
+            curl -sk -X POST -H "Authorization: Bearer $DUMBMONIT_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d '{"duration_secs":14400,"note":"Looking into it"}' \
+              https://dumbmonit.example:8080/api/alerts/$FINGERPRINT/ack
       tags: [Alerts]
       summary: Acknowledge an alert
       description: >-
@@ -3946,6 +4129,12 @@ paths:
   /api/status-pages:
     get:
       operationId: listStatusPages
+      x-codeSamples:
+        - lang: Shell
+          label: curl
+          source: |
+            curl -sk -H "Authorization: Bearer $DUMBMONIT_TOKEN" \
+              https://dumbmonit.example:8080/api/status-pages
       tags: [Status pages]
       summary: Every status page with its items
       x-token-scope: read
@@ -4809,6 +4998,12 @@ paths:
       - $ref: "#/components/parameters/Slug"
     get:
       operationId: getPublicStatus
+      x-codeSamples:
+        - lang: Shell
+          label: curl
+          source: |
+            # No token: published pages are public.
+            curl -sk https://dumbmonit.example:8080/api/public/status/my-page
       tags: [Public status]
       summary: The document a published status page is built from
       description: >-
@@ -7853,6 +8048,89 @@ paths:
               schema: { $ref: "#/components/schemas/LocalBackupStatus" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/backup/schedule:
+    put:
+      operationId: setBackupSchedule
+      tags: [Backup]
+      summary: Change the schedule of the local backups
+      description: >-
+        Administrator session only, recorded in the audit log. Values are clamped (1 to 8760 hours,
+        1 to 365 copies). A `DUMBMONIT_BACKUP_ENABLED`, `DUMBMONIT_BACKUP_INTERVAL_HOURS` or
+        `DUMBMONIT_BACKUP_KEEP` variable that is set still wins; `env_managed` says which.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled, interval_hours, keep]
+              properties:
+                enabled: { type: boolean }
+                interval_hours: { type: integer, minimum: 1 }
+                keep: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: The scheduled backups' state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LocalBackupStatus" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/backup/local/files:
+    get:
+      operationId: listLocalBackups
+      tags: [Backup]
+      summary: The local backups on disk
+      description: Administrator session only. Newest first.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "200":
+          description: The files.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name: { type: string }
+                    bytes: { type: integer }
+                    at: { type: string }
+                    with_secret: { type: boolean }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/backup/local/files/{name}:
+    get:
+      operationId: downloadLocalBackup
+      tags: [Backup]
+      summary: Download one local backup
+      description: >-
+        Administrator session only, recorded in the audit log. The SQLite file alone, never
+        `secret.key`. The name must be `dumbmonit-YYYYMMDD-HHMMSS.db`, else `400`.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: The database copy.
+          content:
+            application/vnd.sqlite3:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/config/plan:
     post:
@@ -10951,7 +11229,8 @@ components:
       scheme: bearer
       bearerFormat: dmt_…
       description: >-
-        API token created in Settings → API & assistants. `read` scope: every
+        API token created in Settings → API & assistants, sent as the header
+        `Authorization: Bearer dmt_…` (no cookie, no `X-Requested-With`). `read` scope: every
         `GET`; `write` scope: also `POST`, `PUT`, `DELETE`. Never valid on
         operations marked `x-token-scope: none`. 120 calls per minute per token.
     scimBearer:
@@ -11367,6 +11646,21 @@ components:
         database: { $ref: "#/components/schemas/ComponentHealth" }
         victoria: { $ref: "#/components/schemas/ComponentHealth" }
         demo: { type: boolean, description: 'Demonstration mode, every write refused.' }
+        data_disk:
+          type: object
+          description: Data volume (`/data`). Signed-in callers only; absent when the system cannot measure it.
+          required: [free_bytes, total_bytes, database_bytes]
+          properties:
+            free_bytes: { type: integer, format: int64 }
+            total_bytes: { type: integer, format: int64 }
+            database_bytes: { type: integer, format: int64, description: SQLite database and its write-ahead log. }
+    Ready:
+      type: object
+      required: [ready, database, victoria]
+      properties:
+        ready: { type: boolean }
+        database: { type: boolean }
+        victoria: { type: boolean }
     UpdateInfo:
       type: object
       required: [current, update_available, enabled, locked_by_env]
@@ -15468,6 +15762,13 @@ components:
               with_secret: { type: boolean }
         total_bytes: { type: integer }
         directory_error: { type: [string, "null"] }
+        env_managed:
+          type: object
+          description: Settings an environment variable fixes; the interface cannot change them.
+          properties:
+            enabled: { type: boolean }
+            interval_hours: { type: boolean }
+            keep: { type: boolean }
     ConfigRequest:
       type: object
       description: Either `yaml` or `config`.

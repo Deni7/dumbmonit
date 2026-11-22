@@ -283,7 +283,8 @@ Every other write is admin only and answers `403` to an operator.
 | `POST` | `/api/auth/totp/enroll` | session only | `{"password": "…"}`. Proposes a secret: `secret` (base32), `otpauth_uri`, `issuer`, `account`. Nothing is enforced until verified. |
 | `POST` | `/api/auth/totp/verify` | session only | `{"code": "123456"}`. Confirms the enrolment and returns `{"recovery_codes": […]}` — shown once. |
 | `DELETE` | `/api/auth/totp` | session only | `{"password": "…"}`. Removes the second factor. `204`. |
-| `GET` | `/api/auth/audit?limit=200` | admin, session only | The latest security events: `id`, `at`, `actor`, `action` (`login`, `login.failed`, `password.changed`, `token.created`, `user.updated`, …), `subject`, `ip`. |
+| `GET` | `/api/auth/audit?limit=200` | admin, session only | The latest security events: `id`, `at`, `actor`, `action` (`login`, `login.failed`, `password.changed`, `token.created`, `user.updated`, …), `subject`, `ip`. Filters (combined with "and"): `actor` (part of the name), `action`, `ip`, `since` and `until` (UTC, `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS`). `before=<id>` returns the events older than that one, for the next page. |
+| `GET` | `/api/auth/audit/export?format=csv\|json` | admin, session only | The same filters, as a file (up to 100 000 events). Recorded in the audit log. In the CSV, a cell a spreadsheet could read as a formula starts with an apostrophe. |
 | `GET` | `/api/auth/oidc/config` | admin, session only | The SSO settings and where they come from (environment or database); the client secret is never returned. |
 | `PUT` | `/api/auth/oidc/config` | admin, session only | `{"issuer", "client_id", "client_secret", "provider_name", "scopes", "auto_create", "admin_groups", "groups_claim", "public_url"}`. An absent or empty `client_secret` keeps the stored one; an absent `auto_create` means off. |
 | `DELETE` | `/api/auth/oidc/config` | admin, session only | Forgets the stored SSO settings (environment variables, if any, apply again). `204`. |
@@ -348,6 +349,7 @@ them, and a proxy default without the nonce leaves a blank page.
 | Method | Route | Auth | Purpose |
 |---|---|---|---|
 | `GET` | `/api/health` | public | Server version and the state of its dependencies. Always `200`: a failing component is in the body. |
+| `GET` | `/api/ready` | public | Readiness probe: `200` when the database and VictoriaMetrics answer, `503` otherwise, with a body `{"ready":…,"database":…,"victoria":…}`. Use `/api/health` for liveness. |
 | `GET` | `/api/update` | session or token | Running version, latest release, `update_available`; the server asks GitHub once a day at most. `POST /api/update/check` looks now, `PUT /api/update/settings` turns the check on or off. See [Update](../install/update.md). |
 | `GET` | `/api/upgrade-notes` | admin session | Configuration changes a release asks for in your `docker-compose.yml`, with the block to copy and where this instance stands. `POST /api/upgrade-notes/close` closes some for good, `POST /api/upgrade-notes/announce` records that the window was shown. See [Update](../install/update.md#configuration-changes-after-an-update). |
 
@@ -367,6 +369,9 @@ VictoriaMetrics, `false` when `DUMBMONIT_VM_URL` points at an external one.
 | `POST` | `/api/backup` | admin, session only | `{"passphrase": "…", "include_account_secrets": false}`. Returns the bundle itself as a JSON file: a cleartext header (`format`, `version`, `created_at`, `summary`, `kdf`) and a `payload` encrypted with AES-256-GCM under a key derived from the passphrase by Argon2id. At least 16 characters, or `400`. |
 | `POST` | `/api/backup/restore` | admin, session only | `{"bundle": {…}, "passphrase": "…", "apply": false}`. Dry run unless `apply` is `true`; both run the same code, the dry run inside a transaction that is rolled back. Answers the report: per section, `created`, `updated`, `skipped` and `notes`, plus `warnings`. `400` on a wrong passphrase, a modified file, or a bundle written in a newer format version. |
 | `POST` | `/api/backup/local` | admin, session only | Writes one scheduled-style local backup right now and answers the new `schedule`. |
+| `PUT` | `/api/backup/schedule` | admin, session only | `{"enabled": true, "interval_hours": 24, "keep": 7}`. Saves the schedule of the local backups; a `DUMBMONIT_BACKUP_*` variable that is set still wins (`schedule.env_managed` says which). Answers the new `schedule`. |
+| `GET` | `/api/backup/local/files` | admin, session only | The local backups on disk, newest first. |
+| `GET` | `/api/backup/local/files/{name}` | admin, session only | Downloads one local backup (the SQLite file, never `secret.key`). The name is checked strictly (`dumbmonit-YYYYMMDD-HHMMSS.db`). Audited. |
 
 A bundle carries every credential of the instance, re-encrypted with the
 passphrase, so these routes refuse API tokens with an explanation: only an
