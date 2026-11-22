@@ -29,6 +29,8 @@
 		type SeverityWord
 	} from './options';
 	import OverridesEditor from './OverridesEditor.svelte';
+	import UnsavedBadge from '#lib/components/settings/UnsavedBadge.svelte';
+	import { useDirtyTracker } from '#lib/settings/unsaved.svelte.js';
 
 	interface Props {
 		rule: AlertRule;
@@ -81,6 +83,28 @@
 	let saving = $state(false);
 	let error = $state<string | null>(null);
 	let hint = $state<string | null>(null);
+
+	// Warns before leaving the page with unsaved edits (navigation, reload, tab close).
+	const tracker = useDirtyTracker(() => ({
+		name,
+		description,
+		query,
+		threshold,
+		clearThreshold,
+		operator,
+		forSecs,
+		severity,
+		selected: [...selected].sort((a, b) => a - b),
+		repeatSecs,
+		escalateSecs,
+		logWindow,
+		logPerTarget,
+		warningDays,
+		criticalDays,
+		driftK,
+		driftMinValue
+	}));
+	tracker.markClean();
 
 	const holdOptions = $derived(withCurrent(holdChoices(), rule.for_secs));
 	const repeatOptions = $derived(withCurrent(repeatChoices(), rule.repeat_secs ?? 0));
@@ -181,6 +205,7 @@
 				repeat_secs: repeatSecs > 0 ? repeatSecs : null,
 				escalate_after_secs: escalateSecs > 0 ? escalateSecs : null
 			});
+			tracker.markClean();
 			onsaved(saved);
 		} catch (cause) {
 			error = cause instanceof Error ? cause.message : m.alerts_rules_edit_error_save();
@@ -408,6 +433,7 @@
 
 	<div class="flex flex-wrap items-center gap-2">
 		<Button type="submit" variant="primary" size="sm" loading={saving}>{m.alerts_rules_edit_save()}</Button>
+		<UnsavedBadge dirty={tracker.dirty} />
 		<Button type="button" variant="ghost" size="sm" disabled={saving} onclick={oncancel}>{m.alerts_form_cancel()}</Button>
 	</div>
 </form>

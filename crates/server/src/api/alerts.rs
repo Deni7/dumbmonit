@@ -31,7 +31,7 @@ use crate::api::{ApiError, ApiResult};
 use crate::auth::audit;
 use crate::auth::client_ip::ClientIp;
 use crate::auth::clients;
-use crate::auth::middleware::OperatorIdentity;
+use crate::auth::middleware::{AdminIdentity, OperatorIdentity};
 use crate::auth::teams::{Access, Level, TeamAccess};
 use crate::db;
 use crate::notify::policy_store;
@@ -110,6 +110,9 @@ pub struct RuleView {
     pub builtin: bool,
     /// Surcharges par équipement de cette règle.
     pub overrides: Vec<RuleOverride>,
+    /// Dernière fois que la règle est passée en alerte (RFC 3339, UTC), d'après
+    /// l'historique ; `null` si elle n'a jamais déclenché sur la période conservée.
+    pub last_fired_at: Option<String>,
 }
 
 impl From<Rule> for RuleView {
@@ -135,6 +138,7 @@ impl From<Rule> for RuleView {
             enabled: rule.enabled,
             builtin: rule.builtin,
             overrides: Vec::new(),
+            last_fired_at: None,
         }
     }
 }
@@ -145,8 +149,10 @@ async fn with_overrides(
     mut views: Vec<RuleView>,
 ) -> ApiResult<Vec<RuleView>> {
     let overrides = policy_store::list_overrides(pool, None, None).await?;
+    let fired = db::alerts::last_fired_by_rule(pool).await?;
     for view in &mut views {
         view.overrides = overrides.iter().filter(|o| o.rule_uid == view.uid).cloned().collect();
+        view.last_fired_at = fired.get(&view.uid).cloned();
     }
     Ok(views)
 }
@@ -630,6 +636,45 @@ pub async fn update_rule(
     if current.enabled && !rule.enabled {
         db::alerts::set_rule_enabled(&state.pool, rule.id, false).await?;
     }
+    Ok(Json(view_with_overrides(&state.pool, rule).await?))
+}
+
+/// Remet une règle livrée à ses valeurs d'origine : seuils, durées, sévérité,
+/// sélecteur, canaux, paramètres et activation. Ses surcharges par équipement
+/// sont des réglages à part et restent en place.
+pub async fn reset_rule(
+    State(state): State<AppState>,
+    AdminIdentity(principal): AdminIdentity,
+    ClientIp(ip): ClientIp,
+    Path(id): Path<i64>,
+) -> ApiResult<Json<RuleView>> {
+    let current = rule_by_id(&state.pool, id).await?;
+    if !current.builtin {
+        return Err(ApiError::Conflict(format!(
+            "The rule \"{}\" was created here: only a rule that ships with DumbMonit has \
+             default values to go back to.",
+            current.name
+        )));
+    }
+    let mut rule = crate::alerting::rules::builtin_rules()
+        .into_iter()
+        .find(|rule| rule.uid == current.uid)
+        .ok_or_else(|| {
+            ApiError::Conflict(format!(
+                "The rule \"{}\" no longer ships with this version: there is no default to \
+                 restore.",
+                current.name
+            ))
+        })?;
+    rule.id = current.id;
+    rule.builtin = true;
+    db::alerts::upsert_rule(&state.pool, &rule).await?;
+    // Désactivée par la remise à zéro : on solde les alertes comme le bouton dédié.
+    if current.enabled && !rule.enabled {
+        db::alerts::set_rule_enabled(&state.pool, rule.id, false).await?;
+    }
+    audit::record(&state.pool, Some(&principal.label()), "alert_rule.reset", Some(&rule.uid), ip)
+        .await;
     Ok(Json(view_with_overrides(&state.pool, rule).await?))
 }
 
@@ -1685,6 +1730,40 @@ async fn check_team_silence(
             "Your teams only let you view this target, not schedule maintenance for it.".into(),
         )),
     }
+}
+
+/// Modifie une fenêtre : nom, commentaire, horaires, portée. Même charge utile
+/// et mêmes contrôles qu'à la création. Terminer une maintenance, c'est la
+/// modifier pour que sa fin tombe à maintenant.
+pub async fn update_silence(
+    TeamAccess(access): TeamAccess,
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Json(payload): Json<SilencePayload>,
+) -> ApiResult<Json<SilenceView>> {
+    let existing = db::alerts::list_silences(&state.pool)
+        .await?
+        .into_iter()
+        .find(|s| s.id == id)
+        .ok_or_else(|| ApiError::NotFound(format!("Maintenance window {id} not found.")))?;
+    // Un compte restreint ne touche qu'aux fenêtres de ses équipements, et ne
+    // les déplace que vers un équipement qu'il peut traiter.
+    check_team_silence(&state, &access, existing.target_id).await?;
+    check_team_silence(&state, &access, payload.target_id).await?;
+    let mut silence = payload.validate(&state).await?;
+    silence.id = id;
+    if !db::alerts::update_silence(&state.pool, &silence).await? {
+        return Err(ApiError::NotFound(format!("Maintenance window {id} not found.")));
+    }
+    if silence.target_id != existing.target_id
+        && let Some(target) = silence.target_id
+    {
+        let client = clients::target_client(&state.pool, target).await?;
+        clients::assign(&state.pool, clients::Kind::Silence, &[silence.id], client)
+            .await
+            .map_err(super::clients::api_error)?;
+    }
+    Ok(Json(SilenceView::new(silence, Utc::now())))
 }
 
 pub async fn delete_silence(

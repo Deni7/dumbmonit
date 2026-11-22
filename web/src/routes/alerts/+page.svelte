@@ -24,6 +24,7 @@
 		listDismissedAlerts,
 		createSilence,
 		deleteSilence,
+		updateSilence,
 		setAlertRuleEnabled,
 		deleteAlertRule,
 		createAlertRule,
@@ -91,6 +92,9 @@
 	let error = $state<unknown>(null);
 
 	let scheduling = $state(false);
+	/** The window the form was opened from: edited in place, or copied into a new one. */
+	let scheduleSource = $state<{ mode: 'edit' | 'duplicate'; silence: Silence } | null>(null);
+	let busySilenceId = $state<number | null>(null);
 	let removingSilenceId = $state<number | null>(null);
 	let ruleBusyId = $state<number | null>(null);
 	let actionError = $state<string | null>(null);
@@ -194,9 +198,60 @@
 	}
 
 	async function createFromForm(payload: SilencePayload) {
-		await createSilence(payload);
-		await refreshSilences();
+		if (scheduleSource?.mode === 'edit') {
+			await updateSilence(scheduleSource.silence.id, payload);
+		} else {
+			await createSilence(payload);
+		}
+		await Promise.all([refreshSilences(), alertsStore.refresh()]);
 		scheduling = false;
+		scheduleSource = null;
+	}
+
+	function openScheduleForm(source: typeof scheduleSource) {
+		scheduleSource = source;
+		scheduling = true;
+		maintenanceOpen = true;
+	}
+
+	/** The window as the API takes it back, with a new one-off end. */
+	function withEnd(silence: Silence, endsAt: Date): SilencePayload | null {
+		const schedule = silence.schedule;
+		if (schedule.kind !== 'once') return null;
+		return {
+			name: silence.name,
+			comment: silence.comment,
+			target_id: silence.target_id,
+			matchers: silence.matchers,
+			enabled: silence.enabled,
+			schedule: { ...schedule, ends_at: endsAt.toISOString() }
+		};
+	}
+
+	async function changeEnd(silence: Silence, endsAt: Date) {
+		const payload = withEnd(silence, endsAt);
+		if (!payload) return;
+		busySilenceId = silence.id;
+		actionError = null;
+		try {
+			await updateSilence(silence.id, payload);
+			await Promise.all([refreshSilences(), alertsStore.refresh()]);
+		} catch (cause) {
+			reportError(cause, m.w1alerts_page_error_update_window());
+		} finally {
+			busySilenceId = null;
+		}
+	}
+
+	/** Ends a running one-off window now; it stays listed until it expires. */
+	function endSilence(silence: Silence) {
+		return changeEnd(silence, new Date());
+	}
+
+	function extendSilence(silence: Silence, minutes: number) {
+		if (silence.schedule.kind !== 'once') return Promise.resolve();
+		const current = new Date(silence.schedule.ends_at).getTime();
+		return changeEnd(silence, new Date(Math.max(current, Date.now()) + minutes * 60_000));
 	}
 
 	async function removeSilence(id: number) {
@@ -341,6 +396,7 @@
 			<Button
 				variant="secondary"
 				onclick={() => {
+					scheduleSource = null;
 					scheduling = !scheduling;
 					if (scheduling) maintenanceOpen = true;
 				}}
@@ -355,7 +411,14 @@
 
 {#if scheduling}
 	<div class="mb-5">
-		<ScheduleForm {targets} oncreate={createFromForm} oncancel={() => (scheduling = false)} />
+		{#key scheduleSource}
+			<ScheduleForm
+				{targets}
+				source={scheduleSource}
+				oncreate={createFromForm}
+				oncancel={() => ((scheduling = false), (scheduleSource = null))}
+			/>
+		{/key}
 	</div>
 {/if}
 
@@ -413,8 +476,13 @@
 						{silences}
 						targets={targetsMap}
 						removingId={removingSilenceId}
+						busyId={busySilenceId}
 						onremove={removeSilence}
-						onschedule={() => (scheduling = true)}
+						onschedule={() => openScheduleForm(null)}
+						onend={endSilence}
+						onextend={extendSilence}
+						onedit={(silence) => openScheduleForm({ mode: 'edit', silence })}
+						onduplicate={(silence) => openScheduleForm({ mode: 'duplicate', silence })}
 					/>
 				</Disclosure>
 			{/if}

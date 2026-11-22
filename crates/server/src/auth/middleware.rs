@@ -132,6 +132,7 @@ pub const OPERATOR_ROUTES: &[(&str, &str)] = &[
     ("POST", "/alerts/*/dismiss"),
     ("DELETE", "/alerts/*/dismiss"),
     ("POST", "/alerts/silences"),
+    ("PUT", "/alerts/silences/*"),
     ("DELETE", "/alerts/silences/*"),
     ("POST", "/alerts/history/dismiss-resolved"),
     ("POST", "/alerts/history/*/dismiss"),
@@ -597,6 +598,7 @@ mod tests {
         yes(Method::POST, "/alerts/abc123/dismiss");
         yes(Method::DELETE, "/api/alerts/abc123/dismiss");
         yes(Method::POST, "/alerts/silences");
+        yes(Method::PUT, "/alerts/silences/4");
         yes(Method::DELETE, "/alerts/silences/4");
         yes(Method::POST, "/alerts/history/dismiss-resolved");
         yes(Method::POST, "/alerts/history/9/dismiss");
@@ -613,7 +615,7 @@ mod tests {
         no(Method::PUT, "/alerts/rules/2");
         no(Method::DELETE, "/alerts/rules/2");
         no(Method::POST, "/alerts/rules/2/enable");
-        no(Method::PUT, "/alerts/silences/4");
+        no(Method::PATCH, "/alerts/silences/4");
         no(Method::POST, "/targets");
         no(Method::PUT, "/targets/1");
         no(Method::POST, "/targets/1/probe");

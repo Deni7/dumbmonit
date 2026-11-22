@@ -55,6 +55,17 @@ The test message takes **exactly the same path** as a real alert: same request,
 same token, same formatting. If it arrives, the channel works. If it fails, the
 error message names the setting to fix.
 
+A successful test also says whether a real alert would have been held back by
+this channel's own settings: the channel is disabled, its severity floor, its quiet
+hours (when they are active at that moment) or its filter. A test message carries no
+severity, monitor or rule, so only these settings can be read; what a filter would
+let through depends on the alert.
+
+In the list, a switch enables or disables a channel without opening it, and
+**Duplicate** (in the ⋮ menu) opens the form prefilled from the channel. Secrets are
+never copied: type them again. Disabling or deleting the last enabled channel asks
+for confirmation, since no alert would reach anyone afterwards.
+
 > **A token is never shown again.** Once saved, it is encrypted in the database and
 > the interface only says "configured". To edit a channel without retyping its
 > token, simply leave the field empty.

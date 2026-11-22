@@ -3473,6 +3473,29 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/alerts/rules/{id}/reset:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    post:
+      operationId: resetRule
+      tags: [Rules]
+      summary: Reset a built-in rule to its default values
+      description: >-
+        Restores thresholds, hold time, severity, selector, channels, parameters and the
+        enabled state a rule ships with. Per-device overrides are kept. A rule created here
+        has no defaults and answers 409.
+      x-token-scope: write
+      responses:
+        "200":
+          description: The rule, back to its defaults.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Rule" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
   /api/alerts/overrides:
     get:
       operationId: listOverrides
@@ -3603,6 +3626,30 @@ paths:
   /api/alerts/silences/{id}:
     parameters:
       - $ref: "#/components/parameters/Id"
+    put:
+      operationId: updateSilence
+      tags: [Silences]
+      summary: Edit a maintenance window
+      description: >-
+        Replaces the name, comment, scope and schedule. To end a window now, send
+        a one-off schedule whose end is the current time.
+      x-token-scope: write
+      x-roles: [admin, operator]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SilencePayload" }
+      responses:
+        "200":
+          description: The updated window.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Silence" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
     delete:
       operationId: deleteSilence
       tags: [Silences]
@@ -13249,7 +13296,7 @@ components:
       enum: [">", ">=", "<", "<="]
     Rule:
       type: object
-      required: [id, uid, name, description, kind, query, operator, threshold, for_secs, severity, selector, channels, params, unit, enabled, builtin, overrides]
+      required: [id, uid, name, description, kind, query, operator, threshold, for_secs, severity, selector, channels, params, unit, enabled, builtin, overrides, last_fired_at]
       properties:
         id: { type: integer, format: int64 }
         uid: { type: string }
@@ -13276,6 +13323,7 @@ components:
         overrides:
           type: array
           items: { $ref: "#/components/schemas/RuleOverride" }
+        last_fired_at: { type: [string, "null"], description: "Last time the rule went to firing according to the alert history (RFC 3339, UTC); `null` when it never fired within the retained history." }
     RulePayload:
       type: object
       required: [name, query]
@@ -13519,6 +13567,13 @@ components:
       properties:
         ok: { type: boolean }
         message: { type: string }
+        filters:
+          type: array
+          description: >-
+            Channel settings that would hold back a real alert: `disabled`,
+            `min_severity_warning`, `min_severity_critical`, `quiet_hours`, `matcher`.
+            Only present on channel tests.
+          items: { type: string }
     MailServer:
       type: object
       required: [host, port, effective_port, security, username, has_password, from_address, from_name, configured, locked_by_env]

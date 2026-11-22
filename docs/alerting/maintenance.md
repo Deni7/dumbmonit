@@ -19,13 +19,31 @@ alert's exact labels rather than the whole monitor, so a sibling rule keeps
 talking. It shows up here too, named `Snooze · …`. See
 [Getting rid of an alert](../using/alerts.md#getting-rid-of-an-alert).
 
+## Managing windows
+
+Each window in the list can be changed after the fact:
+
+- **End now** closes a running one-off window at the current time. It is not the
+  same as **Remove**: the window stays in the list until it is purged.
+- **Extend** pushes the end of a running one-off window by 30 minutes, 1 hour or
+  4 hours (from the later of the current end and now).
+- **Edit** reopens the form with the name, comment, monitor and times, and saves
+  with `PUT /api/alerts/silences/{id}`. Operators can do it, like creating one.
+- **Duplicate** opens the form prefilled from an existing window. A copy of a
+  one-off window starts now and keeps the same length.
+- Once there are more than three windows, a search box (name and comment) and
+  filters (*Active now*, *Scheduled*, *Recurring*) appear above the list.
+
+*End now*, *Extend* apply to one-off windows only; a "until recovery" window
+(from *Seen, I am on it*) is lifted by the server when the monitor answers again.
+
 ## One-off window
 
 | Field | Meaning |
 |---|---|
 | Name | Shown in the list and in history. |
 | Monitor | Leave empty to cover every monitor. |
-| Start, End | Absolute times. The window includes the start and excludes the end. |
+| Start, End | Absolute times. The window includes the start and excludes the end. Buttons for 30 min, 1 h, 2 h and 4 h set the end from the start. |
 | Comment | Optional. Why the window exists. |
 
 One-off windows are purged once they are over.

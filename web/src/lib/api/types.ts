@@ -601,6 +601,8 @@ export interface AlertRule {
 	builtin: boolean;
 	/** Per-device overrides of this rule. */
 	overrides: RuleOverride[];
+	/** Last time the rule went to firing, from the alert history (UTC); `null` = never in the retained history. */
+	last_fired_at: string | null;
 }
 
 /**
@@ -1664,6 +1666,8 @@ export interface ChannelPayload {
 export interface ChannelTestReport {
 	ok: boolean;
 	message: string;
+	/** Settings that would hold back a real alert on this channel (channel tests only). */
+	filters?: string[];
 }
 
 // --- Agents (enrolment tokens) ----------------------------------------------

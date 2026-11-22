@@ -402,6 +402,11 @@ export function setAlertRuleEnabled(id: number, enabled: boolean): Promise<Alert
 	});
 }
 
+/** Resets a built-in rule to the values it ships with. */
+export function resetAlertRule(id: number): Promise<AlertRule> {
+	return request<AlertRule>(`/alerts/rules/${id}/reset`, { method: 'POST' });
+}
+
 /** Lists the maintenance windows, or an empty array if the route does not exist yet. */
 export async function listSilences(signal?: AbortSignal): Promise<Silence[]> {
 	try {
@@ -415,6 +420,11 @@ export async function listSilences(signal?: AbortSignal): Promise<Silence[]> {
 
 export function createSilence(payload: SilencePayload): Promise<Silence> {
 	return request<Silence>('/alerts/silences', { method: 'POST', body: payload });
+}
+
+/** Edits a maintenance window (also how "end now" and "extend" are done). */
+export function updateSilence(id: number, payload: SilencePayload): Promise<Silence> {
+	return request<Silence>(`/alerts/silences/${id}`, { method: 'PUT', body: payload });
 }
 
 export function deleteSilence(id: number): Promise<void> {
