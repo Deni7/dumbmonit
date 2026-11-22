@@ -804,6 +804,14 @@ pub struct BundleStatusPage {
     /// page garde son réglage (`false` sur une page créée).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hide_branding: Option<bool>,
+    /// Langue par défaut de l'interface publique (migration 0290). Absente : celle
+    /// de la page reste telle quelle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_lang: Option<String>,
+    /// Textes traduits par langue (migration 0290). Les langues présentes sont
+    /// rétablies ; celles que le fichier ne cite pas restent.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub translations: Vec<crate::db::status_lang::Translation>,
 }
 
 /// Nom public d'une surveillance arrivée par un groupe coché.

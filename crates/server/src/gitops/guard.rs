@@ -35,7 +35,7 @@ fn target_of(path: &str) -> Option<(&'static str, i64)> {
         ["alerts", "silences", raw] => Some(("silence", id(raw)?)),
         ["notify", "channels", raw] => Some(("channel", id(raw)?)),
         ["status-pages", raw] => Some(("status_page", id(raw)?)),
-        ["status-pages", raw, "items" | "access" | "logo"] => Some(("status_page", id(raw)?)),
+        ["status-pages", raw, "items" | "access" | "logo" | "languages"] => Some(("status_page", id(raw)?)),
         _ => None,
     }
 }

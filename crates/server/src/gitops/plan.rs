@@ -200,6 +200,15 @@ pub fn normalize(desired: &mut ConfigDoc, current: &ConfigDoc) {
         {
             page.hide_branding = old.hide_branding;
         }
+        // Langues non déclarées : celles en place ne sont pas un écart.
+        if let Some(old) = pages.get(page.slug.as_str()) {
+            if page.default_lang.is_none() {
+                page.default_lang = old.default_lang.clone();
+            }
+            if page.translations.is_empty() {
+                page.translations = old.translations.clone();
+            }
+        }
         // Interrupteur du courriel non déclaré (fichier d'avant 0246) : celui
         // en place n'est pas un écart.
         if let Some(old) = pages.get(page.slug.as_str())

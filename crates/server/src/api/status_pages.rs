@@ -32,6 +32,7 @@ pub(crate) mod access;
 mod badges;
 pub(crate) mod branding;
 pub mod delivery;
+mod lang;
 mod older;
 mod postmortem;
 mod subscribers;
@@ -105,6 +106,7 @@ pub fn routes() -> Router<AppState> {
         .route("/status-pages/{id}", get(get_page).put(update_page).delete(delete_page))
         .route("/status-pages/{id}/items", put(set_items))
         .route("/status-pages/{id}/preview", get(preview_page))
+        .route("/status-pages/{id}/languages", get(lang::get_languages).put(lang::put_languages))
         .route(
             "/status-pages/{id}/logo",
             get(branding::admin_logo).put(branding::upload_logo).delete(branding::delete_logo),
@@ -1561,12 +1563,21 @@ async fn load_public_checked(
     Ok((body, private))
 }
 
+/// `?lang=` : la langue de l'interface du visiteur, pour les textes traduits.
+#[derive(Debug, Deserialize)]
+pub struct LangQuery {
+    #[serde(default)]
+    lang: Option<String>,
+}
+
 pub async fn public_status(
     State(state): State<AppState>,
     Path(slug): Path<String>,
+    Query(query): Query<LangQuery>,
     headers: HeaderMap,
 ) -> ApiResult<Response> {
     let (body, private) = load_public_checked(&state, &slug, &headers).await?;
+    let body = lang::localise(&state, &slug, &headers, query.lang.as_deref(), &body).await?;
     // Document public et sans cookie : lisible depuis le site de n'importe qui
     // (bandeau d'état). Pas de `Allow-Credentials`, donc aucune session jointe.
     Ok(access::seal(
@@ -1574,8 +1585,9 @@ pub async fn public_status(
             [
                 (header::CACHE_CONTROL, "public, max-age=30"),
                 (header::ACCESS_CONTROL_ALLOW_ORIGIN, "*"),
+                (header::VARY, "Accept-Language"),
             ],
-            Json(Value::clone(&body)),
+            Json(body),
         )
             .into_response(),
         private,

@@ -9,6 +9,7 @@ pub mod pbs;
 pub mod pdm;
 pub mod pmg;
 pub mod relay_backlog;
+pub mod status_lang;
 pub mod status_pages;
 pub mod target_channels;
 pub mod targets;

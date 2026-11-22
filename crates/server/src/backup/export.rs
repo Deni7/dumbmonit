@@ -933,6 +933,9 @@ async fn status_pages(
                 slack: row.try_get::<i64, _>("subscribe_slack")? != 0,
             }),
             hide_branding: Some(row.try_get::<i64, _>("hide_branding")? != 0),
+            default_lang: Some(crate::db::status_lang::default_lang(pool, id).await?)
+                .filter(|lang| !lang.is_empty()),
+            translations: crate::db::status_lang::list(pool, id).await?,
         });
     }
     Ok(out)

@@ -4717,6 +4717,49 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/status-pages/{id}/languages:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      operationId: getStatusPageLanguages
+      tags: [Status pages]
+      summary: Default language and translations of a status page
+      x-token-scope: read
+      responses:
+        "200":
+          description: The page's languages.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StatusPageLanguages" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      operationId: putStatusPageLanguages
+      tags: [Status pages]
+      summary: Replace the default language and the translations of a page
+      description: >-
+        Translations cover the title, description, footer and the names of services
+        and groups (`labels`, from the written name to its translation). An empty
+        field keeps the written text. Incident messages are not translated.
+      x-token-scope: write
+      x-roles: [admin, operator]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StatusPageLanguages" }
+      responses:
+        "200":
+          description: The saved languages.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StatusPageLanguages" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /api/status-pages/{id}/access:
     parameters:
       - $ref: "#/components/parameters/Id"
@@ -5632,8 +5675,15 @@ paths:
         A page in `password` or `users` access mode answers 401 with an `access`
         field (`password` or `users`) until the visitor unlocks it; badges, RSS,
         iCal, logo and day detail of that page do the same.
+        The page's own texts (title, description, footer, service and group names)
+        come in the visitor's language when the admin translated them: `?lang=`
+        (one of the nine interface languages), else `Accept-Language`, else the
+        page's default language. `page.default_lang`, `page.lang` and
+        `page.languages` report the choice. Incident messages are never translated.
       security: []
       x-token-scope: public
+      parameters:
+        - { name: lang, in: query, required: false, schema: { type: string }, description: "Interface language, for example fr or pt-BR." }
       responses:
         "200":
           description: The page, its services and incidents.
@@ -15451,6 +15501,28 @@ components:
           type: boolean
           default: true
           description: "`false` publishes the message without notifying subscribers."
+    StatusPageLanguages:
+      type: object
+      properties:
+        default_lang:
+          type: string
+          description: Default interface language of the page ("" means English).
+          enum: ["", en, de, es, fr, it, pt, pt-BR, ru, zh-Hans]
+        translations:
+          type: array
+          items:
+            type: object
+            required: [lang]
+            properties:
+              lang: { type: string, enum: [en, de, es, fr, it, pt, pt-BR, ru, zh-Hans] }
+              title: { type: string }
+              description: { type: string }
+              footer_text: { type: string }
+              labels:
+                type: object
+                additionalProperties: { type: string }
+                description: Written service or group name to its translation.
+
     PublicStatus:
       type: object
       required: [page, overall, generated_at, groups, incidents, maintenance]
@@ -15478,6 +15550,9 @@ components:
             show_calendar: { type: boolean, description: Present (true) only when the page shows the calendar. }
             show_latency: { type: boolean, description: Present (true) only when the page shows response times. }
             hide_branding: { type: boolean, description: "White label: the page names nothing of DumbMonit; the tab icon is the logo, or none." }
+            default_lang: { type: string, description: "Default interface language of the page (en when the admin set none)." }
+            lang: { type: string, description: "Language the page's own texts were served in." }
+            languages: { type: array, items: { type: string }, description: "Languages the admin translated the page's texts into." }
             seo:
               type: object
               description: Effective search-engine values (settings, or defaults built from the page name).
