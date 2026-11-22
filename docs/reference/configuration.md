@@ -71,7 +71,8 @@ configuration file to mount.
 | `DUMBMONIT_METRICS_PUBLIC` | *(off)* | `1` to serve `/metrics`, `/federate` and `/prometheus/api/v1/…` without an API token. Anyone who can reach the port then reads every measurement of every monitor and the state of the instance; only set it where something else already restricts access to the port. See [Metrics](metrics.md#scraping-dumbmonit). |
 | `DUMBMONIT_ALERT_INTERVAL_SECS` | `30` | Alert evaluation period. Values below 10 are raised to 10. |
 | `DUMBMONIT_ALERT_HISTORY_DAYS` | `90` | Retention of alert history, in days. |
-| `DUMBMONIT_BACKUP_ENABLED` | `1` | Scheduled local backups of the database. `0`, `false`, `no` or `off` to stop writing them. See [Backup and restore](../install/backup.md#scheduled-local-backups). |
+| `DUMBMONIT_AUDIT_KEEP` | `5000` | How many entries of the security audit log (Settings → Team → Audit log) are kept, 100 to 1 000 000; the oldest are removed first. |
+| `DUMBMONIT_BACKUP_ENABLED` | `1` | Scheduled local backups of the database. `0`, `false`, `no` or `off` to stop writing them. A variable that is set wins over Settings → Backup. See [Backup and restore](../install/backup.md#scheduled-local-backups). |
 | `DUMBMONIT_UPDATE_CHECK` | `1` | `off` stops the daily look at the latest GitHub release (air-gapped instances). See [Update](../install/update.md). |
 | `DUMBMONIT_BACKUP_DIR` | `<data dir>/backups` | Where the scheduled backups are written. Point it at a second volume to survive losing the first. |
 | `DUMBMONIT_BACKUP_INTERVAL_HOURS` | `24` | Hours between two backups, 1 to 8760. The first one happens one interval after startup, not at startup. |
@@ -81,6 +82,20 @@ configuration file to mount.
 
 Baseline retention (60 days) and the 14-day learning period are not
 configurable.
+
+### Checking your configuration {#checking-your-configuration}
+
+`dumbmonit --check-config` reads the environment exactly as the server does at
+startup, prints the problems it finds and the effective non-secret values (data
+directory, ports, VictoriaMetrics, backup schedule, log filter…), and exits `0`
+if the configuration is valid, `1` if not. It starts nothing: no database, no
+network. The instance secret, passwords and URL credentials are never printed.
+
+```sh
+docker run --rm --env-file dumbmonit.env ghcr.io/selfhostr/dumbmonit:latest --check-config
+```
+
+The same list is shown to administrators in Settings → System → About.
 
 ### High availability {#high-availability}
 
