@@ -95,6 +95,7 @@
 
 	let scheduling = $state(false);
 	/** The window the form was opened from: edited in place, or copied into a new one. */
+	let scheduleDay = $state<string | null>(null);
 	let scheduleSource = $state<{ mode: 'edit' | 'duplicate'; silence: Silence } | null>(null);
 	let busySilenceId = $state<number | null>(null);
 	let removingSilenceId = $state<number | null>(null);
@@ -213,8 +214,9 @@
 		scheduleSource = null;
 	}
 
-	function openScheduleForm(source: typeof scheduleSource) {
+	function openScheduleForm(source: typeof scheduleSource, day: string | null = null) {
 		scheduleSource = source;
+		scheduleDay = day;
 		scheduling = true;
 		maintenanceOpen = true;
 	}
@@ -394,6 +396,7 @@
 				variant="secondary"
 				onclick={() => {
 					scheduleSource = null;
+					scheduleDay = null;
 					scheduling = !scheduling;
 					if (scheduling) maintenanceOpen = true;
 				}}
@@ -408,10 +411,11 @@
 
 {#if scheduling}
 	<div class="mb-5">
-		{#key scheduleSource}
+		{#key `${scheduleDay}-${scheduleSource?.silence.id}-${scheduleSource?.mode}`}
 			<ScheduleForm
 				{targets}
 				source={scheduleSource}
+				day={scheduleDay}
 				oncreate={createFromForm}
 				oncancel={() => ((scheduling = false), (scheduleSource = null))}
 			/>
@@ -480,6 +484,7 @@
 						onextend={extendSilence}
 						onedit={(silence) => openScheduleForm({ mode: 'edit', silence })}
 						onduplicate={(silence) => openScheduleForm({ mode: 'duplicate', silence })}
+						oncreateday={(day) => openScheduleForm(null, day)}
 					/>
 				</Disclosure>
 			{/if}

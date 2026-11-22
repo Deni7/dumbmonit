@@ -4164,6 +4164,41 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /api/alerts/silences/occurrences:
+    get:
+      operationId: listSilenceOccurrences
+      tags: [Silences]
+      summary: Maintenance windows unrolled into dated occurrences
+      description: |
+        One-off windows and weekly or monthly rules expanded between `from` and `to`
+        (at most 100 days, 2000 occurrences). "Until recovery" windows have no end and
+        are not listed. Powers the maintenance calendar.
+      x-token-scope: read
+      parameters:
+        - { name: from, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date-time } }
+      responses:
+        "200":
+          description: Occurrences sorted by start.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [silence_id, name, starts_at, ends_at, state, recurring, enabled]
+                  properties:
+                    silence_id: { type: integer }
+                    name: { type: string }
+                    starts_at: { type: string, format: date-time }
+                    ends_at: { type: string, format: date-time }
+                    state: { type: string, enum: [active, upcoming, past] }
+                    recurring: { type: boolean }
+                    enabled: { type: boolean }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /api/alerts/silences/{id}:
     parameters:
       - $ref: "#/components/parameters/Id"

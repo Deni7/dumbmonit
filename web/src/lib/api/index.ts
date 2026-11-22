@@ -25,6 +25,7 @@ import type {
 	AlertRule,
 	AlertRulePayload,
 	Silence,
+	SilenceOccurrence,
 	SilencePayload,
 	AccessInfo,
 	MspAccess,
@@ -420,6 +421,16 @@ export async function listSilences(signal?: AbortSignal): Promise<Silence[]> {
 		if (cause instanceof ApiError && cause.missing) return [];
 		throw cause;
 	}
+}
+
+/** Windows unrolled into dated occurrences between two instants (ISO, UTC). */
+export function listSilenceOccurrences(
+	from: string,
+	to: string,
+	signal?: AbortSignal
+): Promise<SilenceOccurrence[]> {
+	const query = new URLSearchParams({ from, to });
+	return request<SilenceOccurrence[]>(`/alerts/silences/occurrences?${query}`, { signal });
 }
 
 export function createSilence(payload: SilencePayload): Promise<Silence> {

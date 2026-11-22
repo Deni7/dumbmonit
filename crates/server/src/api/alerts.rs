@@ -1679,6 +1679,15 @@ pub async fn list_silences(
     State(state): State<AppState>,
 ) -> ApiResult<Json<Vec<SilenceView>>> {
     let now = Utc::now();
+    let silences = visible_silences(&access, &state).await?;
+    Ok(Json(silences.into_iter().map(|s| SilenceView::new(s, now)).collect()))
+}
+
+/// Les silences que ce compte a le droit de voir.
+pub(crate) async fn visible_silences(
+    access: &Access,
+    state: &AppState,
+) -> ApiResult<Vec<Silence>> {
     let mut silences = db::alerts::list_silences(&state.pool).await?;
     // Compte restreint : seulement les silences posés sur ses équipements. La
     // vue d'un client par l'administrateur montre aussi les silences sans
@@ -1691,7 +1700,7 @@ pub async fn list_silences(
             None => admin_view && owners.get(&s.id).is_some_and(|c| access.sees_client(*c)),
         });
     }
-    Ok(Json(silences.into_iter().map(|s| SilenceView::new(s, now)).collect()))
+    Ok(silences)
 }
 
 pub async fn create_silence(

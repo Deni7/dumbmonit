@@ -16,6 +16,7 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { pad2 } from '#lib/format.js';
 	import { dayName } from './helpers';
+	import { localDay, prefillStart } from './calendar-layout';
 
 	interface Props {
 		targets: Target[];
@@ -24,9 +25,11 @@
 		oncancel: () => void;
 		/** An existing window to edit, or to copy into a new one (prefills the form). */
 		source?: { mode: 'edit' | 'duplicate'; silence: Silence } | null;
+		/** A day (`YYYY-MM-DD`) clicked on the calendar: a new one-off window starts there. */
+		day?: string | null;
 	}
 
-	let { targets, oncreate, oncancel, source = null }: Props = $props();
+	let { targets, oncreate, oncancel, source = null, day = null }: Props = $props();
 	const editing = $derived(source?.mode === 'edit');
 
 	const DAYS = $derived([0, 1, 2, 3, 4, 5, 6].map((index) => ({ index, label: dayName(index) })));
@@ -153,6 +156,13 @@
 	}
 	untrack(() => {
 		if (source) prefill(source.silence, source.mode);
+		else if (day) {
+			const first = new Date(prefillStart(day, localDay(new Date())));
+			if (!Number.isNaN(first.getTime())) {
+				startAt = localInput(first);
+				endAt = localInput(new Date(first.getTime() + 2 * 3600_000));
+			}
+		}
 	});
 
 	function toggleDay(index: number) {

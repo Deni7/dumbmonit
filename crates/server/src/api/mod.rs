@@ -28,6 +28,7 @@ mod gitops;
 mod health;
 mod https;
 mod ical;
+mod silence_calendar;
 mod ingest;
 mod instance;
 mod integrations;
@@ -263,6 +264,7 @@ pub fn router_with_hubs(
         .route("/alerts/rules/{id}/enable", post(alerts::set_rule_enabled))
         .route("/alerts/rules/{id}/reset", post(alerts::reset_rule))
         .route("/alerts/silences", get(alerts::list_silences).post(alerts::create_silence))
+        .route("/alerts/silences/occurrences", get(silence_calendar::occurrences))
         .route("/alerts/silences/{id}", put(alerts::update_silence).delete(alerts::delete_silence))
         .route("/notify/channels", get(channels::list).post(channels::create))
         .route("/notify/channels/{id}", put(channels::update).delete(channels::delete))

@@ -749,6 +749,18 @@ export interface Silence {
 	next_start_at: string | null;
 }
 
+/** One dated occurrence of a maintenance window (`GET /api/alerts/silences/occurrences`). */
+export interface SilenceOccurrence {
+	silence_id: number;
+	name: string;
+	starts_at: string;
+	ends_at: string;
+	state: 'active' | 'upcoming' | 'past';
+	/** True for a weekly or monthly rule. */
+	recurring: boolean;
+	enabled: boolean;
+}
+
 /** Body of `POST /api/alerts/silences`. */
 export interface SilencePayload {
 	name: string;
