@@ -856,6 +856,17 @@ tokens need the `write` scope for changes. See [Email reports](../using/reports.
 | `PUT` | `/api/slos/{id}` | admin | Full replacement. |
 | `DELETE` | `/api/slos/{id}` | admin | `204`. |
 
+## Change markers
+
+Markers drawn on the charts. See [Change markers](../using/annotations.md).
+
+| Method | Route | Auth | Purpose |
+|---|---|---|---|
+| `GET` | `/api/annotations` | session | Markers touching `from`–`to` (RFC 3339), oldest first, 500 at most. `target` keeps those that apply to that monitor. |
+| `POST` | `/api/annotations` | operator | `{"title", "at", "until", "text", "link", "tags", "scope", "source"}`; only `title` is required. A token with the `write` scope can call it. Returns the marker. Audited. |
+| `PATCH` | `/api/annotations/{id}` | operator | Only the fields sent change; `"until": null` removes the window. Audited. |
+| `DELETE` | `/api/annotations/{id}` | operator | `204`. Audited. |
+
 ## Agent tokens and ingest
 
 | Method | Route | Auth | Purpose |

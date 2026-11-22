@@ -68,6 +68,7 @@ recovery**: a bundle whose passphrase is lost is lost.
 | `status_pages` | Public status pages and the services each one lists. |
 | `incidents` | Incidents and maintenance announcements, with their updates and post-mortems. |
 | `slos` | Service level objectives: target, window, alerting on or off, and the monitors and folders they cover. |
+| `annotations` | Change markers drawn on the charts, with the monitors, folder or tags they apply to. |
 | `users` | Accounts: username, display name, email address, role, SSO link, enabled or not. |
 | `auth_policy` | The authentication policy: whether admins and operators must use two-factor authentication. |
 | `agent_tokens` | Agent enrolment tokens, as hashes. Installed agents keep pushing after a restore. Tokens from an older backup are renamed to opaque `tok_…` identifiers. |
