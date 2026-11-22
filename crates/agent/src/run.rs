@@ -167,9 +167,10 @@ pub struct Agent {
     server_relay: Option<RelaySetting>,
     /// Passerelle du relais pour les agents de son site, quand elle écoute.
     gateway: Option<GatewayTask>,
-    /// Dernière adresse que la passerelle n'a pas pu ouvrir : l'échec n'est
-    /// journalisé qu'une fois, la tentative reprend à chaque lot.
-    gateway_failed: Option<std::net::SocketAddr>,
+    /// Dernière adresse que la passerelle n'a pas pu ouvrir, et pourquoi :
+    /// l'échec n'est journalisé qu'une fois, la tentative reprend à chaque lot,
+    /// et la cause part au serveur ([`AgentIdentity::relay_gateway_state`]).
+    gateway_failed: Option<(std::net::SocketAddr, String)>,
     /// Dernier essai de la passerelle à l'adresse du site, rempli par sa tâche
     /// et joint aux lots ([`AgentIdentity::relay_gateway_check`]).
     gateway_check: GatewayCheckSlot,
@@ -827,6 +828,17 @@ impl Agent {
             if let Some(addr) = wanted {
                 match crate::gateway::bind(addr).await {
                     Ok(listener) => {
+                        // L'adresse vraiment liée, pas celle demandée : c'est elle
+                        // que le serveur montre, et qui trahit une écoute limitée
+                        // à la boucle locale.
+                        let bound = listener.local_addr().unwrap_or(addr);
+                        if bound.ip().is_loopback() {
+                            warn!(
+                                listen = %bound,
+                                "relay gateway listens on the loopback only: the site's machines \
+                                 cannot reach it (gateway_listen)"
+                            );
+                        }
                         let upstream = std::sync::Arc::new(crate::gateway::ServerUpstream::new(
                             self.client.clone(),
                         ));
@@ -836,29 +848,53 @@ impl Agent {
                             self.config.gateway.clone(),
                             shutdown.clone(),
                         ));
-                        self.gateway = Some(GatewayTask { addr, handle });
+                        self.gateway = Some(GatewayTask { addr, bound, handle });
                         self.gateway_failed = None;
                     }
                     Err(error) => {
-                        if self.gateway_failed == Some(addr) {
+                        let cause = crate::gateway::describe_bind_error(&error);
+                        let again = self.gateway_failed.as_ref().is_some_and(|(at, _)| *at == addr);
+                        if again {
                             debug!(listen = %addr, %error, "relay gateway still cannot listen");
                         } else {
                             warn!(listen = %addr, %error, "relay gateway cannot listen");
-                            self.gateway_failed = Some(addr);
                         }
+                        self.gateway_failed = Some((addr, cause));
                     }
                 }
             }
         }
-        let port = self.gateway.as_ref().map(|gateway| gateway.addr.port());
-        if port != self.identity.relay_gateway {
-            // Passerelle ouverte, déplacée ou fermée : le serveur (et l'écran
-            // d'ajout qui attend qu'elle écoute) l'apprend par un lot immédiat,
-            // pas à la période suivante.
+        let port = self.gateway.as_ref().map(|gateway| gateway.bound.port());
+        let state = self.gateway_state(wanted);
+        if port != self.identity.relay_gateway || state != self.identity.relay_gateway_state {
+            // Passerelle ouverte, déplacée, fermée ou impossible à ouvrir : le
+            // serveur (et l'écran d'ajout qui attend qu'elle écoute) l'apprend
+            // par un lot immédiat, pas à la période suivante.
             self.client.request_report();
         }
         self.identity.relay_gateway = port;
+        self.identity.relay_gateway_state = state;
         self.sync_gateway_check();
+    }
+
+    /// Ce que la passerelle est vraiment, pour le serveur : l'adresse liée, ou
+    /// la cause de l'échec à l'adresse demandée. `None` sans passerelle demandée.
+    fn gateway_state(
+        &self,
+        wanted: Option<std::net::SocketAddr>,
+    ) -> Option<dumbmonit_proto::GatewayState> {
+        let failed = self
+            .gateway_failed
+            .as_ref()
+            .filter(|(addr, _)| Some(*addr) == wanted)
+            .map(|(_, cause)| cause.as_str());
+        crate::gateway::state(
+            wanted,
+            self.config.gateway.listen.is_some(),
+            self.gateway.as_ref().map(|gateway| gateway.bound),
+            failed,
+            self.client.is_encrypted(),
+        )
     }
 
     /// Essaie la passerelle à l'adresse que le site compose, comme le ferait
@@ -868,7 +904,7 @@ impl Agent {
         if self.gateway_check_task.as_ref().is_some_and(|task| task.is_finished()) {
             self.gateway_check_task = None;
         }
-        let Some(port) = self.gateway.as_ref().map(|gateway| gateway.addr.port()) else {
+        let Some(port) = self.gateway.as_ref().map(|gateway| gateway.bound.port()) else {
             if let Some(task) = self.gateway_check_task.take() {
                 task.abort();
             }
@@ -933,6 +969,11 @@ impl Agent {
         if self.gateway.is_some() {
             self.identity.relay_gateway_check =
                 self.gateway_check.lock().ok().and_then(|held| held.clone());
+        }
+        // Le canal chiffré arrive après l'enrôlement : la passerelle le dit dès
+        // le lot qui suit, sans attendre de changer d'adresse.
+        if let Some(state) = self.identity.relay_gateway_state.as_mut() {
+            state.encrypted = self.client.is_encrypted();
         }
         self.identity.server_link = self.failover.link(&self.client.base_url());
         let mut batch =
@@ -1576,7 +1617,10 @@ fn plain_url_channel(server_url: &str, tls: Option<&mut TlsState>) -> Result<()>
 
 /// Passerelle du relais en service.
 struct GatewayTask {
+    /// Adresse demandée (comparée au réglage en vigueur).
     addr: std::net::SocketAddr,
+    /// Adresse réellement liée, annoncée au serveur.
+    bound: std::net::SocketAddr,
     handle: tokio::task::JoinHandle<()>,
 }
 
@@ -1731,6 +1775,10 @@ mod tests {
         }));
         agent.sync_gateway(&shutdown).await;
         assert_eq!(agent.identity.relay_gateway, Some(port), "le port est annoncé au serveur");
+        let state = agent.identity.relay_gateway_state.clone().expect("état annoncé");
+        assert_eq!(state.listen, Some(format!("0.0.0.0:{port}")), "toutes les interfaces");
+        assert_eq!(state.error, None);
+        assert!(!state.local, "port réglé depuis l'interface");
         // … tout de suite, par un lot demandé sans attendre la période.
         tokio::time::timeout(Duration::from_secs(5), report.notified())
             .await
@@ -1749,6 +1797,47 @@ mod tests {
         agent.sync_gateway(&shutdown).await;
         assert!(agent.gateway.is_none());
         assert_eq!(agent.identity.relay_gateway, None);
+        assert_eq!(agent.identity.relay_gateway_state, None, "rien de demandé, rien à dire");
+    }
+
+    #[tokio::test]
+    async fn a_gateway_that_cannot_listen_tells_the_server_why_and_retries() {
+        let mut agent = Agent::new(config()).expect("agent");
+        let (_trigger, shutdown) = crate::shutdown::channel();
+        // Le port est tenu par un autre programme sur toutes les interfaces.
+        let held = std::net::TcpListener::bind("0.0.0.0:0").expect("port");
+        let port = held.local_addr().unwrap().port();
+        let open = || {
+            Some(RelaySetting {
+                enabled: true,
+                site: None,
+                gateway_port: Some(port),
+                gateway_host: None,
+            })
+        };
+
+        let report = agent.client.report_requested();
+        agent.adopt_relay(open());
+        agent.sync_gateway(&shutdown).await;
+        assert!(agent.gateway.is_none());
+        assert_eq!(agent.identity.relay_gateway, None, "rien n'écoute");
+        let state = agent.identity.relay_gateway_state.clone().expect("échec annoncé");
+        assert_eq!(state.wanted, format!("0.0.0.0:{port}"));
+        assert_eq!(state.listen, None);
+        let error = state.error.expect("cause");
+        assert!(error.contains("already used by another program"), "{error}");
+        // L'échec part tout de suite : l'écran d'ajout ne doit pas attendre en silence.
+        tokio::time::timeout(Duration::from_secs(5), report.notified())
+            .await
+            .expect("lot immédiat demandé");
+
+        // Le port se libère : la tentative suivante (au lot suivant) l'ouvre.
+        drop(held);
+        agent.sync_gateway(&shutdown).await;
+        assert_eq!(agent.identity.relay_gateway, Some(port));
+        let state = agent.identity.relay_gateway_state.clone().expect("état");
+        assert_eq!(state.error, None);
+        assert!(state.listen.is_some());
     }
 
     #[tokio::test]

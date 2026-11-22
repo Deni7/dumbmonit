@@ -24,6 +24,7 @@ fn batch() -> PushBatch {
         self_update: None,
         relay_gateway: None,
         relay_gateway_check: None,
+        relay_gateway_state: None,
         server_link: None,
         remediation: None,
     };
