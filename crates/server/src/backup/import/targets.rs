@@ -400,6 +400,3 @@ pub(super) async fn restore_packs(tx: &mut Transaction<'_, Sqlite>, bundle: &Bun
     }
     Ok(report)
 }
-
-/// Procédures, par titre : même texte et mêmes rattachements, laissée ;
-/// sinon, remplacée.
