@@ -250,6 +250,12 @@
 			const kind = groupKindOf(rule);
 			openGroups = new Set(openGroups).add(kind);
 			markedId = rule.id;
+			// From the noise report: `&edit=1` opens the editor, `&backtest=1` also runs the history test.
+			const params = page.url.searchParams;
+			if (auth.isAdmin && (params.get('edit') === '1' || params.get('backtest') === '1')) {
+				editingId = rule.id;
+				backtestId = params.get('backtest') === '1' ? rule.id : null;
+			}
 		});
 		void tick().then(() => {
 			document.getElementById(`rule-row-${rule.id}`)?.scrollIntoView({ block: 'center', behavior: reducedMotion() ? 'auto' : 'smooth' });
@@ -294,6 +300,8 @@
 	}
 
 	let editingId = $state<number | null>(null);
+	/** The rule whose editor opens straight on its history test (link from the noise report). */
+	let backtestId = $state<number | null>(null);
 	let shownQueryIds = $state<Set<number>>(new Set());
 	let savedId = $state<number | null>(null);
 	let savedTimer: ReturnType<typeof setTimeout> | null = null;
@@ -308,6 +316,7 @@
 	function onSaved(rule: AlertRule) {
 		saved = new Map(saved).set(rule.id, rule);
 		editingId = null;
+		backtestId = null;
 		savedId = rule.id;
 		if (savedTimer) clearTimeout(savedTimer);
 		savedTimer = setTimeout(() => (savedId = null), 4000);
@@ -681,7 +690,14 @@
 		</div>
 
 		{#if editing}
-			<RuleEditor {rule} channels={pickableChannels} {channelsError} onsaved={onSaved} oncancel={() => (editingId = null)} />
+			<RuleEditor
+				{rule}
+				channels={pickableChannels}
+				{channelsError}
+				onsaved={onSaved}
+				oncancel={() => ((editingId = null), (backtestId = null))}
+				autoBacktest={backtestId === rule.id}
+			/>
 		{/if}
 	</div>
 {/snippet}

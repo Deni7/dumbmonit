@@ -4,9 +4,10 @@
 	 * Alerts — what is firing now, what happened, the rules behind it, and what
 	 * runs on its own.
 	 *
-	 * Five tabs (the shared `Tabs`, `?tab=` in the URL), the daily ones first:
+	 * Six tabs (the shared `Tabs`, `?tab=` in the URL), the daily ones first:
 	 * Now (the live list, by severity or by monitor, with the maintenance
-	 * windows folded under it), History, Rules, Automation (remediation log,
+	 * windows folded under it), History, Rules, Noise (admins and operators:
+	 * noisiest rules, flapping alerts, time to acknowledge and resolve), Automation (remediation log,
 	 * runbooks, actions, policies) and On-call (only while turned on in Settings → System). Notification channels and their
 	 * policy live in Settings → Notifications; the old `#notifications…` links
 	 * forward there, and so do the old `#scheduled`, `#oncall`, `#history` and
@@ -51,6 +52,7 @@
 	import SilencesSection from '#lib/components/alerts/SilencesSection.svelte';
 	import RulesSection from '#lib/components/alerts/RulesSection.svelte';
 	import HistorySection from '#lib/components/alerts/HistorySection.svelte';
+	import NoiseSection from '#lib/components/alerts/NoiseSection.svelte';
 	import OnCallSection from '#lib/components/oncall/OnCallSection.svelte';
 	import Segmented from '#lib/components/devices/Segmented.svelte';
 	import AutomationTab from '#lib/components/remediation/AutomationTab.svelte';
@@ -336,6 +338,8 @@
 		{ id: 'now', label: m.alerts_page_tab_now(), badge: sky.attention, attention: true },
 		{ id: 'history', label: m.alerts_page_tab_history() },
 		{ id: 'rules', label: m.alerts_page_tab_rules() },
+		// The noise report is for whoever tunes or answers alerts.
+		...(auth.canOperate ? [{ id: 'noise', label: m.w5alerting_noise_tab() }] : []),
 		{ id: 'automation', label: m.alerts_tab_automation() },
 		...(oncallOn ? [{ id: 'oncall', label: m.oncall_tab() }] : [])
 	]);
@@ -429,6 +433,8 @@
 	{#snippet panel(id)}
 		{#if id === 'automation'}
 			<AutomationTab />
+		{:else if id === 'noise'}
+			{#if auth.canOperate}<NoiseSection />{/if}
 		{:else if id === 'oncall'}
 			{#if oncallOn}<OnCallSection />{/if}
 		{:else if pageError}
