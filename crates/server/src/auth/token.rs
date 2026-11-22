@@ -488,6 +488,12 @@ pub async fn authenticate(pool: &SqlitePool, clear: &str, ip: Option<IpAddr>) ->
         if user_id.is_some() && owner.is_none() {
             return Ok(Outcome::Unknown);
         }
+        // Un écran mural ne lit que le mur, en session : un jeton dont le
+        // propriétaire est passé au rôle `wall` vaudrait un lecteur, plus que
+        // son propriétaire. Il n'ouvre plus rien.
+        if owner_role.as_deref() == Some("wall") {
+            return Ok(Outcome::Unknown);
+        }
         if owner_disabled == Some(true) {
             return Ok(Outcome::OwnerDisabled { name });
         }

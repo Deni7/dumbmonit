@@ -1239,8 +1239,11 @@ function fallbackCredentialView(kind: string): CredentialView {
 
 // --- Authentication ---------------------------------------------------------
 
-/** `operator` handles alerts (ack, ignore, snooze) but changes no configuration. */
-export type Role = 'admin' | 'operator' | 'viewer';
+/**
+ * `operator` handles alerts (ack, ignore, snooze) but changes no configuration.
+ * `wall` is a wall display: it signs in straight to `/wall` and reaches nothing else.
+ */
+export type Role = 'admin' | 'operator' | 'viewer' | 'wall';
 
 /** How an account signs in: a local password, the LDAP / AD directory, or the identity provider. */
 export type AuthMethod = 'password' | 'ldap' | 'oidc' | 'saml';
@@ -1479,6 +1482,8 @@ export interface OidcConfig {
 	admin_groups: string[];
 	/** Groups whose members become operators (unless also in an admin group). */
 	operator_groups: string[];
+	/** Groups whose members become wall displays (unless also in an admin or operator group). */
+	wall_groups: string[];
 	groups_claim: string;
 	public_url: string;
 	/** Computed from `public_url` (or the request origin): register it at the provider. */
@@ -1496,6 +1501,8 @@ export interface OidcConfigPayload {
 	admin_groups: string[];
 	/** Groups whose members become operators (unless also in an admin group). */
 	operator_groups: string[];
+	/** Groups whose members become wall displays (unless also in an admin or operator group). */
+	wall_groups: string[];
 	groups_claim: string;
 	public_url: string;
 }
@@ -1550,6 +1557,8 @@ export interface LdapConfig {
 	operator_groups: string[];
 	/** Once any group list is filled, only members of a listed group can sign in. */
 	viewer_groups: string[];
+	/** Members of no other listed group become wall displays. */
+	wall_groups: string[];
 	timeout_seconds: number;
 }
 
@@ -1572,6 +1581,8 @@ export interface LdapConfigPayload {
 	admin_groups: string[];
 	operator_groups: string[];
 	viewer_groups: string[];
+	/** Members of no other listed group become wall displays. */
+	wall_groups: string[];
 	timeout_seconds: number;
 }
 
@@ -6379,6 +6390,8 @@ export interface SamlConfig {
 	attr_groups: string;
 	admin_groups: string[];
 	operator_groups: string[];
+	/** Groups whose members become wall displays (unless also in an admin or operator group). */
+	wall_groups: string[];
 	sp_metadata_url: string;
 	acs_url: string;
 }
@@ -6390,7 +6403,7 @@ export interface SamlMetadataImport {
 	idp_certificates: string[];
 }
 
-export type ScimDefaultRole = 'viewer' | 'operator';
+export type ScimDefaultRole = 'viewer' | 'operator' | 'wall';
 
 export interface ScimSettings {
 	enabled: boolean;
@@ -6553,6 +6566,8 @@ export interface SamlConfig {
 	attr_groups: string;
 	admin_groups: string[];
 	operator_groups: string[];
+	/** Groups whose members become wall displays (unless also in an admin or operator group). */
+	wall_groups: string[];
 	sp_metadata_url: string;
 	acs_url: string;
 }
@@ -6564,7 +6579,7 @@ export interface SamlMetadataImport {
 	idp_certificates: string[];
 }
 
-export type ScimDefaultRole = 'viewer' | 'operator';
+export type ScimDefaultRole = 'viewer' | 'operator' | 'wall';
 
 export interface ScimSettings {
 	enabled: boolean;

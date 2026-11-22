@@ -24,6 +24,32 @@ Open it with the **Wall mode** icon at the bottom of the left menu, from the com
 An account limited to some teams or clients does not get the wall, since it
 shows the whole fleet.
 
+## A screen that only shows the wall {#wall-display-account}
+
+For a TV or a monitor left on in a room, create an account with the **Wall
+display** role (**Settings → Team & access → Users**) and sign in with it on
+that screen. It lands on the wall right after signing in, and stays there:
+
+- every other address leads back to `/wall`, with the options of its address
+  (`?city=`, `?speaker=`…) kept from the sign-in link;
+- **Exit** becomes **Sign out**, which takes two taps, and ++esc++ does nothing;
+  fullscreen, the light board, the backdrop, the beep and the speaker still
+  work, since they belong to the screen;
+- device tiles and problems are not links;
+- the server answers only what the wall reads, and `403` to everything else.
+
+**Settings → Wall display** (clock, beep, rotation) is out of its reach. Those
+options belong to the browser, not the account: set them on that screen while
+signed in with another account, then sign in as the wall display.
+
+The session is renewed as long as the screen shows the wall, so nobody has to
+type the password again; it ends after `DUMBMONIT_SESSION_DAYS` without use,
+when the account is disabled, its password reset or its role changed. The
+two-factor requirement does not apply to it. Unlike other accounts limited to
+some teams, a wall display limited by its teams does get the wall, showing
+only the monitors those teams grant. See
+[Wall display accounts](settings.md#wall-display-accounts).
+
 ## Keys, options and links
 
 - ++f++ toggles fullscreen (a discreet button next to Exit does the same) and

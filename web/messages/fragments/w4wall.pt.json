@@ -1,0 +1,14 @@
+{
+	"settings_ldap_wall_groups": "Grupos de ecrãs de parede",
+	"settings_ldap_wall_groups_help": "Os membros de nenhum outro grupo da lista tornam-se ecrãs de parede: só veem o modo parede.",
+	"settings_saml_wall_groups": "Grupos de ecrãs de parede",
+	"settings_saml_wall_groups_help": "Separados por vírgulas. Os membros de nenhum grupo de administradores ou operadores tornam-se ecrãs de parede: só veem o modo parede.",
+	"settings_sso_wall_groups": "Grupos de ecrãs de parede",
+	"settings_sso_wall_groups_help": "Separados por vírgulas. Os membros que não são administradores nem operadores tornam-se ecrãs de parede: só veem o modo parede. Preenchida sozinha, esta lista só decide a função de ecrã de parede.",
+	"settings_users_role_wall": "Ecrã de parede",
+	"settings_users_role_wall_help": "Para um ecrã na parede: depois de iniciar sessão vai diretamente para o modo parede e não pode abrir nenhuma outra página, definição ou dado. Mantém a sessão iniciada enquanto mostrar o mural; desative a conta, reponha a palavra-passe ou atribua-lhe outra função para terminar a sessão.",
+	"settings_users_role_wall_option": "Ecrã de parede — mostra só o mural",
+	"wall_sign_out": "Terminar sessão",
+	"wall_sign_out_confirm": "Terminar a sessão deste ecrã?",
+	"wall_sign_out_title": "Esta conta é um ecrã de parede: terminar a sessão é a única forma de sair do mural."
+}

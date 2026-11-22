@@ -79,12 +79,28 @@ info:
     everything. Every other write is admin only, and an operator can never
     manage accounts or roles.
 
+    A fourth role, **`wall`**, is a wall display: it signs in to show the
+    wall (`/wall`) and nothing else. It reaches only what the wall reads —
+    the operations marked `x-wall: true`:
+    `GET /api/auth/me`, `POST /api/auth/logout`, `GET /api/instance/settings`,
+    `GET /api/targets` (without addresses, options or credentials),
+    `GET /api/alerts`, `GET /api/alerts/rules`, `GET /api/metrics/query`,
+    `GET /api/metrics/query_range`, `GET /api/incidents`,
+    `GET /api/alerts/silences`, `GET /api/wall/weather` and the wall's
+    music (`GET /api/music/now`, `GET /api/music/spotify/token`,
+    `POST /api/music/spotify/playback`, `POST /api/music/speaker/report`,
+    `POST /api/music/speaker/play`). Everything else answers `403`, reads
+    included. Its session is renewed while the screen shows the wall, so
+    `DUMBMONIT_SESSION_DAYS` is how long it may stay idle rather than how
+    long it lasts; the two-factor policy does not apply to it; team rights
+    limit what it shows, as for any account. API tokens open nothing for it.
+
     ## Errors
 
     Every error body is JSON: `{"error": "message"}` — `400` bad request,
     `401` no valid session or token (with `WWW-Authenticate: Bearer` for a
-    token), `403` not allowed (viewer, operator outside alert handling, or
-    `read` token on a write route, missing
+    token), `403` not allowed (viewer, operator outside alert handling, wall
+    display outside the wall, or `read` token on a write route, missing
     anti-CSRF header, token on a session-only route, token used from a network
     it is not allowed from), `404` unknown id, `409` conflict, `429` rate
     limited (with `Retry-After`), `500` otherwise. An unknown path under `/api`
@@ -570,6 +586,7 @@ paths:
       summary: End the current session
       security: [{ cookieAuth: [] }]
       x-token-scope: none
+      x-wall: true
       responses:
         "204": { description: Signed out; the cookie is cleared. }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -582,6 +599,7 @@ paths:
       summary: The signed-in account
       security: [{ cookieAuth: [] }]
       x-token-scope: none
+      x-wall: true
       responses:
         "200":
           description: The account.
@@ -989,7 +1007,8 @@ paths:
         `require_totp`, admins and operators who sign in with a local password and
         have no second factor get `403` with `code: "totp_setup_required"` on every
         route but `GET /api/auth/me`, `GET /api/auth/totp`, the enrolment routes and
-        logout. Single sign-on (OIDC, SAML), LDAP and passkey sessions are exempt.
+        logout. Single sign-on (OIDC, SAML), LDAP and passkey sessions are exempt,
+        and viewers and wall displays are never concerned.
       security: [{ cookieAuth: [] }]
       x-token-scope: none
       requestBody:
@@ -1353,8 +1372,8 @@ paths:
       tags: [Accounts]
       summary: Turn SCIM provisioning on or off
       description: >-
-        `default_role` is `viewer` or `operator`: SCIM never creates an
-        administrator. An absent `default_role` keeps the current one.
+        `default_role` is `viewer`, `operator` or `wall` (wall displays): SCIM
+        never creates an administrator. An absent `default_role` keeps the current one.
       security: [{ cookieAuth: [] }]
       x-token-scope: none
       requestBody:
@@ -1366,7 +1385,7 @@ paths:
               required: [enabled]
               properties:
                 enabled: { type: boolean }
-                default_role: { type: string, enum: [viewer, operator] }
+                default_role: { type: string, enum: [viewer, operator, wall] }
       responses:
         "200":
           description: The new settings.
@@ -2756,6 +2775,7 @@ paths:
       tags: [Onboarding]
       summary: Instance settings chosen in the setup wizard
       x-token-scope: read
+      x-wall: true
       responses:
         "200":
           description: Instance settings.
@@ -2797,6 +2817,7 @@ paths:
       tags: [Devices]
       summary: Every device
       x-token-scope: read
+      x-wall: true
       responses:
         "200":
           description: Devices.
@@ -3460,6 +3481,7 @@ paths:
       summary: Instant MetricsQL query
       description: Each series carries a single `[timestamp, "value"]` pair in `values`.
       x-token-scope: read
+      x-wall: true
       parameters:
         - name: query
           in: query
@@ -3490,6 +3512,7 @@ paths:
         between them); `step` is in seconds and is widened so that a series
         never exceeds 2,000 points.
       x-token-scope: read
+      x-wall: true
       parameters:
         - name: query
           in: query
@@ -3539,6 +3562,7 @@ paths:
         deleted or paused devices are never listed. Dismissed alerts are left
         out unless `dismissed=true`, which lists only them.
       x-token-scope: read
+      x-wall: true
       parameters:
         - name: target_id
           in: query
@@ -3743,6 +3767,7 @@ paths:
       tags: [Rules]
       summary: Every alert rule
       x-token-scope: read
+      x-wall: true
       responses:
         "200":
           description: Rules, with their per-device overrides.
@@ -3946,6 +3971,7 @@ paths:
       tags: [Silences]
       summary: Every maintenance window
       x-token-scope: read
+      x-wall: true
       responses:
         "200":
           description: Windows, with `active_now`, `active_until` and `next_start_at` computed by the server.
@@ -5024,6 +5050,7 @@ paths:
       tags: [Incidents]
       summary: Every incident and maintenance announcement, with its updates
       x-token-scope: read
+      x-wall: true
       responses:
         "200":
           description: Incidents.
@@ -10247,6 +10274,7 @@ paths:
         from Spotify at most every few seconds, shared by every caller), and
         the link the walls play. Walls poll it every five seconds.
       x-token-scope: read
+      x-wall: true
       responses:
         "200":
           description: Spotify playback and the shared link.
@@ -10383,6 +10411,7 @@ paths:
         API tokens are refused.
       security: [{ cookieAuth: [] }]
       x-token-scope: none
+      x-wall: true
       responses:
         "200":
           description: The access token (never cached).
@@ -10409,6 +10438,7 @@ paths:
         whether the caller may.
       security: [{ cookieAuth: [] }]
       x-token-scope: none
+      x-wall: true
       requestBody:
         required: true
         content:
@@ -10496,6 +10526,7 @@ paths:
         (`null` when it cannot be checked).
       security: [{ cookieAuth: [] }]
       x-token-scope: none
+      x-wall: true
       requestBody:
         required: true
         content:
@@ -10537,6 +10568,7 @@ paths:
         wall, "Test sound" in Settings.
       security: [{ cookieAuth: [] }]
       x-token-scope: none
+      x-wall: true
       requestBody:
         required: false
         content:
@@ -10571,6 +10603,7 @@ paths:
         Open-Meteo does not answer, `current` is null too (the wall then shows
         nothing). Cached on the server for at least ten minutes.
       x-token-scope: read
+      x-wall: true
       responses:
         "200":
           description: The setting and, when a place is chosen, the weather.
@@ -11840,7 +11873,7 @@ components:
         base_url: { type: string, description: "Tenant URL to give the identity provider: `<origin>/api/scim/v2`." }
         token_set: { type: boolean }
         token_created_at: { type: [string, "null"], description: RFC 3339 UTC. }
-        default_role: { type: string, enum: [viewer, operator] }
+        default_role: { type: string, enum: [viewer, operator, wall] }
 
     ScimResource:
       type: object
@@ -12093,11 +12126,12 @@ components:
     # ----------------------------------------------------------- comptes
     Role:
       type: string
-      enum: [admin, operator, viewer]
+      enum: [admin, operator, viewer, wall]
       description: >-
         `admin` does everything; `operator` reads everything and handles
         alerts (operations marked `x-roles: [admin, operator]`); `viewer`
-        reads.
+        reads; `wall` is a wall display that only reaches what the wall reads
+        (operations marked `x-wall: true`).
     TeamLevel:
       type: string
       enum: [read, operate, manage]
@@ -12478,6 +12512,7 @@ components:
         attr_groups: { type: string, description: Groups attribute. Empty tries the usual names. }
         admin_groups: { type: array, items: { type: string } }
         operator_groups: { type: array, items: { type: string } }
+        wall_groups: { type: array, items: { type: string }, description: Members who are in no admin or operator group become wall displays. }
     SamlConfig:
       allOf:
         - $ref: "#/components/schemas/SamlConfigUpdate"
@@ -12516,6 +12551,12 @@ components:
           type: array
           items: { type: string }
           description: Members who are not in an admin group become operators.
+        wall_groups:
+          type: array
+          items: { type: string }
+          description: >-
+            Members who are in no admin or operator group become wall displays
+            (role `wall`). Alone, this list only decides the `wall` role.
         groups_claim: { type: string }
         public_url: { type: string }
         redirect_uri: { type: string }
@@ -12536,6 +12577,12 @@ components:
           type: array
           items: { type: string }
           description: Members who are not in an admin group become operators.
+        wall_groups:
+          type: array
+          items: { type: string }
+          description: >-
+            Members who are in no admin or operator group become wall displays
+            (role `wall`). Alone, this list only decides the `wall` role.
         groups_claim: { type: string }
         public_url: { type: string }
     OidcTestRequest:
@@ -12584,6 +12631,10 @@ components:
           type: array
           items: { type: string }
           description: Once any group list is filled, only members of a listed group can sign in.
+        wall_groups:
+          type: array
+          items: { type: string }
+          description: Members of no other listed group become wall displays (role `wall`).
         timeout_seconds: { type: integer }
     LdapConfigUpdate:
       type: object
@@ -12609,6 +12660,9 @@ components:
           type: array
           items: { type: string }
         viewer_groups:
+          type: array
+          items: { type: string }
+        wall_groups:
           type: array
           items: { type: string }
         timeout_seconds: { type: integer, minimum: 1, maximum: 30, default: 5 }
@@ -17268,7 +17322,7 @@ components:
         disabled: { type: boolean }
         on_call: { type: boolean, description: On call right now on at least one schedule. }
         username: { type: string, description: Administrators and the person themselves only. }
-        role: { type: string, enum: [admin, operator, viewer], description: Administrators and the person themselves only. }
+        role: { type: string, enum: [admin, operator, viewer, wall], description: Administrators and the person themselves only. }
         contacts: { type: integer, description: Enabled contact methods. Administrators and the person themselves only. }
     OnCallEntry:
       type: object

@@ -6,10 +6,12 @@
 	 * first, then what is waiting, then the healthy rest, alphabetically.
 	 * A device that reports but has an alert of its own wears that alert's
 	 * tone. When there are more devices than the space can show, the tail
-	 * (always healthy ones, given the order) folds into "and N more".
+	 * (always healthy ones, given the order) folds into "and N more". Each tile
+	 * opens its device, except on a wall-display account (no other page).
 	 */
 	import { untrack } from 'svelte';
 	import { m } from '#lib/paraglide/messages.js';
+	import { auth } from '#lib/stores/auth.svelte.js';
 	import { nextPage } from '#lib/components/wall/wallPrefs.js';
 	import { AlertTriangle, CircleAlert, CircleCheck, CircleDashed, Info } from 'lucide-svelte';
 	import type { Sky } from '#lib/components/overview/sky.js';
@@ -133,7 +135,7 @@
 		{#each shown as chip (chip.id)}
 			{@const Icon = ICON[chip.tone]}
 			<li class="min-w-0" class:wide={chip.word !== null && chip.tone !== 'ghost'} data-chip>
-				<a href={withBase(`/targets/${chip.id}`)} class="chip chip--{chip.tone}">
+				<svelte:element this={auth.isWall ? 'span' : 'a'} href={auth.isWall ? undefined : withBase(`/targets/${chip.id}`)} class="chip chip--{chip.tone}">
 					<Icon class="icon shrink-0" aria-hidden="true" />
 					<span class="min-w-0 flex-1 truncate">{chip.name}</span>
 					{#if chip.word}
@@ -141,7 +143,7 @@
 					{:else}
 						<span class="sr-only">{m.wall_devices_reporting()}</span>
 					{/if}
-				</a>
+				</svelte:element>
 			</li>
 		{/each}
 		{#if more > 0}

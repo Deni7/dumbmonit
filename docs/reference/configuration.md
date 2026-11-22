@@ -25,7 +25,7 @@ configuration file to mount.
 | `DUMBMONIT_LOG` | `info` | Log filter, `tracing` syntax: `debug`, `warn`, `dumbmonit=debug,sqlx=warn`… |
 | `DUMBMONIT_AGENT_DIR` | `/agents` | Directory of the agent binaries served under `/download/`. Empty or missing: the install command fails with `404`, the server still runs. |
 | `DUMBMONIT_RESET_PASSWORD` | *(off)* | `1`, `true`, `yes` or `on`: clear the password and every session at startup. The UI then shows `/setup` again. Remove it afterwards. |
-| `DUMBMONIT_SESSION_DAYS` | `30` | Lifetime of a sign-in session, in days, from 1 to 365 (a value outside is brought back to the nearest bound). The browser cookie expires at the same time. Applies to sessions opened after a restart; open ones keep their expiry. Each user can see and close their sessions in **Settings → Account & security**. |
+| `DUMBMONIT_SESSION_DAYS` | `30` | Lifetime of a sign-in session, in days, from 1 to 365 (a value outside is brought back to the nearest bound). The browser cookie expires at the same time. Applies to sessions opened after a restart; open ones keep their expiry. For a wall display account the session is renewed while the screen shows the wall, so this is how long it may stay idle. Each user can see and close their sessions in **Settings → Account & security**. |
 | `DUMBMONIT_AGENT_LISTEN` | `0.0.0.0:8443` | Listen address of the encrypted agent channel (TLS 1.3, client certificates). `off` closes it. The only port agents on other networks need; see [Agent channel security](../install/agent-security.md). |
 | `DUMBMONIT_AGENT_PUBLIC_PORT` | listen port | Port written in the agent install commands, when a port forward or a TCP proxy publishes another number. |
 | `DUMBMONIT_AGENT_PUBLIC_URL` | *(unset)* | Dedicated address of the agent channel, `https://host[:port]` (for example `https://agents.example.com:443` behind an SNI passthrough). Wins over the browser's host and `DUMBMONIT_AGENT_PUBLIC_PORT` in install commands and in the channel announcement. Checked at startup. See [Dedicated agent address](#dedicated-agent-address). |
@@ -53,6 +53,7 @@ configuration file to mount.
 | `DUMBMONIT_OIDC_GROUPS_CLAIM` | `groups` | Token claim listing the user's groups. |
 | `DUMBMONIT_OIDC_ADMIN_GROUPS` | *(empty)* | Comma-separated groups whose members become administrators. |
 | `DUMBMONIT_OIDC_OPERATOR_GROUPS` | *(empty)* | Comma-separated groups whose other members become operators. See [Single sign-on](../using/settings.md#single-sign-on). |
+| `DUMBMONIT_OIDC_WALL_GROUPS` | *(empty)* | Comma-separated groups whose members, when neither admins nor operators, become wall displays (accounts that only show wall mode). See [Wall display accounts](../using/settings.md#wall-display-accounts). |
 | `DUMBMONIT_LDAP_URL` | *(unset)* | LDAP / Active Directory server, `ldaps://host:636` or `ldap://host:389` (with `DUMBMONIT_LDAP_STARTTLS=1`). Like the other `DUMBMONIT_LDAP_*` variables, read only while no LDAP settings are saved in the interface. See [LDAP / Active Directory](../using/ldap.md). |
 | `DUMBMONIT_LDAP_STARTTLS` | *(off)* | `1` to upgrade an `ldap://` connection with StartTLS. |
 | `DUMBMONIT_LDAP_TLS_VERIFY` | `true` | `false` to accept a server certificate that cannot be verified. The connection stays encrypted, but anyone on the path could pose as the directory. |
@@ -69,7 +70,8 @@ configuration file to mount.
 | `DUMBMONIT_LDAP_GROUP_FILTER` | `(&(objectClass=groupOfNames)(member={dn}))` | Group search filter; `{dn}` is the user's DN, `{username}` the username. |
 | `DUMBMONIT_LDAP_ADMIN_GROUPS` | *(empty)* | Groups (name or DN) whose members become admins, separated by `;`. |
 | `DUMBMONIT_LDAP_OPERATOR_GROUPS` | *(empty)* | Groups whose other members become operators. |
-| `DUMBMONIT_LDAP_VIEWER_GROUPS` | *(empty)* | Groups whose other members become viewers. Once any of the three lists is set, only members of a listed group can sign in. |
+| `DUMBMONIT_LDAP_VIEWER_GROUPS` | *(empty)* | Groups whose other members become viewers. Once any of the four lists is set, only members of a listed group can sign in. |
+| `DUMBMONIT_LDAP_WALL_GROUPS` | *(empty)* | Groups whose other members become wall displays (accounts that only show wall mode). |
 | `DUMBMONIT_LDAP_TIMEOUT_SECONDS` | `5` | Timeout of each LDAP operation, 1 to 30. |
 | `DUMBMONIT_LDAP_ALLOW_PLAIN` | *(off)* | `1` to accept `ldap://` without StartTLS. Off, it is refused: every password would cross the network in clear text. Only for a test directory. |
 | `DUMBMONIT_METRICS_PUBLIC` | *(off)* | `1` to serve `/metrics`, `/federate` and `/prometheus/api/v1/…` without an API token. Anyone who can reach the port then reads every measurement of every monitor and the state of the instance; only set it where something else already restricts access to the port. See [Metrics](metrics.md#scraping-dumbmonit). |

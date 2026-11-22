@@ -1,7 +1,8 @@
 //! Des groupes de l'annuaire au rôle DumbMonit.
 //!
 //! La règle : membre d'un groupe administrateur → `admin`, sinon d'un groupe
-//! opérateur → `operator`, sinon d'un groupe lecteur → `viewer`. Dès qu'une
+//! opérateur → `operator`, sinon d'un groupe lecteur → `viewer`, sinon d'un
+//! groupe d'écrans muraux → `wall` (le mode mur seul). Dès qu'une
 //! liste est remplie, il faut appartenir à l'un des groupes listés pour entrer :
 //! un utilisateur qui perd ses groupes perd l'accès. Sans aucune liste, tout
 //! utilisateur trouvé par le filtre entre, et son rôle se règle à la main.
@@ -29,9 +30,14 @@ pub fn decide(
     admin_groups: &[String],
     operator_groups: &[String],
     viewer_groups: &[String],
+    wall_groups: &[String],
     current: Option<Role>,
 ) -> Decision {
-    if admin_groups.is_empty() && operator_groups.is_empty() && viewer_groups.is_empty() {
+    if admin_groups.is_empty()
+        && operator_groups.is_empty()
+        && viewer_groups.is_empty()
+        && wall_groups.is_empty()
+    {
         return Decision::Keep;
     }
     let member = |listed: &[String]| {
@@ -44,6 +50,8 @@ pub fn decide(
         Role::Operator
     } else if member(viewer_groups) {
         Role::Viewer
+    } else if member(wall_groups) {
+        Role::Wall
     } else {
         return Decision::Deny;
     };
@@ -124,43 +132,59 @@ mod tests {
     const ADMINS: &str = "CN=DumbMonit Admins,OU=Groups,DC=corp,DC=example";
     const NOC: &str = "cn=noc,ou=groups,dc=example,dc=org";
     const STAFF: &str = "cn=staff,ou=groups,dc=example,dc=org";
+    const SCREENS: &str = "cn=screens,ou=groups,dc=example,dc=org";
 
     #[test]
     fn groups_map_to_the_highest_role() {
         let admin = strings(&["dumbmonit admins"]);
         let operator = strings(&[NOC]);
         let viewer = strings(&["staff"]);
-        let decide = |groups: &[&str]| decide(&strings(groups), &admin, &operator, &viewer, None);
+        let wall = strings(&["screens"]);
+        let decide =
+            |groups: &[&str]| decide(&strings(groups), &admin, &operator, &viewer, &wall, None);
         assert_eq!(decide(&[ADMINS, NOC]), Decision::Role(Role::Admin));
         assert_eq!(decide(&[NOC, STAFF]), Decision::Role(Role::Operator));
         assert_eq!(decide(&[STAFF]), Decision::Role(Role::Viewer));
+        assert_eq!(decide(&[SCREENS]), Decision::Role(Role::Wall));
+        assert_eq!(decide(&[SCREENS, STAFF]), Decision::Role(Role::Viewer));
+        assert_eq!(decide(&[SCREENS, NOC]), Decision::Role(Role::Operator));
+    }
+
+    #[test]
+    fn a_wall_group_alone_lets_only_its_members_in() {
+        let wall = strings(&["screens"]);
+        assert_eq!(
+            decide(&strings(&[SCREENS]), &[], &[], &[], &wall, None),
+            Decision::Role(Role::Wall)
+        );
+        assert_eq!(decide(&strings(&[STAFF]), &[], &[], &[], &wall, None), Decision::Deny);
     }
 
     #[test]
     fn losing_every_listed_group_denies_access() {
         let viewer = strings(&["staff"]);
-        assert_eq!(decide(&[], &[], &[], &viewer, Some(Role::Viewer)), Decision::Deny);
+        assert_eq!(decide(&[], &[], &[], &viewer, &[], Some(Role::Viewer)), Decision::Deny);
         assert_eq!(
-            decide(&strings(&["cn=other,dc=x"]), &strings(&["admins"]), &[], &[], None),
+            decide(&strings(&["cn=other,dc=x"]), &strings(&["admins"]), &[], &[], &[], None),
             Decision::Deny
         );
     }
 
     #[test]
     fn without_any_list_the_groups_say_nothing() {
-        assert_eq!(decide(&strings(&[STAFF]), &[], &[], &[], None), Decision::Keep);
-        assert_eq!(decide(&[], &[], &[], &[], Some(Role::Admin)), Decision::Keep);
+        assert_eq!(decide(&strings(&[STAFF]), &[], &[], &[], &[], None), Decision::Keep);
+        assert_eq!(decide(&[], &[], &[], &[], &[], Some(Role::Admin)), Decision::Keep);
     }
 
     #[test]
     fn without_an_admin_list_an_admin_is_never_demoted() {
         let viewer = strings(&["staff"]);
         assert_eq!(
-            decide(&strings(&[STAFF]), &[], &[], &viewer, Some(Role::Admin)),
+            decide(&strings(&[STAFF]), &[], &[], &viewer, &[], Some(Role::Admin)),
             Decision::Keep
         );
         assert_eq!(
-            decide(&strings(&[STAFF]), &[], &[], &viewer, Some(Role::Operator)),
+            decide(&strings(&[STAFF]), &[], &[], &viewer, &[], Some(Role::Operator)),
             Decision::Role(Role::Viewer)
         );
     }

@@ -1,0 +1,14 @@
+{
+	"settings_ldap_wall_groups": "Grupos de pantallas murales",
+	"settings_ldap_wall_groups_help": "Los miembros que no están en ningún otro grupo de la lista pasan a ser pantallas murales: solo ven el modo pared.",
+	"settings_saml_wall_groups": "Grupos de pantallas murales",
+	"settings_saml_wall_groups_help": "Separados por comas. Los miembros que no están en ningún grupo de administradores u operadores pasan a ser pantallas murales: solo ven el modo pared.",
+	"settings_sso_wall_groups": "Grupos de pantallas murales",
+	"settings_sso_wall_groups_help": "Separados por comas. Los miembros que no son administradores ni operadores pasan a ser pantallas murales: solo ven el modo pared. Si es la única lista rellenada, solo decide el rol de pantalla mural.",
+	"settings_users_role_wall": "Pantalla mural",
+	"settings_users_role_wall_help": "Para una pantalla en la pared: al iniciar sesión va directo al modo pared y no puede abrir ninguna otra página, ajuste ni dato. Sigue conectada mientras muestre el mural; desactiva la cuenta, restablece su contraseña o dale otro rol para cerrar su sesión.",
+	"settings_users_role_wall_option": "Pantalla mural — solo muestra el mural",
+	"wall_sign_out": "Cerrar sesión",
+	"wall_sign_out_confirm": "¿Cerrar la sesión de esta pantalla?",
+	"wall_sign_out_title": "Esta cuenta es una pantalla mural: cerrar sesión es la única forma de salir del mural."
+}

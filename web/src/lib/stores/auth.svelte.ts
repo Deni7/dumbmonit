@@ -3,7 +3,7 @@
  *
  * Accounts have three roles: `admin` (everything), `operator` (reads everything
  * and handles alerts: ack, ignore, snooze — no configuration) and `viewer`
- * (read only). This
+ * (read only), plus `wall`, a wall display that only ever shows `/wall`. This
  * store is the single source of truth about the session. The cookie set by the
  * server is `HttpOnly`: the interface can neither read nor forge it, and stores
  * no token. The state is therefore deduced only from `GET /api/auth/status`
@@ -168,6 +168,14 @@ class AuthStore {
 	get canOperate(): boolean {
 		if (this.isAdmin) return true;
 		return this.user?.role === 'operator';
+	}
+
+	/**
+	 * True for a wall-display account (`wall` role): it signs in straight to
+	 * `/wall`, the layout keeps it there, and the server answers nothing else.
+	 */
+	get isWall(): boolean {
+		return this.available && this.configured && this.user?.role === 'wall';
 	}
 
 	/**

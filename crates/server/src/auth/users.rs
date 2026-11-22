@@ -1,9 +1,11 @@
 //! Comptes utilisateurs : lecture et écriture de la table `users`.
 //!
 //! Trois rôles, ordonnés : `viewer` regarde, `operator` regarde et traite les
-//! alertes (acquitter, ignorer, mettre en sourdine), `admin` fait tout. Il n'y a ni
-//! permission fine, ni groupe local — quand une équipe a besoin de plus, c'est le
-//! fournisseur d'identité qui décide, par ses groupes (voir `oidc`).
+//! alertes (acquitter, ignorer, mettre en sourdine), `admin` fait tout. Un
+//! quatrième, `wall`, est à part : un écran mural, qui ne voit que le mode mur
+//! (`/wall`) et ne lit que les routes dont il a besoin (`wall::WALL_ROUTES`).
+//! Il n'y a ni permission fine, ni groupe local — quand une équipe a besoin de
+//! plus, c'est le fournisseur d'identité qui décide, par ses groupes (voir `oidc`).
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -17,6 +19,8 @@ pub enum Role {
     Admin,
     Operator,
     Viewer,
+    /// Écran mural : le mode mur et rien d'autre, en lecture.
+    Wall,
 }
 
 impl Role {
@@ -25,6 +29,7 @@ impl Role {
             Self::Admin => "admin",
             Self::Operator => "operator",
             Self::Viewer => "viewer",
+            Self::Wall => "wall",
         }
     }
 
@@ -33,12 +38,18 @@ impl Role {
             "admin" => Some(Self::Admin),
             "operator" => Some(Self::Operator),
             "viewer" => Some(Self::Viewer),
+            "wall" => Some(Self::Wall),
             _ => None,
         }
     }
 
     pub fn is_admin(self) -> bool {
         matches!(self, Self::Admin)
+    }
+
+    /// Compte d'écran mural : le garde d'API ne lui ouvre que `WALL_ROUTES`.
+    pub fn is_wall(self) -> bool {
+        matches!(self, Self::Wall)
     }
 
     /// Peut traiter les alertes : opérateur ou administrateur. Ce que cela
@@ -415,13 +426,30 @@ pub async fn set_email(pool: &SqlitePool, id: i64, email: Option<&str>) -> Resul
     Ok(())
 }
 
+/// Ferme les sessions d'un écran mural qui quitte ce rôle, avant le
+/// changement. Sa session se renouvelle tant qu'il affiche le mur : laissée
+/// ouverte, elle donnerait au premier passant devant l'écran tout ce que le
+/// nouveau rôle permet. Sans effet sur un autre compte.
+const CLOSE_WALL_SESSIONS: &str = "DELETE FROM auth_sessions WHERE user_id = ?
+     AND EXISTS (SELECT 1 FROM users WHERE id = ? AND role = 'wall')";
+
 pub async fn set_role(pool: &SqlitePool, id: i64, role: Role) -> Result<()> {
+    let mut tx = pool.begin().await.context("ouverture de la transaction")?;
+    if !role.is_wall() {
+        sqlx::query(CLOSE_WALL_SESSIONS)
+            .bind(id)
+            .bind(id)
+            .execute(&mut *tx)
+            .await
+            .context("fermeture des sessions de l'écran mural")?;
+    }
     sqlx::query("UPDATE users SET role = ? WHERE id = ?")
         .bind(role.as_str())
         .bind(id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await
         .context("mise à jour du rôle")?;
+    tx.commit().await.context("validation de la transaction")?;
     Ok(())
 }
 
@@ -472,6 +500,14 @@ pub async fn apply_changes(pool: &SqlitePool, id: i64, changes: &AccountChanges<
             .context("mise à jour de l'adresse électronique")?;
     }
     if let Some(role) = changes.role {
+        if !role.is_wall() {
+            sqlx::query(CLOSE_WALL_SESSIONS)
+                .bind(id)
+                .bind(id)
+                .execute(&mut *tx)
+                .await
+                .context("fermeture des sessions de l'écran mural")?;
+        }
         sqlx::query("UPDATE users SET role = ? WHERE id = ?")
             .bind(role.as_str())
             .bind(id)
@@ -735,12 +771,16 @@ mod tests {
 
     #[test]
     fn roles_round_trip_through_their_text_form() {
-        for role in [Role::Admin, Role::Operator, Role::Viewer] {
+        for role in [Role::Admin, Role::Operator, Role::Viewer, Role::Wall] {
             assert_eq!(Role::parse(role.as_str()), Some(role));
+            assert_eq!(serde_json::to_value(role).unwrap(), serde_json::json!(role.as_str()));
         }
         assert_eq!(Role::parse("root"), None);
         assert!(Role::Admin.is_admin());
         assert!(!Role::Viewer.is_admin());
+        assert!(Role::Wall.is_wall());
+        assert!(!Role::Wall.is_admin() && !Role::Wall.can_operate());
+        assert!(!Role::Viewer.is_wall());
     }
 
     #[test]

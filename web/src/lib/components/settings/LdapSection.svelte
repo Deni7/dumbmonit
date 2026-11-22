@@ -72,6 +72,7 @@
 		admin_groups: '',
 		operator_groups: '',
 		viewer_groups: '',
+		wall_groups: '',
 		timeout_seconds: 5
 	});
 	let connOpen = $state(false);
@@ -107,6 +108,7 @@
 			admin_groups: next.admin_groups.join('\n'),
 			operator_groups: next.operator_groups.join('\n'),
 			viewer_groups: next.viewer_groups.join('\n'),
+			wall_groups: (next.wall_groups ?? []).join('\n'),
 			timeout_seconds: next.timeout_seconds
 		};
 		tracker.markClean();
@@ -165,6 +167,7 @@
 			admin_groups: lines(form.admin_groups),
 			operator_groups: lines(form.operator_groups),
 			viewer_groups: lines(form.viewer_groups),
+			wall_groups: lines(form.wall_groups),
 			timeout_seconds: Math.min(30, Math.max(1, Math.round(Number(form.timeout_seconds) || 5)))
 		};
 	}
@@ -255,7 +258,8 @@
 	const ROLE_LABELS = {
 		admin: () => m.settings_users_role_admin(),
 		operator: () => m.settings_users_role_operator(),
-		viewer: () => m.settings_users_role_viewer()
+		viewer: () => m.settings_users_role_viewer(),
+		wall: () => m.settings_users_role_wall()
 	};
 
 	async function test(): Promise<boolean> {
@@ -361,6 +365,9 @@
 				</Field>
 				<Field label={m.settings_ldap_viewer_groups()} for="ldap-viewer-groups">
 					<textarea id="ldap-viewer-groups" class="input min-h-20 font-mono text-[0.8125rem]" rows="3" bind:value={form.viewer_groups} placeholder="CN=IT Staff,OU=Groups,DC=corp,DC=example" spellcheck="false" autocomplete="off" disabled={saving}></textarea>
+				</Field>
+				<Field label={m.settings_ldap_wall_groups()} for="ldap-wall-groups" help={m.settings_ldap_wall_groups_help()}>
+					<textarea id="ldap-wall-groups" class="input min-h-20 font-mono text-[0.8125rem]" rows="3" bind:value={form.wall_groups} placeholder="Lobby screens" spellcheck="false" autocomplete="off" disabled={saving}></textarea>
 				</Field>
 				<DocLink page="using/ldap/" class="sm:col-span-2" />
 			</div>

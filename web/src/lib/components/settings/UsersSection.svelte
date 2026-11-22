@@ -3,7 +3,8 @@
 	 * Settings → Users: the accounts that can sign in, and their role.
 	 *
 	 * Three roles: admin (everything), operator (handles alerts — ack, ignore,
-	 * snooze — but changes no configuration) and viewer (read only). The server keeps
+	 * snooze — but changes no configuration) and viewer (read only), plus wall
+	 * display (signs in straight to the wall, reaches nothing else). The server keeps
 	 * at least one active admin; the disabled controls here just reflect that
 	 * rule so nobody discovers it through an error.
 	 *
@@ -99,9 +100,9 @@
 		}
 	}
 
-	/** Staff accounts the policy would hold at enrolment (local password, no second factor). */
+	/** Staff accounts the policy would hold at enrolment (local password, no second factor). Viewers and wall displays are never held. */
 	const staffWithout2fa = $derived(
-		users.filter((u) => u.role !== 'viewer' && !u.disabled && !u.totp_enabled && u.auth === 'password').length
+		users.filter((u) => (u.role === 'admin' || u.role === 'operator') && !u.disabled && !u.totp_enabled && u.auth === 'password').length
 	);
 
 	const activeAdmins = $derived(users.filter((u) => u.role === 'admin' && !u.disabled).length);
@@ -127,8 +128,10 @@
 	const ROLE_LABELS: Record<Role, () => string> = {
 		admin: () => m.settings_users_role_admin(),
 		operator: () => m.settings_users_role_operator(),
-		viewer: () => m.settings_users_role_viewer()
+		viewer: () => m.settings_users_role_viewer(),
+		wall: () => m.settings_users_role_wall()
 	};
+	const ROLE_TONES: Record<Role, 'signal' | 'info' | 'ghost'> = { admin: 'signal', operator: 'info', viewer: 'ghost', wall: 'ghost' };
 
 	let draft = $state({ username: '', display_name: '', email: '', role: 'viewer' as Role, password: '' });
 	let draftErrors = $state<{ username?: string; password?: string; email?: string }>({});
@@ -353,11 +356,12 @@
 							oninput={() => (draftErrors = { ...draftErrors, email: undefined })}
 						/>
 					</Field>
-					<Field label={m.settings_users_role()} for="new-role">
-						<select id="new-role" class="input" bind:value={draft.role} disabled={creating}>
+					<Field label={m.settings_users_role()} for="new-role" help={draft.role === 'wall' ? m.settings_users_role_wall_help() : undefined}>
+						<select id="new-role" class="input min-h-10" bind:value={draft.role} disabled={creating}>
 							<option value="viewer">{m.settings_users_role_viewer_option()}</option>
 							<option value="operator">{m.settings_users_role_operator_option()}</option>
 							<option value="admin">{m.settings_users_role_admin_option()}</option>
+							<option value="wall">{m.settings_users_role_wall_option()}</option>
 						</select>
 					</Field>
 					<Field
@@ -491,7 +495,7 @@
 									{#if user.display_name.trim()}
 										<span class="text-sm text-ink-2">{user.username}</span>
 									{/if}
-									<Plate tone={user.role === 'admin' ? 'signal' : user.role === 'operator' ? 'info' : 'ghost'} bare label={ROLE_LABELS[user.role]?.() ?? user.role} />
+									<Plate tone={ROLE_TONES[user.role] ?? 'ghost'} bare label={ROLE_LABELS[user.role]?.() ?? user.role} />
 									<Plate
 										tone="info"
 										bare
@@ -559,11 +563,16 @@
 										oninput={() => (editEmailError = null)}
 									/>
 								</Field>
-								<Field label={m.settings_users_role()} for={`edit-role-${user.id}`} help={lastAdmin ? m.settings_users_role_last_admin_help() : undefined}>
-									<select id={`edit-role-${user.id}`} class="input" bind:value={edit.role} disabled={saving || lastAdmin} title={lastAdmin ? m.settings_users_promote_first() : undefined}>
+								<Field
+									label={m.settings_users_role()}
+									for={`edit-role-${user.id}`}
+									help={lastAdmin ? m.settings_users_role_last_admin_help() : edit.role === 'wall' ? m.settings_users_role_wall_help() : undefined}
+								>
+									<select id={`edit-role-${user.id}`} class="input min-h-10" bind:value={edit.role} disabled={saving || lastAdmin} title={lastAdmin ? m.settings_users_promote_first() : undefined}>
 										<option value="viewer">{m.settings_users_role_viewer_option()}</option>
 										<option value="operator">{m.settings_users_role_operator_option()}</option>
 										<option value="admin">{m.settings_users_role_admin_option()}</option>
+										<option value="wall">{m.settings_users_role_wall_option()}</option>
 									</select>
 								</Field>
 								<Field

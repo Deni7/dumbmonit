@@ -420,6 +420,7 @@ pub async fn list(
     let owners = clients::target_clients(&state.pool).await?;
     let cve_off = db::targets::cve_scan_off(&state.pool).await?;
     let admin = who.is_admin();
+    let wall = who.is_wall();
     Ok(Json(
         targets
             .into_iter()
@@ -435,6 +436,7 @@ pub async fn list(
                     .client(client)
                     .cve(cve_scan)
                     .for_reader(admin)
+                    .for_wall(wall)
             })
             .collect(),
     ))
@@ -484,6 +486,22 @@ impl TargetView {
         if let Some(client) = client {
             self.client_id = client;
         }
+        self
+    }
+
+    /// Version de la vue destinée à un écran mural (rôle `wall`) : le mur
+    /// affiche le nom, le type et l'état d'un équipement, jamais son adresse,
+    /// ses options, sa note ni l'origine de sa déclaration. Ce qu'il ne montre
+    /// pas ne lui est pas envoyé ; la forme de la réponse, elle, ne change pas.
+    fn for_wall(mut self, wall: bool) -> Self {
+        if !wall {
+            return self;
+        }
+        self.address = String::new();
+        self.tags.clear();
+        self.credential_public.clear();
+        self.note = String::new();
+        self.managed = None;
         self
     }
 

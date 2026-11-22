@@ -38,13 +38,15 @@ pub const SETTINGS_KEY: &str = "scim.config";
 pub const TOKEN_KEY: &str = "scim.token";
 
 /// Rôle donné aux comptes que SCIM crée. Jamais administrateur : le type ne
-/// le permet pas.
+/// le permet pas. `wall` sert à une application du fournisseur dédiée aux
+/// écrans muraux : chaque compte qu'elle crée ne voit que le mode mur.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum DefaultRole {
     #[default]
     Viewer,
     Operator,
+    Wall,
 }
 
 impl DefaultRole {
@@ -52,6 +54,7 @@ impl DefaultRole {
         match self {
             Self::Viewer => Role::Viewer,
             Self::Operator => Role::Operator,
+            Self::Wall => Role::Wall,
         }
     }
 
@@ -59,6 +62,7 @@ impl DefaultRole {
         match self {
             Self::Viewer => "viewer",
             Self::Operator => "operator",
+            Self::Wall => "wall",
         }
     }
 
@@ -66,6 +70,7 @@ impl DefaultRole {
         match value.trim() {
             "viewer" => Some(Self::Viewer),
             "operator" => Some(Self::Operator),
+            "wall" => Some(Self::Wall),
             _ => None,
         }
     }
@@ -199,6 +204,8 @@ mod tests {
     fn the_default_role_is_never_admin() {
         assert_eq!(DefaultRole::parse("viewer"), Some(DefaultRole::Viewer));
         assert_eq!(DefaultRole::parse("operator"), Some(DefaultRole::Operator));
+        assert_eq!(DefaultRole::parse("wall"), Some(DefaultRole::Wall));
+        assert_eq!(DefaultRole::Wall.role(), Role::Wall);
         assert_eq!(DefaultRole::parse("admin"), None);
         assert_eq!(DefaultRole::default().role(), Role::Viewer);
         assert!(serde_json::from_str::<DefaultRole>("\"admin\"").is_err());

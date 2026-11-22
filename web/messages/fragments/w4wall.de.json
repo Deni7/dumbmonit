@@ -1,0 +1,14 @@
+{
+	"settings_ldap_wall_groups": "Wandbildschirm-Gruppen",
+	"settings_ldap_wall_groups_help": "Mitglieder keiner anderen aufgeführten Gruppe werden Wandbildschirme: Sie sehen nur den Wandmodus.",
+	"settings_saml_wall_groups": "Wandbildschirm-Gruppen",
+	"settings_saml_wall_groups_help": "Durch Kommas getrennt. Mitglieder keiner Administrator- oder Operatorgruppe werden Wandbildschirme: Sie sehen nur den Wandmodus.",
+	"settings_sso_wall_groups": "Wandbildschirm-Gruppen",
+	"settings_sso_wall_groups_help": "Durch Kommas getrennt. Mitglieder, die weder Admins noch Operatoren sind, werden Wandbildschirme: Sie sehen nur den Wandmodus. Allein ausgefüllt, entscheidet diese Liste nur über die Rolle Wandbildschirm.",
+	"settings_users_role_wall": "Wandbildschirm",
+	"settings_users_role_wall_help": "Für einen Bildschirm an der Wand: Nach der Anmeldung öffnet er direkt den Wandmodus und kann keine andere Seite, keine Einstellung und keine Daten öffnen. Er bleibt angemeldet, solange er die Wand zeigt; deaktivieren Sie das Konto, setzen Sie sein Passwort zurück oder geben Sie ihm eine andere Rolle, um ihn abzumelden.",
+	"settings_users_role_wall_option": "Wandbildschirm – zeigt nur die Wand",
+	"wall_sign_out": "Abmelden",
+	"wall_sign_out_confirm": "Diesen Bildschirm abmelden?",
+	"wall_sign_out_title": "Dieses Konto ist ein Wandbildschirm: Abmelden ist der einzige Weg, die Wand zu verlassen."
+}

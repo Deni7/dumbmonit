@@ -1,6 +1,7 @@
 //! Authentification de l'instance.
 //!
-//! Des comptes, trois rôles (`admin`, `operator`, `viewer`), une session par navigateur, et une
+//! Des comptes, trois rôles (`admin`, `operator`, `viewer`) et un rôle d'écran mural
+//! (`wall`, le mode mur seul), une session par navigateur, et une
 //! connexion déléguée à un fournisseur OpenID Connect quand une équipe en a un. Il
 //! n'y a volontairement ni inscription libre, ni récupération par courriel, ni
 //! permission fine — chaque écran de configuration en plus dégraderait la
@@ -38,6 +39,7 @@ pub mod token;
 pub mod totp;
 pub mod totp_login;
 pub mod users;
+pub mod wall;
 pub mod webauthn;
 
 /// Réinitialise l'instance : plus aucun compte, plus aucune session.
