@@ -41,6 +41,7 @@ mod mail_server;
 mod mcp;
 mod metrics;
 mod monitor_imports;
+mod monitor_templates;
 mod music;
 mod netconfig;
 mod netinventory;
@@ -84,6 +85,7 @@ mod summary;
 mod synology;
 mod target_rules;
 pub(crate) mod targets;
+mod targets_bulk;
 mod targets_import;
 mod teams;
 mod threats;
@@ -216,6 +218,10 @@ pub fn router_with_hubs(
         .route("/targets/test", post(targets::test_connection))
         .route("/targets/reorder", post(targets::reorder))
         .route("/targets/folders/rename", post(targets::rename_folder))
+        // Modification groupée (`targets_bulk.rs`) et modèles de moniteur
+        // (`monitor_templates.rs`).
+        .merge(targets_bulk::routes())
+        .merge(monitor_templates::routes())
         .route("/targets/import", post(targets_import::import))
         .route(
             "/targets/import/kuma",

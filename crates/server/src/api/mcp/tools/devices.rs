@@ -555,7 +555,7 @@ pub(super) async fn add_device(state: &AppState, args: &Args) -> ToolResult {
     let (_, Json(view)) = targets::create(
         crate::auth::teams::TeamAccess(crate::auth::teams::Access::All),
         State(state.clone()),
-        Json(payload),
+        Json(crate::api::targets_bulk::WithChannels { target: payload, channels: None }),
     )
     .await?;
     let mut text = format!(

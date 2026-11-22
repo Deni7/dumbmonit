@@ -22,6 +22,7 @@ use sqlx::{Row, SqlitePool};
 
 use crate::api::topology_edits;
 use crate::backup::bundle::*;
+use crate::backup::monitor_templates;
 use crate::crypto::Cipher;
 
 /// Ce que l'opérateur choisit d'emporter.
@@ -120,6 +121,9 @@ pub async fn collect(pool: &SqlitePool, cipher: &Cipher, options: ExportOptions)
             .map(|(logo_type, bytes)| BundleReportLogo { logo_type, data: BASE64.encode(bytes) }),
         slos: slos(pool, &refs).await?,
         auth_policy: crate::auth::settings::get::<Value>(pool, crate::auth::policy::SETTINGS_KEY)
+            .await?,
+        monitor_templates: monitor_templates::collect_templates(pool, &channel_names).await?,
+        target_channels: monitor_templates::collect_target_channels(pool, &refs, &channel_names)
             .await?,
     })
 }

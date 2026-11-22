@@ -2,6 +2,7 @@ pub mod abb_runs;
 pub mod activedirectory;
 pub mod alerts;
 pub mod lun_links;
+pub mod monitor_templates;
 pub mod multisite;
 pub mod opnsense;
 pub mod pbs;
@@ -9,6 +10,7 @@ pub mod pdm;
 pub mod pmg;
 pub mod relay_backlog;
 pub mod status_pages;
+pub mod target_channels;
 pub mod targets;
 pub mod truenas;
 

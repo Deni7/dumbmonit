@@ -250,6 +250,12 @@ pub struct Bundle {
     /// qu'elle n'a jamais été réglée.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auth_policy: Option<Value>,
+    /// Modèles de moniteur (migration 0283), leurs canaux par nom.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub monitor_templates: Vec<crate::backup::monitor_templates::BundleMonitorTemplate>,
+    /// Canaux propres aux moniteurs (migration 0282), par référence.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub target_channels: Vec<crate::backup::monitor_templates::BundleTargetChannels>,
 }
 
 /// Serveur de courriel enregistré et son mot de passe.
@@ -294,6 +300,8 @@ impl Bundle {
             ("lun_links".to_string(), self.lun_links.len()),
             ("upgrade_notes_closed".to_string(), self.upgrade_notes_closed.len()),
             ("slos".to_string(), self.slos.len()),
+            ("monitor_templates".to_string(), self.monitor_templates.len()),
+            ("target_channels".to_string(), self.target_channels.len()),
         ])
     }
 }

@@ -4,11 +4,15 @@
 	 * disable, silence, move to a folder, and (in one menu, being rarer)
 	 * location, relay and CVE check, then delete. Each action is handed back to
 	 * the list, which runs it over the selection and reports the outcome.
+	 * "Edit" opens `BulkEditDialog` (interval, channels, tags, folder in one
+	 * request); its verdicts go back to the list through `onedited`.
 	 */
 	import { m } from '#lib/paraglide/messages.js';
 	import { Button, Confirm, Menu, SelectionBar } from '#lib/ui/index.js';
-	import type { MapLocation, RelayAgent } from '#lib/api/types.js';
-	import { BellOff, EllipsisVertical, FolderInput, MapPin, Power, PowerOff, RadioTower, ShieldCheck, Trash2 } from 'lucide-svelte';
+	import type { MapLocation, RelayAgent, Target } from '#lib/api/types.js';
+	import type { TargetBulkReport } from '#lib/api/targetsBulk.js';
+	import { BellOff, EllipsisVertical, FolderInput, MapPin, Power, PowerOff, RadioTower, ShieldCheck, SlidersHorizontal, Trash2 } from 'lucide-svelte';
+	import BulkEditDialog from './BulkEditDialog.svelte';
 
 	interface Props {
 		/** Selected monitors still on screen: what the actions reach. */
@@ -21,6 +25,11 @@
 		folderChoices: string[];
 		locations: MapLocation[];
 		relays: RelayAgent[];
+		/** The selected monitors on screen, for "Edit". */
+		targets: Target[];
+		/** Free tag keys of the selection, offered for removal in "Edit". */
+		tagKeys: string[];
+		onedited: (report: TargetBulkReport) => void;
 		onselectall: (on: boolean) => void;
 		onexit: () => void;
 		onsetenabled: (enabled: boolean) => void;
@@ -41,6 +50,9 @@
 		folderChoices,
 		locations,
 		relays,
+		targets,
+		tagKeys,
+		onedited,
 		onselectall,
 		onexit,
 		onsetenabled,
@@ -53,6 +65,7 @@
 	}: Props = $props();
 
 	let folderDraft = $state('');
+	let editDialog = $state<BulkEditDialog | null>(null);
 	// Turning the CVE check off is armed first (second click in the menu).
 	let cveArmed = $state(false);
 
@@ -71,6 +84,10 @@
 	{onselectall}
 	{onexit}
 >
+	<Button size="sm" variant="ghost" disabled={busy || count === 0} aria-haspopup="dialog" onclick={() => editDialog?.show()}>
+		<SlidersHorizontal class="size-4" aria-hidden="true" />
+		{m.w5monitors_bulkedit_open()}
+	</Button>
 	<Button size="sm" variant="ghost" disabled={busy || count === 0} onclick={() => onsetenabled(true)}>
 		<Power class="size-4" aria-hidden="true" />
 		{m.devices_list_bulk_enable()}
@@ -196,3 +213,5 @@
 		{m.devices_list_bulk_delete()}
 	</Confirm>
 </SelectionBar>
+
+<BulkEditDialog bind:this={editDialog} {targets} {folderChoices} {tagKeys} ondone={onedited} />

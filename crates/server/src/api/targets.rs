@@ -7,6 +7,7 @@ use axum::http::StatusCode;
 use dumbmonit_proto::{Credential, CredentialInput, Target, TargetId};
 use serde::{Deserialize, Serialize};
 
+use crate::api::targets_bulk::{WithChannels, check_channels};
 use crate::api::{ApiError, ApiResult};
 use crate::auth::clients;
 use crate::auth::middleware::Identity;
@@ -85,6 +86,9 @@ pub struct TargetView {
     pub multisite: Option<MultisiteConfig>,
     /// Mode MSP : le client de l'équipement (client par défaut, `1`, sinon).
     pub client_id: i64,
+    /// Canaux de notification propres au moniteur (migration 0282) ; vide :
+    /// ceux de ses règles (voir `db::target_channels`).
+    pub channels: Vec<i64>,
     pub last_probe_at: Option<String>,
     pub last_error: Option<String>,
     /// Nature de `last_error` : `down` (équipement injoignable) ou `config`
@@ -158,6 +162,7 @@ impl TargetView {
             location_id: None,
             multisite: None,
             client_id: crate::auth::clients::DEFAULT_CLIENT,
+            channels: Vec::new(),
             last_probe_at,
             last_error,
             error_kind,
@@ -419,12 +424,14 @@ pub async fn list(
     let mut multisite = db::multisite::all(&state.pool).await?;
     let owners = clients::target_clients(&state.pool).await?;
     let cve_off = db::targets::cve_scan_off(&state.pool).await?;
+    let mut channels = db::target_channels::all(&state.pool).await?;
     let admin = who.is_admin();
     let wall = who.is_wall();
     Ok(Json(
         targets
             .into_iter()
             .map(|target| {
+                let target_id = target.id;
                 let status = statuses.remove(&target.id);
                 let location = places.get(&target.id).copied();
                 let sites = multisite.remove(&target.id);
@@ -435,6 +442,7 @@ pub async fn list(
                     .sites(sites)
                     .client(client)
                     .cve(cve_scan)
+                    .with_channels(channels.remove(&target_id).unwrap_or_default())
                     .for_reader(admin)
                     .for_wall(wall)
             })
@@ -453,12 +461,14 @@ pub async fn get_one(
     let sites = db::multisite::get(&state.pool, id).await?;
     let client = clients::target_client(&state.pool, id).await?;
     let cve_scan = db::targets::cve_scan_of(&state.pool, id).await?;
+    let channels = db::target_channels::of(&state.pool, id).await?;
     Ok(Json(
         TargetView::new(target, status)
             .at(location)
             .sites(sites)
             .client(client)
             .cve(cve_scan)
+            .with_channels(channels)
             .for_reader(who.is_admin()),
     ))
 }
@@ -585,7 +595,7 @@ pub fn redact_userinfo(text: &str) -> String {
 pub async fn create(
     TeamAccess(access): TeamAccess,
     State(state): State<AppState>,
-    Json(payload): Json<TargetPayload>,
+    Json(WithChannels { target: payload, channels }): Json<WithChannels>,
 ) -> ApiResult<(StatusCode, Json<TargetView>)> {
     let location = payload.location_id.flatten();
     let multisite = payload.multisite.clone().flatten();
@@ -603,6 +613,7 @@ pub async fn create(
     check_pack_relay(&input)?;
     let multisite = check_multisite(&state, None, &input, multisite).await?;
     check_client_links(&state, client, &input, multisite.as_ref()).await?;
+    let channels = check_channels(&state, client, channels.as_deref()).await?.unwrap_or_default();
     let id = db::targets::create_in(&state.pool, &state.cipher, &input, client)
         .await
         .map_err(duplicate_address_to_conflict)?;
@@ -617,6 +628,9 @@ pub async fn create(
     }
     if let Some(note) = note.filter(|note| !note.is_empty()) {
         db::targets::set_note(&state.pool, id, &note).await?;
+    }
+    if !channels.is_empty() {
+        db::target_channels::set(&state.pool, id, &channels).await?;
     }
     let target = load(&state, id).await?;
     crate::packs::apply_thresholds(&state.pool, &target).await;
@@ -634,7 +648,8 @@ pub async fn create(
         .at(location)
         .sites(multisite)
         .client(Some(client))
-        .cve(cve_scan);
+        .cve(cve_scan)
+        .with_channels(channels);
     Ok((StatusCode::CREATED, Json(view)))
 }
 
@@ -642,7 +657,7 @@ pub async fn update(
     TeamAccess(access): TeamAccess,
     State(state): State<AppState>,
     Path(id): Path<TargetId>,
-    Json(payload): Json<TargetPayload>,
+    Json(WithChannels { target: payload, channels }): Json<WithChannels>,
 ) -> ApiResult<Json<TargetView>> {
     let keep_profile = payload.profile_id.is_none();
     let keep_relay = payload.via_agent.is_none();
@@ -710,6 +725,7 @@ pub async fn update(
     check_parent(&state, input.parent_id).await?;
     check_relay(&state, input.via_agent).await?;
     check_client_links(&state, client, &input, multisite.as_ref()).await?;
+    let channels = check_channels(&state, client, channels.as_deref()).await?;
     let updated = db::targets::update(&state.pool, &state.cipher, id, &input)
         .await
         .map_err(duplicate_address_to_conflict)?;
@@ -726,6 +742,9 @@ pub async fn update(
     }
     if let Some(note) = new_note {
         db::targets::set_note(&state.pool, id, &note).await?;
+    }
+    if let Some(channels) = &channels {
+        db::target_channels::set(&state.pool, id, channels).await?;
     }
     if let Some(cve_scan) = new_cve_scan {
         db::targets::set_cve_scan(&state.pool, &[id], cve_scan).await?;
@@ -746,12 +765,14 @@ pub async fn update(
     let status = db::targets::statuses(&state.pool).await?.remove(&id);
     let location = super::locations::location_of(&state.pool, id).await?;
     let cve_scan = db::targets::cve_scan_of(&state.pool, id).await?;
+    let channels = db::target_channels::of(&state.pool, id).await?;
     Ok(Json(
         TargetView::new(target, status)
             .at(location)
             .sites(multisite)
             .client(Some(client))
-            .cve(cve_scan),
+            .cve(cve_scan)
+            .with_channels(channels),
     ))
 }
 

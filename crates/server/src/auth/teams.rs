@@ -450,6 +450,9 @@ pub const SCOPED_ROUTES: &[(&str, &str, RouteRule)] = &[
     // Filtrées par le gestionnaire.
     ("GET", "/targets", RouteRule::Open),
     ("POST", "/targets", RouteRule::Open),
+    // Lot : le gestionnaire exige `manage` sur chaque moniteur et sur le dossier
+    // d'arrivée (`api/targets_bulk.rs`).
+    ("PATCH", "/targets/bulk", RouteRule::Open),
     ("GET", "/metrics/query", RouteRule::Open),
     ("GET", "/metrics/query_range", RouteRule::Open),
     ("GET", "/metrics/catalog", RouteRule::Open),
@@ -494,6 +497,7 @@ pub const MANAGE_TARGET_ROUTES: &[(&str, &str)] = &[
     ("DELETE", "/targets/*"),
     ("POST", "/targets/*/probe"),
     ("POST", "/targets"),
+    ("PATCH", "/targets/bulk"),
     // SLO : le gestionnaire exige `manage` sur chacun des moniteurs couverts.
     ("POST", "/slos"),
     ("PUT", "/slos/*"),

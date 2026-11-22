@@ -43,6 +43,9 @@
 	import { firstRowError, parseRows, rowErrors, seedChecklists } from './option-values';
 	import { parseSteps, stepIssues } from './scenario-steps';
 	import TagsEditor from './TagsEditor.svelte';
+	import ChannelsField from './ChannelsField.svelte';
+	import { sameChannels, templateSeed } from './template-seed';
+	import type { MonitorTemplate } from '#lib/api/monitorTemplates.js';
 	import RequirementNotice from './RequirementNotice.svelte';
 	import MonitoredRules from './MonitoredRules.svelte';
 	import { overrideActions, pendingChanges } from './monitored-rules';
@@ -72,6 +75,8 @@
 		 * (the name gets " (copy)"); no secret comes along, they are typed again.
 		 */
 		duplicateOf?: Target;
+		/** Add only: the monitor template that seeds the form, as a copy would (no name, address or secret in it). */
+		template?: MonitorTemplate;
 		/** Candidates for "Parent device". The target itself is filtered out. */
 		targets?: Target[];
 		onsaved: (target: Target) => void;
@@ -85,15 +90,20 @@
 		folderDefault?: string;
 	}
 
-	let { collector, target, duplicateOf, targets = [], onsaved, cancelHref, prefill = null, viaAgentDefault = null, locationDefault = null, folderDefault = '' }: Props = $props();
+	let { collector, target, duplicateOf, template, targets = [], onsaved, cancelHref, prefill = null, viaAgentDefault = null, locationDefault = null, folderDefault = '' }: Props = $props();
 
 	/** Value of the interval select that opens the number and unit fields. */
 	const CUSTOM_INTERVAL = 'custom';
 
 	// The scan's findings, folded into this kind's fields. Seeds once, like the rest.
-	const seed = untrack(() => seedFromPrefill(target || duplicateOf ? null : prefill, collector));
-	/** What the fields are seeded from: the edited monitor, or the one being copied. */
-	const base = untrack(() => target ?? duplicateOf);
+	const seed = untrack(() => seedFromPrefill(target || duplicateOf || template ? null : prefill, collector));
+	/** What the fields are seeded from: the edited monitor, the one being copied, or a template. */
+	const base = untrack(
+		() =>
+			target ??
+			duplicateOf ??
+			(template ? templateSeed(template, { viaAgent: viaAgentDefault, location: locationDefault, folder: folderDefault }) : undefined)
+	);
 
 	const editing = $derived(target !== undefined);
 	/** The credential families this kind accepts, field by field, from the server. */
@@ -172,6 +182,10 @@
 	let enabled = $state(untrack(() => base?.enabled ?? true));
 	let cveScan = $state(untrack(() => base?.cve_scan ?? true));
 	let groupName = $state(untrack(() => base?.group_name ?? folderDefault));
+	/** The monitor's own notification channels; empty: every channel its rules choose. */
+	let channels = $state<number[]>(untrack(() => [...(base?.channels ?? [])]));
+	/** Sent only when changed (or chosen for a new monitor): an unreadable list never clears them. */
+	const sendChannels = $derived(target ? !sameChannels(channels, target.channels ?? []) : channels.length > 0);
 	// MSP mode: the client of the target. Offered when there is a choice; only
 	// the MSP administrator moves an existing target (its dependents follow).
 	const clientChoices = $derived(auth.mspOn ? (auth.msp?.clients ?? []) : []);
@@ -200,7 +214,9 @@
 				? { ...target.tags }
 				: duplicateOf
 					? withoutSecretTags(duplicateOf.tags)
-					: seedChecklists(collector.options, seed.tags)
+					: template
+						? { ...template.tags }
+						: seedChecklists(collector.options, seed.tags)
 		)
 	);
 	let credential = $state<CredentialView>(initialCredential);
@@ -430,6 +446,7 @@
 			cve_scan: cveScan,
 			group_name: groupName.trim(),
 			location_id: locationId,
+			...(sendChannels ? { channels } : {}),
 			...(showClient && clientId !== null && !clientLocked ? { client_id: clientId } : {}),
 			// No empty tag: a blank setting means "server default".
 			tags: Object.fromEntries(Object.entries(tags).filter(([, v]) => v.trim()))
@@ -461,6 +478,7 @@
 		enabled,
 		cveScan,
 		groupName,
+		channels,
 		clientId,
 		locationId,
 		tags,
@@ -588,6 +606,10 @@
 	{#if duplicateOf}
 		<p class="rounded-[var(--radius-card)] border border-line bg-surface-2/60 px-3 py-2 text-sm text-ink-2" role="note">
 			{m.w1monitors_form_copy_notice({ name: duplicateOf.name })}
+		</p>
+	{:else if template}
+		<p class="rounded-[var(--radius-card)] border border-line bg-surface-2/60 px-3 py-2 text-sm text-ink-2" role="note">
+			{m.w5monitors_form_template_notice({ name: template.name })}
 		</p>
 	{/if}
 	<RequirementNotice requirements={collector.requirements} />
@@ -848,6 +870,8 @@
 			</div>
 
 			<TagsEditor tags={freeTags} reserved={optionKeys} onchange={setFreeTags} />
+
+			<ChannelsField bind:value={channels} />
 
 			<Field label={m.w1monitors_form_note_label()} for="target-note" help={m.w1monitors_form_note_help()}>
 				<textarea

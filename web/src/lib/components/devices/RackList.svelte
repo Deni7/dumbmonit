@@ -18,6 +18,13 @@
 	 * reports its rows' elements and forwards pointer/keyboard events, and
 	 * draws the insertion line the page tells it to. The hit-testing is
 	 * vertical, so the page only passes `reorder` to the compact layout.
+	 *
+	 * A long compact list is windowed (`windowing.ts`): only the rows near the
+	 * viewport are in the DOM, at a fixed height, with padding standing in for
+	 * the others. Rows keep `data-list-row`, so `j`/`k` walk them (the overscan
+	 * is always drawn), and the checkboxes read the page's selection. While a
+	 * row is dragged or picked up with the keyboard, every row is drawn: the
+	 * reorder hit-tests their elements.
 	 */
 	import type { SecurityGrade, TargetId } from '#lib/api/index.js';
 	import type { Serie } from '#lib/components/Chart.svelte';
@@ -29,6 +36,7 @@
 	import type { RowActionHandlers } from './RowActions.svelte';
 	import type { RackRow } from './rack';
 	import type { RackView } from './view';
+	import { OVERSCAN_ROWS, ROW_REM, rowHeightPx, shouldWindow, visibleRange } from './windowing';
 
 	export interface DropSlot {
 		kind: 'row';
@@ -92,6 +100,49 @@
 
 	let { rows, sparklines, kindLabels, sites = new Map(), showSite = true, reorder = null, layout = 'compact', names = new Map(), security = new Map(), alertCounts = new Map(), selection = null, river = new Map(), ontoggle = null, tags = new Map(), rowActions = null }: Props = $props();
 
+	// --- Windowing (compact layout, long lists) -------------------------------
+	const reordering = $derived(reorder !== null && (reorder.dragging !== null || reorder.pickedUp !== null));
+	const windowed = $derived(shouldWindow(rows.length, layout === 'compact', reordering));
+	let listEl = $state<HTMLOListElement | null>(null);
+	/** Bumped on scroll, resize and layout changes: the window is read again. */
+	let frame = $state(0);
+	$effect(() => {
+		if (!windowed) return;
+		let raf = 0;
+		const bump = () => {
+			if (raf) return;
+			raf = requestAnimationFrame(() => {
+				raf = 0;
+				frame += 1;
+			});
+		};
+		window.addEventListener('scroll', bump, { passive: true });
+		window.addEventListener('resize', bump);
+		// A folder opened or closed above moves this list without any scroll.
+		const observer = new ResizeObserver(bump);
+		observer.observe(document.body);
+		return () => {
+			window.removeEventListener('scroll', bump);
+			window.removeEventListener('resize', bump);
+			observer.disconnect();
+			if (raf) cancelAnimationFrame(raf);
+		};
+	});
+	const range = $derived.by(() => {
+		void frame;
+		if (!windowed) return null;
+		const rowHeight = rowHeightPx(parseFloat(getComputedStyle(document.documentElement).fontSize));
+		return visibleRange({
+			count: rows.length,
+			rowHeight,
+			// Before the list is laid out: as if it started at the top, a screenful only.
+			listTop: listEl ? listEl.getBoundingClientRect().top : 0,
+			viewportHeight: window.innerHeight,
+			overscan: OVERSCAN_ROWS
+		});
+	});
+	const drawn = $derived(range ? rows.slice(range.start, range.end) : rows);
+
 	const LIST_CLASS: Record<RackView, string> = {
 		compact: 'flex flex-col divide-y divide-line',
 		tiles: 'grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-3 max-sm:grid-cols-2 max-sm:gap-2'
@@ -99,8 +150,13 @@
 </script>
 
 {#snippet list()}
-<ol class={LIST_CLASS[layout]} aria-label={m.devices_rack_aria()}>
-	{#each rows as row (row.target.id)}
+<ol
+	bind:this={listEl}
+	class={LIST_CLASS[layout]}
+	aria-label={m.devices_rack_aria()}
+	style={range ? `padding-top: ${range.padTop}px; padding-bottom: ${range.padBottom}px;` : undefined}
+>
+	{#each drawn as row, index (row.target.id)}
 		{@const id = row.target.id}
 		{@const slot = reorder?.dropSlot?.id === id ? reorder.dropSlot : null}
 		{@const isDragging = reorder?.dragging === id}
@@ -149,6 +205,9 @@
 		<li
 			data-list-row
 			class={`relative flex min-w-0 items-stretch gap-1.5 first:rounded-t-[inherit] last:rounded-b-[inherit] ${layout === 'compact' ? `overflow-hidden [content-visibility:auto] ${ROW_INTRINSIC}` : ''}`}
+			style={range ? `height: ${ROW_REM}rem;` : undefined}
+			aria-posinset={range ? range.start + index + 1 : undefined}
+			aria-setsize={range ? rows.length : undefined}
 			{@attach (node) => {
 				reorder?.registerRow(id, node);
 				return () => reorder?.registerRow(id, null);
