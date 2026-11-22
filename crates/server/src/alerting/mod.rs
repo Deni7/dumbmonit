@@ -35,7 +35,10 @@
 //! ([`forecast`], sur les familles de [`capacity`]) rend un nombre de jours, la
 //! dérive de baseline ([`drift`]) un rapport à la normale, et ces séries passent
 //! ensuite par les étapes 2 à 6 comme les autres.
-
+//!
+//! Le rapport de bruit ([`noise`]) relit l'historique des transitions : règles
+//! qui parlent trop, alertes qui battent, délais d'acquittement et de
+//! résolution.
 
 pub mod baseline;
 pub mod capacity;
@@ -50,6 +53,7 @@ pub mod log_source;
 pub mod machine;
 pub mod matcher;
 pub mod model;
+pub mod noise;
 pub mod notify_policy;
 pub mod overrides;
 pub mod replay;

@@ -486,6 +486,11 @@ pub async fn evaluate_once(
         }
     }
     db::alerts::record_history(pool, &history, &plan.announced).await?;
+    // Rapport de bruit : chaque notification routée compte pour l'épisode en
+    // cours de son empreinte. Au mieux : le cycle n'en dépend pas.
+    if let Err(error) = db::alert_insights::count_notifications(pool, &plan.announced).await {
+        warn!(?error, "notifications not counted for the noise report");
+    }
     // Relais d'escalade pris en charge : datés à part, pour qu'ils ne partent
     // qu'une fois par épisode (voir `group::decide`).
     let relayed: Vec<String> = outcome

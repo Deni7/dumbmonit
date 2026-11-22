@@ -1,5 +1,6 @@
 pub mod abb_runs;
 pub mod activedirectory;
+pub mod alert_insights;
 pub mod alerts;
 pub mod lun_links;
 pub mod multisite;

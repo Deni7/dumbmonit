@@ -450,6 +450,7 @@ pub const SCOPED_ROUTES: &[(&str, &str, RouteRule)] = &[
     ("GET", "/metrics/catalog", RouteRule::Open),
     ("GET", "/alerts", RouteRule::Open),
     ("GET", "/alerts/history", RouteRule::Open),
+    ("GET", "/alerts/noise", RouteRule::Open),
     ("GET", "/alerts/rules", RouteRule::Open),
     ("GET", "/alerts/silences", RouteRule::Open),
     ("POST", "/alerts/silences", RouteRule::Open),

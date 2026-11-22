@@ -1397,6 +1397,7 @@ pub async fn acknowledge(
         return Err(alert_not_found(fingerprint));
     }
     if let Some(ack) = &ack {
+        db::alert_insights::note_acknowledged(&state.pool, fingerprint).await;
         // Les tickets ouverts de l'alerte en gardent la trace, sans faire attendre
         // l'utilisateur derrière un service de tickets lent.
         let mut text =
@@ -1462,6 +1463,9 @@ pub async fn dismiss(
     let by = dismissed.then_some(actor);
     if !db::alerts::set_dismiss(&state.pool, fingerprint, by, Utc::now()).await? {
         return Err(alert_not_found(fingerprint));
+    }
+    if dismissed {
+        db::alert_insights::note_acknowledged(&state.pool, fingerprint).await;
     }
     let alert = db::alerts::get_active(&state.pool, fingerprint)
         .await?

@@ -3594,6 +3594,37 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /api/alerts/noise:
+    get:
+      operationId: getAlertNoise
+      tags: [Alerts]
+      summary: Alert noise report
+      description: >-
+        Over the last 7, 30 or 90 days of alert history: the noisiest rules
+        (firing episodes and notifications), flapping alerts (state changes
+        per alert), and the mean time to acknowledge (MTTA) and to resolve
+        (MTTR) overall, per rule and per team. An episode is one transition to
+        `firing`; its notifications are the firing, reminders, escalations and
+        resolution the engine routed to at least one channel. Acknowledging or
+        dismissing an alert dates the episode's first reaction. Admin and
+        operator accounts only (viewers get 403); a team-restricted account
+        sees the episodes of its own devices and the rows of its own teams.
+      x-token-scope: read
+      parameters:
+        - name: days
+          in: query
+          description: Window, in days. 30 by default.
+          schema: { type: integer, enum: [7, 30, 90] }
+      responses:
+        "200":
+          description: The report.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AlertNoise" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /api/alerts/history/dismiss-resolved:
     post:
       operationId: dismissResolvedAlertHistory
@@ -14067,6 +14098,64 @@ components:
           type: array
           description: Series that would have fired, noisiest first.
           items: { $ref: "#/components/schemas/RuleBacktestSeries" }
+    AlertNoiseStats:
+      type: object
+      required: [fired, notifications, acknowledged, resolved, mtta_secs, mttr_secs]
+      properties:
+        fired: { type: integer, description: Firing episodes in the window. }
+        notifications: { type: integer }
+        acknowledged: { type: integer, description: Episodes acknowledged or dismissed. }
+        resolved: { type: integer }
+        mtta_secs: { type: [integer, "null"], description: Mean time to acknowledge. }
+        mttr_secs: { type: [integer, "null"], description: Mean time to resolve. }
+    AlertNoise:
+      type: object
+      required: [days, since, truncated, overall, rules, flapping, teams]
+      properties:
+        days: { type: integer }
+        since: { type: string, description: "Start of the window, UTC without suffix." }
+        truncated:
+          type: boolean
+          description: More than 100,000 episodes in the window; the report covers the most recent.
+        overall: { $ref: "#/components/schemas/AlertNoiseStats" }
+        rules:
+          type: array
+          description: The 20 noisiest rules (notifications, then episodes).
+          items:
+            allOf:
+              - $ref: "#/components/schemas/AlertNoiseStats"
+              - type: object
+                required: [rule_uid, rule_id, rule_name, replayable]
+                properties:
+                  rule_uid: { type: string }
+                  rule_id: { type: [integer, "null"], format: int64, description: Null once the rule is deleted. }
+                  rule_name: { type: string }
+                  replayable: { type: boolean, description: The rule can be tested on history. }
+        flapping:
+          type: array
+          description: Alerts that fired at least 3 times, most state changes first (10 at most).
+          items:
+            type: object
+            required: [fingerprint, rule_uid, rule_id, rule_name, target_id, target_name, changes, firings]
+            properties:
+              fingerprint: { type: string }
+              rule_uid: { type: string }
+              rule_id: { type: [integer, "null"], format: int64 }
+              rule_name: { type: string }
+              target_id: { type: [integer, "null"], format: int64 }
+              target_name: { type: [string, "null"] }
+              changes: { type: integer, description: Transitions to firing or resolved. }
+              firings: { type: integer }
+        teams:
+          type: array
+          items:
+            allOf:
+              - $ref: "#/components/schemas/AlertNoiseStats"
+              - type: object
+                required: [team_id, team_name]
+                properties:
+                  team_id: { type: integer, format: int64 }
+                  team_name: { type: string }
     RulePayload:
       type: object
       required: [name, query]
