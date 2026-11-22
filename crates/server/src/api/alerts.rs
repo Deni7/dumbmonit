@@ -1688,10 +1688,7 @@ pub async fn list_silences(
 }
 
 /// Les silences que ce compte a le droit de voir.
-pub(crate) async fn visible_silences(
-    access: &Access,
-    state: &AppState,
-) -> ApiResult<Vec<Silence>> {
+pub(crate) async fn visible_silences(access: &Access, state: &AppState) -> ApiResult<Vec<Silence>> {
     let mut silences = db::alerts::list_silences(&state.pool).await?;
     // Compte restreint : seulement les silences posés sur ses équipements. La
     // vue d'un client par l'administrateur montre aussi les silences sans

@@ -71,8 +71,11 @@ mod tests {
             utc_offset_minutes: 0,
             timezone: None,
         };
-        let found =
-            schedule.occurrences_between(at("2026-11-01T00:00:00Z"), at("2026-12-01T00:00:00Z"), 100);
+        let found = schedule.occurrences_between(
+            at("2026-11-01T00:00:00Z"),
+            at("2026-12-01T00:00:00Z"),
+            100,
+        );
         // Dimanches de novembre 2026 : 1, 8, 15, 22, 29.
         assert_eq!(found.len(), 5);
         assert_eq!(found[0], (at("2026-11-01T02:00:00Z"), at("2026-11-01T04:00:00Z")));
@@ -88,8 +91,11 @@ mod tests {
             timezone: None,
         };
         // Samedi 2026-11-07 23 h -> dimanche 1 h ; la borne tombe à minuit.
-        let found =
-            schedule.occurrences_between(at("2026-11-08T00:00:00Z"), at("2026-11-09T00:00:00Z"), 10);
+        let found = schedule.occurrences_between(
+            at("2026-11-08T00:00:00Z"),
+            at("2026-11-09T00:00:00Z"),
+            10,
+        );
         assert_eq!(found, vec![(at("2026-11-07T23:00:00Z"), at("2026-11-08T01:00:00Z"))]);
     }
 
@@ -103,8 +109,11 @@ mod tests {
             utc_offset_minutes: 0,
             timezone: None,
         };
-        let found =
-            schedule.occurrences_between(at("2026-01-01T00:00:00Z"), at("2027-01-01T00:00:00Z"), 100);
+        let found = schedule.occurrences_between(
+            at("2026-01-01T00:00:00Z"),
+            at("2027-01-01T00:00:00Z"),
+            100,
+        );
         assert_eq!(found.len(), 12);
         assert_eq!(found[10].0, at("2026-11-27T00:00:00Z"));
         let capped =

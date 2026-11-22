@@ -97,17 +97,19 @@ async fn un_lot_change_periode_canaux_etiquettes_et_dossier() {
     }
 
     // Retirer un canal, puis le lot apparaît au journal d'audit.
-    let reply =
-        bulk(&lab, &lab.admin, json!({ "ids": [a], "patch": { "channels": { "remove": [mail] } } }))
-            .await;
+    let reply = bulk(
+        &lab,
+        &lab.admin,
+        json!({ "ids": [a], "patch": { "channels": { "remove": [mail] } } }),
+    )
+    .await;
     assert_eq!(reply.body["updated"], 1, "{}", reply.body);
     assert_eq!(db::target_channels::of(&lab.pool, a).await.unwrap(), vec![ops]);
-    let audited: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM audit_log WHERE action = 'targets.bulk_update'",
-    )
-    .fetch_one(&lab.pool)
-    .await
-    .unwrap();
+    let audited: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM audit_log WHERE action = 'targets.bulk_update'")
+            .fetch_one(&lab.pool)
+            .await
+            .unwrap();
     assert_eq!(audited, 2);
 }
 
@@ -117,8 +119,8 @@ async fn un_lot_invalide_est_refuse_en_entier() {
     let a = create_target(&lab, "10.0.0.1", "", json!({})).await;
     let nothing = bulk(&lab, &lab.admin, json!({ "ids": [a], "patch": {} })).await;
     assert_eq!(nothing.status, StatusCode::BAD_REQUEST);
-    let too_fast = bulk(&lab, &lab.admin, json!({ "ids": [a], "patch": { "interval_secs": 5 } }))
-        .await;
+    let too_fast =
+        bulk(&lab, &lab.admin, json!({ "ids": [a], "patch": { "interval_secs": 5 } })).await;
     assert_eq!(too_fast.status, StatusCode::BAD_REQUEST);
     let unknown =
         bulk(&lab, &lab.admin, json!({ "ids": [a], "patch": { "channels": { "add": [4242] } } }))

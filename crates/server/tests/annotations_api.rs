@@ -253,10 +253,7 @@ async fn a_team_restricted_operator_only_touches_its_own_monitors() {
     assert_eq!(status, StatusCode::FORBIDDEN, "the tag reaches Lyon too");
 
     // Lecture : le global et le sien, jamais celui de Lyon.
-    assert_eq!(
-        titles_at(&app, &cookie, "/api/annotations").await,
-        ["global", "mine", "folder"]
-    );
+    assert_eq!(titles_at(&app, &cookie, "/api/annotations").await, ["global", "mine", "folder"]);
     let hidden = app.get(&format!("/api/annotations?target={lyon}"), Some(&cookie)).await;
     assert_eq!(hidden.status, StatusCode::NOT_FOUND);
 

@@ -97,7 +97,8 @@ pub async fn get_one(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> ApiResult<Json<MonitorTemplate>> {
-    let template = db::monitor_templates::get(&state.pool, id).await?.ok_or_else(|| not_found(id))?;
+    let template =
+        db::monitor_templates::get(&state.pool, id).await?.ok_or_else(|| not_found(id))?;
     Ok(Json(template))
 }
 
@@ -160,7 +161,8 @@ pub async fn rename(
     }
     audit::record(&state.pool, Some(&who.label()), "monitor_template.renamed", Some(&name), ip)
         .await;
-    let template = db::monitor_templates::get(&state.pool, id).await?.ok_or_else(|| not_found(id))?;
+    let template =
+        db::monitor_templates::get(&state.pool, id).await?.ok_or_else(|| not_found(id))?;
     Ok(Json(template))
 }
 
@@ -171,7 +173,8 @@ pub async fn remove(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> ApiResult<StatusCode> {
-    let template = db::monitor_templates::get(&state.pool, id).await?.ok_or_else(|| not_found(id))?;
+    let template =
+        db::monitor_templates::get(&state.pool, id).await?.ok_or_else(|| not_found(id))?;
     db::monitor_templates::delete(&state.pool, id).await?;
     audit::record(
         &state.pool,

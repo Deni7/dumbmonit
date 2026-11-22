@@ -772,11 +772,9 @@ fn evaluate_point(
         | RuleKind::Predict
         | RuleKind::LogPattern
         | RuleKind::Forecast
-        | RuleKind::SloBurn => (
-            evaluation::threshold_holds(rule, effective, point.value, active),
-            None,
-            false,
-        ),
+        | RuleKind::SloBurn => {
+            (evaluation::threshold_holds(rule, effective, point.value, active), None, false)
+        }
         // Dérive : un seuil sur le rapport à la normale, qui ne s'ouvre que si
         // l'écart est aussi statistiquement net (voir `Annotation::armed`).
         RuleKind::Drift => {

@@ -272,10 +272,7 @@ fn validate(ids: &[TargetId], patch: &BulkPatch) -> ApiResult<()> {
 
 /// Les moniteurs du lot, d'une requête — sans leurs identifiants chiffrés,
 /// dont le lot n'a pas besoin.
-async fn load(
-    state: &AppState,
-    ids: &HashSet<TargetId>,
-) -> ApiResult<HashMap<TargetId, Current>> {
+async fn load(state: &AppState, ids: &HashSet<TargetId>) -> ApiResult<HashMap<TargetId, Current>> {
     let rows = sqlx::query(
         "SELECT id, kind, interval_secs, tags, group_name, managed_by, client_id FROM targets",
     )

@@ -12,9 +12,7 @@ use axum::http::HeaderMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::{
-    MAX_DESCRIPTION_LEN, MAX_FOOTER_LEN, MAX_LABEL_LEN, MAX_TITLE_LEN, page_not_found,
-};
+use super::{MAX_DESCRIPTION_LEN, MAX_FOOTER_LEN, MAX_LABEL_LEN, MAX_TITLE_LEN, page_not_found};
 use crate::api::{ApiError, ApiResult};
 use crate::db;
 use crate::db::status_lang::{SUPPORTED, Translation};
@@ -58,7 +56,9 @@ pub fn pick_language(query: Option<&str>, accept: Option<&str>) -> Option<&'stat
             let mut pieces = part.split(';');
             let tag = pieces.next()?.trim();
             let weight = pieces
-                .find_map(|p| p.trim().strip_prefix("q=").and_then(|q| q.trim().parse::<f32>().ok()))
+                .find_map(|p| {
+                    p.trim().strip_prefix("q=").and_then(|q| q.trim().parse::<f32>().ok())
+                })
                 .unwrap_or(1.0);
             (weight > 0.0 && !tag.is_empty()).then_some((weight, index, tag))
         })
@@ -285,8 +285,11 @@ mod tests {
             title: "État".into(),
             description: String::new(),
             footer_text: "pied".into(),
-            labels: [("Web".to_string(), "Site".to_string()), ("API".to_string(), "Interface".to_string())]
-                .into(),
+            labels: [
+                ("Web".to_string(), "Site".to_string()),
+                ("API".to_string(), "Interface".to_string()),
+            ]
+            .into(),
         };
         apply(&mut body, &t);
         assert_eq!(body["page"]["title"], "État");
@@ -299,7 +302,8 @@ mod tests {
 
     #[test]
     fn la_validation_refuse_les_langues_inconnues_ou_doublees() {
-        let t = |lang: &str| Translation { lang: lang.into(), title: "x".into(), ..Default::default() };
+        let t =
+            |lang: &str| Translation { lang: lang.into(), title: "x".into(), ..Default::default() };
         let bad = Languages { default_lang: "xx".into(), translations: vec![] };
         assert!(validate(bad).is_err());
         let twice = Languages { default_lang: String::new(), translations: vec![t("fr"), t("fr")] };

@@ -123,14 +123,13 @@ pub async fn restore<'e, E>(executor: E, page_id: i64, default_lang: &str) -> Re
 where
     E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
 {
-    let done = sqlx::query(
-        "UPDATE status_pages SET default_lang = ? WHERE id = ? AND default_lang != ?",
-    )
-    .bind(default_lang)
-    .bind(page_id)
-    .bind(default_lang)
-    .execute(executor)
-    .await
-    .context("langue par défaut de la page de statut")?;
+    let done =
+        sqlx::query("UPDATE status_pages SET default_lang = ? WHERE id = ? AND default_lang != ?")
+            .bind(default_lang)
+            .bind(page_id)
+            .bind(default_lang)
+            .execute(executor)
+            .await
+            .context("langue par défaut de la page de statut")?;
     Ok(done.rows_affected() > 0)
 }
