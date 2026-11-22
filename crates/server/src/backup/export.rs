@@ -125,6 +125,7 @@ pub async fn collect(pool: &SqlitePool, cipher: &Cipher, options: ExportOptions)
         monitor_templates: monitor_templates::collect_templates(pool, &channel_names).await?,
         target_channels: monitor_templates::collect_target_channels(pool, &refs, &channel_names)
             .await?,
+        accounts: crate::backup::accounts::collect(pool).await?,
     })
 }
 
@@ -1182,6 +1183,11 @@ pub fn sections() -> BTreeMap<&'static str, &'static str> {
         ("slos", "Service level objectives: target, window and the monitors they cover."),
         ("users", "Accounts, their role, email address and SSO link."),
         ("auth_policy", "Authentication policy: two-factor required for admins and operators."),
+        (
+            "accounts",
+            "Reset link and invitation settings, pending invitations, and each account's \
+             personal notification choices.",
+        ),
         ("agent_tokens", "Agent enrolment tokens, as hashes: installed agents keep working."),
         ("api_tokens", "API tokens, as hashes: existing tokens keep working."),
         ("push_monitors", "Heartbeat tokens, so the URLs your cron jobs call stay the same."),

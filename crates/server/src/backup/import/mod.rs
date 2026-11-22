@@ -125,6 +125,11 @@ pub async fn restore(
     let refs = target_ids(&mut tx).await?;
     report.push(restore_locations(&mut tx, bundle, &refs).await?);
     report.push(restore_teams(&mut tx, bundle).await?);
+    // Après les comptes et les équipes : les invitations citent des équipes,
+    // les notifications personnelles des comptes.
+    for section in crate::backup::accounts::restore(&mut tx, &bundle.accounts).await? {
+        report.push(section);
+    }
     report.push(restore_topology_corrections(&mut tx, bundle, &refs).await?);
     report.push(restore_topology_rules(&mut tx, bundle, &refs).await?);
     report.push(restore_lun_links(&mut tx, bundle, &refs).await?);

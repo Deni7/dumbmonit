@@ -256,6 +256,10 @@ pub struct Bundle {
     /// Canaux propres aux moniteurs (migration 0282), par référence.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub target_channels: Vec<crate::backup::monitor_templates::BundleTargetChannels>,
+    /// Réglages des liens de compte, invitations ouvertes et notifications
+    /// personnelles (migrations 0294 et 0295).
+    #[serde(default, skip_serializing_if = "crate::backup::accounts::BundleAccounts::is_empty")]
+    pub accounts: crate::backup::accounts::BundleAccounts,
 }
 
 /// Serveur de courriel enregistré et son mot de passe.
@@ -302,6 +306,8 @@ impl Bundle {
             ("slos".to_string(), self.slos.len()),
             ("monitor_templates".to_string(), self.monitor_templates.len()),
             ("target_channels".to_string(), self.target_channels.len()),
+            ("invitations".to_string(), self.accounts.invitations.len()),
+            ("notification_prefs".to_string(), self.accounts.notification_prefs.len()),
         ])
     }
 }
