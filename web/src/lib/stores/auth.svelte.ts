@@ -18,6 +18,7 @@ import {
 	loginTotp as apiLoginTotp,
 	logout as apiLogout,
 	setUnauthorizedHandler,
+	setTotpSetupHandler,
 	setupAccount as apiSetupAccount,
 	type LdapStatus,
 	type OidcStatus,
@@ -140,6 +141,12 @@ class AuthStore {
 	demo = $state(false);
 	/** HTTPS on the web port, for the "session in clear" banner. */
 	https = $state<HttpsStatus | null>(null);
+	/**
+	 * The instance requires two-factor from admins and operators, and this
+	 * session has none yet: the server refuses everything but the enrolment,
+	 * and the layout shows only that.
+	 */
+	totpSetupRequired = $state(false);
 	/** Error preventing us from knowing the session state (server unreachable). */
 	error = $state<unknown>(null);
 
@@ -223,6 +230,9 @@ class AuthStore {
 		if (!this.#installed) {
 			this.#installed = true;
 			setUnauthorizedHandler(() => this.handleUnauthorized());
+			setTotpSetupHandler(() => {
+				this.totpSetupRequired = true;
+			});
 		}
 		await this.refresh();
 	}
@@ -241,6 +251,7 @@ class AuthStore {
 			this.passkeys = state.passkeys;
 			this.demo = state.demo;
 			this.https = state.https;
+			this.totpSetupRequired = state.totpSetupRequired;
 			this.error = null;
 			const rights = state.user ? await getMyRights(signal) : { access: null, msp: null };
 			this.access = rights.access;
@@ -277,6 +288,7 @@ class AuthStore {
 	 * destinations.
 	 */
 	handleUnauthorized(): void {
+		this.totpSetupRequired = false;
 		this.available = true;
 		this.configured = true;
 		this.authenticated = false;
@@ -349,6 +361,7 @@ class AuthStore {
 			// the sign-in screen will take over and fix the state if needed.
 		}
 		this.authenticated = false;
+		this.totpSetupRequired = false;
 		this.user = null;
 		this.access = null;
 		this.msp = null;

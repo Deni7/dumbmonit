@@ -1,0 +1,114 @@
+{
+	"auth_totp_gate_intro": "Cette instance exige l’authentification à deux facteurs pour les administrateurs et les opérateurs. Configurez-la pour continuer.",
+	"auth_totp_gate_intro_user": "Cette instance exige l’authentification à deux facteurs pour les administrateurs et les opérateurs. Configurez-la pour {username} afin de continuer.",
+	"auth_totp_gate_later": "Pas maintenant ? Déconnectez-vous et revenez quand vous aurez votre téléphone.",
+	"auth_totp_gate_sign_out": "Se déconnecter",
+	"auth_totp_gate_title": "Configurez l’authentification à deux facteurs",
+	"settings_2fa_codes_file_header": "Codes de secours DumbMonit pour {account}. Chaque code vous connecte une fois si votre téléphone est perdu. Rangez-les en lieu sûr.",
+	"settings_2fa_codes_note": "Enregistrez ces codes maintenant : ils ne s’affichent qu’une fois, et chacun vous connecte une seule fois si votre téléphone est perdu.",
+	"settings_2fa_download_codes": "Télécharger en .txt",
+	"settings_2fa_err_wrong_code": "Ce code n’est pas valide. Attendez le suivant et réessayez.",
+	"settings_2fa_recovery_none_replace": "Remplacez-les pour en obtenir de nouveaux.",
+	"settings_2fa_regenerate": "Remplacer les codes de secours",
+	"settings_2fa_regenerate_code_label": "Code de votre application d’authentification",
+	"settings_2fa_regenerate_confirm": "Remplacer les codes",
+	"settings_2fa_regenerate_error": "Impossible de remplacer les codes de secours",
+	"settings_2fa_regenerate_intro": "Vous recevez un nouveau jeu de codes de secours ; les anciens cessent aussitôt de fonctionner. L’authentification à deux facteurs reste active.",
+	"settings_2fa_regenerate_password_label": "Votre mot de passe",
+	"settings_2fa_regenerate_use_code": "Utiliser plutôt un code de l’application",
+	"settings_2fa_regenerate_use_password": "Utiliser plutôt mon mot de passe",
+	"settings_assistant_edit": "Modifier",
+	"settings_assistant_edit_aria": "Modifier le jeton {name}",
+	"settings_assistant_edit_cancel": "Annuler",
+	"settings_assistant_edit_err_name": "Saisissez un nom pour le jeton.",
+	"settings_assistant_edit_error": "Impossible de mettre à jour le jeton",
+	"settings_assistant_edit_expiry": "Échéance",
+	"settings_assistant_edit_expiry_30": "30 jours à partir d’aujourd’hui",
+	"settings_assistant_edit_expiry_365": "1 an à partir d’aujourd’hui",
+	"settings_assistant_edit_expiry_90": "90 jours à partir d’aujourd’hui",
+	"settings_assistant_edit_expiry_help": "Expire actuellement le {date}. Une nouvelle échéance se compte à partir d’aujourd’hui.",
+	"settings_assistant_edit_expiry_help_never": "N’expire jamais actuellement. Une nouvelle échéance se compte à partir d’aujourd’hui.",
+	"settings_assistant_edit_expiry_keep": "Garder l’échéance actuelle",
+	"settings_assistant_edit_expiry_never": "N’expire jamais",
+	"settings_assistant_edit_name": "Nom",
+	"settings_assistant_edit_save": "Enregistrer",
+	"settings_assistant_edit_saved": "Jeton mis à jour",
+	"settings_sessions_current": "Cet appareil",
+	"settings_sessions_device": "{browser} sous {os}",
+	"settings_sessions_device_unknown": "Appareil inconnu",
+	"settings_sessions_hint": "Chaque navigateur où votre compte est connecté. Déconnectez ceux que vous ne reconnaissez pas.",
+	"settings_sessions_last_active": "dernière activité {when}",
+	"settings_sessions_load_error": "Impossible de lire vos sessions",
+	"settings_sessions_revoke": "Déconnecter",
+	"settings_sessions_revoke_confirm": "Déconnecter cet appareil ?",
+	"settings_sessions_revoke_error": "Impossible de fermer la session",
+	"settings_sessions_revoke_others": "Déconnecter mes autres sessions",
+	"settings_sessions_revoke_others_confirm": "Déconnecter partout ailleurs ?",
+	"settings_sessions_revoked_others": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} autre session déconnectée.",
+				"countPlural=other": "{count} autres sessions déconnectées."
+			}
+		}
+	],
+	"settings_sessions_signed_in": "Connecté {when}",
+	"settings_sessions_title": "Appareils connectés",
+	"settings_sessions_via_passkey": "Clé d’accès",
+	"settings_sessions_via_password": "Mot de passe",
+	"settings_users_email": "Adresse e-mail",
+	"settings_users_email_help": "Facultatif. Pour savoir qui joindre ; ne sert jamais à se connecter.",
+	"settings_users_err_email": "Saisissez une adresse comme jane@example.org, ou laissez le champ vide.",
+	"settings_users_filter_without_2fa": "Sans 2FA",
+	"settings_users_no_match": "Aucun utilisateur ne correspond à cette recherche.",
+	"settings_users_policy_error": "Impossible de modifier la règle de double authentification",
+	"settings_users_policy_help": "Ceux qui se connectent par mot de passe sans second facteur doivent en configurer un avant de pouvoir utiliser DumbMonit. Les connexions par SSO, LDAP ou clé d’accès sont exemptées : le fournisseur d’identité ou la clé s’en chargent déjà.",
+	"settings_users_policy_pending": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} administrateur ou opérateur devra le configurer à sa prochaine connexion.",
+				"countPlural=other": "{count} administrateurs ou opérateurs devront le configurer à leur prochaine connexion."
+			}
+		}
+	],
+	"settings_users_policy_title": "Exiger l’authentification à deux facteurs des administrateurs et opérateurs",
+	"settings_users_search_label": "Rechercher des utilisateurs",
+	"settings_users_search_placeholder": "Nom, identifiant ou e-mail",
+	"settings_users_sign_out": "Déconnecter partout",
+	"settings_users_sign_out_confirm": "Déconnecter partout ?",
+	"settings_users_sign_out_self_title": "Ferme vos autres sessions ; celle-ci reste ouverte.",
+	"settings_users_sign_out_title": "Ferme toutes les sessions de cet utilisateur. Il devra se reconnecter.",
+	"settings_users_signed_out": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} session fermée.",
+				"countPlural=other": "{count} sessions fermées."
+			}
+		}
+	],
+	"settings_users_sort_label": "Trier par",
+	"settings_users_sort_last_login": "Dernière connexion",
+	"settings_users_sort_name": "Nom",
+	"settings_users_sort_role": "Rôle"
+}

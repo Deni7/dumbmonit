@@ -1,0 +1,114 @@
+{
+	"auth_totp_gate_intro": "Esta instância exige autenticação em dois fatores para administradores e operadores. Configure-a para continuar.",
+	"auth_totp_gate_intro_user": "Esta instância exige autenticação em dois fatores para administradores e operadores. Configure-a para {username} para continuar.",
+	"auth_totp_gate_later": "Agora não? Saia e volte quando estiver com o celular em mãos.",
+	"auth_totp_gate_sign_out": "Sair",
+	"auth_totp_gate_title": "Configure a autenticação em dois fatores",
+	"settings_2fa_codes_file_header": "Códigos de recuperação do DumbMonit para {account}. Cada código permite entrar uma vez se você perder o celular. Guarde-os em um lugar seguro.",
+	"settings_2fa_codes_note": "Salve estes códigos agora: eles aparecem só uma vez, e cada um permite entrar uma única vez se você perder o celular.",
+	"settings_2fa_download_codes": "Baixar .txt",
+	"settings_2fa_err_wrong_code": "Esse código não é válido. Espere o próximo e tente de novo.",
+	"settings_2fa_recovery_none_replace": "Substitua-os para obter um novo conjunto.",
+	"settings_2fa_regenerate": "Substituir códigos de recuperação",
+	"settings_2fa_regenerate_code_label": "Código do seu aplicativo autenticador",
+	"settings_2fa_regenerate_confirm": "Substituir os códigos",
+	"settings_2fa_regenerate_error": "Não foi possível substituir os códigos de recuperação",
+	"settings_2fa_regenerate_intro": "Você recebe um novo conjunto de códigos de recuperação; os antigos param de funcionar na hora. A autenticação em dois fatores continua ativa.",
+	"settings_2fa_regenerate_password_label": "Sua senha",
+	"settings_2fa_regenerate_use_code": "Usar um código do aplicativo",
+	"settings_2fa_regenerate_use_password": "Usar minha senha",
+	"settings_assistant_edit": "Editar",
+	"settings_assistant_edit_aria": "Editar o token {name}",
+	"settings_assistant_edit_cancel": "Cancelar",
+	"settings_assistant_edit_err_name": "Digite um nome para o token.",
+	"settings_assistant_edit_error": "Não foi possível atualizar o token",
+	"settings_assistant_edit_expiry": "Validade",
+	"settings_assistant_edit_expiry_30": "30 dias a partir de hoje",
+	"settings_assistant_edit_expiry_365": "1 ano a partir de hoje",
+	"settings_assistant_edit_expiry_90": "90 dias a partir de hoje",
+	"settings_assistant_edit_expiry_help": "Hoje expira em {date}. Uma nova validade conta a partir de hoje.",
+	"settings_assistant_edit_expiry_help_never": "Hoje não expira nunca. Uma nova validade conta a partir de hoje.",
+	"settings_assistant_edit_expiry_keep": "Manter a validade atual",
+	"settings_assistant_edit_expiry_never": "Nunca expira",
+	"settings_assistant_edit_name": "Nome",
+	"settings_assistant_edit_save": "Salvar",
+	"settings_assistant_edit_saved": "Token atualizado",
+	"settings_sessions_current": "Este dispositivo",
+	"settings_sessions_device": "{browser} no {os}",
+	"settings_sessions_device_unknown": "Dispositivo desconhecido",
+	"settings_sessions_hint": "Todos os navegadores em que sua conta está conectada. Desconecte os que você não reconhece.",
+	"settings_sessions_last_active": "última atividade {when}",
+	"settings_sessions_load_error": "Não foi possível ler suas sessões",
+	"settings_sessions_revoke": "Desconectar",
+	"settings_sessions_revoke_confirm": "Desconectar este dispositivo?",
+	"settings_sessions_revoke_error": "Não foi possível encerrar a sessão",
+	"settings_sessions_revoke_others": "Encerrar minhas outras sessões",
+	"settings_sessions_revoke_others_confirm": "Sair de todos os outros lugares?",
+	"settings_sessions_revoked_others": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} outra sessão encerrada.",
+				"countPlural=other": "{count} outras sessões encerradas."
+			}
+		}
+	],
+	"settings_sessions_signed_in": "Conectado {when}",
+	"settings_sessions_title": "Dispositivos conectados",
+	"settings_sessions_via_passkey": "Chave de acesso",
+	"settings_sessions_via_password": "Senha",
+	"settings_users_email": "Endereço de e-mail",
+	"settings_users_email_help": "Opcional. Para saber quem contatar; nunca é usado para entrar.",
+	"settings_users_err_email": "Digite um e-mail como jane@example.org ou deixe o campo vazio.",
+	"settings_users_filter_without_2fa": "Sem 2FA",
+	"settings_users_no_match": "Nenhum usuário corresponde a esta busca.",
+	"settings_users_policy_error": "Não foi possível alterar a política de dois fatores",
+	"settings_users_policy_help": "Quem entra com senha e não tem segundo fator precisa configurar um antes de usar o DumbMonit. Logins por SSO, LDAP ou chave de acesso ficam isentos: o provedor de identidade ou a chave já cuidam disso.",
+	"settings_users_policy_pending": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} administrador ou operador terá de configurá-lo no próximo login.",
+				"countPlural=other": "{count} administradores ou operadores terão de configurá-lo no próximo login."
+			}
+		}
+	],
+	"settings_users_policy_title": "Exigir autenticação em dois fatores de administradores e operadores",
+	"settings_users_search_label": "Buscar usuários",
+	"settings_users_search_placeholder": "Nome, usuário ou e-mail",
+	"settings_users_sign_out": "Desconectar de tudo",
+	"settings_users_sign_out_confirm": "Desconectar de tudo?",
+	"settings_users_sign_out_self_title": "Encerra suas outras sessões; esta continua aberta.",
+	"settings_users_sign_out_title": "Encerra todas as sessões deste usuário. Ele terá de entrar novamente.",
+	"settings_users_signed_out": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} sessão encerrada.",
+				"countPlural=other": "{count} sessões encerradas."
+			}
+		}
+	],
+	"settings_users_sort_label": "Ordenar por",
+	"settings_users_sort_last_login": "Último acesso",
+	"settings_users_sort_name": "Nome",
+	"settings_users_sort_role": "Função"
+}

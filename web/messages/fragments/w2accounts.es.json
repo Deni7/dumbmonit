@@ -1,0 +1,114 @@
+{
+	"auth_totp_gate_intro": "Esta instancia exige la autenticación en dos pasos a administradores y operadores. Configúrala para continuar.",
+	"auth_totp_gate_intro_user": "Esta instancia exige la autenticación en dos pasos a administradores y operadores. Configúrala para {username} y continúa.",
+	"auth_totp_gate_later": "¿Ahora no? Cierra sesión y vuelve cuando tengas el móvil a mano.",
+	"auth_totp_gate_sign_out": "Cerrar sesión",
+	"auth_totp_gate_title": "Configura la autenticación en dos pasos",
+	"settings_2fa_codes_file_header": "Códigos de recuperación de DumbMonit para {account}. Cada código te permite iniciar sesión una vez si pierdes el móvil. Guárdalos en un lugar seguro.",
+	"settings_2fa_codes_note": "Guarda estos códigos ahora: solo se muestran una vez y cada uno te permite iniciar sesión una sola vez si pierdes el móvil.",
+	"settings_2fa_download_codes": "Descargar .txt",
+	"settings_2fa_err_wrong_code": "Ese código no es válido. Espera al siguiente e inténtalo de nuevo.",
+	"settings_2fa_recovery_none_replace": "Sustitúyelos para obtener un juego nuevo.",
+	"settings_2fa_regenerate": "Sustituir códigos de recuperación",
+	"settings_2fa_regenerate_code_label": "Código de tu aplicación de autenticación",
+	"settings_2fa_regenerate_confirm": "Sustituir los códigos",
+	"settings_2fa_regenerate_error": "No se pudieron sustituir los códigos de recuperación",
+	"settings_2fa_regenerate_intro": "Recibirás un juego nuevo de códigos de recuperación; los anteriores dejan de funcionar al instante. La autenticación en dos pasos sigue activa.",
+	"settings_2fa_regenerate_password_label": "Tu contraseña",
+	"settings_2fa_regenerate_use_code": "Usar un código de la aplicación en su lugar",
+	"settings_2fa_regenerate_use_password": "Usar mi contraseña en su lugar",
+	"settings_assistant_edit": "Editar",
+	"settings_assistant_edit_aria": "Editar el token {name}",
+	"settings_assistant_edit_cancel": "Cancelar",
+	"settings_assistant_edit_err_name": "Introduce un nombre para el token.",
+	"settings_assistant_edit_error": "No se pudo actualizar el token",
+	"settings_assistant_edit_expiry": "Caducidad",
+	"settings_assistant_edit_expiry_30": "30 días desde hoy",
+	"settings_assistant_edit_expiry_365": "1 año desde hoy",
+	"settings_assistant_edit_expiry_90": "90 días desde hoy",
+	"settings_assistant_edit_expiry_help": "Ahora caduca el {date}. Una nueva caducidad cuenta desde hoy.",
+	"settings_assistant_edit_expiry_help_never": "Ahora no caduca nunca. Una nueva caducidad cuenta desde hoy.",
+	"settings_assistant_edit_expiry_keep": "Mantener la caducidad actual",
+	"settings_assistant_edit_expiry_never": "No caduca nunca",
+	"settings_assistant_edit_name": "Nombre",
+	"settings_assistant_edit_save": "Guardar",
+	"settings_assistant_edit_saved": "Token actualizado",
+	"settings_sessions_current": "Este dispositivo",
+	"settings_sessions_device": "{browser} en {os}",
+	"settings_sessions_device_unknown": "Dispositivo desconocido",
+	"settings_sessions_hint": "Todos los navegadores donde tu cuenta tiene la sesión iniciada. Cierra los que no reconozcas.",
+	"settings_sessions_last_active": "última actividad {when}",
+	"settings_sessions_load_error": "No se pudieron leer tus sesiones",
+	"settings_sessions_revoke": "Cerrar sesión",
+	"settings_sessions_revoke_confirm": "¿Cerrar la sesión de este dispositivo?",
+	"settings_sessions_revoke_error": "No se pudo cerrar la sesión",
+	"settings_sessions_revoke_others": "Cerrar mis otras sesiones",
+	"settings_sessions_revoke_others_confirm": "¿Cerrar sesión en todos los demás sitios?",
+	"settings_sessions_revoked_others": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} sesión más cerrada.",
+				"countPlural=other": "{count} sesiones más cerradas."
+			}
+		}
+	],
+	"settings_sessions_signed_in": "Sesión iniciada {when}",
+	"settings_sessions_title": "Dispositivos con sesión iniciada",
+	"settings_sessions_via_passkey": "Llave de acceso",
+	"settings_sessions_via_password": "Contraseña",
+	"settings_users_email": "Correo electrónico",
+	"settings_users_email_help": "Opcional. Para saber a quién contactar; nunca se usa para iniciar sesión.",
+	"settings_users_err_email": "Introduce un correo como jane@example.org o deja el campo vacío.",
+	"settings_users_filter_without_2fa": "Sin 2FA",
+	"settings_users_no_match": "Ningún usuario coincide con esta búsqueda.",
+	"settings_users_policy_error": "No se pudo cambiar la política de dos pasos",
+	"settings_users_policy_help": "Quien inicie sesión con contraseña y no tenga segundo factor deberá configurarlo antes de usar DumbMonit. El inicio de sesión único, LDAP y las llaves de acceso quedan exentos: el proveedor de identidad o la llave ya lo cubren.",
+	"settings_users_policy_pending": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} administrador u operador tendrá que configurarlo en su próximo inicio de sesión.",
+				"countPlural=other": "{count} administradores u operadores tendrán que configurarlo en su próximo inicio de sesión."
+			}
+		}
+	],
+	"settings_users_policy_title": "Exigir autenticación en dos pasos a administradores y operadores",
+	"settings_users_search_label": "Buscar usuarios",
+	"settings_users_search_placeholder": "Nombre, usuario o correo",
+	"settings_users_sign_out": "Cerrar todas las sesiones",
+	"settings_users_sign_out_confirm": "¿Cerrar todas las sesiones?",
+	"settings_users_sign_out_self_title": "Cierra tus otras sesiones; esta sigue abierta.",
+	"settings_users_sign_out_title": "Cierra todas las sesiones de este usuario. Tendrá que volver a iniciar sesión.",
+	"settings_users_signed_out": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} sesión cerrada.",
+				"countPlural=other": "{count} sesiones cerradas."
+			}
+		}
+	],
+	"settings_users_sort_label": "Ordenar por",
+	"settings_users_sort_last_login": "Último inicio de sesión",
+	"settings_users_sort_name": "Nombre",
+	"settings_users_sort_role": "Rol"
+}

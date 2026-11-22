@@ -1,0 +1,120 @@
+{
+	"auth_totp_gate_intro": "На этом экземпляре администраторы и операторы обязаны использовать двухфакторную аутентификацию. Настройте её, чтобы продолжить.",
+	"auth_totp_gate_intro_user": "На этом экземпляре администраторы и операторы обязаны использовать двухфакторную аутентификацию. Настройте её для {username}, чтобы продолжить.",
+	"auth_totp_gate_later": "Не сейчас? Выйдите и вернитесь, когда телефон будет под рукой.",
+	"auth_totp_gate_sign_out": "Выйти",
+	"auth_totp_gate_title": "Настройте двухфакторную аутентификацию",
+	"settings_2fa_codes_file_header": "Коды восстановления DumbMonit для {account}. Каждый код позволяет войти один раз, если телефон потерян. Храните их в надёжном месте.",
+	"settings_2fa_codes_note": "Сохраните эти коды сейчас: они показываются только один раз, и каждый позволяет войти однократно, если телефон потерян.",
+	"settings_2fa_download_codes": "Скачать .txt",
+	"settings_2fa_err_wrong_code": "Этот код недействителен. Дождитесь следующего и попробуйте снова.",
+	"settings_2fa_recovery_none_replace": "Замените их, чтобы получить новый набор.",
+	"settings_2fa_regenerate": "Заменить коды восстановления",
+	"settings_2fa_regenerate_code_label": "Код из приложения-аутентификатора",
+	"settings_2fa_regenerate_confirm": "Заменить коды",
+	"settings_2fa_regenerate_error": "Не удалось заменить коды восстановления",
+	"settings_2fa_regenerate_intro": "Вы получите новый набор кодов восстановления, старые сразу перестанут действовать. Двухфакторная аутентификация останется включённой.",
+	"settings_2fa_regenerate_password_label": "Ваш пароль",
+	"settings_2fa_regenerate_use_code": "Использовать код из приложения",
+	"settings_2fa_regenerate_use_password": "Использовать пароль",
+	"settings_assistant_edit": "Изменить",
+	"settings_assistant_edit_aria": "Изменить токен {name}",
+	"settings_assistant_edit_cancel": "Отмена",
+	"settings_assistant_edit_err_name": "Введите название токена.",
+	"settings_assistant_edit_error": "Не удалось обновить токен",
+	"settings_assistant_edit_expiry": "Срок действия",
+	"settings_assistant_edit_expiry_30": "30 дней с сегодняшнего дня",
+	"settings_assistant_edit_expiry_365": "1 год с сегодняшнего дня",
+	"settings_assistant_edit_expiry_90": "90 дней с сегодняшнего дня",
+	"settings_assistant_edit_expiry_help": "Сейчас истекает {date}. Новый срок отсчитывается от сегодняшнего дня.",
+	"settings_assistant_edit_expiry_help_never": "Сейчас бессрочный. Новый срок отсчитывается от сегодняшнего дня.",
+	"settings_assistant_edit_expiry_keep": "Оставить текущий срок",
+	"settings_assistant_edit_expiry_never": "Бессрочно",
+	"settings_assistant_edit_name": "Название",
+	"settings_assistant_edit_save": "Сохранить",
+	"settings_assistant_edit_saved": "Токен обновлён",
+	"settings_sessions_current": "Это устройство",
+	"settings_sessions_device": "{browser} на {os}",
+	"settings_sessions_device_unknown": "Неизвестное устройство",
+	"settings_sessions_hint": "Все браузеры, в которых выполнен вход в вашу учётную запись. Завершите сеансы, которые вам незнакомы.",
+	"settings_sessions_last_active": "последняя активность: {when}",
+	"settings_sessions_load_error": "Не удалось получить список сеансов",
+	"settings_sessions_revoke": "Завершить",
+	"settings_sessions_revoke_confirm": "Завершить сеанс на этом устройстве?",
+	"settings_sessions_revoke_error": "Не удалось завершить сеанс",
+	"settings_sessions_revoke_others": "Завершить другие сеансы",
+	"settings_sessions_revoke_others_confirm": "Выйти на всех остальных устройствах?",
+	"settings_sessions_revoked_others": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Завершён {count} другой сеанс.",
+				"countPlural=few": "Завершено {count} других сеанса.",
+				"countPlural=many": "Завершено {count} других сеансов.",
+				"countPlural=other": "Завершено {count} других сеанса."
+			}
+		}
+	],
+	"settings_sessions_signed_in": "Вход: {when}",
+	"settings_sessions_title": "Устройства со входом",
+	"settings_sessions_via_passkey": "Ключ доступа",
+	"settings_sessions_via_password": "Пароль",
+	"settings_users_email": "Адрес электронной почты",
+	"settings_users_email_help": "Необязательно. Чтобы знать, с кем связаться; для входа не используется.",
+	"settings_users_err_email": "Введите адрес вида jane@example.org или оставьте поле пустым.",
+	"settings_users_filter_without_2fa": "Без 2FA",
+	"settings_users_no_match": "Нет пользователей, подходящих под этот поиск.",
+	"settings_users_policy_error": "Не удалось изменить политику двухфакторной аутентификации",
+	"settings_users_policy_help": "Те, кто входит по паролю без второго фактора, должны настроить его, прежде чем пользоваться DumbMonit. Вход через SSO, LDAP или ключ доступа освобождён: это уже обеспечивает поставщик удостоверений или ключ.",
+	"settings_users_policy_pending": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} администратор или оператор должен будет настроить его при следующем входе.",
+				"countPlural=few": "{count} администратора или оператора должны будут настроить его при следующем входе.",
+				"countPlural=many": "{count} администраторов или операторов должны будут настроить его при следующем входе.",
+				"countPlural=other": "{count} администратора или оператора должны будут настроить его при следующем входе."
+			}
+		}
+	],
+	"settings_users_policy_title": "Требовать двухфакторную аутентификацию от администраторов и операторов",
+	"settings_users_search_label": "Поиск пользователей",
+	"settings_users_search_placeholder": "Имя, логин или почта",
+	"settings_users_sign_out": "Выйти везде",
+	"settings_users_sign_out_confirm": "Выйти везде?",
+	"settings_users_sign_out_self_title": "Завершает другие ваши сеансы; текущий остаётся открытым.",
+	"settings_users_sign_out_title": "Завершает все сеансы этого пользователя. Ему придётся войти заново.",
+	"settings_users_signed_out": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Завершён {count} сеанс.",
+				"countPlural=few": "Завершено {count} сеанса.",
+				"countPlural=many": "Завершено {count} сеансов.",
+				"countPlural=other": "Завершено {count} сеанса."
+			}
+		}
+	],
+	"settings_users_sort_label": "Сортировка",
+	"settings_users_sort_last_login": "Последний вход",
+	"settings_users_sort_name": "Имя",
+	"settings_users_sort_role": "Роль"
+}

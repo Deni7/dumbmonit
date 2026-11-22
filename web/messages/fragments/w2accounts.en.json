@@ -1,0 +1,114 @@
+{
+	"auth_totp_gate_intro": "This instance requires two-factor authentication for admins and operators. Set it up to continue.",
+	"auth_totp_gate_intro_user": "This instance requires two-factor authentication for admins and operators. Set it up for {username} to continue.",
+	"auth_totp_gate_later": "Not now? Sign out and come back when your phone is at hand.",
+	"auth_totp_gate_sign_out": "Sign out",
+	"auth_totp_gate_title": "Set up two-factor authentication",
+	"settings_2fa_codes_file_header": "DumbMonit recovery codes for {account}. Each code signs you in once if your phone is lost. Keep them somewhere safe.",
+	"settings_2fa_codes_note": "Save these codes now: they are shown only once, and each one signs you in a single time if your phone is lost.",
+	"settings_2fa_download_codes": "Download .txt",
+	"settings_2fa_err_wrong_code": "That code is not valid. Wait for the next one and try again.",
+	"settings_2fa_recovery_none_replace": "Replace them to get a fresh set.",
+	"settings_2fa_regenerate": "Replace recovery codes",
+	"settings_2fa_regenerate_code_label": "Code from your authenticator app",
+	"settings_2fa_regenerate_confirm": "Replace the codes",
+	"settings_2fa_regenerate_error": "Could not replace the recovery codes",
+	"settings_2fa_regenerate_intro": "You get a new set of recovery codes; the old ones stop working at once. Two-factor authentication stays on.",
+	"settings_2fa_regenerate_password_label": "Your password",
+	"settings_2fa_regenerate_use_code": "Use a code from the app instead",
+	"settings_2fa_regenerate_use_password": "Use my password instead",
+	"settings_assistant_edit": "Edit",
+	"settings_assistant_edit_aria": "Edit the token {name}",
+	"settings_assistant_edit_cancel": "Cancel",
+	"settings_assistant_edit_err_name": "Enter a name for the token.",
+	"settings_assistant_edit_error": "Could not update the token",
+	"settings_assistant_edit_expiry": "Expiry",
+	"settings_assistant_edit_expiry_30": "30 days from today",
+	"settings_assistant_edit_expiry_365": "1 year from today",
+	"settings_assistant_edit_expiry_90": "90 days from today",
+	"settings_assistant_edit_expiry_help": "Currently expires on {date}. A new expiry counts from today.",
+	"settings_assistant_edit_expiry_help_never": "Currently never expires. A new expiry counts from today.",
+	"settings_assistant_edit_expiry_keep": "Keep the current expiry",
+	"settings_assistant_edit_expiry_never": "Never expires",
+	"settings_assistant_edit_name": "Name",
+	"settings_assistant_edit_save": "Save",
+	"settings_assistant_edit_saved": "Token updated",
+	"settings_sessions_current": "This device",
+	"settings_sessions_device": "{browser} on {os}",
+	"settings_sessions_device_unknown": "Unknown device",
+	"settings_sessions_hint": "Every browser where your account is signed in. Sign out the ones you do not recognise.",
+	"settings_sessions_last_active": "last active {when}",
+	"settings_sessions_load_error": "Could not read your sessions",
+	"settings_sessions_revoke": "Sign out",
+	"settings_sessions_revoke_confirm": "Sign this device out?",
+	"settings_sessions_revoke_error": "Could not sign the session out",
+	"settings_sessions_revoke_others": "Sign out my other sessions",
+	"settings_sessions_revoke_others_confirm": "Sign out everywhere else?",
+	"settings_sessions_revoked_others": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} other session signed out.",
+				"countPlural=other": "{count} other sessions signed out."
+			}
+		}
+	],
+	"settings_sessions_signed_in": "Signed in {when}",
+	"settings_sessions_title": "Signed-in devices",
+	"settings_sessions_via_passkey": "Passkey",
+	"settings_sessions_via_password": "Password",
+	"settings_users_email": "Email address",
+	"settings_users_email_help": "Optional. To know whom to reach; never used to sign in.",
+	"settings_users_err_email": "Enter an email address such as jane@example.org, or leave the field empty.",
+	"settings_users_filter_without_2fa": "Without 2FA",
+	"settings_users_no_match": "No user matches this search.",
+	"settings_users_policy_error": "Could not change the two-factor policy",
+	"settings_users_policy_help": "Those who sign in with a password and have no second factor must set one up before they can use DumbMonit. Single sign-on, LDAP and passkey sign-ins are exempt: the identity provider or the passkey already covers it.",
+	"settings_users_policy_pending": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} admin or operator will have to set it up at their next sign-in.",
+				"countPlural=other": "{count} admins or operators will have to set it up at their next sign-in."
+			}
+		}
+	],
+	"settings_users_policy_title": "Require two-factor authentication for admins and operators",
+	"settings_users_search_label": "Search users",
+	"settings_users_search_placeholder": "Name, username or email",
+	"settings_users_sign_out": "Sign out everywhere",
+	"settings_users_sign_out_confirm": "Sign out everywhere?",
+	"settings_users_sign_out_self_title": "Closes your other sessions; this one stays open.",
+	"settings_users_sign_out_title": "Closes every session of this user. They will have to sign in again.",
+	"settings_users_signed_out": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} session closed.",
+				"countPlural=other": "{count} sessions closed."
+			}
+		}
+	],
+	"settings_users_sort_label": "Sort by",
+	"settings_users_sort_last_login": "Last sign-in",
+	"settings_users_sort_name": "Name",
+	"settings_users_sort_role": "Role"
+}

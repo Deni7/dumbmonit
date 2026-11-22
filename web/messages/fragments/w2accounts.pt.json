@@ -1,0 +1,114 @@
+{
+	"auth_totp_gate_intro": "Esta instância exige a autenticação de dois fatores para administradores e operadores. Configure-a para continuar.",
+	"auth_totp_gate_intro_user": "Esta instância exige a autenticação de dois fatores para administradores e operadores. Configure-a para {username} para continuar.",
+	"auth_totp_gate_later": "Agora não? Termine a sessão e volte quando tiver o telemóvel à mão.",
+	"auth_totp_gate_sign_out": "Terminar sessão",
+	"auth_totp_gate_title": "Configure a autenticação de dois fatores",
+	"settings_2fa_codes_file_header": "Códigos de recuperação do DumbMonit para {account}. Cada código permite iniciar sessão uma vez se perder o telemóvel. Guarde-os num local seguro.",
+	"settings_2fa_codes_note": "Guarde estes códigos agora: só são apresentados uma vez e cada um permite iniciar sessão uma única vez se perder o telemóvel.",
+	"settings_2fa_download_codes": "Transferir .txt",
+	"settings_2fa_err_wrong_code": "Esse código não é válido. Aguarde pelo seguinte e tente novamente.",
+	"settings_2fa_recovery_none_replace": "Substitua-os para obter um novo conjunto.",
+	"settings_2fa_regenerate": "Substituir códigos de recuperação",
+	"settings_2fa_regenerate_code_label": "Código da sua aplicação de autenticação",
+	"settings_2fa_regenerate_confirm": "Substituir os códigos",
+	"settings_2fa_regenerate_error": "Não foi possível substituir os códigos de recuperação",
+	"settings_2fa_regenerate_intro": "Recebe um novo conjunto de códigos de recuperação; os antigos deixam de funcionar de imediato. A autenticação de dois fatores mantém-se ativa.",
+	"settings_2fa_regenerate_password_label": "A sua palavra-passe",
+	"settings_2fa_regenerate_use_code": "Usar antes um código da aplicação",
+	"settings_2fa_regenerate_use_password": "Usar antes a minha palavra-passe",
+	"settings_assistant_edit": "Editar",
+	"settings_assistant_edit_aria": "Editar o token {name}",
+	"settings_assistant_edit_cancel": "Cancelar",
+	"settings_assistant_edit_err_name": "Introduza um nome para o token.",
+	"settings_assistant_edit_error": "Não foi possível atualizar o token",
+	"settings_assistant_edit_expiry": "Validade",
+	"settings_assistant_edit_expiry_30": "30 dias a partir de hoje",
+	"settings_assistant_edit_expiry_365": "1 ano a partir de hoje",
+	"settings_assistant_edit_expiry_90": "90 dias a partir de hoje",
+	"settings_assistant_edit_expiry_help": "Expira atualmente a {date}. Uma nova validade conta a partir de hoje.",
+	"settings_assistant_edit_expiry_help_never": "Atualmente nunca expira. Uma nova validade conta a partir de hoje.",
+	"settings_assistant_edit_expiry_keep": "Manter a validade atual",
+	"settings_assistant_edit_expiry_never": "Nunca expira",
+	"settings_assistant_edit_name": "Nome",
+	"settings_assistant_edit_save": "Guardar",
+	"settings_assistant_edit_saved": "Token atualizado",
+	"settings_sessions_current": "Este dispositivo",
+	"settings_sessions_device": "{browser} em {os}",
+	"settings_sessions_device_unknown": "Dispositivo desconhecido",
+	"settings_sessions_hint": "Cada navegador onde a sua conta tem sessão iniciada. Termine as que não reconhecer.",
+	"settings_sessions_last_active": "última atividade {when}",
+	"settings_sessions_load_error": "Não foi possível ler as suas sessões",
+	"settings_sessions_revoke": "Terminar sessão",
+	"settings_sessions_revoke_confirm": "Terminar a sessão deste dispositivo?",
+	"settings_sessions_revoke_error": "Não foi possível terminar a sessão",
+	"settings_sessions_revoke_others": "Terminar as minhas outras sessões",
+	"settings_sessions_revoke_others_confirm": "Terminar a sessão em todos os outros locais?",
+	"settings_sessions_revoked_others": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} outra sessão terminada.",
+				"countPlural=other": "{count} outras sessões terminadas."
+			}
+		}
+	],
+	"settings_sessions_signed_in": "Sessão iniciada {when}",
+	"settings_sessions_title": "Dispositivos com sessão iniciada",
+	"settings_sessions_via_passkey": "Chave de acesso",
+	"settings_sessions_via_password": "Palavra-passe",
+	"settings_users_email": "Endereço de email",
+	"settings_users_email_help": "Opcional. Para saber a quem recorrer; nunca é usado para iniciar sessão.",
+	"settings_users_err_email": "Introduza um endereço como jane@example.org ou deixe o campo vazio.",
+	"settings_users_filter_without_2fa": "Sem 2FA",
+	"settings_users_no_match": "Nenhum utilizador corresponde a esta pesquisa.",
+	"settings_users_policy_error": "Não foi possível alterar a política de dois fatores",
+	"settings_users_policy_help": "Quem inicia sessão com palavra-passe e não tem segundo fator tem de configurar um antes de usar o DumbMonit. O início de sessão único, o LDAP e as chaves de acesso estão isentos: o fornecedor de identidade ou a chave já o garantem.",
+	"settings_users_policy_pending": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} administrador ou operador terá de o configurar no próximo início de sessão.",
+				"countPlural=other": "{count} administradores ou operadores terão de o configurar no próximo início de sessão."
+			}
+		}
+	],
+	"settings_users_policy_title": "Exigir autenticação de dois fatores a administradores e operadores",
+	"settings_users_search_label": "Pesquisar utilizadores",
+	"settings_users_search_placeholder": "Nome, utilizador ou email",
+	"settings_users_sign_out": "Terminar todas as sessões",
+	"settings_users_sign_out_confirm": "Terminar todas as sessões?",
+	"settings_users_sign_out_self_title": "Termina as suas outras sessões; esta continua aberta.",
+	"settings_users_sign_out_title": "Termina todas as sessões deste utilizador. Terá de iniciar sessão novamente.",
+	"settings_users_signed_out": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} sessão terminada.",
+				"countPlural=other": "{count} sessões terminadas."
+			}
+		}
+	],
+	"settings_users_sort_label": "Ordenar por",
+	"settings_users_sort_last_login": "Último início de sessão",
+	"settings_users_sort_name": "Nome",
+	"settings_users_sort_role": "Função"
+}

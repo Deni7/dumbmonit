@@ -1,6 +1,7 @@
 <script lang="ts">
 	/**
-	 * Settings → Account & security: change your own password, sign out.
+	 * Settings → Account & security: change your own password, see and close
+	 * your other sessions, sign out.
 	 * Accounts that sign in through the identity provider have no password
 	 * here; when the server runs unprotected there is nothing to change either.
 	 */
@@ -12,6 +13,7 @@
 	import PasswordInput from './PasswordInput.svelte';
 	import TwoFactorSection from './TwoFactorSection.svelte';
 	import PasskeysSection from './PasskeysSection.svelte';
+	import SessionsSection from './SessionsSection.svelte';
 
 	let current = $state('');
 	let next = $state('');
@@ -144,6 +146,8 @@
 	<TwoFactorSection />
 
 	<PasskeysSection />
+
+	<SessionsSection />
 
 	{#if auth.available}
 		<div class="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5 max-sm:mt-4 max-sm:pt-4">
