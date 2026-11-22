@@ -20,8 +20,13 @@
 	 * list of the corrections, and the rules DumbMonit suggests from them.
 	 * Everything goes through the server (`/api/topology/corrections`), which
 	 * applies it to the map it sends back.
+	 *
+	 * Reading aids: a search box (outside the corrections too) that selects a
+	 * node and centres the map on it, a filter by site and one for problems
+	 * only, a CSV of the list view, and `?node=<id>` (the panel's "copy link")
+	 * that opens the map on that node with its panel open.
 	 */
-	import { flushSync, tick } from 'svelte';
+	import { flushSync, tick, untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { replaceState } from '$app/navigation';
 	import { m } from '#lib/paraglide/messages.js';
@@ -43,8 +48,12 @@
 	import EdgeEditor from '#lib/components/topology/EdgeEditor.svelte';
 	import CorrectionsPanel from '#lib/components/topology/CorrectionsPanel.svelte';
 	import { EditHistory, ruleSpec } from '#lib/components/topology/edits.js';
-	import { buildGraph, edgeKey, isGuestKind, layoutMap, listRows, type MapEdge, type MapNode } from '#lib/components/topology/layout.js';
-	import { ExportError, exportPng, exportSvg } from '#lib/components/topology/export.js';
+	import { ancestors, buildGraph, edgeKey, isGuestKind, layoutMap, listRows, type MapEdge, type MapNode, type NodeState } from '#lib/components/topology/layout.js';
+	import NodePicker from '#lib/components/topology/NodePicker.svelte';
+	import { guestLabel, zoneLabel } from '#lib/components/topology/legend.js';
+	import { kindLabel } from '#lib/kind-label.js';
+	import { STATE_LABEL, type TargetState } from '#lib/format.js';
+	import { ExportError, exportCsv, exportPng, exportSvg, listCsv, type CsvRowInput } from '#lib/components/topology/export.js';
 	import WorldView from '#lib/components/worldmap/WorldView.svelte';
 	import { Download, Network, PencilRuler, Redo2, Undo2 } from 'lucide-svelte';
 
@@ -247,7 +256,28 @@
 	/** Some link carries port counters: the Traffic toggle and the load scale make sense. */
 	const hasTraffic = $derived(edges.some((e) => !!e.traffic));
 	const weather = $derived(showTraffic && hasTraffic);
-	const graph = $derived(buildGraph(nodes, edges));
+	// Filters: one site, or only what is in trouble (with the devices it hangs from, for context).
+	const MAIN_SITE = '\u0000main';
+	let siteFilter = $state('');
+	let problemsOnly = $state(false);
+	const filtered = $derived(siteFilter !== '' || problemsOnly);
+	const visibleNodes = $derived.by((): MapNode[] => {
+		if (!filtered) return nodes;
+		let list = nodes;
+		if (siteFilter !== '') list = list.filter((n) => (siteFilter === MAIN_SITE ? !n.site : n.site === siteFilter));
+		if (problemsOnly) {
+			const g = buildGraph(list, edges);
+			const keep = new Set<string>();
+			for (const n of list) {
+				if (!g.down.has(n.id) && !g.impacted.has(n.id) && n.state !== 'misconfigured') continue;
+				keep.add(n.id);
+				for (const up of ancestors(g, n.id)) keep.add(up);
+			}
+			list = list.filter((n) => keep.has(n.id));
+		}
+		return list;
+	});
+	const graph = $derived(buildGraph(visibleNodes, edges));
 	const layout = $derived(layoutMap(graph, { byGroup, bySubnet }));
 	const sections = $derived(listRows(graph));
 	const siteCount = $derived(sections.length - 1);
@@ -313,6 +343,66 @@
 	}
 
 	const loading = $derived(topology === null && loadError === null);
+
+	function stateText(state: NodeState): string {
+		if (state === 'running') return m.topology_state_running();
+		if (state === 'stopped') return m.topology_state_stopped();
+		return STATE_LABEL[state as TargetState];
+	}
+
+	/** The list view as a CSV file: one line per device, its parent named. */
+	function runCsv() {
+		const header: CsvRowInput = {
+			site: m.w1wall_topo_csv_site(),
+			name: m.w1wall_topo_csv_name(),
+			type: m.w1wall_topo_csv_type(),
+			state: m.w1wall_topo_csv_state(),
+			folder: m.w1wall_topo_csv_folder(),
+			network: m.w1wall_topo_csv_network(),
+			parent: m.w1wall_topo_csv_parent()
+		};
+		const rows: CsvRowInput[] = [];
+		for (const section of sections) {
+			const trail: string[] = [];
+			for (const row of section.rows) {
+				trail.length = row.depth;
+				trail[row.depth] = row.node.name;
+				rows.push({
+					site: section.site.name ?? m.topology_site_main(),
+					name: row.node.name,
+					type: guestLabel(row.node) ?? kindLabel(row.node.kind),
+					state: stateText(row.node.state),
+					folder: row.node.group,
+					network: row.node.subnet ? zoneLabel(row.node.subnet, row.node.vlan ?? null, row.node.vlanName ?? null) : '',
+					parent: row.depth > 0 ? (trail[row.depth - 1] ?? '') : ''
+				});
+			}
+		}
+		exportCsv(listCsv(header, rows), filename('csv'));
+	}
+
+	// Search outside the corrections, and the `?node=` link: select the node, centre the map on it.
+	let centerRequest = $state<{ id: string; n: number } | null>(null);
+	let centerCount = 0;
+	function goTo(id: string) {
+		selected = id;
+		centerRequest = { id, n: ++centerCount };
+	}
+	let deepLinkDone = false;
+	$effect(() => {
+		const wanted = page.url.searchParams.get('node');
+		if (deepLinkDone || !wanted || !topology) return;
+		deepLinkDone = true;
+		untrack(() => {
+			if (view !== 'map') setView('map');
+			if (allNodes.some((n) => n.id === wanted)) {
+				// The link names a node: show everything, then centre on it.
+				siteFilter = '';
+				problemsOnly = false;
+				goTo(wanted);
+			}
+		});
+	});
 
 	// --- Correcting the map ------------------------------------------------
 
@@ -523,6 +613,9 @@
 						{/snippet}
 						{#snippet children({ close })}
 							{@const item = 'flex min-h-10 w-full items-center rounded-lg px-3 text-left text-sm text-ink hover:bg-surface focus-visible:outline-2 focus-visible:outline-focus'}
+							{#if view === 'list'}
+								<button type="button" role="menuitem" class={item} onclick={() => { close(); runCsv(); }}>{m.w1wall_topo_export_csv()}</button>
+							{/if}
 							<button type="button" role="menuitem" class={item} onclick={() => { close(); void run('svg'); }}>{m.topology_export_svg()}</button>
 							<button type="button" role="menuitem" class={item} onclick={() => { close(); void run('png'); }}>{m.topology_export_png()}</button>
 							<button type="button" role="menuitem" class={item} onclick={() => { close(); void print('A4'); }}>{m.topology_print_a4()}</button>
@@ -532,6 +625,30 @@
 				{/if}
 			</div>
 		</div>
+
+		{#if view !== 'world'}
+			<div class="mb-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+				{#if view === 'map'}
+					<div class="min-w-0 sm:w-64">
+						<NodePicker nodes={[...graph.nodes.values()]} except="" id="topology-search" label={m.w1wall_topo_search_label()} onpick={goTo} />
+					</div>
+				{/if}
+				{#if sites.length > 0}
+					<div class="flex min-w-0 flex-col gap-1.5">
+						<label for="topology-site" class="text-xs font-semibold text-ink-2">{m.w1wall_topo_site_label()}</label>
+						<select id="topology-site" class="input" bind:value={siteFilter}>
+							<option value="">{m.w1wall_topo_site_all()}</option>
+							<option value={MAIN_SITE}>{m.topology_site_main()}</option>
+							{#each sites as site (site)}<option value={site}>{site}</option>{/each}
+						</select>
+					</div>
+				{/if}
+				<label class="inline-flex min-h-10 items-center gap-2.5 text-sm text-ink-2">
+					<Toggle bind:checked={problemsOnly} label={m.w1wall_topo_problems_only()} />
+					<span aria-hidden="true">{m.w1wall_topo_problems_only()}</span>
+				</label>
+			</div>
+		{/if}
 
 		{#if topology && !topology.metrics_available}
 			<p class="mb-3 rounded-lg border border-advisory/40 bg-advisory-soft px-3 py-2 text-sm text-advisory-ink">{m.topology_metrics_missing()}</p>
@@ -561,9 +678,12 @@
 			{/if}
 		{/if}
 
-		{#if view === 'map'}
+		{#if layout.nodes.length === 0 && filtered}
+			<p class="rounded-[var(--radius-card)] border border-line bg-surface px-4 py-6 text-center text-sm text-ink-2">{m.w1wall_topo_filter_empty()}</p>
+		{:else if view === 'map'}
 			<TopologyCanvas
 				{layout}
+				{centerRequest}
 				{graph}
 				bind:selected
 				bind:selectedEdge

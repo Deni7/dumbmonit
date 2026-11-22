@@ -152,3 +152,33 @@ export async function exportPng(sheet: SVGSVGElement, filename: string): Promise
 	if (!blob) throw new ExportError('png');
 	download(blob, filename);
 }
+
+// --- CSV of the list view ---------------------------------------------------
+
+/** One cell of a CSV: quoted when needed, and a leading `= + - @` defused so a spreadsheet never runs it as a formula. */
+export function csvCell(value: string): string {
+	let text = value.replace(/\r?\n/g, ' ');
+	if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+	return /[",;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+export interface CsvRowInput {
+	site: string;
+	name: string;
+	type: string;
+	state: string;
+	folder: string;
+	network: string;
+	parent: string;
+}
+
+/** The list as CSV (header first, CRLF lines, a BOM so Excel reads the accents). */
+export function listCsv(header: CsvRowInput, rows: readonly CsvRowInput[]): string {
+	const keys: (keyof CsvRowInput)[] = ['site', 'name', 'type', 'state', 'folder', 'network', 'parent'];
+	const line = (row: CsvRowInput) => keys.map((key) => csvCell(row[key])).join(',');
+	return `﻿${[header, ...rows].map(line).join('\r\n')}\r\n`;
+}
+
+export function exportCsv(csv: string, filename: string) {
+	download(new Blob([csv], { type: 'text/csv;charset=utf-8' }), filename);
+}
