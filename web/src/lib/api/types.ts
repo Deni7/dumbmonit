@@ -560,6 +560,8 @@ export interface Alert {
 	last_notified_at: string | null;
 	/** Tickets opened for this alert by the ticket channels (Jira, GLPI, Zammad, GitHub, GitLab). */
 	tickets?: AlertTicket[];
+	/** The change marker of this monitor that preceded the alert by less than 30 minutes. */
+	after_change?: AfterChange | null;
 	notify_count: number;
 }
 
@@ -7379,4 +7381,51 @@ export interface MailServerPayload {
 export interface MailServerTestReport {
 	ok: boolean;
 	message: string;
+}
+
+// --- Change markers (`/api/annotations`, mirrors `crates/server/src/annotations`) ---
+
+/** Where a marker applies. Mirrors `annotations::Scope`. */
+export type AnnotationScope =
+	| { kind: 'global' }
+	| { kind: 'monitors'; targets: number[] }
+	| { kind: 'folder'; folder: string }
+	| { kind: 'tags'; tags: string[] };
+
+export type AnnotationSource = 'api' | 'ui' | 'ci';
+
+/** Mirrors `annotations::Annotation`. Times are UTC without suffix (`parseServerDate`). */
+export interface Annotation {
+	id: number;
+	at: string;
+	/** End of the window, null for a single instant. */
+	until: string | null;
+	title: string;
+	text: string;
+	link: string;
+	tags: string[];
+	scope: AnnotationScope;
+	source: AnnotationSource;
+	/** Account, or `token:name`. */
+	author: string;
+	created_at: string;
+}
+
+/** Body of `POST /api/annotations`. `at` defaults to now on the server. */
+export interface AnnotationPayload {
+	title: string;
+	at?: string;
+	until?: string | null;
+	text?: string;
+	link?: string;
+	tags?: string[];
+	scope?: AnnotationScope;
+	source?: AnnotationSource;
+}
+
+/** Mirrors `annotations::AfterChange`. */
+export interface AfterChange {
+	id: number;
+	title: string;
+	at: string;
 }

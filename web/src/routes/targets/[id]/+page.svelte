@@ -64,7 +64,8 @@
 	} from '#lib/metrics.js';
 	import { lastRun, parseSteps } from '#lib/components/device-form/scenario-steps.js';
 	import ScenarioSteps from '#lib/components/devices/ScenarioSteps.svelte';
-	import Chart, { type Serie } from '#lib/components/Chart.svelte';
+	import Chart, { type ChartEvent, type Serie } from '#lib/components/Chart.svelte';
+	import AnnotationsPanel from '#lib/components/annotations/AnnotationsPanel.svelte';
 	import { eventsFromHistory, eventsFromRestarts, thresholdsFor } from '#lib/chart-context.js';
 	import { CONTAINER_RESTART_METRIC, UPTIME_METRIC, restartEvents, type RestartEvent } from '#lib/restart-events.js';
 	import Readout from '#lib/components/Readout.svelte';
@@ -379,8 +380,10 @@
 	let chartRules = $state.raw<AlertRule[]>([]);
 	let chartHistory = $state.raw<AlertHistoryEntry[]>([]);
 	let chartRestarts = $state.raw<RestartEvent[]>([]);
+	/** Change markers (deployments, updates) of this device, from the panel above the charts. */
+	let annotationEvents = $state.raw<ChartEvent[]>([]);
 	const chartEvents = $derived(
-		[...eventsFromHistory(chartHistory, chartRules, id), ...eventsFromRestarts(chartRestarts)].sort((a, b) => a.at - b.at)
+		[...eventsFromHistory(chartHistory, chartRules, id), ...eventsFromRestarts(chartRestarts), ...annotationEvents].sort((a, b) => a.at - b.at)
 	);
 	/** One cursor for every chart of this device page. */
 	const syncKey = $derived(`target-${id}`);
@@ -977,6 +980,8 @@
 			</h2>
 			<Segmented options={rangeOptions} value={range} onchange={setRange} label={m.devices_target_time_range()} size="sm" />
 		</div>
+
+		<AnnotationsPanel targetId={id} seconds={rangeSeconds} bind:events={annotationEvents} />
 
 		{#if service}
 			{#if uptimeError}

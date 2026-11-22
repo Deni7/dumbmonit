@@ -24,6 +24,7 @@
 	import { getLocale } from '#lib/paraglide/runtime.js';
 	import { theme } from '#lib/stores/theme.svelte.js';
 	import { instanceStore } from '#lib/stores/instance.svelte.js';
+	import { markerSpan } from '#lib/annotations/layout.js';
 
 	export interface Serie {
 		label: string;
@@ -44,6 +45,14 @@
 		at: number;
 		label: string;
 		tone: ChartTone;
+		/** `change`: a change marker (deployment, update): solid line, flag, optional window. */
+		kind?: 'change';
+		/** End of a window, in seconds: shaded from `at` to here. */
+		until?: number;
+		/** Free text of the tooltip. */
+		detail?: string;
+		/** An http(s) link, reachable from the tooltip once the marker is tapped or clicked. */
+		href?: string;
 	}
 
 	interface Props {
@@ -113,6 +122,28 @@
 	let marks = $state<{ i: number; x: number }[]>([]);
 	let marksKey = '';
 	let activeEvent = $state<number | null>(null);
+	/** A marker with a link stays open after a click, so the link can be reached. */
+	let pinned = $state(false);
+
+	function toggleEvent(i: number) {
+		if (events[i]?.href) {
+			pinned = !(activeEvent === i && pinned);
+			activeEvent = pinned ? i : null;
+			return;
+		}
+		activeEvent = activeEvent === i ? null : i;
+	}
+
+	function showEvent(i: number) {
+		if (activeEvent !== i) pinned = false;
+		activeEvent = i;
+	}
+
+	function releaseEvent() {
+		if (!pinned) activeEvent = null;
+	}
+
+	const safeHref = (href: string | undefined) => (href && /^https?:\/\//.test(href) ? href : undefined);
 
 	/** Individual values of each series, for the legend of a stacked chart whose
 	 *  plotted columns are cumulative. */
@@ -281,16 +312,30 @@
 		const xMin = u.scales.x.min ?? -Infinity;
 		const xMax = u.scales.x.max ?? Infinity;
 		events.forEach((event, i) => {
-			if (event.at < xMin || event.at > xMax) return;
-			const x = Math.round(u.valToPos(event.at, 'x', true));
-			ctx.strokeStyle = toneColor(event.tone);
-			ctx.lineWidth = Math.max(1, Math.round(ratio));
-			ctx.setLineDash([2 * ratio, 3 * ratio]);
-			ctx.beginPath();
-			ctx.moveTo(x, top);
-			ctx.lineTo(x, top + bh);
-			ctx.stroke();
-			next.push({ i, x: u.over.offsetLeft + u.valToPos(event.at, 'x', false) });
+			const span = markerSpan(event.at, event.until, xMin, xMax, bw);
+			if (!span) return;
+			const x = Math.round(left + span.x);
+			const change = event.kind === 'change';
+			const color = change ? cssVar('--c-ink') : toneColor(event.tone);
+			if (change && span.width > 0) {
+				// A window: a pale band, bounded by a line at each end that is in view.
+				ctx.globalAlpha = 0.12;
+				ctx.fillStyle = color;
+				ctx.fillRect(x, top, Math.round(span.width), bh);
+				ctx.globalAlpha = 1;
+			}
+			ctx.strokeStyle = color;
+			ctx.lineWidth = Math.max(1, Math.round((change ? 1.5 : 1) * ratio));
+			// Alerts are dotted, change markers solid: told apart without colour.
+			ctx.setLineDash(change ? [] : [2 * ratio, 3 * ratio]);
+			const edges = change && span.width > 0 && !span.clippedEnd ? [x, x + Math.round(span.width)] : [x];
+			for (const edge of edges) {
+				ctx.beginPath();
+				ctx.moveTo(edge, top);
+				ctx.lineTo(edge, top + bh);
+				ctx.stroke();
+			}
+			next.push({ i, x: u.over.offsetLeft + span.x / ratio });
 		});
 		ctx.restore();
 		const key = next.map((n) => `${n.i}:${Math.round(n.x)}`).join('|');
@@ -408,7 +453,7 @@
 		[...series.map((serie) => serie.label), ...ghosts.map((serie) => serie.label)].join('\u0000')
 	);
 	const thresholdKey = $derived(thresholds.map((t) => `${t.value}|${t.tone}|${t.label}`).join('\u0000'));
-	const eventKey = $derived(events.map((e) => `${e.at}|${e.tone}|${e.label}`).join('\u0000'));
+	const eventKey = $derived(events.map((e) => `${e.at}|${e.until ?? ''}|${e.kind ?? ''}|${e.tone}|${e.label}`).join('\u0000'));
 	/** Series labels only: a ghost reload must not depend on its own result. */
 	const shapeOfSeries = $derived(series.map((serie) => serie.label).join('\u0000'));
 	const themeKey = $derived(`${theme.resolved}|${instanceStore.accent}`);
@@ -632,15 +677,17 @@
 						class="absolute top-0 z-10 flex h-10 w-10 -translate-x-1/2 items-start justify-center pt-1.5 text-ink focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
 						style="left: {mark.x}px"
 						aria-label={m.devices_chart_event_label({ when: when(event.at), label: event.label })}
-						onpointerenter={() => (activeEvent = mark.i)}
-						onpointerleave={() => (activeEvent = null)}
-						onfocus={() => (activeEvent = mark.i)}
-						onblur={() => (activeEvent = null)}
-						onclick={() => (activeEvent = activeEvent === mark.i ? null : mark.i)}
-						onkeydown={(e) => e.key === 'Escape' && (activeEvent = null)}
+						onpointerenter={() => showEvent(mark.i)}
+						onpointerleave={releaseEvent}
+						onfocus={() => showEvent(mark.i)}
+						onblur={releaseEvent}
+						onclick={() => toggleEvent(mark.i)}
+						onkeydown={(e) => e.key === 'Escape' && ((pinned = false), (activeEvent = null))}
 					>
-						<svg viewBox="0 0 12 12" class="size-3" aria-hidden="true" style="color: var(--c-{event.tone === 'ghost' ? 'ink-3' : event.tone})">
-							{#if event.tone === 'warning'}
+						<svg viewBox="0 0 12 12" class="size-3" aria-hidden="true" style="color: var(--c-{event.kind === 'change' ? 'ink' : event.tone === 'ghost' ? 'ink-3' : event.tone})">
+							{#if event.kind === 'change'}
+								<path d="M2.5 1v10.5M2.5 1.5h7.5L8 4.5 10 7.5H2.5" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+							{:else if event.tone === 'warning'}
 								<path d="M6 1 11 11H1Z" fill="currentColor" />
 							{:else if event.tone === 'advisory'}
 								<path d="M6 0.5 11.5 6 6 11.5 0.5 6Z" fill="currentColor" />
@@ -658,13 +705,27 @@
 			{#if activeEvent !== null && events[activeEvent]}
 				{@const shown = marks.find((mk) => mk.i === activeEvent)}
 				{#if shown}
+					{@const tipEvent = events[activeEvent]}
+					{@const link = safeHref(tipEvent.href)}
 					<div
-						class="pointer-events-none absolute top-10 z-20 w-[200px] rounded-md border border-line bg-surface px-2.5 py-1.5 text-xs shadow-md"
+						class="absolute top-10 z-20 w-[200px] rounded-md border border-line bg-surface px-2.5 py-1.5 text-xs shadow-md {pinned && link ? '' : 'pointer-events-none'}"
 						style="left: {tipLeft(shown.x)}px"
 						role="tooltip"
 					>
-						<div class="font-medium text-ink">{events[activeEvent].label}</div>
-						<div class="tnum text-ink-2">{when(events[activeEvent].at)}</div>
+						<div class="font-medium break-words text-ink">{tipEvent.label}</div>
+						<div class="tnum text-ink-2">
+							{when(tipEvent.at)}{#if tipEvent.until} → {when(tipEvent.until)}{/if}
+						</div>
+						{#if tipEvent.detail}<div class="mt-1 line-clamp-4 break-words text-ink-2">{tipEvent.detail}</div>{/if}
+						{#if link}
+							<a
+								href={link}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="mt-1 inline-flex min-h-10 items-center font-medium text-ink underline decoration-line-strong underline-offset-2"
+								>{m.w5annot_chart_open_link()}</a
+							>
+						{/if}
 					</div>
 				{/if}
 			{/if}
