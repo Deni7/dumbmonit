@@ -125,7 +125,7 @@ fn from_row(row: &sqlx::sqlite::SqliteRow) -> Result<Destination> {
 /// journalisée : elle ne doit pas priver les autres de leur copie.
 pub async fn list(pool: &SqlitePool) -> Result<Vec<Destination>> {
     let sql = format!("SELECT {COLUMNS} FROM backup_destinations ORDER BY name COLLATE NOCASE");
-    let rows = sqlx::query(&sql)
+    let rows = sqlx::query(sqlx::AssertSqlSafe(sql))
         .fetch_all(pool)
         .await
         .context("lecture des destinations de sauvegarde")?;
@@ -140,11 +140,13 @@ pub async fn list(pool: &SqlitePool) -> Result<Vec<Destination>> {
 }
 
 pub async fn get(pool: &SqlitePool, id: i64) -> Result<Option<Destination>> {
-    let row = sqlx::query(&format!("SELECT {COLUMNS} FROM backup_destinations WHERE id = ?"))
-        .bind(id)
-        .fetch_optional(pool)
-        .await
-        .context("lecture d'une destination de sauvegarde")?;
+    let row = sqlx::query(sqlx::AssertSqlSafe(format!(
+        "SELECT {COLUMNS} FROM backup_destinations WHERE id = ?"
+    )))
+    .bind(id)
+    .fetch_optional(pool)
+    .await
+    .context("lecture d'une destination de sauvegarde")?;
     row.as_ref().map(from_row).transpose()
 }
 
