@@ -1060,6 +1060,24 @@ pub(super) fn rules() -> Vec<Rule> {
                  and dumbmonit_instance_database_bytes > 100e6",
             )
         },
+        // Jeton d'API qui expire dans la semaine : le script ou l'assistant qui
+        // s'en sert sera refusé à l'échéance. Le prolonger se fait en deux clics.
+        Rule {
+            description: "An API token expires within 7 days: extend it in Settings → API & \
+                          assistants before the scripts or assistants using it are refused."
+                .to_string(),
+            operator: Operator::Gt,
+            threshold: 0.0,
+            for_duration: Duration::from_secs(5 * 60),
+            severity: Severity::Warning,
+            repeat_interval: Some(Duration::from_secs(24 * 3600)),
+            ..base(
+                "instance_api_token_expiring",
+                "DumbMonit API token expiring soon",
+                RuleKind::Threshold,
+                "dumbmonit_instance_api_tokens_expiring",
+            )
+        },
 
         // --- Note de sécurité (`security/`) ---
         //
