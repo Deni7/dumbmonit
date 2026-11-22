@@ -64,7 +64,8 @@
 		last_30_days: () => m.app_ui_range_last_30_days(),
 		this_month: () => m.app_ui_range_this_month(),
 		last_month: () => m.app_ui_range_last_month(),
-		last_quarter: () => m.app_ui_range_last_quarter()
+		last_quarter: () => m.app_ui_range_last_quarter(),
+		this_year: () => m.app_ui_range_this_year()
 	};
 
 	let open = $state(false);

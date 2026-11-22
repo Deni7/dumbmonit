@@ -133,9 +133,9 @@ export function firstDayOfWeek(locale: string): number {
 	}
 }
 
-export type RangePreset = 'last_7_days' | 'last_30_days' | 'this_month' | 'last_month' | 'last_quarter';
+export type RangePreset = 'last_7_days' | 'last_30_days' | 'this_month' | 'last_month' | 'last_quarter' | 'this_year';
 
-export const RANGE_PRESETS: RangePreset[] = ['last_7_days', 'last_30_days', 'this_month', 'last_month', 'last_quarter'];
+export const RANGE_PRESETS: RangePreset[] = ['last_7_days', 'last_30_days', 'this_month', 'last_month', 'last_quarter', 'this_year'];
 
 /** The days a shortcut stands for, both included, as seen on `today`. */
 export function presetRange(preset: RangePreset, today: string): { from: string; to: string } {
@@ -155,6 +155,10 @@ export function presetRange(preset: RangePreset, today: string): { from: string;
 			const quarterStart = isoDate(parts.year, Math.floor((parts.month - 1) / 3) * 3 + 1, 1);
 			const from = addMonths(quarterStart, -3);
 			return { from, to: addDays(quarterStart, -1) };
+		}
+		case 'this_year': {
+			const parts = parseIsoDate(today);
+			return { from: parts ? isoDate(parts.year, 1, 1) : today, to: today };
 		}
 	}
 }

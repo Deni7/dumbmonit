@@ -17,7 +17,7 @@ use crate::auth::clients;
 use crate::auth::middleware::{AdminIdentity, Identity};
 use crate::auth::teams::TeamAccess;
 use crate::db;
-use crate::reports::layout::{Layout, LogoSource, Paper, Scope, Sections, Template};
+use crate::reports::layout::{Layout, LogoSource, Objectives, Paper, Scope, Sections, Template};
 use crate::reports::schedule::{self, Frequency, Period, parse_timezone};
 use crate::reports::store::{self, ScheduleInput, StoredSchedule};
 use crate::reports::{self, MAX_SCHEDULES};
@@ -28,6 +28,8 @@ pub fn routes() -> Router<AppState> {
         .route("/reports/schedules", get(list).post(create))
         .route("/reports/schedules/{id}", get(get_one).put(update).delete(remove))
         .route("/reports/schedules/{id}/send-test", post(send_test))
+        .route("/reports/schedules/{id}/retry", post(retry))
+        .route("/reports/schedules/{id}/pdf", get(schedule_pdf))
         .route("/reports/sla", get(download_sla))
         .route("/reports/logo", get(report_logo).put(upload_report_logo).delete(delete_report_logo))
 }
@@ -336,6 +338,82 @@ pub async fn send_test(
     }
 }
 
+/// Relance l'envoi d'un rapport dont le dernier envoi a échoué. Contrairement à
+/// l'aperçu, c'est un vrai envoi : en cas de succès l'erreur est effacée.
+pub async fn retry(
+    State(state): State<AppState>,
+    _admin: AdminIdentity,
+    Path(id): Path<i64>,
+) -> ApiResult<Json<SendTestReply>> {
+    let stored = store::get(&state.pool, id).await?.ok_or_else(not_found)?;
+    if stored.last_error.is_none() {
+        return Err(ApiError::Conflict("The last send of this report did not fail.".into()));
+    }
+    // Même garde-fou que l'aperçu, sous une autre clé : on ne relance pas en rafale.
+    if !reports::try_reserve_preview(-id) {
+        return Err(ApiError::Conflict(
+            "A retry was just made. Wait half a minute before trying again.".into(),
+        ));
+    }
+    match reports::deliver(&state, &stored, false, Utc::now()).await {
+        Ok(delivery) => {
+            let partial = (delivery.failed > 0)
+                .then(|| format!("{} recipient(s) could not be reached.", delivery.failed));
+            store::set_error(&state.pool, id, partial.as_deref()).await?;
+            Ok(Json(SendTestReply { sent: delivery.sent, failed: delivery.failed }))
+        }
+        Err(message) => {
+            store::set_error(&state.pool, id, Some(&message)).await?;
+            Err(ApiError::BadRequest(message))
+        }
+    }
+}
+
+/// Paramètre `?disposition=` des téléchargements de rapport.
+#[derive(Debug, Deserialize)]
+pub struct PdfQuery {
+    pub disposition: Option<String>,
+}
+
+/// `attachment` (défaut) ou `inline`.
+fn content_disposition(raw: Option<&str>) -> ApiResult<&'static str> {
+    match raw.map(str::trim).filter(|d| !d.is_empty()) {
+        None | Some("attachment") => Ok("attachment"),
+        Some("inline") => Ok("inline"),
+        Some(_) => Err(ApiError::BadRequest(
+            "The disposition must be \"attachment\" or \"inline\".".into(),
+        )),
+    }
+}
+
+/// `GET /api/reports/schedules/{id}/pdf` : le PDF du dernier rapport SLA envoyé,
+/// refait pour la même période (le mois qui précédait l'envoi) : les envois ne
+/// gardent pas leurs pièces jointes, les chiffres viennent de l'historique.
+pub async fn schedule_pdf(
+    State(state): State<AppState>,
+    _admin: AdminIdentity,
+    Path(id): Path<i64>,
+    Query(query): Query<PdfQuery>,
+) -> ApiResult<Response> {
+    let stored = store::get(&state.pool, id).await?.ok_or_else(not_found)?;
+    let disposition = content_disposition(query.disposition.as_deref())?;
+    let sent_at = stored
+        .last_sent_at
+        .ok_or_else(|| ApiError::NotFound("This report has not been sent yet.".into()))?;
+    let (filename, body) = reports::regenerate_sla_pdf(&state, &stored, sent_at, Utc::now())
+        .await
+        .map_err(ApiError::BadRequest)?;
+    Ok((
+        [
+            (header::CONTENT_TYPE, "application/pdf".to_string()),
+            (header::CONTENT_DISPOSITION, format!("{disposition}; filename=\"{filename}\"")),
+            (header::CACHE_CONTROL, "private, no-store".to_string()),
+        ],
+        body,
+    )
+        .into_response())
+}
+
 /// `GET /api/reports/logo` : le logo téléversé pour les rapports SLA. Lisible
 /// par tout compte connecté, comme l'aperçu du rapport qui l'affiche.
 pub async fn report_logo(State(state): State<AppState>, _who: Identity) -> ApiResult<Response> {
@@ -416,6 +494,12 @@ pub struct SlaQuery {
     pub logo: Option<String>,
     /// Périmètre en JSON : `{"targets":[1,2],"groups":["Edge"]}`.
     pub scope: Option<String>,
+    /// Objectifs propres à des groupes ou à des moniteurs, en JSON :
+    /// `{"groups":{"Edge":99.5},"monitors":{"Gateway":99.99}}`.
+    pub objectives: Option<String>,
+    /// `attachment` (défaut) : le fichier se télécharge ; `inline` : le
+    /// navigateur l'affiche (un PDF s'ouvre dans l'onglet).
+    pub disposition: Option<String>,
 }
 
 impl SlaQuery {
@@ -448,6 +532,16 @@ impl SlaQuery {
             notes: self.notes.clone().unwrap_or_default(),
             show_logo: true,
             logo,
+            objectives: match self.objectives.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+                None => Objectives::default(),
+                Some(raw) => serde_json::from_str::<Objectives>(raw).map_err(|_| {
+                    ApiError::BadRequest(
+                        "The objectives must be JSON like \
+                         {\"groups\":{\"Edge\":99.5},\"monitors\":{\"Gateway\":99.99}}."
+                            .into(),
+                    )
+                })?,
+            },
         }
         .validate()
         .map_err(ApiError::BadRequest)?;
@@ -577,14 +671,16 @@ pub async fn download_sla(
         )));
     }
 
-    let data =
+    let mut data =
         collect::collect_scoped(&state, name, Frequency::Monthly, period, now, client, &scope)
             .await
             .map_err(|error| ApiError::Internal(error.context("collecte du rapport SLA")))?;
+    data.apply_objectives(&layout.objectives);
     let options = reports::sla_options(&state, query.page, client, objective, layout, now).await;
     if format == "json" {
         return Ok(Json(sla_view(&data, tz, tz_name, &options)).into_response());
     }
+    let disposition = content_disposition(query.disposition.as_deref())?;
     let stem = sla::file_stem(&data, tz);
     let (body, content_type, filename) = match format {
         "csv" => (
@@ -602,7 +698,7 @@ pub async fn download_sla(
     Ok((
         [
             (header::CONTENT_TYPE, content_type.to_string()),
-            (header::CONTENT_DISPOSITION, format!("attachment; filename=\"{filename}\"")),
+            (header::CONTENT_DISPOSITION, format!("{disposition}; filename=\"{filename}\"")),
             (header::CACHE_CONTROL, "private, no-store".to_string()),
         ],
         body,
@@ -651,6 +747,10 @@ pub struct SlaGroupView {
     pub monitors: usize,
     pub uptime: Option<f64>,
     pub previous_uptime: Option<f64>,
+    /// Objectif qui s'applique à ce groupe : le sien s'il en a un, sinon celui du rapport.
+    pub objective: Option<f64>,
+    /// Vrai quand l'objectif est propre au groupe, pas celui du rapport.
+    pub own_objective: bool,
     pub status: String,
 }
 
@@ -660,6 +760,10 @@ pub struct SlaMonitorView {
     pub group: String,
     pub uptime: Option<f64>,
     pub previous_uptime: Option<f64>,
+    /// Objectif de ce moniteur : le sien ou celui de son groupe, sinon celui du rapport.
+    pub objective: Option<f64>,
+    /// Vrai quand l'objectif est propre au moniteur ou à son groupe.
+    pub own_objective: bool,
     pub status: String,
     pub incidents: usize,
     pub downtime_secs: i64,
@@ -727,7 +831,9 @@ fn sla_view(
                 monitors: g.devices,
                 uptime: g.uptime,
                 previous_uptime: g.previous_uptime,
-                status: sla::status_word(g.uptime, objective).to_string(),
+                objective: g.objective.or(objective),
+                own_objective: g.objective.is_some(),
+                status: sla::status_word(g.uptime, g.objective.or(objective)).to_string(),
             })
             .collect(),
         monitors: data
@@ -739,7 +845,9 @@ fn sla_view(
                 group: d.group.clone(),
                 uptime: d.uptime,
                 previous_uptime: d.previous_uptime,
-                status: sla::status_word(d.uptime, objective).to_string(),
+                objective: d.objective.or(objective),
+                own_objective: d.objective.is_some(),
+                status: sla::status_word(d.uptime, d.objective.or(objective)).to_string(),
                 incidents: d.incidents,
                 downtime_secs: d.downtime_secs,
                 latency_avg_ms: d.latency_avg_ms,

@@ -789,8 +789,10 @@ tokens need the `write` scope for changes. See [Email reports](../using/reports.
 | `GET` | `/api/reports/schedules/{id}` | admin | One report. |
 | `PUT` | `/api/reports/schedules/{id}` | admin | Full replacement. |
 | `DELETE` | `/api/reports/schedules/{id}` | admin | `204`. |
-| `GET` | `/api/reports/sla` | admin | The availability (SLA) report of a period, as a file. Query: `from`, `to` (inclusive days, `YYYY-MM-DD`; none: the previous calendar month; a year at most), `tz` (IANA, default `UTC`), `format` (`pdf` default, `csv` for the monitors, `incidents_csv`), `objective` (percent), `page` (status page id whose title heads the PDF), `title`. See [SLA reports](../using/reports.md#sla). |
+| `GET` | `/api/reports/sla` | admin | The availability (SLA) report of a period, as a file. Query: `from`, `to` (inclusive days, `YYYY-MM-DD`; none: the previous calendar month; a year at most), `tz` (IANA, default `UTC`), `format` (`pdf` default, `csv` for the monitors, `incidents_csv`), `objective` (percent), `page` (status page id whose title heads the PDF), `title`, `objectives` (JSON of per-group and per-monitor objectives), `disposition` (`attachment` default, `inline`). See [SLA reports](../using/reports.md#sla). |
 | `POST` | `/api/reports/schedules/{id}/send-test` | admin | Emails a preview to the saved recipients: `{"sent": 2, "failed": 0}`. Does not touch the schedule. `400` without a usable email channel; `409` within 30 seconds of the previous preview. |
+| `POST` | `/api/reports/schedules/{id}/retry` | admin | Sends again a report whose last send failed (a real send): `{"sent": 2, "failed": 0}`; the recorded error is cleared on success. `409` when the last send did not fail or within 30 seconds of the previous retry. |
+| `GET` | `/api/reports/schedules/{id}/pdf` | admin | The PDF of the last SLA report sent, built again for the same period. `disposition=inline` shows it in the browser. `404` before the first send, `400` for a digest. |
 
 ## Status pages and incidents
 
