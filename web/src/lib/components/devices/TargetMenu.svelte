@@ -8,7 +8,7 @@
 	 * The gear is tinted while a snooze window covers the monitor, so the state
 	 * is still visible with the menu closed.
 	 */
-	import { Power, PowerOff, ScrollText, Settings, Trash2 } from 'lucide-svelte';
+	import { CopyPlus, Power, PowerOff, ScrollText, Settings, Trash2 } from 'lucide-svelte';
 	import type { Silence, Target } from '#lib/api/index.js';
 	import { listSilences } from '#lib/api/index.js';
 	import SilenceControl from '#lib/components/devices/SilenceControl.svelte';
@@ -39,6 +39,8 @@
 			.catch(() => {});
 		return () => controller.abort();
 	});
+	/** An agent and what a Docker label manages are not made from the add form: no copy of them. */
+	const duplicable = $derived(target.kind !== 'agent' && target.kind !== 'agent_service' && !target.managed);
 	const silenced = $derived(silences.some((s) => s.active_now && (s.target_id === target.id || s.target_id === null)));
 
 	const item =
@@ -84,6 +86,12 @@
 			<a href={withBase(`/targets/${target.id}/edit`)} role="menuitem" class={item}>
 				<Settings class="size-4 shrink-0 text-ink-2" aria-hidden="true" />{m.devices_target_settings()}
 			</a>
+
+			{#if duplicable}
+				<a href={withBase(`/targets/new?kind=${encodeURIComponent(target.kind)}&duplicate=${target.id}`)} role="menuitem" class={item}>
+					<CopyPlus class="size-4 shrink-0 text-ink-2" aria-hidden="true" />{m.w1monitors_detail_duplicate()}
+				</a>
+			{/if}
 
 			<div class="my-1 border-t border-line" role="separator"></div>
 
