@@ -2,7 +2,6 @@
 
 use super::*;
 
-
 pub(super) async fn restore_status_pages(
     tx: &mut Transaction<'_, Sqlite>,
     bundle: &Bundle,

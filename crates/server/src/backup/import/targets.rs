@@ -2,7 +2,6 @@
 
 use super::*;
 
-
 pub(super) async fn target_ids(tx: &mut Transaction<'_, Sqlite>) -> Result<HashMap<String, i64>> {
     let rows = sqlx::query("SELECT id, kind, address FROM targets")
         .fetch_all(&mut **tx)
@@ -352,7 +351,10 @@ pub(super) fn same_secret(cipher: &Cipher, stored: Option<&[u8]>, wanted: Option
     }
 }
 
-pub(super) async fn restore_packs(tx: &mut Transaction<'_, Sqlite>, bundle: &Bundle) -> Result<SectionReport> {
+pub(super) async fn restore_packs(
+    tx: &mut Transaction<'_, Sqlite>,
+    bundle: &Bundle,
+) -> Result<SectionReport> {
     let mut report = SectionReport::new("packs");
     for entry in &bundle.packs {
         let pack = match dumbmonit_pack::Pack::parse(&entry.yaml) {

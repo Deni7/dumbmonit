@@ -59,7 +59,8 @@ pub(super) fn read_specs() -> Vec<ToolSpec> {
                 schema["properties"]["profile_id"] = nullable("string");
                 schema["properties"]["metrics_24h"] = json!({ "type": "object" });
                 schema["properties"]["alerts"] = list_of(alert_schema());
-                schema["required"] = json!(["id", "name", "kind", "state", "metrics_24h", "alerts"]);
+                schema["required"] =
+                    json!(["id", "name", "kind", "state", "metrics_24h", "alerts"]);
                 schema
             },
         ),

@@ -2,7 +2,6 @@
 
 use super::*;
 
-
 /// Sentinelles : un agent absent du lot (ou de l'instance) est signalé, un réglage
 /// identique à celui en place n'est pas réécrit.
 pub(super) async fn restore_agent_sentinels(

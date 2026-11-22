@@ -53,16 +53,16 @@ use devices::*;
 use helpers::*;
 use inventory::*;
 use notify::*;
+pub use overview::dashboard_summary;
 use overview::*;
 use pages::*;
 use rules::*;
 use series::*;
 use silences::*;
 use spec::*;
+pub use spec::{ToolSpec, catalogue, find};
 use spec_read::*;
 use spec_write::*;
-pub use overview::dashboard_summary;
-pub use spec::{ToolSpec, catalogue, find};
 
 /// Ce que l'assistant lit à l'initialisation, avant tout appel d'outil.
 pub const INSTRUCTIONS: &str = "DumbMonit monitors a homelab or a small fleet: devices \

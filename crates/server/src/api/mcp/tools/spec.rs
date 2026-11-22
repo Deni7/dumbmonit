@@ -184,7 +184,6 @@ pub fn find(name: &str) -> Option<ToolSpec> {
     specs().into_iter().find(|spec| spec.name == name)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

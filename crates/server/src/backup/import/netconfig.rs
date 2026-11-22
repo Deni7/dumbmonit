@@ -2,7 +2,6 @@
 
 use super::*;
 
-
 /// Clés d'hôte mémorisées : identique, laissée ; différente, remplacée par
 /// celle du lot (c'est elle que l'opérateur a validée).
 pub(super) async fn restore_netconfig_host_keys(

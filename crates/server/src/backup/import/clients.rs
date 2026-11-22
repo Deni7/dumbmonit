@@ -2,7 +2,6 @@
 
 use super::*;
 
-
 /// Clients (mode MSP) : créés ou mis à jour par nom. Les membres du lot sont
 /// ajoutés (un compte absent est signalé), sans retirer ceux de l'instance.
 pub(super) async fn restore_clients(

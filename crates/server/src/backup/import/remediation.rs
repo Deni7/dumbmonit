@@ -2,7 +2,6 @@
 
 use super::*;
 
-
 /// Procédures, par titre : même texte et mêmes rattachements, laissée ;
 /// sinon, remplacée.
 pub(super) async fn restore_runbooks(

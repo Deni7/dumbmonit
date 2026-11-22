@@ -2,7 +2,6 @@
 
 use super::*;
 
-
 /// Logo des rapports : remplacé par celui du lot s'il se lit et s'incorpore au
 /// PDF (mêmes contrôles que l'API). Un lot sans logo ne touche à rien.
 pub(super) async fn restore_report_logo(

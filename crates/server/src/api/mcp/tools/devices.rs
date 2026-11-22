@@ -614,7 +614,11 @@ pub(super) async fn discover_network(token: &ApiToken, args: &Args) -> ToolResul
     Ok(ToolOutput::new(text, structured))
 }
 
-pub(super) async fn restart_container(state: &AppState, token: &ApiToken, args: &Args) -> ToolResult {
+pub(super) async fn restart_container(
+    state: &AppState,
+    token: &ApiToken,
+    args: &Args,
+) -> ToolResult {
     let container = args
         .str("container")
         .ok_or_else(|| failed("\"container\" (see list_containers) is required."))?

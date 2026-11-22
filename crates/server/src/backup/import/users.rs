@@ -2,7 +2,6 @@
 
 use super::*;
 
-
 pub(super) async fn restore_users(
     tx: &mut Transaction<'_, Sqlite>,
     cipher: &Cipher,
@@ -244,11 +243,13 @@ pub(super) async fn restore_api_tokens(
     Ok(report)
 }
 
-
 /// Équipes : créées ou mises à jour par nom. Les droits sont remplacés par ceux
 /// du lot ; les membres du lot sont ajoutés (un compte absent est signalé), sans
 /// retirer ceux que l'instance a déjà.
-pub(super) async fn restore_teams(tx: &mut Transaction<'_, Sqlite>, bundle: &Bundle) -> Result<SectionReport> {
+pub(super) async fn restore_teams(
+    tx: &mut Transaction<'_, Sqlite>,
+    bundle: &Bundle,
+) -> Result<SectionReport> {
     let mut report = SectionReport::new("teams");
     if let Some(settings) = &bundle.teams_settings
         && serde_json::from_value::<crate::auth::teams::TeamSettings>(settings.clone()).is_ok()

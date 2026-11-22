@@ -192,7 +192,10 @@ pub(super) async fn list_agents(state: &AppState) -> ToolResult {
 }
 
 /// Un équipement de type `agent`, ou un échec qui dit lesquels le sont.
-pub(super) fn resolve_agent<'a>(devices: &'a [Device], args: &Args) -> Result<&'a Device, ToolError> {
+pub(super) fn resolve_agent<'a>(
+    devices: &'a [Device],
+    args: &Args,
+) -> Result<&'a Device, ToolError> {
     let device = resolve_arg(devices, args)?;
     if device.target.kind != "agent" {
         let agents: Vec<String> = devices

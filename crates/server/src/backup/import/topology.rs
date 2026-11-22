@@ -2,7 +2,6 @@
 
 use super::*;
 
-
 /// Un nœud du lot, avec les identifiants d'ici ; `None` : son équipement
 /// n'est pas là.
 fn local_node(node: &BundleNode, refs: &HashMap<String, i64>) -> Option<(String, i64)> {

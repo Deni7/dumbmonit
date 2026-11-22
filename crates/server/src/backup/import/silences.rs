@@ -2,7 +2,6 @@
 
 use super::*;
 
-
 pub(super) async fn restore_silences(
     tx: &mut Transaction<'_, Sqlite>,
     bundle: &Bundle,

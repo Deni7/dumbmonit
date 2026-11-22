@@ -2,7 +2,6 @@
 
 use super::*;
 
-
 /// Planification des sauvegardes locales : remplacée par celle du lot, après
 /// contrôle et mise dans les bornes. Un lot sans section ne touche à rien.
 pub(super) async fn restore_backup_schedule(

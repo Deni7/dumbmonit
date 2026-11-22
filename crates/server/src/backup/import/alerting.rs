@@ -2,7 +2,6 @@
 
 use super::*;
 
-
 /// Rend au sélecteur ses identifiants locaux.
 fn selector_from_bundle(
     report: &mut SectionReport,

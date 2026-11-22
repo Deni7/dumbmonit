@@ -2,7 +2,6 @@
 
 use super::*;
 
-
 pub(super) async fn restore_channels(
     tx: &mut Transaction<'_, Sqlite>,
     cipher: &Cipher,

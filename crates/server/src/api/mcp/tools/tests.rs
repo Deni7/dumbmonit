@@ -31,20 +31,11 @@ fn the_classic_state_follows_the_interface_rules() {
         DeviceState::Unreachable
     );
     assert_eq!(classic_state(&target(60, true), None, None, now), DeviceState::Waiting);
-    assert_eq!(
-        classic_state(&target(60, true), Some(&fresh), None, now),
-        DeviceState::Reporting
-    );
-    assert_eq!(
-        classic_state(&target(60, true), Some(&stale), None, now),
-        DeviceState::Unreachable
-    );
+    assert_eq!(classic_state(&target(60, true), Some(&fresh), None, now), DeviceState::Reporting);
+    assert_eq!(classic_state(&target(60, true), Some(&stale), None, now), DeviceState::Unreachable);
     // La tolérance ne descend jamais sous 90 s, même à 10 s de période.
     let recent = rfc3339(now - TimeDelta::seconds(80));
-    assert_eq!(
-        classic_state(&target(10, true), Some(&recent), None, now),
-        DeviceState::Reporting
-    );
+    assert_eq!(classic_state(&target(10, true), Some(&recent), None, now), DeviceState::Reporting);
 }
 
 #[test]
