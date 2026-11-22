@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { docTitle } from '#lib/stores/page-title.svelte.js';
 	/**
 	 * Status: what you publish. Pages (the public status pages and the
 	 * announcements shown on them), Reports (scheduled reports, deadlines),
@@ -24,7 +25,7 @@
 	]);
 </script>
 
-<svelte:head><title>{m.status_heading()} · DumbMonit</title></svelte:head>
+<svelte:head><title>{docTitle(m.status_heading())}</title></svelte:head>
 
 <PageHeader title={m.status_heading()} />
 

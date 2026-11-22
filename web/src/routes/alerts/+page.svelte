@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { docTitle } from '#lib/stores/page-title.svelte.js';
 	/**
 	 * Alerts — what is firing now, what happened, the rules behind it, and what
 	 * runs on its own.
@@ -333,7 +334,7 @@
 	});
 </script>
 
-<svelte:head><title>{m.alerts_page_title()} · DumbMonit</title></svelte:head>
+<svelte:head><title>{docTitle(m.alerts_page_title())}</title></svelte:head>
 
 <PageHeader title={m.alerts_page_title()}>
 	{#snippet actions()}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { docTitle } from '#lib/stores/page-title.svelte.js';
 	/**
 	 * Metrics explorer: the `dumbmonit_*` metrics and their labels, a MetricsQL
 	 * box with name completion, and a chart. Queries go through the server's
@@ -100,7 +101,7 @@
 	}
 </script>
 
-<svelte:head><title>{m.explore_title()} · DumbMonit</title></svelte:head>
+<svelte:head><title>{docTitle(m.explore_title())}</title></svelte:head>
 
 <PageHeader title={m.explore_title()} description={m.explore_description()} />
 
