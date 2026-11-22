@@ -84,16 +84,18 @@ settings** falls back to them.
   Active Directory groups:
   `(&(objectClass=group)(member:1.2.840.113556.1.4.1941:={dn}))`.
 
-*Admin groups*, *Operator groups* and *Viewer groups* take one group per line,
-by name (`DumbMonit Admins`, the first value of its DN) or full DN, case
-ignored. A member of an admin group is an admin, else of an operator group an
-operator, else of a viewer group a viewer.
+*Admin groups*, *Operator groups*, *Viewer groups* and *Wall display groups*
+take one group per line, by name (`DumbMonit Admins`, the first value of its
+DN) or full DN, case ignored. A member of an admin group is an admin, else of
+an operator group an operator, else of a viewer group a viewer, else of a wall
+display group a [wall display](settings.md#wall-display-accounts) (an account
+that only shows wall mode).
 
 - **Once any list is filled, only members of a listed group can sign in.** An
   account whose user left all of them is **disabled** at its next sign-in (and
   its sessions closed); it is enabled again when the user is back in a listed
   group. An account an admin disabled by hand stays disabled.
-- **All three lists empty**: everyone the filter finds can sign in, as a viewer
+- **All lists empty**: everyone the filter finds can sign in, as a viewer
   at first; roles are then managed under **Users**. Narrow the user filter to
   restrict access, for example
   `(&(objectClass=user)(sAMAccountName={username})(memberOf=CN=Monitoring,OU=Groups,DC=corp,DC=example))`.

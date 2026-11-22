@@ -119,6 +119,7 @@ Admins only. The accounts that can sign in, and their role:
 | **Viewer** | yes | no | no |
 | **Operator** | yes | yes | no |
 | **Admin** | yes | yes | yes |
+| **Wall display** | only what the wall shows | no | no |
 
 A viewer sees every page with every control that would change something
 hidden. A few things stay admin only even to read: API and agent tokens,
@@ -148,13 +149,41 @@ at least one active admin, and the controls reflect that rule rather than
 reporting it as an error: the last admin cannot be demoted, disabled or
 deleted, and you cannot disable or delete your own account.
 
+### Wall display accounts {#wall-display-accounts}
+
+The **Wall display** role is for a screen that stays on in a room (a TV, a
+lobby or control-room monitor). Signed in with such an account, the browser
+goes straight to [wall mode](wall.md) and stays there: every other address
+leads back to the wall, the wall's **Exit** becomes **Sign out** (two taps,
+so a stray one does nothing) and ++esc++ does nothing. Device tiles and
+problems on the wall are not links.
+
+The server enforces the same: the account reaches only what the wall reads
+(devices without their address, options or note, alerts, rules, metrics,
+incidents and maintenance windows, the instance name, the weather and the
+wall's music) and every other call answers `403`, reads included. Team
+rights limit which monitors it shows, as for any account. It cannot create
+API tokens, and a token whose owner becomes a wall display stops working.
+
+- **Session.** A wall display stays signed in as long as it shows the wall:
+  its session is renewed while it is in use, so `DUMBMONIT_SESSION_DAYS` is
+  how long it may stay switched off or idle before it has to sign in again.
+  Disable the account, reset its password, use **Sign out everywhere**, or
+  give it another role to sign the screen out: leaving the wall display role
+  closes its sessions at once.
+- **Two-factor.** The two-factor requirement below never applies to wall
+  displays: nobody stands in front of the screen to type a code.
+- **Single sign-on, LDAP and SCIM** can hand out the role too: see the
+  *Wall display groups* below and the [SCIM](scim.md) default role.
+
 ### Require two-factor for admins and operators
 
 The switch at the top of **Users** makes two-factor authentication mandatory
 for admins and operators who sign in with a local password. One of them
 without a second factor can, after signing in, only set it up (or sign out):
 the rest of the interface waits, and the API answers `403` with
-`"code": "totp_setup_required"` until it is done. Viewers are not concerned.
+`"code": "totp_setup_required"` until it is done. Viewers and wall displays
+are not concerned.
 Sign-ins through single sign-on (OIDC, SAML) and LDAP are exempt — the
 identity provider handles their multi-factor authentication — and so are
 passkey sign-ins, which already prove possession and the user. API tokens
@@ -187,10 +216,14 @@ exist can sign in until you turn it on.
 *Operator groups* the groups whose other members become operators; everyone
 else is a viewer. Leave both empty to keep managing roles under **Users**.
 With only *Operator groups* filled in, the groups never touch the admin role:
-admins stay admins, the others become operators or viewers. Roles are
+admins stay admins, the others become operators or viewers. *Wall display
+groups* lists the groups whose members, when they are neither admins nor
+operators, become [wall displays](#wall-display-accounts); filled in alone,
+it only decides that role (its members become wall displays, a wall display
+that leaves it becomes a viewer, other accounts keep their role). Roles are
 re-evaluated at each sign-in, except that the last active admin is never
-demoted. The matching environment variables are `DUMBMONIT_OIDC_ADMIN_GROUPS`
-and `DUMBMONIT_OIDC_OPERATOR_GROUPS`.
+demoted. The matching environment variables are `DUMBMONIT_OIDC_ADMIN_GROUPS`,
+`DUMBMONIT_OIDC_OPERATOR_GROUPS` and `DUMBMONIT_OIDC_WALL_GROUPS`.
 
 **Which account a sign-in lands on.** The identity is remembered by its
 provider subject after the first sign-in. On a first sign-in:

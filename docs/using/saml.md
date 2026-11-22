@@ -48,7 +48,10 @@ You can change each attribute name in the form.
 
 - **Admin groups** and **Operator groups** give the role: a member of an
   admin group is an admin, else of an operator group an operator, else a
-  viewer. Roles are re-evaluated at every sign-in.
+  viewer. **Wall display groups** make their other members
+  [wall displays](settings.md#wall-display-accounts), accounts that only show
+  wall mode; filled in alone, that list only decides the wall display role.
+  Roles are re-evaluated at every sign-in.
 - The same groups can fill [teams](teams.md) through their **IdP groups**
   field.
 
