@@ -13,8 +13,9 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use chrono::{DateTime, Utc};
 
 use crate::alerting::baseline::{self, Bucket, SeriesBaseline};
+use crate::alerting::evaluation;
 use crate::alerting::group::{self, AlertGroup, AlertOutcome};
-use crate::alerting::machine::{self, AlertState, Phase, Transition};
+use crate::alerting::machine::{AlertState, Phase, Transition};
 use crate::alerting::model::{
     self, Rule, TARGET_ADDRESS_LABELS, TARGET_ID_LABELS, TARGET_NAME_LABELS, TargetId, TargetNode,
 };
@@ -183,15 +184,16 @@ pub struct CycleOutcome {
     pub carried_over: Vec<String>,
 }
 
-/// Index de résolution série → cible.
-struct TargetIndex {
+/// Index de résolution série → cible. Partagé avec le rejeu sur l'historique
+/// ([`crate::alerting::replay`]), qui rattache ses séries de la même façon.
+pub(crate) struct TargetIndex {
     by_id: HashMap<TargetId, TargetNode>,
     by_name: HashMap<String, TargetId>,
     by_address: HashMap<String, TargetId>,
 }
 
 impl TargetIndex {
-    fn new(targets: &[TargetNode]) -> Self {
+    pub(crate) fn new(targets: &[TargetNode]) -> Self {
         Self {
             by_id: targets.iter().map(|t| (t.id, t.clone())).collect(),
             by_name: targets.iter().map(|t| (t.name.clone(), t.id)).collect(),
@@ -207,7 +209,7 @@ impl TargetIndex {
     /// autres conventions d'étiquettes : l'identité posée sur les échantillons
     /// relève des collecteurs, et une règle écrite à la main par l'utilisateur
     /// peut parfaitement agréger en ne gardant que `host`.
-    fn resolve(&self, labels: &BTreeMap<String, String>) -> Option<&TargetNode> {
+    pub(crate) fn resolve(&self, labels: &BTreeMap<String, String>) -> Option<&TargetNode> {
         if model::carries_target_id(labels) {
             return TARGET_ID_LABELS.iter().find_map(|label| {
                 labels.get(*label)?.parse::<TargetId>().ok().and_then(|id| self.by_id.get(&id))
@@ -463,7 +465,7 @@ pub fn plan_cycle(input: CycleInput, baselines: &mut BaselineStore) -> CycleOutc
 
             // Hystérésis : la condition était vraie au cycle précédent si elle est
             // datée, que l'alerte soit encore en attente ou déjà partie.
-            let active = before.condition_since.is_some();
+            let active = evaluation::was_active(&before);
             let annotation = input.annotations.get(&fingerprint);
             let (condition, score, learning) = evaluate_point(
                 rule,
@@ -476,8 +478,7 @@ pub fn plan_cycle(input: CycleInput, baselines: &mut BaselineStore) -> CycleOutc
                 baselines,
             );
             let dismissed_by = dismissal_author(&before);
-            let (mut state, transition) =
-                machine::advance(&before, condition, now, rule.for_duration);
+            let (mut state, transition) = evaluation::step(&before, condition, now, rule);
             state.value = Some(point.value);
             state.score = score;
             state.learning = learning;
@@ -545,7 +546,7 @@ pub fn plan_cycle(input: CycleInput, baselines: &mut BaselineStore) -> CycleOutc
             before.suppressed_by = None;
             before.silenced = false;
             let dismissed_by = dismissal_author(&before);
-            let (state, transition) = machine::advance(&before, false, now, rule.for_duration);
+            let (state, transition) = evaluation::step(&before, false, now, rule);
 
             // Une empreinte revenue au repos et jamais notifiée n'a plus rien à dire :
             // on la laisse sortir de la table plutôt que d'y accumuler du passé.
@@ -772,24 +773,14 @@ fn evaluate_point(
         | RuleKind::LogPattern
         | RuleKind::Forecast
         | RuleKind::SloBurn => (
-            rule.operator.holds(
-                point.value,
-                effective.threshold,
-                effective.clear_threshold,
-                active,
-            ),
+            evaluation::threshold_holds(rule, effective, point.value, active),
             None,
             false,
         ),
         // Dérive : un seuil sur le rapport à la normale, qui ne s'ouvre que si
         // l'écart est aussi statistiquement net (voir `Annotation::armed`).
         RuleKind::Drift => {
-            let holds = rule.operator.holds(
-                point.value,
-                effective.threshold,
-                effective.clear_threshold,
-                active,
-            );
+            let holds = evaluation::threshold_holds(rule, effective, point.value, active);
             let armed = annotation.is_some_and(|annotation| annotation.armed);
             (holds && (active || armed), annotation.and_then(|annotation| annotation.score), false)
         }
