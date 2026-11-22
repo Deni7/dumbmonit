@@ -18,12 +18,15 @@
 		type IncidentKind,
 		type IncidentSeverity,
 		type IncidentStatus,
+		type PublicIncident,
 		type StatusPage
 	} from '#lib/api/index.js';
 	import { formatDateTime, formatRelative, parseServerDate } from '#lib/format.js';
 	import { Button, Confirm, DateTimeField, EmptyState, ErrorNotice, Field, Plate } from '#lib/ui/index.js';
 	import { INCIDENT_STATUS, KIND_LABEL, STATUSES_FOR, isClosed } from './words';
 	import PostmortemEditor from './PostmortemEditor.svelte';
+	import MessageTools from './MessageTools.svelte';
+	import { draftIncident } from './incident-view';
 	import { dateToLocal, localToIso, updatesPayload, validateDates, validateHistory, type DraftUpdate, type HistoryError } from './incident-history';
 
 	interface Props {
@@ -72,6 +75,21 @@
 		const date = new Date(local);
 		return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 	}
+
+	/** The announcement being created, as the public page would show it. */
+	const createPreview = $derived<PublicIncident>(
+		draftIncident({
+			kind,
+			title,
+			severity,
+			status: kind === 'maintenance' ? 'scheduled' : 'investigating',
+			startsAt: toIso(startsAt) ?? new Date().toISOString(),
+			endsAt: toIso(endsAt) ?? null,
+			updates: [],
+			message: body,
+			now: new Date().toISOString()
+		})
+	);
 
 	function addHistoryRow() {
 		const last = history[history.length - 1];
@@ -149,6 +167,8 @@
 	let updateStatus = $state<IncidentStatus>('investigating');
 	let updateBody = $state('');
 	let updateAt = $state('');
+	// Post without writing to the subscribers (a correction, a typo).
+	let updateSilent = $state(false);
 	let updateError = $state<unknown>(null);
 	let posting = $state(false);
 
@@ -159,7 +179,24 @@
 		updateStatus = incident.status;
 		updateBody = '';
 		updateAt = '';
+		updateSilent = false;
 		updateError = null;
+	}
+
+	/** The thread of `incident` with the message being written, as the public page would show it. */
+	function updatePreview(incident: Incident): PublicIncident {
+		return draftIncident({
+			id: incident.id,
+			kind: incident.kind,
+			title: incident.title,
+			severity: incident.severity,
+			status: updateStatus,
+			startsAt: incident.starts_at,
+			endsAt: incident.ends_at,
+			updates: incident.updates,
+			message: updateBody,
+			now: new Date().toISOString()
+		});
 	}
 
 	function replace(next: Incident) {
@@ -175,7 +212,7 @@
 		posting = true;
 		updateError = null;
 		try {
-			replace(await addIncidentUpdate(incident.id, { status: updateStatus, body: updateBody.trim(), at: localToIso(updateAt) }));
+			replace(await addIncidentUpdate(incident.id, { status: updateStatus, body: updateBody.trim(), at: localToIso(updateAt), notify: updateSilent && !updateAt ? false : undefined }));
 			updating = null;
 			updateBody = '';
 			updateAt = '';
@@ -376,6 +413,15 @@
 						<DateTimeField id="inc-{incident.id}-at" bind:value={updateAt} min={dateToLocal(new Date(incident.starts_at.endsWith('Z') ? incident.starts_at : `${incident.starts_at}Z`))} max={nowLocal} disabled={posting} label={m.status_incidents_update_when()} />
 					</Field>
 				</div>
+				<div class="grid gap-2 sm:col-span-3">
+					<MessageTools kind={incident.kind} body={updateBody} preview={updatePreview(incident)} disabled={posting} onbody={(text) => (updateBody = text)} onpick={(next) => (updateStatus = next)} />
+					{#if !updateAt}
+						<label class="inline-flex min-h-10 w-fit items-center gap-2 text-sm text-ink">
+							<input type="checkbox" class="size-4 accent-[var(--c-signal)]" bind:checked={updateSilent} disabled={posting} />
+							{m.status_incidents_silent()}
+						</label>
+					{/if}
+				</div>
 				{#if updateError}
 					<div class="sm:col-span-3"><ErrorNotice error={updateError} title={m.status_incidents_post_error()} /></div>
 				{/if}
@@ -465,6 +511,7 @@
 			<Field label={m.status_incidents_first_message()} for="inc-new-body" help={m.status_incidents_first_message_help()}>
 				<textarea id="inc-new-body" class="input min-h-10" rows="2" bind:value={body} placeholder={kind === 'incident' ? m.status_incidents_body_placeholder_incident() : m.status_incidents_body_placeholder_maintenance()} maxlength="4000" disabled={saving}></textarea>
 			</Field>
+			<MessageTools {kind} {body} preview={createPreview} disabled={saving} onbody={(text) => (body = text)} />
 			{#if kind === 'incident'}
 				<div class="grid gap-3">
 					<div class="flex flex-wrap items-center justify-between gap-2">

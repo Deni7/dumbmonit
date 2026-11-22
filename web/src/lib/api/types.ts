@@ -2424,6 +2424,8 @@ export interface IncidentUpdatePayload {
 	body: string;
 	/** Past date of the message, to complete a history; omitted: now, and subscribers are notified. */
 	at?: string;
+	/** `false`: publish without notifying subscribers. Omitted: they are notified. */
+	notify?: boolean;
 }
 
 /** One step of a post-mortem timeline. Mirrors `db::status_pages::TimelineEntry`. */
@@ -2625,6 +2627,10 @@ export interface PublicIncidentUpdate {
 }
 
 export interface PublicIncident {
+	/** Anchor and permalink: `#incident-<id>`. */
+	id: number;
+	/** Public keys of the services touched; absent: the whole page. */
+	components?: string[];
 	title: string;
 	kind: IncidentKind;
 	status: IncidentStatus;
@@ -2693,6 +2699,13 @@ export interface PublicStatus {
 	incidents: PublicIncident[];
 	/** Scheduled or in-progress maintenance windows. */
 	maintenance: PublicIncident[];
+}
+
+/** One slice of past incidents older than the page's 30 days. */
+export interface PublicOlderIncidents {
+	incidents: PublicIncident[];
+	/** Cursor of the next slice; absent at the end. */
+	next?: string;
 }
 
 // --- Proxmox Backup Server (crates/server/src/api/pbs.rs) --------------------
