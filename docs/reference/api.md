@@ -661,6 +661,7 @@ A `target_id` that no longer exists is shown as "(deleted monitor)" by the UI.
 | `PUT` | `/api/alerts/rules/{id}` | Update. A built-in rule keeps its query. |
 | `DELETE` | `/api/alerts/rules/{id}` | `204`. Built-in rules cannot be deleted. |
 | `POST` | `/api/alerts/rules/{id}/enable` | `{"enabled": false}`. Returns the rule. |
+| `POST` | `/api/alerts/rules/{id}/reset` | Restores a built-in rule's shipped values (per-monitor overrides are kept). `409` for a rule you created. Admin. |
 
 A rule:
 
@@ -693,6 +694,7 @@ Creating one needs at least `name` and `query`; `kind` (`threshold`,
 |---|---|---|
 | `GET` | `/api/alerts/silences` | Every window, with `active_now`, `active_until` and `next_start_at` (RFC 3339, computed by the server). |
 | `POST` | `/api/alerts/silences` | Create. `201`. Operator. |
+| `PUT` | `/api/alerts/silences/{id}` | Replace name, comment, scope and schedule (same body as create). Operator. To end a window now, set a one-off end at the current time. |
 | `DELETE` | `/api/alerts/silences/{id}` | `204`. Operator. |
 
 ```json

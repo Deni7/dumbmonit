@@ -105,6 +105,37 @@ fn present<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<Value>, 
 pub struct TestReport {
     pub ok: bool,
     pub message: String,
+    /// Ce qui aurait écarté une vraie alerte sur ce canal, en codes stables que
+    /// l'interface traduit : `disabled`, `min_severity_warning`,
+    /// `min_severity_critical`, `quiet_hours`, `matcher`. Vide : rien ne la retient.
+    pub filters: Vec<&'static str>,
+}
+
+/// Les réglages du canal qui retiendraient une vraie alerte. Un message de test
+/// n'a ni sévérité, ni équipement, ni règle : seuls les réglages se lisent ici ;
+/// le détail du filtre, lui, dépend de l'alerte.
+fn test_filters(
+    enabled: bool,
+    policy: &ChannelPolicy,
+    now: chrono::DateTime<Utc>,
+) -> Vec<&'static str> {
+    use crate::alerting::model::Severity;
+    let mut filters = Vec::new();
+    if !enabled {
+        filters.push("disabled");
+    }
+    match policy.min_severity {
+        Severity::Critical => filters.push("min_severity_critical"),
+        Severity::Warning => filters.push("min_severity_warning"),
+        Severity::Info => {}
+    }
+    if policy.in_quiet_hours(now) {
+        filters.push("quiet_hours");
+    }
+    if !policy.matcher.is_empty() {
+        filters.push("matcher");
+    }
+    filters
 }
 
 // --------------------------------------------------------------------------
@@ -303,10 +334,15 @@ pub async fn test(
     };
     db::alerts::record_delivery(&state.pool, &report, Utc::now()).await?;
 
+    let policies = policy_store::load_channel_policies(&state.pool).await?;
+    let policy = policies.get(&id).cloned().unwrap_or_default();
+    let filters = test_filters(config.enabled, &policy, Utc::now());
+
     match error {
         None => Ok(Json(TestReport {
             ok: true,
             message: format!("Test message sent to \"{}\".", config.name),
+            filters,
         })),
         // Déjà expurgée par la couche notification : aucune interpolation de secret
         // n'est possible ici.
@@ -609,6 +645,17 @@ fn duplicate_name_to_conflict(error: anyhow::Error) -> ApiError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn le_test_dit_ce_qui_retiendrait_une_vraie_alerte() {
+        use crate::alerting::model::Severity;
+        let now = Utc::now();
+        let open = ChannelPolicy::default();
+        assert!(test_filters(true, &open, now).is_empty());
+        assert_eq!(test_filters(false, &open, now), vec!["disabled"]);
+        let strict = ChannelPolicy { min_severity: Severity::Critical, ..Default::default() };
+        assert_eq!(test_filters(true, &strict, now), vec!["min_severity_critical"]);
+    }
 
     fn payload(kind: &str, settings: Value, secrets: Option<Value>) -> ChannelPayload {
         ChannelPayload {
