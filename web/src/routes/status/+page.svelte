@@ -19,8 +19,8 @@
 		{ id: 'pages', label: m.status_tab_pages(), icon: Globe },
 		{ id: 'reports', label: m.reports_page_title(), icon: FileText },
 		{ id: 'sla', label: m.shell_nav_sla(), icon: FileCheck, hidden: !(auth.isAdmin || (auth.mspOn && (auth.msp?.clients.length ?? 0) > 0)) },
-		// Team-restricted accounts: the server keeps SLOs to unrestricted accounts.
-		{ id: 'slo', label: m.status_tab_slos(), icon: Gauge, hidden: auth.scoped }
+		// Team-restricted accounts see the SLOs made of their own monitors.
+		{ id: 'slo', label: m.status_tab_slos(), icon: Gauge }
 	]);
 </script>
 
