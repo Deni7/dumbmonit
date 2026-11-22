@@ -167,9 +167,7 @@ async fn verified(state: &AppState, ip: Option<IpAddr>, token: &str) -> ApiResul
     let claims = key.verify(token, Utc::now()).map_err(refuse)?;
     // Couper la fonction (ou retirer l'URL publique) révoque les liens déjà
     // envoyés : c'est l'interrupteur d'urgence d'un lien qui aurait fui.
-    let global = policy_store::load_global(&state.pool).await?;
-    let env_url = crate::config::env_var("DUMBMONIT_PUBLIC_URL");
-    if !global.action_links || global.public_url(env_url.as_deref()).is_none() {
+    if !links_enabled(state).await? {
         return Err(refuse(Rejected::BadSignature));
     }
     Ok(claims)
@@ -282,15 +280,48 @@ pub async fn execute(
 ) -> ApiResult<Response> {
     same_origin(&headers)?;
     let claims = verified(&state, ip, &payload.token).await?;
-    let alerts = linked_alerts(&state, &claims).await?;
-    if alerts.is_empty() {
-        return Err(ApiError::NotFound(
+    match apply(&state, &claims, ACTOR, ip).await? {
+        Applied::Done(result) => Ok(no_store(result)),
+        Applied::Inactive => Err(ApiError::NotFound(
             "These alerts are no longer active: nothing left to do.".into(),
-        ));
+        )),
+        Applied::Used => Err(ApiError::Conflict("This link has already been used.".into())),
+    }
+}
+
+/// Issue d'un geste dont le jeton a déjà été vérifié.
+pub(crate) enum Applied {
+    Done(ActionResult),
+    /// Aucune des alertes du jeton n'est encore active.
+    Inactive,
+    /// Le jeton a déjà servi : rien n'est refait (deux clics, une reprise).
+    Used,
+}
+
+/// Vrai si les liens d'action sont en service (fonction active, adresse
+/// publique connue). Les couper révoque tous les jetons envoyés.
+pub(crate) async fn links_enabled(state: &AppState) -> ApiResult<bool> {
+    let global = policy_store::load_global(&state.pool).await?;
+    let env_url = crate::config::env_var("DUMBMONIT_PUBLIC_URL");
+    Ok(global.action_links && global.public_url(env_url.as_deref()).is_some())
+}
+
+/// Exécute le geste d'un jeton vérifié, une seule fois, au nom de `actor` :
+/// la page de confirmation (« via notification link ») comme les boutons des
+/// messageries (« slack:alice »).
+pub(crate) async fn apply(
+    state: &AppState,
+    claims: &Claims,
+    actor: &str,
+    ip: Option<IpAddr>,
+) -> ApiResult<Applied> {
+    let alerts = linked_alerts(state, claims).await?;
+    if alerts.is_empty() {
+        return Ok(Applied::Inactive);
     }
     let now = Utc::now();
-    if !consume(&state, &claims, now).await? {
-        return Err(ApiError::Conflict("This link has already been used.".into()));
+    if !consume(state, claims, now).await? {
+        return Ok(Applied::Used);
     }
 
     let until = now + claims.action.duration();
@@ -302,17 +333,11 @@ pub async fn execute(
                 views.push(alert);
                 continue;
             }
-            match dismiss(&state, &fingerprint, true, ACTOR).await {
+            match dismiss(state, &fingerprint, true, actor).await {
                 Ok(view) => {
                     dismissed += 1;
-                    audit::record(
-                        &state.pool,
-                        Some(ACTOR),
-                        "alert.dismissed",
-                        Some(&fingerprint),
-                        ip,
-                    )
-                    .await;
+                    let subject = Some(fingerprint.as_str());
+                    audit::record(&state.pool, Some(actor), "alert.dismissed", subject, ip).await;
                     views.push(LinkedAlert { dismissed: view.dismissed, ..alert });
                 }
                 // Résolue entre-temps : rien à écarter, ce n'est pas une erreur.
@@ -320,7 +345,7 @@ pub async fn execute(
                 Err(error) => return Err(error),
             }
         }
-        return Ok(no_store(ActionResult {
+        return Ok(Applied::Done(ActionResult {
             action: claims.action,
             until,
             acked: 0,
@@ -342,10 +367,10 @@ pub async fn execute(
             continue;
         }
         let request = AckRequest::Set { until, note: None };
-        match acknowledge(&state, &fingerprint, request, ACTOR).await {
+        match acknowledge(state, &fingerprint, request, actor).await {
             Ok(view) => {
                 acked += 1;
-                audit::record(&state.pool, Some(ACTOR), audit_action, Some(&fingerprint), ip).await;
+                audit::record(&state.pool, Some(actor), audit_action, Some(&fingerprint), ip).await;
                 views.push(LinkedAlert {
                     acked: view.acked,
                     acked_until: view.acked_until,
@@ -357,7 +382,8 @@ pub async fn execute(
             Err(error) => return Err(error),
         }
     }
-    Ok(no_store(ActionResult { action: claims.action, until, acked, dismissed: 0, alerts: views }))
+    let action = claims.action;
+    Ok(Applied::Done(ActionResult { action, until, acked, dismissed: 0, alerts: views }))
 }
 
 #[cfg(test)]

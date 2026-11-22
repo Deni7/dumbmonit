@@ -31,13 +31,17 @@ use crate::notify::secret::SecretString;
 pub struct Teams {
     http: reqwest::Client,
     webhook_url: SecretString,
+    /// Boutons `Action.OpenUrl` vers les liens signés plutôt que des liens dans
+    /// le texte (voir [`crate::notify::interactive`] : un flux Workflows ne
+    /// renvoie pas les clics).
+    interactive: bool,
 }
 
 impl Teams {
     pub fn new(http: reqwest::Client, channel: &ChannelConfig) -> Result<Self, NotifyError> {
         let webhook_url = channel.secret("webhook_url")?;
         http::check_url(webhook_url.expose(), "webhook_url")?;
-        Ok(Self { http, webhook_url })
+        Ok(Self { http, webhook_url, interactive: crate::notify::interactive::enabled(channel) })
     }
 
     /// Couleur de titre, dans le vocabulaire fermé des Adaptive Cards : elles
@@ -54,7 +58,16 @@ impl Teams {
         }
     }
 
-    fn payload(message: &Message) -> Value {
+    fn payload(message: &Message, interactive: bool) -> Value {
+        let mut card = Self::card(message);
+        let actions = crate::notify::interactive::teams_actions(message);
+        if interactive && !actions.is_empty() {
+            card["attachments"][0]["content"]["actions"] = Value::Array(actions);
+        }
+        card
+    }
+
+    fn card(message: &Message) -> Value {
         json!({
             "type": "message",
             "attachments": [{
@@ -111,11 +124,15 @@ impl Notifier for Teams {
         "teams"
     }
 
+    fn renders_actions(&self) -> bool {
+        self.interactive
+    }
+
     async fn send(&self, message: &Message) -> Result<(), NotifyError> {
         http::send(
             &self.http,
             Request::post(self.webhook_url.expose())
-                .json(Self::payload(message))
+                .json(Self::payload(message, self.interactive))
                 .secret(&self.webhook_url)
                 .explain(Self::explain),
         )
@@ -594,7 +611,26 @@ mod tests {
                 },
             }],
         });
-        assert_eq!(Teams::payload(&sample_message(false)), attendu);
+        assert_eq!(Teams::payload(&sample_message(false), false), attendu);
+        assert_eq!(Teams::payload(&sample_message(false), true), attendu, "no links, no buttons");
+    }
+
+    #[test]
+    fn teams_interactive_cards_open_the_signed_links() {
+        let key = crate::notify::action_link::ActionKey::from_bytes([6; 32]);
+        let mut message = sample_message(false);
+        message.actions = crate::notify::action_link::build(
+            &key,
+            "https://m.lan",
+            &["a@1".into()],
+            chrono::Utc::now(),
+        );
+        let card = Teams::payload(&message, true);
+        let actions = &card["attachments"][0]["content"]["actions"];
+        assert_eq!(actions[0]["type"], "Action.OpenUrl");
+        assert_eq!(actions[0]["title"], "Acknowledge");
+        let plain = Teams::payload(&message, false);
+        assert!(plain["attachments"][0]["content"].get("actions").is_none());
     }
 
     #[test]

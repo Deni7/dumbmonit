@@ -57,6 +57,13 @@ enum Segment {
     Variable(String),
 }
 
+/// Morceau d'un gabarit, tel que [`Template::parts`] le rend.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Part<'a> {
+    Literal(&'a str),
+    Variable(&'a str),
+}
+
 /// Gabarit analysé et validé, prêt à être rendu autant de fois que nécessaire.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Template {
@@ -69,6 +76,19 @@ impl Template {
     /// `field` nomme le réglage fautif dans le message d'erreur : l'utilisateur doit
     /// savoir si le problème vient de l'URL ou du corps.
     pub fn parse(source: &str, field: &str) -> Result<Self, NotifyError> {
+        Self::parse_with(source, field, is_known, &known_names().join(", "))
+    }
+
+    /// Comme [`Template::parse`], avec un autre jeu de variables : `is_known`
+    /// décide, `available` est la liste citée dans le message d'erreur. C'est
+    /// ce que les gabarits de message ([`crate::notify::message_template`])
+    /// réutilisent, avec leurs variables et leurs `tags.<clé>`.
+    pub fn parse_with(
+        source: &str,
+        field: &str,
+        is_known: impl Fn(&str) -> bool,
+        available: &str,
+    ) -> Result<Self, NotifyError> {
         let mut segments = Vec::new();
         let mut literal = String::new();
         let mut rest = source;
@@ -92,8 +112,7 @@ impl Template {
             }
             if !is_known(&name) {
                 return Err(NotifyError::Config(format!(
-                    "\"{field}\": unknown variable \"{name}\" (available: {})",
-                    known_names().join(", ")
+                    "\"{field}\": unknown variable \"{name}\" (available: {available})"
                 )));
             }
 
@@ -126,6 +145,15 @@ impl Template {
             }
         }
         rendered
+    }
+
+    /// Les morceaux du gabarit, dans l'ordre : un appelant qui échappe selon le
+    /// contexte (le Markdown de Telegram, par exemple) fait son propre rendu.
+    pub fn parts(&self) -> impl Iterator<Item = Part<'_>> {
+        self.segments.iter().map(|segment| match segment {
+            Segment::Literal(text) => Part::Literal(text),
+            Segment::Variable(name) => Part::Variable(name),
+        })
     }
 
     /// Vrai si le gabarit cite cette variable, pour prévenir l'utilisateur qu'il

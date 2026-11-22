@@ -69,6 +69,10 @@ pub struct KindInfo {
     /// ou `none` (le service a son propre acquittement, PagerDuty, Opsgenie).
     /// Voir [`action_style`].
     pub actions: &'static str,
+    /// Format des gabarits de message de ce type (`plain`, `slack_mrkdwn`,
+    /// `html`, `telegram_markdown_v2`), vide s'il n'en prend pas. Voir
+    /// [`super::message_template::format_for`].
+    pub template_format: &'static str,
 }
 
 /// Page de la documentation en ligne qui décrit chaque canal ; chaque `doc_url`
@@ -220,7 +224,17 @@ fn info(
     settings: Vec<Field>,
     secrets: Vec<Field>,
 ) -> KindInfo {
-    KindInfo { kind, label, summary, doc_url, settings, secrets, actions: action_style(kind) }
+    let template_format = super::message_template::format_for(kind).map_or("", |f| f.as_str());
+    KindInfo {
+        kind,
+        label,
+        summary,
+        doc_url,
+        settings,
+        secrets,
+        actions: action_style(kind),
+        template_format,
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -296,6 +310,11 @@ pub fn supports_insecure_tls(kind: &str) -> bool {
 /// Clé du réglage booléen, dans `settings`.
 pub const INSECURE_TLS_KEY: &str = "insecure_tls";
 
+/// Réglage « Interactive buttons » (voir [`super::interactive`]).
+fn interactive_field(help: &'static str) -> Field {
+    field(super::interactive::INTERACTIVE_KEY, "Interactive buttons", "boolean", help, "")
+}
+
 fn insecure_tls_field() -> Field {
     field(
         INSECURE_TLS_KEY,
@@ -327,11 +346,24 @@ fn describe_base(kind: &'static str) -> Option<KindInfo> {
             "Slack",
             "Message in a Slack channel, through an incoming webhook.",
             "https://dumbmonit.selfhostr.io/docs/notifications/#slack",
-            vec![],
-            vec![webhook_url(
-                "URL provided by \"Incoming Webhooks\" in your Slack app.",
-                "https://hooks.slack.com/services/T000/B000/XXXX",
+            vec![interactive_field(
+                "Acknowledge and Snooze become buttons that act right in Slack. Needs the app's \
+                 signing secret below, and its Interactivity Request URL set to the address \
+                 shown once the channel is saved (requires the instance's public URL).",
             )],
+            vec![
+                webhook_url(
+                    "URL provided by \"Incoming Webhooks\" in your Slack app.",
+                    "https://hooks.slack.com/services/T000/B000/XXXX",
+                ),
+                password(
+                    super::interactive::slack::SIGNING_SECRET_KEY,
+                    "Signing secret",
+                    "Only for interactive buttons: Basic Information → App Credentials → \
+                     Signing Secret. DumbMonit checks it on every button press.",
+                    "8f742231b10e8888abcd99yyyzzz85a5",
+                ),
+            ],
         ),
         "telegram" => info(
             kind,
@@ -362,6 +394,12 @@ fn describe_base(kind: &'static str) -> Option<KindInfo> {
                     "https://api.telegram.org",
                 )
                 .with_default("https://api.telegram.org"),
+                interactive_field(
+                    "Acknowledge and Snooze act right in Telegram, without opening a page. \
+                     DumbMonit registers itself as the bot's webhook when you save (the \
+                     instance's public URL must be https): the bot then cannot be read with \
+                     getUpdates by another tool.",
+                ),
             ],
             vec![
                 password(
@@ -378,7 +416,10 @@ fn describe_base(kind: &'static str) -> Option<KindInfo> {
             "Microsoft Teams",
             "Adaptive card in a Teams channel, through a Workflows flow.",
             "https://dumbmonit.selfhostr.io/docs/notifications/#microsoft-teams",
-            vec![],
+            vec![interactive_field(
+                "Acknowledge, Snooze and Open become buttons on the card. Workflows webhooks \
+                 cannot send a press back, so the buttons open DumbMonit's confirmation page.",
+            )],
             vec![webhook_url(
                 "HTTPS POST URL of the \"Post to a channel when a webhook request is \
                  received\" flow. The old Office 365 connectors no longer work.",
@@ -1729,6 +1770,7 @@ mod tests {
         let json = serde_json::to_value(all()).unwrap();
         let Value::Array(kinds) = json else { panic!("an array was expected") };
         let first = kinds.first().and_then(Value::as_object).expect("one object per kind");
+        assert!(first.contains_key("template_format"), "\"template_format\" missing from KindInfo");
         for key in ["kind", "label", "summary", "doc_url", "settings", "secrets", "actions"] {
             assert!(first.contains_key(key), "\"{key}\" missing from KindInfo");
         }

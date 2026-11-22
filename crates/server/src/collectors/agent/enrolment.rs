@@ -931,6 +931,7 @@ fn message(
         count: 1,
         link,
         actions: Vec::new(),
+        context: Default::default(),
     }
 }
 

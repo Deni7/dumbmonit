@@ -14,6 +14,7 @@ use crate::alerting::model::Severity;
 use crate::alerting::notify_policy::{DIGEST_MAX_LINES, Digest, Hold};
 pub use crate::notify::action_link::MessageAction;
 use crate::notify::action_link::{Action, AlertRef};
+pub use crate::notify::message_template::MessageContext;
 
 /// Message prêt à partir, indépendant du canal.
 #[derive(Debug, Clone, PartialEq)]
@@ -53,6 +54,9 @@ pub struct Message {
     /// chaque canal les rend à sa façon, ou reçoit
     /// [`Message::with_action_links`] s'il ne sait pas faire de boutons.
     pub actions: Vec<MessageAction>,
+    /// Ce que les gabarits de message et les boutons interactifs lisent en plus
+    /// (début de l'incident, étiquettes de l'équipement, rendu personnalisé).
+    pub context: MessageContext,
 }
 
 /// Variables utilisables dans un gabarit de canal personnalisé, avec leur
@@ -535,6 +539,11 @@ pub fn render(group: &AlertGroup) -> Message {
         count,
         link: None,
         actions: Vec::new(),
+        context: MessageContext {
+            started_at: head.and_then(|item| item.since),
+            tags: group.target_tags.clone(),
+            ..MessageContext::default()
+        },
     }
 }
 
@@ -678,6 +687,12 @@ pub fn render_digest(digest: &Digest, public_url: Option<&str>) -> Message {
         count: digest.item_count() + digest.resolved_meanwhile.len(),
         link: None,
         actions: Vec::new(),
+        context: MessageContext {
+            started_at: head.and_then(|item| item.since),
+            // Les étiquettes d'un seul équipement : celles de plusieurs se mêleraient.
+            tags: if devices == 1 { digest.groups[0].target_tags.clone() } else { BTreeMap::new() },
+            ..MessageContext::default()
+        },
     };
     // Le lien global n'est ajouté que si aucun lien par équipement ne l'a été.
     if let Some(base) = public_url
@@ -735,6 +750,7 @@ pub fn test_message(channel_name: &str) -> Message {
         count: 1,
         link: None,
         actions: Vec::new(),
+        context: MessageContext::default(),
     }
 }
 
@@ -775,6 +791,7 @@ pub fn sample_message(resolved: bool) -> Message {
         count: 1,
         link: None,
         actions: Vec::new(),
+        context: MessageContext::default(),
     }
 }
 
