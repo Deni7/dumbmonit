@@ -1,5 +1,11 @@
 {
 	"deviceform_channelcheck_websocket_ok": "Agents connect through the web address {address}: their encrypted channel (TLS 1.3, client certificate) travels inside a WebSocket. No other port to open.",
 	"deviceform_channelcheck_websocket_title": "The agent WebSocket does not answer at {address}",
-	"deviceform_channelcheck_websocket_body": "This address goes through a tunnel or a reverse proxy. It must forward WebSockets to DumbMonit (Upgrade and Connection headers, no response buffering, a long read timeout): see “Agents behind a proxy” in the documentation."
+	"deviceform_channelcheck_websocket_body": "This address goes through a tunnel or a reverse proxy. It must forward WebSockets to DumbMonit (Upgrade and Connection headers, no response buffering, a long read timeout): see “Agents behind a proxy” in the documentation.",
+	"deviceform_channelcheck_websocket_hint": "If this port cannot be opened (Cloudflare Tunnel, a reverse proxy, a corporate firewall), agents can go through the web address instead: their encrypted channel then travels inside a WebSocket, still end to end.",
+	"deviceform_channelcheck_use_websocket": "Use the web address (WebSocket)",
+	"deviceform_channelcheck_use_direct": "Use the agent port",
+	"devices_agent_channel": "Channel",
+	"devices_agent_channel_websocket": "WebSocket via the web address",
+	"devices_agent_channel_websocket_detail": "Its last encrypted batch came through the WebSocket of the web address (Cloudflare Tunnel, reverse proxy) rather than straight to the agent port. The TLS session inside is the same, end to end."
 }

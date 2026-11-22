@@ -1192,6 +1192,9 @@ pub struct HostInfo {
     pub relay_gateway_check: Option<GatewayCheck>,
     /// Serveur en service, quand l'agent en connaît plusieurs (`server_urls`).
     pub server_link: Option<ServerLink>,
+    /// Vrai si son dernier lot chiffré est arrivé par la WebSocket de
+    /// l'interface (Cloudflare Tunnel, mandataire) plutôt qu'en direct.
+    pub via_websocket: bool,
     pub last_seen_at: Option<String>,
     /// Vrai si la machine est liée à un secret connu d'elle seule.
     pub bound: bool,
@@ -1226,7 +1229,7 @@ pub async fn host(pool: &SqlitePool, target_id: TargetId) -> Result<Option<HostI
         "SELECT hostname, os, os_version, arch, agent_version, commands_enabled, relay, site,
                 relay_wanted, relay_wanted_site, relay_control, relay_local, last_seen_at, secret_hash, bound_at, binding_supported, rebind_until,
                 relay_gateway_wanted, relay_gateway_port, relay_gateway_host, relay_gateway_check,
-                server_link
+                server_link, tls_websocket
          FROM agent_hosts WHERE target_id = ?",
     )
     .bind(target_id)
@@ -1244,7 +1247,7 @@ pub async fn list_hosts(pool: &SqlitePool) -> Result<Vec<(TargetId, String, Host
                 h.commands_enabled, h.relay, h.site, h.relay_wanted, h.relay_wanted_site,
                 h.relay_control, h.relay_local, h.last_seen_at, h.secret_hash, h.bound_at,
                 h.binding_supported, h.rebind_until, h.relay_gateway_wanted, h.relay_gateway_port,
-                h.relay_gateway_host, h.relay_gateway_check, h.server_link
+                h.relay_gateway_host, h.relay_gateway_check, h.server_link, h.tls_websocket
          FROM agent_hosts h JOIN targets t ON t.id = h.target_id
          ORDER BY t.name",
     )
@@ -1286,6 +1289,7 @@ fn row_to_host(row: &sqlx::sqlite::SqliteRow) -> Result<HostInfo> {
         relay_gateway_host: row.try_get("relay_gateway_host")?,
         relay_gateway_check: gateway_check,
         server_link,
+        via_websocket: row.try_get::<i64, _>("tls_websocket")? != 0,
         last_seen_at: row.try_get("last_seen_at")?,
         bound: row.try_get::<Option<String>, _>("secret_hash")?.is_some(),
         bound_at: row.try_get("bound_at")?,

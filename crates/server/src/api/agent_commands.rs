@@ -291,6 +291,10 @@ pub struct AgentHostView {
     /// (`server_urls`) : primaire ou secours, depuis quand. `None` : une
     /// seule adresse.
     pub server_link: Option<dumbmonit_proto::ServerLink>,
+    /// Vrai si son dernier lot chiffré est arrivé par la WebSocket de
+    /// l'interface (`GET /api/agent/ws`) plutôt qu'en direct sur le port des
+    /// agents : constaté par le serveur.
+    pub via_websocket: bool,
 }
 
 impl AgentHostView {
@@ -321,6 +325,7 @@ impl AgentHostView {
             rebind_until: info.rebind_until,
             last_seen_at: info.last_seen_at,
             server_link: info.server_link,
+            via_websocket: info.via_websocket,
         }
     }
 }

@@ -57,6 +57,9 @@ pub struct AgentCert {
     pub group: Option<String>,
     /// Agent relais dont le tunnel porte la connexion, s'il y en a un.
     pub via_relay: Option<TargetId>,
+    /// Connexion arrivée par la WebSocket de l'interface (`websocket.rs`) :
+    /// constaté par le serveur, jamais déclaré par l'agent.
+    pub via_websocket: bool,
 }
 
 /// Chemin d'une route sous `/api`, depuis sa constante partagée.
@@ -121,8 +124,10 @@ async fn require_certificate(
                     }
                 }
             }
+            let via_websocket = peer.as_ref().is_some_and(|peer| peer.via_websocket);
             let group = peer.and_then(|peer| peer.group);
-            request.extensions_mut().insert(AgentCert { target_id, group, via_relay });
+            let cert = AgentCert { target_id, group, via_relay, via_websocket };
+            request.extensions_mut().insert(cert);
             next.run(request).await
         }
         Ok(None) => error(StatusCode::UNAUTHORIZED, CERT_REFUSED),

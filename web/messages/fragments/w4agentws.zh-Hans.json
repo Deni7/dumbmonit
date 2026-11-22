@@ -1,5 +1,11 @@
 {
 	"deviceform_channelcheck_websocket_ok": "代理通过界面地址 {address} 连接：其加密通道（TLS 1.3，客户端证书）在 WebSocket 中传输。无需开放其他端口。",
 	"deviceform_channelcheck_websocket_title": "代理 WebSocket 在 {address} 无响应",
-	"deviceform_channelcheck_websocket_body": "此地址经过隧道或反向代理服务器。它必须将 WebSocket 转发到 DumbMonit（Upgrade 和 Connection 标头，不缓冲响应，较长的读取超时）：请参阅文档中的“位于代理服务器后的代理”。"
+	"deviceform_channelcheck_websocket_body": "此地址经过隧道或反向代理服务器。它必须将 WebSocket 转发到 DumbMonit（Upgrade 和 Connection 标头，不缓冲响应，较长的读取超时）：请参阅文档中的“位于代理服务器后的代理”。",
+	"deviceform_channelcheck_websocket_hint": "如果无法开放此端口（Cloudflare Tunnel、反向代理、企业防火墙），代理可以改走 Web 地址：其加密通道将在 WebSocket 中传输，仍为端到端加密。",
+	"deviceform_channelcheck_use_websocket": "使用 Web 地址（WebSocket）",
+	"deviceform_channelcheck_use_direct": "使用代理端口",
+	"devices_agent_channel": "通道",
+	"devices_agent_channel_websocket": "经 Web 地址的 WebSocket",
+	"devices_agent_channel_websocket_detail": "它最近一批加密数据经由 Web 地址的 WebSocket（Cloudflare Tunnel、反向代理）到达，而非直接连到代理端口。其中的 TLS 会话相同，仍为端到端。"
 }

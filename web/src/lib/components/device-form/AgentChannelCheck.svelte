@@ -20,13 +20,18 @@
 	 * The command (`children`) shows once the channel answers, or when the
 	 * administrator chooses to see it anyway (a check made from the server can
 	 * fail behind NAT without hairpin although agents outside connect fine).
+	 *
+	 * Transport (`transport`, `onTransport`): when the agent port does not
+	 * answer, the administrator can send agents through the web address
+	 * instead (WebSocket), or back to the agent port; the parent issues the
+	 * command again with that choice and the check runs again.
 	 */
 	import type { Snippet } from 'svelte';
 	import { untrack } from 'svelte';
 	import { Lock, RadioTower, AlertTriangle } from 'lucide-svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { checkAgentChannel } from '#lib/api/agent_tls.js';
-	import type { AgentChannelCheck } from '#lib/api/types.js';
+	import type { AgentChannelCheck, AgentTransportWish } from '#lib/api/types.js';
 	import { Button, CopyBlock, ErrorNotice, Led } from '#lib/ui/index.js';
 
 	interface Props {
@@ -34,9 +39,13 @@
 		baseUrl: string;
 		relayId?: number | null;
 		relayHost?: string | null;
+		/** Transport the command uses: `auto` lets the server decide. */
+		transport?: AgentTransportWish;
+		/** Asks the parent for a command with another transport. */
+		onTransport?: (next: AgentTransportWish) => void;
 		children: Snippet;
 	}
-	let { baseUrl, relayId = null, relayHost = null, children }: Props = $props();
+	let { baseUrl, relayId = null, relayHost = null, transport = 'auto', onTransport, children }: Props = $props();
 
 	let result = $state<AgentChannelCheck | null>(null);
 	let checking = $state(false);
@@ -52,6 +61,7 @@
 		try {
 			result = await checkAgentChannel({
 				base_url: baseUrl,
+				transport,
 				...(relayId !== null ? { relay_id: relayId, relay_host: relayHost } : {})
 			});
 			// A relay opens its gateway, then tests it: look again until it passes.
@@ -66,6 +76,8 @@
 	}
 
 	$effect(() => {
+		// Checked again when the command changes transport.
+		void transport;
 		untrack(run);
 		return () => {
 			if (timer) clearTimeout(timer);
@@ -116,6 +128,12 @@
 			default:
 				return { title: m.deviceform_channelcheck_tls_title({ port: p }), body: m.deviceform_channelcheck_tls_body({ address, port: p }), compose: false };
 		}
+	});
+	/** The other way agents can reach the channel, when this one fails: offered only straight to this server. */
+	const otherTransport = $derived.by((): AgentTransportWish | null => {
+		if (!onTransport || !result || result.relay || !problem) return null;
+		if (result.transport === 'websocket') return 'direct';
+		return result.websocket && result.outcome !== 'dns' ? 'websocket' : null;
 	});
 </script>
 
@@ -174,8 +192,17 @@
 				<CopyBlock value={firewall} label={m.deviceform_channelcheck_copy_firewall()} />
 			{/if}
 			<p class="max-w-prose text-[0.8125rem] text-ink-2">{m.deviceform_channelcheck_hairpin()}</p>
+			{#if otherTransport === 'websocket'}
+				<p class="max-w-prose text-sm text-ink">{m.deviceform_channelcheck_websocket_hint()}</p>
+			{/if}
 			<div class="flex flex-wrap items-center gap-2">
 				<Button variant="secondary" size="sm" loading={checking} onclick={run}>{m.deviceform_channelcheck_retry()}</Button>
+				{#if otherTransport && onTransport}
+					{@const next = otherTransport}
+					<Button variant="secondary" size="sm" disabled={checking} onclick={() => onTransport?.(next)}>
+						{next === 'websocket' ? m.deviceform_channelcheck_use_websocket() : m.deviceform_channelcheck_use_direct()}
+					</Button>
+				{/if}
 				{#if !showAnyway}
 					<Button variant="ghost" size="sm" onclick={() => (showAnyway = true)}>{m.deviceform_channelcheck_show_anyway()}</Button>
 				{/if}

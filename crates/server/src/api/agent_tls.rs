@@ -79,6 +79,10 @@ pub struct ChannelCheck {
     /// l'interface ; `url`, `host` et `port` sont alors ceux de la WebSocket,
     /// et la tentative a été faite à travers elle.
     pub transport: Option<&'static str>,
+    /// Vrai si le serveur accepte les agents par la WebSocket de l'interface
+    /// (`DUMBMONIT_AGENT_WEBSOCKET`, port des agents ouvert) : l'interface
+    /// peut alors proposer d'y faire passer la commande.
+    pub websocket: bool,
 }
 
 /// `POST /api/agent/tls/check` : le canal chiffré répond-il à l'adresse que
@@ -141,6 +145,7 @@ async fn check(
             check_error: route.check_error,
         }),
         transport: params.transport,
+        websocket: state.config.agent_websocket && state.config.agent_listen.is_some(),
     }))
 }
 

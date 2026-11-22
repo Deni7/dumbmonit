@@ -6217,6 +6217,7 @@ paths:
                     type: [string, "null"]
                     enum: [websocket, null]
                     description: "websocket: agents go through the web address; url, host and port are those of the agent WebSocket."
+                  websocket: { type: boolean, description: "The server accepts agents through the WebSocket of the web address (`DUMBMONIT_AGENT_WEBSOCKET`, agent port open): a command can be switched to it with `transport: websocket`." }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
@@ -15424,6 +15425,7 @@ components:
           oneOf:
             - type: "null"
             - $ref: "#/components/schemas/ServerLink"
+        via_websocket: { type: boolean, description: "Its last encrypted batch came through the agent WebSocket of the web address (`/api/agent/ws`, behind Cloudflare Tunnel or a proxy) rather than straight to the agent port. Seen by the server, not declared by the agent." }
     RebindWindow:
       type: object
       required: [rebind_until, minutes]

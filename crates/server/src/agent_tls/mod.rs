@@ -407,12 +407,16 @@ pub async fn note_channel(
     note_route(pool, target_id, cert.and_then(|cert| cert.via_relay)).await?;
     match cert {
         Some(cert) => {
-            sqlx::query("UPDATE agent_hosts SET tls_seen_ms = ?, tls_group = ? WHERE target_id = ?")
-                .bind(now)
-                .bind(cert.group.as_deref())
-                .bind(target_id)
-                .execute(pool)
-                .await?
+            sqlx::query(
+                "UPDATE agent_hosts SET tls_seen_ms = ?, tls_group = ?, tls_websocket = ?
+                 WHERE target_id = ?",
+            )
+            .bind(now)
+            .bind(cert.group.as_deref())
+            .bind(cert.via_websocket)
+            .bind(target_id)
+            .execute(pool)
+            .await?
         }
         None => {
             sqlx::query("UPDATE agent_hosts SET legacy_seen_ms = ? WHERE target_id = ?")

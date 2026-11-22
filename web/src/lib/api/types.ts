@@ -1421,6 +1421,11 @@ export interface AgentChannelCheck {
 	 * those of the agent WebSocket, and the check went through it.
 	 */
 	transport?: 'websocket' | null;
+	/**
+	 * The server accepts agents through the WebSocket of the web address
+	 * (`DUMBMONIT_AGENT_WEBSOCKET`): a command can be switched to it.
+	 */
+	websocket?: boolean;
 }
 
 export interface CreateUserPayload {
@@ -1805,8 +1810,16 @@ export interface AgentTokenPayload {
 	 * Transport of the encrypted channel in the commands. `auto` (default): the
 	 * WebSocket through the web address when the server sees a proxy in front.
 	 */
-	transport?: 'auto' | 'websocket' | 'direct';
+	transport?: AgentTransportWish;
 }
+
+/**
+ * Transport of the encrypted agent channel asked for an install command:
+ * `websocket` through the web address, `direct` to the agent port, `auto` lets
+ * the server decide (the WebSocket when the browser address is served by
+ * another certificate than DumbMonit's and no dedicated agent address is set).
+ */
+export type AgentTransportWish = 'auto' | 'websocket' | 'direct';
 
 /** A machine enrolled with a token. `GET /api/agent/tokens/{id}/machines`. */
 export interface TokenMachine {
@@ -1973,6 +1986,12 @@ export interface AgentHost {
 	 * absent on an older server.
 	 */
 	server_link?: ServerLink | null;
+	/**
+	 * Its last encrypted batch came through the agent WebSocket of the web
+	 * address (Cloudflare Tunnel, a reverse proxy) rather than straight to the
+	 * agent port. Seen by the server. Absent on an older server.
+	 */
+	via_websocket?: boolean;
 }
 
 /**

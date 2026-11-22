@@ -20,10 +20,10 @@
 	 */
 	import { untrack } from 'svelte';
 	import { Check, MapPin, RadioTower, Server } from 'lucide-svelte';
-	import { createAgentToken, getTarget, listTokenMachines, updateTarget, type CreatedAgentToken, type RelayAgent, type TokenMachine } from '#lib/api/index.js';
+	import { closeAgentToken, createAgentToken, getTarget, listTokenMachines, updateTarget, type CreatedAgentToken, type RelayAgent, type TokenMachine } from '#lib/api/index.js';
 	import { listRelays } from '#lib/api/relay.js';
 	import { listLocations } from '#lib/api/locations.js';
-	import type { MapLocation } from '#lib/api/types.js';
+	import type { AgentTransportWish, MapLocation } from '#lib/api/types.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import { Button, ClickSpark, CopyBlock, DocLink, ErrorNotice, Field, Led, Plate } from '#lib/ui/index.js';
 	import AgentChecksums from './AgentChecksums.svelte';
@@ -111,9 +111,30 @@
 	/** A relay from the URL that is unknown or not a relay falls back to direct. */
 	const throughRelay = $derived(!relay && chosenRelay !== null);
 
+	/** Transport of the encrypted channel in the commands; `auto` lets the server decide. */
+	let transport = $state<AgentTransportWish>('auto');
+
 	async function create(event: SubmitEvent) {
 		event.preventDefault();
-		if (creating) return;
+		await issue();
+	}
+
+	/**
+	 * The channel check asks for the other transport (the agent port does not
+	 * answer, or the WebSocket does not): the commands change, so the unused
+	 * token is closed and a new one issued with that transport.
+	 */
+	async function changeTransport(next: AgentTransportWish) {
+		if (creating || machine) return;
+		const previous = token;
+		// A failure keeps the current token and command (the error shows below the check).
+		if (await issue(next)) {
+			if (previous) closeAgentToken(previous.id).catch(() => {});
+		}
+	}
+
+	async function issue(wish: AgentTransportWish = transport): Promise<boolean> {
+		if (creating) return false;
 		creating = true;
 		error = null;
 		try {
@@ -121,15 +142,19 @@
 			origin = window.location.origin;
 			token = await createAgentToken({
 				base_url: origin,
+				transport: wish,
 				...(relay ? { relay: true, site: siteLabel } : {}),
 				...(reusable && !relay ? { reusable: true } : {}),
 				...(throughRelay && chosenRelay ? { relay_id: chosenRelay.id, relay_host: relayHost.trim() || null } : {}),
 				// MSP mode: the machine enters the client picked in the header.
 				...(auth.mspOn && auth.currentClient !== null ? { client_id: auth.currentClient } : {})
 			});
+			transport = wish;
 			watch(token.id);
+			return true;
 		} catch (cause) {
 			error = cause;
+			return false;
 		} finally {
 			creating = false;
 		}
@@ -137,6 +162,7 @@
 
 	function reset() {
 		stopWatching();
+		transport = 'auto';
 		token = null;
 		error = null;
 		machine = null;
@@ -293,7 +319,7 @@
 		{/if}
 
 		<!-- The channel must answer where the command sends machines before the command shows. -->
-		<AgentChannelCheck baseUrl={origin} relayId={throughRelay && chosenRelay ? chosenRelay.id : null} relayHost={relayHost.trim() || null}>
+		<AgentChannelCheck baseUrl={origin} relayId={throughRelay && chosenRelay ? chosenRelay.id : null} relayHost={relayHost.trim() || null} {transport} onTransport={changeTransport}>
 {#if spk}
 			<div class="grid gap-1.5">
 				<p class="text-sm font-semibold text-ink">{m.deviceform_enroll_spk_url()}</p>
@@ -352,6 +378,10 @@
 		</div>
 		<AgentChecksums />
 		</AgentChannelCheck>
+		{#if error}
+			<!-- A command asked with another transport could not be issued: the current one stays. -->
+			<ErrorNotice {error} title={m.deviceform_enroll_create_error()} />
+		{/if}
 
 		{#if relay}
 			<!-- Only for an agent installed before, or by hand: the commands above already do it. -->

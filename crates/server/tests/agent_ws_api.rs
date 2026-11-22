@@ -302,6 +302,18 @@ async fn an_agent_enrols_and_reports_through_the_interface_websocket() {
     assert_eq!(group.as_deref(), Some(agent_tls::POST_QUANTUM_GROUP));
     let target = target_of(&lab, "id-cloudflare").await;
     assert_eq!(via_agent(&lab, target).await, None);
+
+    // Le serveur constate le transport (l'agent ne le déclare pas) et la page
+    // de la machine le montre.
+    let reply = lab.app.get(&format!("/api/targets/{target}/agent"), Some(&admin)).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(reply.body["via_websocket"], true);
+
+    // Le même agent, revenu en direct sur le port des agents : plus marqué.
+    let response = push_through(&lab, lab.agents, &agent, &enrolment, "id-cloudflare").await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let reply = lab.app.get(&format!("/api/targets/{target}/agent"), Some(&admin)).await;
+    assert_eq!(reply.body["via_websocket"], false);
 }
 
 #[tokio::test]
@@ -516,5 +528,20 @@ async fn behind_a_proxy_the_install_command_goes_through_the_websocket() {
     // Sans demande ni intermédiaire constaté : rien d'imposé.
     let reply = lab.app.get("/api/agent/install?base_url=https://nas.lan:8080", Some(&admin)).await;
     assert_eq!(reply.body["transport"], Value::Null);
+    assert!(!reply.body["linux_template"].as_str().unwrap().contains("--transport"));
+    // `direct` n'impose rien non plus, même demandé.
+    let query = "/api/agent/install?base_url=https://monit.example.com&transport=direct";
+    let reply = lab.app.get(query, Some(&admin)).await;
+    assert_eq!(reply.body["transport"], Value::Null);
+}
+
+#[tokio::test]
+async fn the_websocket_transport_is_never_offered_when_the_route_is_closed() {
+    let lab = lab_configured(|config| config.agent_websocket = false).await;
+    let admin = lab.app.admin_cookie().await;
+    let query = "/api/agent/install?base_url=https://monit.example.com&transport=websocket";
+    let reply = lab.app.get(query, Some(&admin)).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(reply.body["transport"], Value::Null, "la route fermée n'est jamais proposée");
     assert!(!reply.body["linux_template"].as_str().unwrap().contains("--transport"));
 }
