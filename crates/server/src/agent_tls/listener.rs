@@ -57,6 +57,10 @@ pub struct AgentPeer {
     /// Agent relais dont le tunnel porte cette connexion. La session TLS reste
     /// de bout en bout entre l'agent et le serveur : le relais n'en voit rien.
     pub via_relay: Option<TargetId>,
+    /// Connexion arrivée par la WebSocket de l'interface
+    /// ([`super::websocket`]) : `addr` est alors l'adresse du client telle que
+    /// la route l'a établie. La session TLS est la même qu'en direct.
+    pub via_websocket: bool,
 }
 
 impl Connected<IncomingStream<'_, AgentListener>> for AgentPeer {
@@ -84,7 +88,13 @@ impl Listener for AgentListener {
     }
 
     fn local_addr(&self) -> std::io::Result<Self::Addr> {
-        Ok(AgentPeer { addr: self.local, certificate: None, group: None, via_relay: None })
+        Ok(AgentPeer {
+            addr: self.local,
+            certificate: None,
+            group: None,
+            via_relay: None,
+            via_websocket: false,
+        })
     }
 }
 
@@ -170,5 +180,6 @@ pub(crate) fn peer_of<T>(
             .negotiated_key_exchange_group()
             .map(|group| format!("{:?}", group.name())),
         via_relay,
+        via_websocket: false,
     }
 }

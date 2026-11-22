@@ -338,6 +338,8 @@ pub struct CreatedToken {
     pub install_windows: String,
     /// Origine de l'empreinte `--pinned-key` (voir [`InstallParams::pin_source`]).
     pub pin_source: Option<&'static str>,
+    /// Transport imposé par les commandes (voir [`InstallParams::transport`]).
+    pub transport: Option<&'static str>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -392,6 +394,11 @@ pub struct TokenPayload {
     /// que de ce port. Toujours vrai pour un jeton de relais.
     #[serde(default)]
     pub agent_port_only: bool,
+    /// Transport du canal chiffré dans les commandes : `websocket` (par
+    /// l'adresse de l'interface), `direct`, ou `auto` (défaut : la WebSocket
+    /// derrière un intermédiaire qui termine TLS).
+    #[serde(default)]
+    pub transport: TransportWish,
 }
 
 impl TokenPayload {
@@ -490,12 +497,13 @@ pub async fn create_token(
     // Un relais est posé sur un site distant : sa commande n'utilise que le
     // port des agents, le seul qu'un site distant ait à joindre.
     let agent_port_only = payload.relay || payload.agent_port_only;
-    let mut params = install_parameters_probed(
+    let mut params = install_parameters_for(
         &state,
         payload.base_url.as_deref(),
         route,
         Some(&headers),
         agent_port_only,
+        payload.transport,
     )
     .await;
 
@@ -513,6 +521,7 @@ pub async fn create_token(
             token,
             secret,
             pin_source: params.pin_source,
+            transport: params.transport,
         }),
     ))
 }
@@ -565,6 +574,12 @@ pub struct InstallParams {
     /// `trusted` (certificat de confiance : aucune empreinte). Absent : pas de
     /// sondage (relais, adresse saisie à la main, échec).
     pub pin_source: Option<&'static str>,
+    /// `websocket` : l'agent passe par l'adresse de l'interface
+    /// (`--transport=websocket`, `-Transport websocket`), sa session TLS dans
+    /// une WebSocket — derrière Cloudflare Tunnel ou un mandataire inverse qui
+    /// termine TLS. Absent : rien d'imposé (l'agent essaie le port des agents,
+    /// puis la WebSocket s'il est injoignable).
+    pub transport: Option<&'static str>,
 }
 
 /// Passage par un agent relais : sa passerelle, telle que les machines du site
@@ -676,6 +691,9 @@ impl InstallParams {
         if let (Some(url), Some(pin)) = (&self.agent_url, &self.ca_pin) {
             command.push_str(&format!(" --tls-url={url} --ca-pin={pin}"));
         }
+        if let Some(transport) = self.transport {
+            command.push_str(&format!(" --transport={transport}"));
+        }
         if self.open_gateway {
             command.push_str(" --open-gateway");
         }
@@ -688,6 +706,9 @@ impl InstallParams {
             install_windows(&self.base_url, token, &self.pairs(true), self.https_pin.as_deref());
         if let (Some(url), Some(pin)) = (&self.agent_url, &self.ca_pin) {
             command.push_str(&format!(" -TlsUrl {url} -CaPin {pin}"));
+        }
+        if let Some(transport) = self.transport {
+            command.push_str(&format!(" -Transport {transport}"));
         }
         if self.open_gateway {
             command.push_str(" -OpenGateway");
@@ -723,6 +744,45 @@ pub async fn install_parameters_probed(
     headers: Option<&HeaderMap>,
     agent_port_only: bool,
 ) -> InstallParams {
+    install_parameters_for(state, base_url, route, headers, agent_port_only, TransportWish::Auto)
+        .await
+}
+
+/// Transport du canal chiffré que la commande d'installation doit donner.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TransportWish {
+    /// Au jugé : la WebSocket quand l'interface est vue à travers un
+    /// intermédiaire qui termine TLS et qu'aucune adresse dédiée aux agents
+    /// n'est réglée ; sinon rien (l'agent essaie le port des agents, puis la
+    /// WebSocket de lui-même).
+    #[default]
+    Auto,
+    /// Toujours par l'adresse de l'interface (WebSocket).
+    Websocket,
+    /// Jamais de transport imposé dans la commande.
+    Direct,
+}
+
+/// Valeur de `--transport` quand les agents passent par l'adresse de
+/// l'interface.
+pub const TRANSPORT_WEBSOCKET: &str = "websocket";
+
+/// Comme [`install_parameters_probed`], avec le transport demandé.
+///
+/// Derrière Cloudflare Tunnel ou un mandataire inverse qui termine TLS, le
+/// port des agents n'est pas joignable à l'adresse du navigateur : la
+/// commande fait alors passer l'agent par la WebSocket de l'interface
+/// (`--transport=websocket`). Scripts et binaires viennent de cette même
+/// adresse, jamais du port des agents.
+pub async fn install_parameters_for(
+    state: &AppState,
+    base_url: Option<&str>,
+    route: Option<RelayRoute>,
+    headers: Option<&HeaderMap>,
+    agent_port_only: bool,
+    wish: TransportWish,
+) -> InstallParams {
     let web_url = match &route {
         Some(route) => format!("https://{}:{}", route.host, route.port),
         None => normalise_base_url(base_url, state.config.bind),
@@ -738,10 +798,38 @@ pub async fn install_parameters_probed(
     // marque ALPN des agents y voit l'interface) : c'est donc son épingle, pas
     // celle du port des agents, que la commande porte.
     let shared = route.is_none() && on_single_port(state, &web_url);
+    // Ce que présente réellement l'adresse ouverte par le navigateur : le
+    // certificat de DumbMonit, ou celui d'un intermédiaire (son épingle, et
+    // de quoi savoir qu'il y en a un).
+    let probed = match (&route, headers) {
+        (None, Some(headers)) => {
+            let target = pin_probe::probe_target(&web_url, headers);
+            let seen = match target {
+                Some((host, port)) => pin_probe::probe(&host, port).await,
+                None => None,
+            };
+            Some(pin_probe::decide(seen.as_ref(), web_pin(state)))
+        }
+        _ => None,
+    };
+    let behind_proxy = matches!(
+        probed,
+        Some((_, Some(pin_probe::PinSource::Proxy | pin_probe::PinSource::Trusted)))
+    );
+    let websocket = route.is_none()
+        && offer.is_some()
+        && state.config.agent_websocket
+        && match wish {
+            TransportWish::Websocket => true,
+            TransportWish::Direct => false,
+            TransportWish::Auto => behind_proxy && state.config.agent_public_url.is_none(),
+        };
     // Un seul port : il faut le canal ouvert et la clé de son certificat, que
-    // les commandes épinglent pour lire scripts et binaires.
+    // les commandes épinglent pour lire scripts et binaires. Pas par la
+    // WebSocket : le port des agents n'est justement pas joignable.
     let server_pin = state.agent_tls().server_pin();
-    let single_port = route.is_none() && agent_port_only && server_pin.is_some() && !shared;
+    let single_port =
+        route.is_none() && agent_port_only && server_pin.is_some() && !shared && !websocket;
     let (base_url, agent_port_only) = match (&agent_url, single_port) {
         (Some(url), true) => (url.clone(), true),
         _ => (web_url, false),
@@ -750,17 +838,13 @@ pub async fn install_parameters_probed(
     let https_pin = match &route {
         Some(_) => server_pin,
         None if agent_port_only => server_pin,
-        None => {
-            let own = web_pin(state);
-            let target = headers.and_then(|headers| pin_probe::probe_target(&base_url, headers));
-            let seen = match target {
-                Some((host, port)) => pin_probe::probe(&host, port).await,
-                None => None,
-            };
-            let (pin, source) = pin_probe::decide(seen.as_ref(), own);
-            pin_source = source.map(pin_probe::PinSource::as_str);
-            pin
-        }
+        None => match probed {
+            Some((pin, source)) => {
+                pin_source = source.map(pin_probe::PinSource::as_str);
+                pin
+            }
+            None => web_pin(state),
+        },
     };
     let checksums = crate::api::agent_files::platform_checksums(&state.config.agent_dir)
         .await
@@ -782,6 +866,7 @@ pub async fn install_parameters_probed(
         pin_source,
         via_relay: route,
         open_gateway: false,
+        transport: websocket.then_some(TRANSPORT_WEBSOCKET),
     };
     params.linux_template = params.linux_command(TOKEN_PLACEHOLDER);
     params.windows_template = params.windows_command(TOKEN_PLACEHOLDER);
@@ -834,6 +919,9 @@ pub struct InstallQuery {
     /// Commandes qui n'utilisent que le port des agents (site distant).
     #[serde(default)]
     pub agent_port_only: bool,
+    /// Transport du canal chiffré (voir [`TokenPayload::transport`]).
+    #[serde(default)]
+    pub transport: TransportWish,
 }
 
 /// `GET /api/agent/install?base_url=…` : paramètres et gabarits de la commande
@@ -851,12 +939,13 @@ pub async fn install_params(
         None => None,
     };
     Ok(Json(
-        install_parameters_probed(
+        install_parameters_for(
             &state,
             query.base_url.as_deref(),
             route,
             Some(&headers),
             query.agent_port_only,
+            query.transport,
         )
         .await,
     ))
@@ -1113,6 +1202,7 @@ mod tests {
             https_pin: None,
             pin_source: None,
             open_gateway: false,
+            transport: None,
         };
         let linux = params.linux_command("dmon_abc");
         assert!(linux.ends_with(&format!(" --tls-url=https://s:8443 --ca-pin={pin}")), "{linux}");
@@ -1125,6 +1215,25 @@ mod tests {
         let relay = InstallParams { open_gateway: true, ..params };
         assert!(relay.linux_command("dmon_abc").ends_with(" --open-gateway"));
         assert!(relay.windows_command("dmon_abc").ends_with(" -OpenGateway"));
+
+        // Derrière Cloudflare Tunnel ou un mandataire : par la WebSocket de
+        // l'interface, l'autorité toujours épinglée.
+        let proxied =
+            InstallParams { transport: Some(TRANSPORT_WEBSOCKET), open_gateway: false, ..relay };
+        let linux = proxied.linux_command("dmon_abc");
+        assert!(linux.ends_with(&format!(" --ca-pin={pin} --transport=websocket")), "{linux}");
+        let windows = proxied.windows_command("dmon_abc");
+        assert!(windows.ends_with(&format!(" -CaPin {pin} -Transport websocket")), "{windows}");
+    }
+
+    #[test]
+    fn the_transport_asked_for_reads_as_a_plain_word() {
+        let wish = |raw: &str| serde_json::from_str::<TransportWish>(raw).ok();
+        assert_eq!(wish(r#""websocket""#), Some(TransportWish::Websocket));
+        assert_eq!(wish(r#""direct""#), Some(TransportWish::Direct));
+        assert_eq!(wish(r#""auto""#), Some(TransportWish::Auto));
+        assert_eq!(wish(r#""ws; rm -rf /""#), None, "rien d'autre n'entre dans une commande");
+        assert_eq!(TransportWish::default(), TransportWish::Auto);
     }
 
     #[test]
@@ -1141,6 +1250,7 @@ mod tests {
             https_pin: Some(PIN.into()),
             pin_source: None,
             open_gateway: false,
+            transport: None,
         };
         let linux = params.linux_command("dmon_abc");
         assert!(

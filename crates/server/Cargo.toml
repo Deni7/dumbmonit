@@ -84,6 +84,12 @@ tokio-rustls = "0.26"
 # des agents, et son adaptateur tokio. Déjà compilés pour axum.
 hyper = { version = "1.12", features = ["http1", "server"] }
 hyper-util = { version = "0.1.21", features = ["tokio"] }
+# Canal des agents par WebSocket, à l'adresse de l'interface (Cloudflare
+# Tunnel, mandataire inverse) : le flux d'octets de la session TLS de l'agent
+# dans des messages binaires (`agent_tls::websocket`). Sans pile TLS ni client
+# de la crate : la mise à niveau passe par hyper (serveur) et reqwest (essai du
+# canal) ; seuls le cadrage et `handshake` (clés de la mise à niveau) servent.
+tokio-tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
 # Canal chiffré des agents (`agent_tls`) : TLS 1.3 seulement, échange de clés
 # hybride post-quantique X25519MLKEM768, certificats clients. Le moteur
 # aws-lc-rs est celui que rustls compile déjà (via reqwest) ; `rcgen` fabrique

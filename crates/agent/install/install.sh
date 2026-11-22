@@ -41,6 +41,10 @@ TOKEN=""
 URL=""
 TLS_URL=""
 CA_PIN=""
+# Transport du canal chiffré (`transport:` de agent.yaml) : auto, direct ou
+# websocket (par l'adresse de l'interface, derrière Cloudflare Tunnel ou un
+# mandataire inverse). Vide : celui de l'agent (auto).
+TRANSPORT=""
 # Clé publique épinglée du certificat HTTPS du serveur (`sha256//…`), quand il
 # est autosigné : les téléchargements passent alors en HTTPS vérifié par elle.
 PINNED_KEY=""
@@ -99,6 +103,13 @@ OPTIONS:
                         it, the agent only talks to that server, over TLS 1.3
                         with its own client certificate, and never in clear.
                         The install command shown by the server includes it.
+    --transport=MODE    How the agent reaches its encrypted channel: auto
+                        (default: the agent port, then the server URL if that
+                        port is unreachable), direct (the agent port only) or
+                        websocket (through the server URL: Cloudflare Tunnel,
+                        a reverse proxy that terminates TLS, a corporate
+                        proxy). The agent's own TLS session, with its client
+                        certificate, goes inside a WebSocket.
     --interval=N        Sampling period in seconds (default: 30)
     --services=a,b,c    Services whose state is reported: systemd units on
                         Linux, launchd labels on macOS, rc.d names on FreeBSD
@@ -180,6 +191,7 @@ for argument in "$@"; do
         --url=*)      URL="${argument#*=}" ;;
         --tls-url=*)  TLS_URL="${argument#*=}" ;;
         --ca-pin=*)   CA_PIN="${argument#*=}" ;;
+        --transport=*) TRANSPORT="${argument#*=}" ;;
         --pinned-key=*) PINNED_KEY="${argument#*=}" ;;
         --interval=*) INTERVAL="${argument#*=}" ;;
         --services=*) SERVICES="${argument#*=}" ;;
@@ -507,6 +519,11 @@ case "$URL" in
     *) echec "the server URL must start with https:// (got $URL): DumbMonit only serves HTTPS" ;;
 esac
 
+case "$TRANSPORT" in
+    ""|auto|direct|websocket) ;;
+    *) echec "--transport expects auto, direct or websocket (got $TRANSPORT)" ;;
+esac
+
 # Mandataire : les téléchargements de ce script le prennent aussi (curl, wget
 # et fetch lisent ces variables). Seul http:// est accepté, comme l'agent.
 case "$PROXY" in
@@ -768,6 +785,7 @@ umask 077
     if [ -n "$PINNED_KEY" ]; then echo "server_pin: $PINNED_KEY"; fi
     if [ -n "$TLS_URL" ]; then echo "tls_url: $TLS_URL"; fi
     if [ -n "$CA_PIN" ]; then echo "ca_pin: $CA_PIN"; fi
+    if [ -n "$TRANSPORT" ]; then echo "transport: $TRANSPORT"; fi
     if [ -n "$PROXY" ]; then
         # Entre apostrophes : des identifiants peuvent contenir « : » ou « # ».
         echo "proxy: '$(echo "$PROXY" | sed "s/'/''/g")'"
@@ -1009,6 +1027,15 @@ esac
 # suivie d'une poignée de main suffit à la reconnaître (curl : code 7 =
 # connexion refusée, 28 = délai dépassé, 35 = TLS impossible).
 diagnostiquer_canal() {
+    if [ "$TRANSPORT" = "websocket" ]; then
+        # Par l'adresse de l'interface : c'est la WebSocket qu'il faut laisser
+        # passer, pas un port de plus.
+        echo "Error: the agent goes through $URL/api/agent/ws (WebSocket). The tunnel or" >&2
+        echo "       reverse proxy in front of DumbMonit must forward WebSockets to it (Upgrade" >&2
+        echo "       and Connection headers, no buffering): see \"Agents behind a proxy\" in" >&2
+        echo "       the documentation." >&2
+        return 0
+    fi
     canal="$TLS_URL"
     if [ -z "$canal" ]; then
         hote="${URL#*://}"

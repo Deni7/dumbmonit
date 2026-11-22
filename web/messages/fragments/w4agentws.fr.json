@@ -1,0 +1,5 @@
+{
+	"deviceform_channelcheck_websocket_ok": "Les agents passent par l'adresse de l'interface {address} : leur canal chiffré (TLS 1.3, certificat client) voyage dans une WebSocket. Aucun autre port à ouvrir.",
+	"deviceform_channelcheck_websocket_title": "La WebSocket des agents ne répond pas à {address}",
+	"deviceform_channelcheck_websocket_body": "Cette adresse passe par un tunnel ou un mandataire inverse. Il doit transmettre les WebSockets à DumbMonit (en-têtes Upgrade et Connection, réponses sans mise en tampon, délai de lecture long) : voir « Agents derrière un mandataire » dans la documentation."
+}

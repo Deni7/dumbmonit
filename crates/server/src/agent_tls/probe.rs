@@ -8,6 +8,11 @@
 //! de main TLS jusqu'au bout et vérifie que c'est bien lui qui répond (son
 //! autorité épinglée dans la chaîne) ; aucune donnée n'est échangée, rien de
 //! secret n'est présenté.
+//!
+//! Quand la commande fait passer les agents par l'adresse de l'interface
+//! (WebSocket, derrière Cloudflare Tunnel ou un mandataire), c'est ce chemin-là
+//! qui est essayé ([`check_websocket`]) : la même poignée de main, à travers
+//! l'intermédiaire.
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -42,6 +47,9 @@ pub enum Outcome {
     Tls,
     /// Un autre service répond en TLS sur ce port (autre autorité).
     Foreign,
+    /// L'adresse de l'interface répond en HTTP, mais pas la WebSocket des
+    /// agents : le tunnel ou le mandataire ne la transmet pas.
+    NoWebsocket,
 }
 
 /// Vérificateur qui accepte tout et retient la chaîne présentée : la
@@ -109,6 +117,71 @@ pub async fn check(host: &str, port: u16, pins: &[String]) -> Outcome {
         Ok(Err(_)) => return Outcome::Refused,
         Err(_) => return Outcome::Timeout,
     };
+    identify(tcp, pins).await
+}
+
+/// Ouvre la WebSocket des agents à l'adresse de l'interface (`base_url`),
+/// comme le ferait un agent passé par Cloudflare Tunnel ou un mandataire, et
+/// dit ce qui répond au bout : la poignée de main TLS du canal est menée à
+/// travers elle. Le certificat de l'intermédiaire n'est pas vérifié — rien de
+/// secret n'est envoyé, et c'est l'autorité épinglée, à l'intérieur, qui dit
+/// si c'est bien ce serveur.
+pub async fn check_websocket(base_url: &str, pins: &[String]) -> Outcome {
+    use tokio_tungstenite::tungstenite::handshake::{client::generate_key, derive_accept_key};
+
+    let Ok(http) = reqwest::Client::builder()
+        .http1_only()
+        .tls_danger_accept_invalid_certs(true)
+        .redirect(reqwest::redirect::Policy::none())
+        .connect_timeout(STEP_TIMEOUT)
+        .timeout(2 * STEP_TIMEOUT)
+        .build()
+    else {
+        return Outcome::Tls;
+    };
+    let key = generate_key();
+    let sent = http
+        .get(super::websocket::url_for(base_url))
+        .header(reqwest::header::CONNECTION, "Upgrade")
+        .header(reqwest::header::UPGRADE, "websocket")
+        .header(reqwest::header::SEC_WEBSOCKET_VERSION, "13")
+        .header(reqwest::header::SEC_WEBSOCKET_KEY, key.as_str())
+        .header(reqwest::header::SEC_WEBSOCKET_PROTOCOL, dumbmonit_proto::AGENT_WS_PROTOCOL)
+        .send()
+        .await;
+    let response = match sent {
+        Ok(response) => response,
+        Err(error) if error.is_timeout() => return Outcome::Timeout,
+        Err(error) if error.is_dns() => return Outcome::Dns,
+        Err(error) if error.is_connect() => return Outcome::Refused,
+        Err(_) => return Outcome::Tls,
+    };
+    let accept = response
+        .headers()
+        .get(reqwest::header::SEC_WEBSOCKET_ACCEPT)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_string);
+    if response.status() != reqwest::StatusCode::SWITCHING_PROTOCOLS
+        || accept.as_deref() != Some(derive_accept_key(key.as_bytes()).as_str())
+    {
+        return Outcome::NoWebsocket;
+    }
+    let Ok(upgraded) = response.upgrade().await else { return Outcome::NoWebsocket };
+    let ws = tokio_tungstenite::WebSocketStream::from_raw_socket(
+        upgraded,
+        tokio_tungstenite::tungstenite::protocol::Role::Client,
+        Some(super::websocket::config()),
+    )
+    .await;
+    identify(super::WsIo::new(ws), pins).await
+}
+
+/// Poignée de main TLS du canal sur un transport déjà ouvert, sans certificat
+/// client : ce serveur (son autorité dans la chaîne), un autre, ou rien.
+async fn identify<T>(transport: T, pins: &[String]) -> Outcome
+where
+    T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
     let provider = super::provider();
     let capture = Arc::new(Capture { chain: Mutex::new(Vec::new()), provider: provider.clone() });
     let Ok(builder) = ClientConfig::builder_with_provider(provider)
@@ -120,7 +193,7 @@ pub async fn check(host: &str, port: u16, pins: &[String]) -> Outcome {
         builder.dangerous().with_custom_certificate_verifier(capture.clone()).with_no_client_auth();
     let Ok(name) = ServerName::try_from(AGENT_TLS_SERVER_NAME) else { return Outcome::Tls };
     let connector = TlsConnector::from(Arc::new(config));
-    match tokio::time::timeout(STEP_TIMEOUT, connector.connect(name, tcp)).await {
+    match tokio::time::timeout(STEP_TIMEOUT, connector.connect(name, transport)).await {
         Ok(Ok(_tls)) => {}
         Ok(Err(_)) => return Outcome::Tls,
         Err(_) => return Outcome::Timeout,
@@ -158,6 +231,32 @@ mod tests {
             }
         });
         assert_eq!(check("127.0.0.1", port, &["x".into()]).await, Outcome::Tls);
+    }
+
+    #[tokio::test]
+    async fn an_address_that_does_not_carry_the_agent_websocket_says_so() {
+        // Un service HTTP ordinaire : il répond, mais ne met rien à niveau.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            while let Ok((mut socket, _)) = listener.accept().await {
+                let mut request = [0u8; 2048];
+                let _ = socket.read(&mut request).await;
+                let _ = socket
+                    .write_all(b"HTTP/1.1 404 Not Found\r\ncontent-length: 0\r\n\r\n")
+                    .await;
+            }
+        });
+        let base = format!("http://127.0.0.1:{port}");
+        assert_eq!(check_websocket(&base, &["x".into()]).await, Outcome::NoWebsocket);
+        // Rien n'écoute plus : refusé.
+        let closed = {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            listener.local_addr().unwrap().port()
+        };
+        let base = format!("http://127.0.0.1:{closed}");
+        assert_eq!(check_websocket(&base, &["x".into()]).await, Outcome::Refused);
     }
 
     #[tokio::test]

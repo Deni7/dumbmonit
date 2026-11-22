@@ -95,9 +95,9 @@ mod tests {
     /// Routes que la spécification ne décrit volontairement pas :
     ///
     /// - le protocole des agents (`/api/ingest`, `/api/agent/commands*`,
-    ///   `/api/agent/relay*`) : un échange entre le binaire de l'agent et le
-    ///   serveur, authentifié par un jeton d'enregistrement, que nul client n'a
-    ///   à appeler ;
+    ///   `/api/agent/relay*`, la WebSocket `/api/agent/ws`) : un échange entre
+    ///   le binaire de l'agent et le serveur, authentifié par un jeton
+    ///   d'enregistrement ou un certificat, que nul client n'a à appeler ;
     /// - les redirections de la connexion OIDC (`/api/auth/oidc/start` et
     ///   `/callback`) et SAML (`/api/auth/saml/start`, `/acs`, `/complete`), et
     ///   le retour de Spotify (`/api/music/spotify/callback`) :
@@ -116,6 +116,7 @@ mod tests {
         "/api/agent/relay/plan",
         "/api/agent/relay/backlog",
         "/api/agent/update/download/{name}",
+        "/api/agent/ws",
         "/api/auth/oidc/start",
         "/api/auth/oidc/callback",
         "/api/auth/saml/start",

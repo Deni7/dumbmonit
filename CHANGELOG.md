@@ -560,6 +560,23 @@ All notable changes to this project are documented here. The format follows
   falls back to one tunnel per connection (retried hourly); an older relay keeps opening tunnels,
   which the server still serves; the server offers HTTP/2 only to clients that announce the agent
   protocol, so installers and older agents still get HTTP/1.1.
+- **Agents through Cloudflare Tunnel, reverse proxies and corporate proxies.** When the agent port
+  cannot be reached, agents go through the web address: they open a WebSocket to `/api/agent/ws`
+  and carry their usual TLS session inside it (TLS 1.3, client certificate, pinned authority, end
+  to end). The proxy only sees opaque binary messages, and its own certificate proves nothing about
+  the agent. `transport:` in `agent.yaml` (`DUMBMONIT_AGENT_TRANSPORT`, `--transport` /
+  `-Transport` in the installers): `auto` (default) tries the agent port first, switches to the
+  WebSocket after repeated connection failures if it answers, and remembers it; `direct` and
+  `websocket` force one. A relay can use it too: its multiplexed connection goes through the same
+  WebSocket. The route is no way around the channel: nothing passes without a complete handshake
+  inside, a session without a client certificate only reaches enrolment and is closed after a
+  minute, install files are not served there, requests carrying an `Origin` header or the session
+  cookie are refused, and connections per address (`DUMBMONIT_AGENT_WS_MAX_PER_IP`), incoming rate
+  (`DUMBMONIT_AGENT_WS_RATE_KIB`), message size and idle time are bounded; `DUMBMONIT_AGENT_WEBSOCKET=off`
+  closes it. Opened through a tunnel or proxy that presents another certificate, the add screen
+  shows a command with `--transport=websocket` and checks the channel through the WebSocket
+  (`transport=websocket` in `GET /api/agent/install` and token creation). New page: Agents behind a
+  proxy, with Cloudflare Tunnel, nginx, Traefik and Caddy settings.
 
 
 - **authentik 2025.10 and later: workers and tasks are measured again.** authentik moved them to

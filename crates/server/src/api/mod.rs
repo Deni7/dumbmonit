@@ -451,6 +451,11 @@ pub fn router_with_hubs(
         // les sert derrière un certificat client : ici, c'est l'ancien canal,
         // refusé quand l'administrateur exige mTLS.
         .merge(agent_routes(&state))
+        // Canal des agents par WebSocket (Cloudflare Tunnel, mandataire inverse
+        // qui termine TLS) : rien n'y est authentifié par la session ni par le
+        // jeton — c'est la session TLS de l'agent, à l'intérieur, qui l'est
+        // (`agent_tls::websocket`). Aucun cookie lu, aucune origine acceptée.
+        .route("/agent/ws", get(crate::agent_tls::websocket::upgrade))
         // Pages de statut publiques : lecture seule, sans session, par conception.
         .merge(status_pages::public_routes())
         // Calendriers iCal des maintenances : par page, ou privé avec jeton (`ical.rs`).

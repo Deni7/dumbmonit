@@ -1,0 +1,5 @@
+{
+	"deviceform_channelcheck_websocket_ok": "Агенты подключаются через адрес интерфейса {address}: их зашифрованный канал (TLS 1.3, клиентский сертификат) идёт внутри WebSocket. Открывать другие порты не нужно.",
+	"deviceform_channelcheck_websocket_title": "WebSocket агентов не отвечает по адресу {address}",
+	"deviceform_channelcheck_websocket_body": "Этот адрес проходит через туннель или обратный прокси. Он должен пересылать WebSocket в DumbMonit (заголовки Upgrade и Connection, без буферизации ответов, длинный тайм-аут чтения): см. «Агенты за прокси» в документации."
+}

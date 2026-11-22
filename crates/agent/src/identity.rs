@@ -178,6 +178,7 @@ mod tests {
             server_pin: None,
             plain_server_url: false,
             fallback_servers: Vec::new(),
+            transport: crate::ws::TransportMode::Auto,
             log_level: tracing::Level::INFO,
             proxy: crate::proxy::ProxyConfig::default(),
             deprecated_env: Vec::new(),

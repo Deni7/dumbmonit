@@ -19,6 +19,10 @@
 //! travers lui : leur commande vise `https://relais:8443`, la passerelle du
 //! relais la porte jusqu'ici, et la session TLS (épinglée par la commande) va
 //! de la machine au serveur — le relais ne voit que du chiffré.
+//!
+//! Les connexions arrivées par la WebSocket de l'interface
+//! ([`super::websocket`]) sont servies ici aussi, à une différence près : les
+//! fichiers d'installation n'y sont pas servis.
 
 use std::net::SocketAddr;
 use std::time::Instant;
@@ -264,7 +268,14 @@ async fn open_tunnel(
 /// demande, comme sur le port de l'interface : rien n'y est secret (le jeton
 /// voyage dans les arguments de la commande, jamais dans l'URL). À travers le
 /// tunnel d'un relais, seulement si celui-ci l'est encore. `None` : servi.
+///
+/// Jamais par la WebSocket de l'interface : la même adresse les sert déjà
+/// en HTTPS ordinaire, et une session sans certificat n'y a droit qu'à
+/// l'enrôlement.
 async fn site_files_refused(state: &AppState, peer: Option<&AgentPeer>) -> Option<Response> {
+    if peer.is_some_and(|peer| peer.via_websocket) {
+        return Some(error(StatusCode::NOT_FOUND, "Not found."));
+    }
     let relay = peer.and_then(|peer| peer.via_relay)?;
     match is_relay(state, relay).await {
         Ok(true) => None,

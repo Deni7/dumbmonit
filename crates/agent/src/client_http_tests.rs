@@ -2,7 +2,7 @@
 //! liaison, corps) et la façon dont chaque statut de réponse est qualifié.
 
 use super::*;
-use crate::testsupport::fake_http;
+use crate::testsupport::{Req, Resp, fake_channel, fake_http};
 use dumbmonit_proto::{AgentIdentity, CommandStatus};
 
 fn batch() -> PushBatch {
@@ -264,4 +264,93 @@ async fn the_encrypted_channel_crosses_an_http_proxy_by_connect_end_to_end() {
     assert!(head.to_lowercase().contains(&expected), "identifiants absents : {head}");
     assert_eq!(first, 0x16, "un ClientHello TLS, pas du HTTP en clair");
     assert!(!head.contains("/api/ingest") && !head.contains("dmon_jeton"), "{head}");
+}
+
+// ------------------------------------------- transport WebSocket (`ws.rs`)
+
+/// Port local fermé : rien n'y répond.
+fn closed_port() -> u16 {
+    std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port()
+}
+
+/// Client du canal chiffré dont le port des agents est fermé et dont
+/// l'interface (`server`) porte la WebSocket des agents.
+fn client_behind(server: std::net::SocketAddr, pin: &str, mode: TransportMode) -> PushClient {
+    let interface = format!("http://{server}");
+    let client = client(&interface, None);
+    let ws_url = crate::ws::websocket_url(&interface);
+    client.set_transport(mode, ws_url, None).expect("transport");
+    client.set_pins(vec![pin.to_string()]);
+    client.use_tls(&format!("https://127.0.0.1:{}", closed_port()), None).expect("canal chiffré");
+    client
+}
+
+/// Le faux canal accepte les lots, et rien d'autre.
+fn ingest_only(request: &Req) -> Resp {
+    match (request.method.as_str(), request.path.as_str()) {
+        ("POST", "/api/ingest") => (200, ACK.to_string()),
+        _ => (404, String::new()),
+    }
+}
+
+/// Le faux canal délivre un certificat, et rien d'autre.
+fn enrolment_only(request: &Req) -> Resp {
+    match request.path.as_str() {
+        "/api/agent/tls/enroll" => {
+            (200, r#"{"certificate":"AAAA","not_after_ms":4102444800000,"pins":[]}"#.into())
+        }
+        _ => (404, String::new()),
+    }
+}
+
+#[tokio::test]
+async fn in_auto_mode_the_websocket_takes_over_when_the_agent_port_is_unreachable() {
+    let (server, pin, calls) = fake_channel(ingest_only).await;
+    let client = client_behind(server, &pin, TransportMode::Auto);
+    assert_eq!(client.route(), Route::Direct, "le port des agents d'abord");
+
+    // Deux échecs de connexion au port des agents, et rien de plus.
+    for _ in 0..2 {
+        assert!(matches!(client.send(&batch()).await, Err(PushError::Transport(_))));
+    }
+    assert!(calls.all().is_empty());
+    assert_eq!(client.reconsider_route(3).await, None, "pas encore assez d'échecs");
+
+    // L'essai de la WebSocket répond (la poignée de main TLS à l'intérieur,
+    // sous l'autorité épinglée) : l'agent l'adopte, et le lot passe.
+    assert_eq!(client.reconsider_route(2).await, Some(Route::WebSocket));
+    assert_eq!(client.route(), Route::WebSocket);
+    let ack = client.send(&batch()).await.expect("lot accepté par la WebSocket");
+    assert_eq!(ack.target_id, 12);
+    assert_eq!(calls.count("POST", "/api/ingest"), 1);
+    let request = calls.all().into_iter().find(|r| r.path == "/api/ingest").unwrap();
+    assert_eq!(request.header("authorization"), Some("Bearer dmon_jeton"));
+    assert!(client.describe_transport().starts_with("websocket ws://127.0.0.1:"));
+}
+
+#[tokio::test]
+async fn a_websocket_agent_enrols_through_the_interface_and_never_dials_the_agent_port() {
+    let (server, pin, calls) = fake_channel(enrolment_only).await;
+    let client = client_behind(server, &pin, TransportMode::WebSocket);
+    assert_eq!(client.route(), Route::WebSocket, "imposé : la WebSocket d'emblée");
+    let request = TlsEnrolRequest { identity: batch().identity, public_key: "Zm9v".into() };
+    // L'URL du port des agents (fermé) n'est que l'étiquette du canal.
+    let closed = format!("https://127.0.0.1:{}", closed_port());
+    let issued = client.enrol(&closed, &request).await.expect("enrôlé par la WebSocket");
+    assert_eq!(issued.certificate, "AAAA");
+    let enrolment = &calls.all()[0];
+    assert_eq!(enrolment.path, "/api/agent/tls/enroll");
+    assert_eq!(enrolment.header("authorization"), Some("Bearer dmon_jeton"));
+}
+
+#[tokio::test]
+async fn an_unreachable_websocket_says_why_instead_of_a_broken_handshake() {
+    // Rien n'écoute à l'adresse de l'interface : l'erreur dit la WebSocket.
+    let nowhere: std::net::SocketAddr = format!("127.0.0.1:{}", closed_port()).parse().unwrap();
+    let client = client_behind(nowhere, &"a".repeat(64), TransportMode::WebSocket);
+    let error = client.send(&batch()).await.expect_err("injoignable");
+    let message = error.to_string();
+    assert!(message.contains("agent websocket ws://127.0.0.1:"), "{message}");
+    assert!(message.contains("cannot connect"), "{message}");
+    assert!(!message.contains("dmon_jeton"), "{message}");
 }

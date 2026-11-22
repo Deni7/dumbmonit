@@ -1391,7 +1391,7 @@ export interface PortsView {
 }
 
 /** `POST /api/agent/tls/check`: is the encrypted agent channel reachable where agents will dial? */
-export type AgentChannelOutcome = 'ok' | 'dns' | 'refused' | 'timeout' | 'tls' | 'foreign';
+export type AgentChannelOutcome = 'ok' | 'dns' | 'refused' | 'timeout' | 'tls' | 'foreign' | 'no_websocket';
 export interface AgentChannelCheck {
 	enabled: boolean;
 	url: string | null;
@@ -1415,6 +1415,12 @@ export interface AgentChannelCheck {
 		/** What failed, as the relay reports it (English). */
 		check_error?: string | null;
 	} | null;
+	/**
+	 * `websocket`: agents reach their channel through the web address (Cloudflare
+	 * Tunnel, a reverse proxy that terminates TLS); `url`, `host` and `port` are
+	 * those of the agent WebSocket, and the check went through it.
+	 */
+	transport?: 'websocket' | null;
 }
 
 export interface CreateUserPayload {
@@ -1795,6 +1801,11 @@ export interface AgentTokenPayload {
 	relay_host?: string | null;
 	/** Commands that use the agent port only (a remote site). Always on for a relay token. */
 	agent_port_only?: boolean;
+	/**
+	 * Transport of the encrypted channel in the commands. `auto` (default): the
+	 * WebSocket through the web address when the server sees a proxy in front.
+	 */
+	transport?: 'auto' | 'websocket' | 'direct';
 }
 
 /** A machine enrolled with a token. `GET /api/agent/tokens/{id}/machines`. */
@@ -1816,6 +1827,8 @@ export interface CreatedAgentToken extends AgentToken {
 	install_windows: string;
 	/** Origin of the `--pinned-key` in the commands, when the server probed the opened address. */
 	pin_source?: 'own' | 'proxy' | 'trusted' | null;
+	/** `websocket`: the commands send the agent through the web address (`--transport=websocket`). */
+	transport?: 'websocket' | null;
 }
 
 /** Channel an agent last reported through. Mirrors `AgentChannel` in `crates/server/src/api/agent_tls.rs`. */

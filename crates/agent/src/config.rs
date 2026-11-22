@@ -96,6 +96,7 @@ struct FileConfig {
     tls_url: Option<String>,
     ca_pin: Option<String>,
     server_pin: Option<String>,
+    transport: Option<String>,
     interval_secs: Option<u64>,
     hostname: Option<String>,
     services: Option<Vec<String>>,
@@ -346,6 +347,10 @@ pub struct Config {
     /// qu'elle répond (voir `failover.rs`). Vide : un seul serveur, rien ne
     /// change.
     pub fallback_servers: Vec<ServerEndpoint>,
+    /// Transport du canal chiffré (`transport`, `DUMBMONIT_AGENT_TRANSPORT`) :
+    /// `auto` (défaut : le port des agents, puis la WebSocket de l'interface
+    /// s'il est injoignable), `direct` ou `websocket` (voir `ws.rs`).
+    pub transport: crate::ws::TransportMode,
     pub interval: Duration,
     /// Nom d'hôte annoncé au serveur. `None` : celui que le système déclare.
     pub hostname: Option<String>,
@@ -441,6 +446,7 @@ impl fmt::Debug for Config {
             .field("server_pin", &self.server_pin)
             .field("plain_server_url", &self.plain_server_url)
             .field("fallback_servers", &self.fallback_servers)
+            .field("transport", &self.transport)
             .field("interval", &self.interval)
             .field("hostname", &self.hostname)
             .field("services", &self.services)
@@ -664,6 +670,17 @@ impl Config {
                 Some(pin)
             }
             _ => None,
+        };
+
+        let transport = match env
+            .get("DUMBMONIT_AGENT_TRANSPORT")
+            .filter(|raw| !raw.trim().is_empty())
+            .or(file.transport)
+        {
+            Some(raw) => crate::ws::TransportMode::parse(&raw).with_context(|| {
+                format!("transport: auto, direct or websocket is expected, got '{raw}'")
+            })?,
+            None => crate::ws::TransportMode::Auto,
         };
 
         let interval_secs = match env.get("DUMBMONIT_AGENT_INTERVAL_SECS") {
@@ -1020,6 +1037,7 @@ impl Config {
             server_pin,
             plain_server_url,
             fallback_servers,
+            transport,
             interval: Duration::from_secs(interval_secs),
             hostname: env
                 .get("DUMBMONIT_AGENT_HOSTNAME")
@@ -2234,6 +2252,27 @@ system_health:
         assert_eq!(url.password.as_deref(), Some("p@ss"));
         assert!(Config::merge(from_yaml("proxy: https://proxy.corp:3128\n"), env(&[])).is_err());
         assert!(Config::merge(from_yaml("proxy: proxy.corp:3128\n"), env(&[])).is_err());
+    }
+
+    #[test]
+    fn the_channel_transport_comes_from_the_file_or_the_environment() {
+        use crate::ws::TransportMode;
+        // Rien : le port des agents d'abord, la WebSocket s'il est injoignable.
+        let config = Config::merge(file_with_url_and_token(), env(&[])).unwrap();
+        assert_eq!(config.transport, TransportMode::Auto);
+
+        let config = Config::merge(from_yaml("transport: websocket\n"), env(&[])).unwrap();
+        assert_eq!(config.transport, TransportMode::WebSocket);
+        // La variable prime ; vide (docker-compose.agent.yml), elle laisse le
+        // fichier décider.
+        let vars = env(&[("DUMBMONIT_AGENT_TRANSPORT", "direct")]);
+        let config = Config::merge(from_yaml("transport: websocket\n"), vars).unwrap();
+        assert_eq!(config.transport, TransportMode::Direct);
+        let vars = env(&[("DUMBMONIT_AGENT_TRANSPORT", "")]);
+        let config = Config::merge(from_yaml("transport: websocket\n"), vars).unwrap();
+        assert_eq!(config.transport, TransportMode::WebSocket);
+        // Une faute de frappe se voit au démarrage.
+        assert!(Config::merge(from_yaml("transport: tcp\n"), env(&[])).is_err());
     }
 
     #[test]

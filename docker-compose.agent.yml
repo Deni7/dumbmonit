@@ -20,6 +20,10 @@ services:
       # as the install command shows them. Behind a relay, the relay's gateway.
       DUMBMONIT_AGENT_TLS_URL: ${DUMBMONIT_AGENT_TLS_URL:-}
       DUMBMONIT_AGENT_CA_PIN: ${DUMBMONIT_AGENT_CA_PIN:-}
+      # How that channel is reached: auto (the agent port, then the server URL),
+      # direct, or websocket (through the server URL, behind Cloudflare Tunnel
+      # or a reverse proxy; the agent's own TLS goes inside a WebSocket).
+      DUMBMONIT_AGENT_TRANSPORT: ${DUMBMONIT_AGENT_TRANSPORT:-}
       # The name shown in DumbMonit (a container's own hostname is random).
       DUMBMONIT_AGENT_HOSTNAME: ${DUMBMONIT_AGENT_HOSTNAME:-}
       # true = also run the probes of the devices assigned to this agent.

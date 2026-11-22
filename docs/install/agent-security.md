@@ -281,6 +281,14 @@ tunnel through it and its TLS session stays end to end, client certificate and
 pinning included; a proxy that intercepts TLS is refused. See
 [Outbound proxy](../devices/agent.md#outbound-proxy).
 
+When only the web address is reachable (Cloudflare Tunnel, a reverse proxy that
+terminates TLS, a network where only web traffic goes out), the agent opens a
+WebSocket to `/api/agent/ws` on that address and carries the same TLS session
+inside it. The proxy terminates its own TLS and sees opaque messages; the
+agent's client certificate and the pinned authority still go end to end, and
+without a valid handshake inside, nothing reaches a route. See
+[Agents behind a proxy](agents-behind-proxy.md).
+
 ## Rotating the certificate authority
 
 In **Settings → Agents → Agent channel → Certificate authority rotation**:

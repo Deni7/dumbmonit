@@ -7,7 +7,8 @@
 # Un test de dérive compare les routes déclarées dans `crates/server/src/api/**`
 # à ce fichier : toute route ajoutée au routeur doit l'être ici, avec ses méthodes
 # exactes. Seules en sont exclues, volontairement, les routes du protocole des
-# agents (`/api/ingest`, `/api/agent/commands*`, `/api/agent/relay*`), les
+# agents (`/api/ingest`, `/api/agent/commands*`, `/api/agent/relay*`, la
+# WebSocket `/api/agent/ws`), les
 # redirections du navigateur pour OpenID Connect (`/api/auth/oidc/start`,
 # `/api/auth/oidc/callback`) et SAML (`/api/auth/saml/start`, `/acs`,
 # `/complete`), et la distribution de l'agent (`/install.sh`,
@@ -6044,6 +6045,11 @@ paths:
           required: false
           schema: { type: boolean, default: false }
           description: "Commands that use the agent port only (a remote site): the install scripts and binaries are read on the agent port, pinned by the key of its certificate, next to the encrypted channel."
+        - name: transport
+          in: query
+          required: false
+          schema: { type: string, enum: [auto, websocket, direct], default: auto }
+          description: "Transport of the encrypted channel in the commands; see `transport` of the token creation."
       responses:
         "200":
           description: Install parameters.
@@ -6159,7 +6165,11 @@ paths:
         command will carry (from `base_url`), completes the TLS 1.3 handshake
         and checks that the certificate chain is its own. Through a relay
         (`relay_id`), nothing is dialled: the answer says whether the relay
-        reports that its gateway listens. Nothing secret is sent.
+        reports that its gateway listens. When the command sends agents through
+        the web address (`transport: websocket`, behind Cloudflare Tunnel or a
+        reverse proxy that terminates TLS), the server opens the agent
+        WebSocket at that address instead and completes the same handshake
+        inside it. Nothing secret is sent.
       security: [{ cookieAuth: [] }]
       x-token-scope: none
       requestBody:
@@ -6172,6 +6182,10 @@ paths:
                 base_url: { type: string, description: "Address machines reach the web interface at." }
                 relay_id: { type: integer }
                 relay_host: { type: [string, "null"] }
+                transport:
+                  type: string
+                  enum: [auto, websocket, direct]
+                  description: Transport the install command uses (default auto).
       responses:
         "200":
           description: What answered.
@@ -6187,7 +6201,7 @@ paths:
                   listen_port: { type: [integer, "null"], description: "Listen port inside the container." }
                   outcome:
                     type: [string, "null"]
-                    enum: [ok, dns, refused, timeout, tls, foreign, null]
+                    enum: [ok, dns, refused, timeout, tls, foreign, no_websocket, null]
                   relay:
                     type: [object, "null"]
                     properties:
@@ -6199,6 +6213,10 @@ paths:
                       self_check: { type: boolean, description: The relay tests its own gateway (up-to-date agent). }
                       reachable: { type: [boolean, "null"], description: "Outcome of the relay's last test of its gateway at this address; null: not tested there yet." }
                       check_error: { type: [string, "null"] }
+                  transport:
+                    type: [string, "null"]
+                    enum: [websocket, null]
+                    description: "websocket: agents go through the web address; url, host and port are those of the agent WebSocket."
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
@@ -12779,6 +12797,10 @@ components:
             - type: "null"
             - $ref: "#/components/schemas/RelayRoute"
         open_gateway: { type: boolean, description: "The installed machine will be a relay: the commands carry `--open-gateway` / `-OpenGateway`, and the installer opens the gateway port on the local firewall, to the local subnet only." }
+        transport:
+          type: [string, "null"]
+          enum: [websocket, null]
+          description: "`websocket`: the commands carry `--transport=websocket` / `-Transport websocket`, and the agent reaches its encrypted channel through the web address (`GET /api/agent/ws`), its TLS session inside a WebSocket. `null`: nothing set; the agent tries the agent port first, then the WebSocket."
     RelayRoute:
       type: object
       required: [relay_id, relay_name, host, port, listening]
@@ -13001,6 +13023,11 @@ components:
         relay_id: { type: [integer, "null"], format: int64, description: "Install through this relay agent (a site behind a firewall): the commands point at its gateway, which the server asks the relay to open. The relay must belong to the same client." }
         relay_host: { type: [string, "null"], maxLength: 253, description: Address the site reaches the relay at (host name or IP, no scheme or port). }
         agent_port_only: { type: boolean, default: false, description: "Commands that use the agent port only (a remote site). Always on for a relay token." }
+        transport:
+          type: string
+          enum: [auto, websocket, direct]
+          default: auto
+          description: "Transport of the encrypted channel in the commands. `websocket`: through the web address (Cloudflare Tunnel, a reverse proxy that terminates TLS), the agent's TLS inside a WebSocket. `auto`: `websocket` when the browser address is served by another certificate than DumbMonit's and no dedicated agent address is set."
     CreatedAgentToken:
       allOf:
         - $ref: "#/components/schemas/AgentToken"
@@ -13014,6 +13041,10 @@ components:
               type: [string, "null"]
               enum: [own, proxy, trusted, null]
               description: Where the pin in the commands comes from; see `pin_source` of the install parameters.
+            transport:
+              type: [string, "null"]
+              enum: [websocket, null]
+              description: Transport the commands set; see `transport` of the install parameters.
     AgentAdKitCreate:
       type: object
       required: [domain]

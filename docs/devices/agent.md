@@ -433,6 +433,7 @@ Windows) in place of its other flags does the same.
 | `--pinned-key=sha256//…` | `-PinnedKey` | Public key of the server's self-signed certificate. The download of the script and of the binary is accepted from that key only, and the agent keeps it. Included in the command DumbMonit shows when the server uses its own certificate. |
 | `--tls-url=URL` | `-TlsUrl` | Address of the encrypted agent channel (default: the host of `--url`, port 8443). |
 | `--ca-pin=SHA256` | `-CaPin` | Fingerprint of the server's certificate authority: the agent then only talks to that server, never in clear. |
+| `--transport=MODE` | `-Transport` | How the agent reaches its encrypted channel: `auto` (default: the agent port, then the server URL if that port is unreachable), `direct` or `websocket` (through the server URL, behind Cloudflare Tunnel or a reverse proxy). Written to `agent.yaml` as `transport`; the command shown through a proxy carries `websocket`. See [Agents behind a proxy](../install/agents-behind-proxy.md). |
 | `--hostname=NAME` | `-HostName` | Name announced to the server (default: the machine's). |
 | `--modules=a,b` | `-Modules a,b` | Optional modules to run — see [Choosing the modules](#choosing-the-modules). Without it, every module detects itself; `none` keeps system metrics only. The install command shown by DumbMonit adds it when you tick modules. |
 | `--plakar-klosets=a,b` | | Plakar klosets to read (`@name` or a path); default: every kloset found. |
@@ -1088,6 +1089,12 @@ netsh winhttp import proxy source=ie   # or copy the Internet Explorer settings
 
 The agent logs the proxy it uses at startup (`outbound proxy to the server`),
 never its credentials.
+
+A proxy that only lets web traffic out, or inspects TLS, cannot carry the agent
+port: set `transport: websocket` (or keep `auto`) and the agent goes through
+the server URL instead, its TLS session inside a WebSocket that the proxy
+forwards like any HTTPS request. See
+[Agents behind a proxy](../install/agents-behind-proxy.md).
 
 ## Run the agent in Docker / on another network
 

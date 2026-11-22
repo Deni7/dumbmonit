@@ -81,6 +81,7 @@ nav:
       - Add your first monitor: install/first-device.md
       - Monitor a remote site: install/remote-site.md
       - Agent channel security: install/agent-security.md
+      - Agents behind a proxy: install/agents-behind-proxy.md
       - Backup and restore: install/backup.md
       - High availability: install/high-availability.md
       - Watching DumbMonit itself: install/self-monitoring.md

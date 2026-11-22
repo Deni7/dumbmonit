@@ -51,6 +51,10 @@ use crate::tls::TlsState;
 /// canal chiffré, après un échec.
 const TLS_RETRY: Duration = Duration::from_secs(60);
 
+/// Échecs de connexion d'affilée au canal chiffré avant d'essayer l'autre
+/// transport (`transport: auto`) : port des agents ou WebSocket de l'interface.
+const TRANSPORT_FALLBACK_AFTER: u32 = 2;
+
 /// Période de l'essai de la passerelle par le relais, une fois ouverte et
 /// essayée : un pare-feu, une publication de port ou une adresse peuvent
 /// changer sans que rien ne le dise à l'agent.
@@ -256,12 +260,20 @@ impl Agent {
         if let Some(pin) = &config.server_pin {
             client.pin_server(pin).context("pinning the server key")?;
         }
+        // Transport du canal chiffré : la WebSocket vit à l'adresse de
+        // l'interface, jamais en clair hors de la boucle locale.
+        let plain = config.plain_server_url;
+        let ws_url = crate::ws::websocket_url(&config.server_url).filter(|_| !plain);
+        client
+            .set_transport(config.transport, ws_url, config.server_pin.as_deref())
+            .context("preparing the WebSocket transport")?;
         let tls_path = crate::tls::beside(&config.secret_path);
         let mut tls = initial_tls(&config, TlsState::load(&tls_path));
         if config.plain_server_url {
             plain_url_channel(&config.server_url, tls.as_mut())?;
         }
         if let Some(state) = &tls {
+            client.remember_route(state.transport);
             client.set_pins(state.pins.clone());
             if let Some(identity) = state.identity() {
                 client
@@ -509,7 +521,15 @@ impl Agent {
         let samples = self.collect().await;
         let count = samples.len();
         self.buffer.push(samples);
-        match self.flush().await {
+        let mut outcome = self.flush().await;
+        // Vérification d'installation : le port des agents injoignable, la
+        // WebSocket de l'interface est essayée tout de suite (`transport: auto`).
+        if matches!(outcome, FlushOutcome::Failed(PushError::Transport(_)))
+            && self.consider_transport(1).await
+        {
+            outcome = self.flush().await;
+        }
+        match outcome {
             FlushOutcome::Sent { .. } => {
                 info!(samples = count, "batch sent");
                 self.commands.poll().await;
@@ -524,6 +544,7 @@ impl Agent {
     pub async fn run(mut self, mut shutdown: Shutdown) -> Result<()> {
         info!(
             server = self.client.url(),
+            transport = self.client.describe_transport(),
             host = self.identity.hostname,
             period_s = self.interval.as_secs(),
             "agent started"
@@ -620,7 +641,14 @@ impl Agent {
                             // La panne commence peut-être : ce qui attend passe
                             // sur le disque, et la suite y ira au fil de l'eau.
                             self.buffer.spill();
-                            Instant::now() + delay
+                            let unreachable = matches!(error, PushError::Transport(_));
+                            if unreachable
+                                && self.consider_transport(TRANSPORT_FALLBACK_AFTER).await
+                            {
+                                Instant::now()
+                            } else {
+                                Instant::now() + delay
+                            }
                         }
                     };
                 }
@@ -1191,6 +1219,7 @@ impl Agent {
             state.pins = issued.pins;
         }
         state.locked = true;
+        state.transport = Some(self.client.route());
         self.client.set_pins(state.pins.clone());
         if let Err(error) = state.save(&self.tls_path) {
             // Gardé en mémoire : l'agent marche, mais se réenrôlera au prochain
@@ -1223,6 +1252,26 @@ impl Agent {
             warn!(error = %format!("{error:#}"), "cannot reset the encrypted agent channel");
         }
         self.tls_retry_at = None;
+    }
+
+    /// `transport: auto` : après des échecs de connexion au canal chiffré,
+    /// essaie l'autre transport (port des agents ou WebSocket de l'interface)
+    /// et l'adopte s'il répond ; le choix est retenu dans `agent-tls.json`.
+    /// Vrai si l'agent vient d'en changer.
+    async fn consider_transport(&mut self, min_failures: u32) -> bool {
+        let Some(route) = self.client.reconsider_route(min_failures).await else { return false };
+        info!(transport = self.client.describe_transport(), "agent channel transport switched");
+        if let Some(state) = self.tls.as_mut() {
+            state.transport = Some(route);
+            if state.locked
+                && let Err(error) = state.save(&self.tls_path)
+            {
+                warn!(error = %format!("{error:#}"), "cannot store the encrypted channel state");
+            }
+        }
+        // L'enrôlement peut reprendre tout de suite, par le nouveau chemin.
+        self.tls_retry_at = None;
+        true
     }
 
     fn note_tls_failure(&mut self, what: &str, error: &PushError) {
@@ -1636,6 +1685,7 @@ mod tests {
             server_pin: None,
             plain_server_url: false,
             fallback_servers: Vec::new(),
+            transport: crate::ws::TransportMode::Auto,
             log_level: tracing::Level::INFO,
             proxy: crate::proxy::ProxyConfig::default(),
             deprecated_env: Vec::new(),
@@ -2030,6 +2080,55 @@ mod tests {
         state.certificate = Some(engine.encode(cert.der()));
         state.key = Some(engine.encode(key.serialize_der()));
         state
+    }
+
+    /// Le faux canal accepte les lots ; tout le reste (commandes…) est inconnu.
+    fn channel_ingest(request: &crate::testsupport::Req) -> crate::testsupport::Resp {
+        match (request.method.as_str(), request.path.as_str()) {
+            (_, "/api/ingest") => (200, ACK.to_string()),
+            // L'essai d'un transport : une réponse sans corps suffit.
+            ("HEAD", _) => (404, String::new()),
+            _ => (404, r#"{"error":"Not found."}"#.to_string()),
+        }
+    }
+
+    #[tokio::test]
+    async fn in_auto_mode_an_unreachable_agent_port_falls_back_to_the_websocket_and_keeps_it() {
+        use crate::ws::Route;
+
+        // Agent enrôlé dont le port des agents est fermé ; l'adresse de
+        // l'interface porte la WebSocket (Cloudflare Tunnel, mandataire).
+        let dir = tempfile::tempdir().unwrap();
+        let (server, pin, calls) = crate::testsupport::fake_channel(channel_ingest).await;
+        let tls_path = crate::tls::beside(&dir.path().join("agent-secret"));
+        let mut state = enrolled_state(&format!("https://127.0.0.1:{}", closed_port()));
+        state.pins = vec![pin];
+        state.not_after_ms = Some(i64::MAX);
+        state.locked = true;
+        state.save(&tls_path).unwrap();
+        let interface = format!("http://{server}");
+        let mut agent = agent_for(&interface, &dir);
+        assert_eq!(agent.client.route(), Route::Direct, "le port des agents d'abord");
+
+        // La vérification d'installation (`--once`) passe : la WebSocket a pris
+        // le relais, le lot est accepté à travers elle.
+        agent.run_once().await.expect("lot accepté par la WebSocket");
+        assert_eq!(agent.client.route(), Route::WebSocket);
+        assert_eq!(calls.count("POST", "/api/ingest"), 1);
+
+        // Retenu : au démarrage suivant, la WebSocket d'emblée.
+        assert_eq!(TlsState::load(&tls_path).unwrap().transport, Some(Route::WebSocket));
+        let restarted = agent_for(&interface, &dir);
+        assert_eq!(restarted.client.route(), Route::WebSocket);
+
+        // Imposé dans agent.yaml, `direct` ne bascule jamais.
+        let mut config = config();
+        config.server_url = interface;
+        config.secret_path = dir.path().join("agent-secret");
+        config.transport = crate::ws::TransportMode::Direct;
+        let direct = Agent::new(config).expect("agent");
+        assert_eq!(direct.client.route(), Route::Direct);
+        assert_eq!(direct.client.reconsider_route(1).await, None);
     }
 
     /// Agent installé avant le tout-HTTPS : `server_url` en clair, hors boucle.

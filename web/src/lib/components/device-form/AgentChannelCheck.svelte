@@ -7,6 +7,10 @@
 	 *   address (`POST /api/agent/tls/check`) and says what answered. An
 	 *   unpublished Docker port is the first cause of "the agent could not
 	 *   reach the server", so the fix is spelled out with the real ports.
+	 * - Through the web address (`transport: websocket`, behind Cloudflare
+	 *   Tunnel or a reverse proxy): the server opens the agent WebSocket there
+	 *   and completes the channel handshake inside it; no port to publish, the
+	 *   proxy must forward WebSockets.
 	 * - Through a relay: the server cannot see the site's network. The relay
 	 *   opens its gateway as soon as it is told (within seconds), then tests it
 	 *   itself at the site's address, as a machine of the site would, and
@@ -99,6 +103,9 @@
 		if (!result || result.relay || !outcome || outcome === 'ok') return null;
 		const p = String(result.port ?? 8443);
 		const host = result.host ?? '';
+		if (result.transport === 'websocket') {
+			return { title: m.deviceform_channelcheck_websocket_title({ address }), body: m.deviceform_channelcheck_websocket_body(), compose: false };
+		}
 		switch (outcome) {
 			case 'refused':
 				return { title: m.deviceform_channelcheck_refused_title({ port: p }), body: m.deviceform_channelcheck_refused_body({ address }), compose: true };
@@ -177,7 +184,7 @@
 	{:else if result?.outcome === 'ok'}
 		<p class="flex items-center gap-2 text-sm text-ink">
 			<Lock class="size-4 shrink-0 text-signal-ink" aria-hidden="true" />
-			{m.deviceform_channelcheck_ok({ address })}
+			{result?.transport === 'websocket' ? m.deviceform_channelcheck_websocket_ok({ address }) : m.deviceform_channelcheck_ok({ address })}
 		</p>
 	{/if}
 	{#if !ready && result?.relay}

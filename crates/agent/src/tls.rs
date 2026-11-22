@@ -67,6 +67,10 @@ pub struct TlsState {
     /// jamais en clair, même s'il doit se réenrôler.
     #[serde(default)]
     pub locked: bool,
+    /// Chemin qui a marché en dernier (`transport: auto`) : le port des agents
+    /// ou la WebSocket de l'interface (voir `ws.rs`). Repris au démarrage.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transport: Option<crate::ws::Route>,
 }
 
 /// La clé privée n'apparaît jamais dans une trace.
@@ -78,6 +82,7 @@ impl std::fmt::Debug for TlsState {
             .field("enrolled", &self.certificate.is_some())
             .field("not_after_ms", &self.not_after_ms)
             .field("locked", &self.locked)
+            .field("transport", &self.transport)
             .finish_non_exhaustive()
     }
 }

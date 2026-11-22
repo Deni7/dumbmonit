@@ -1,0 +1,5 @@
+{
+	"deviceform_channelcheck_websocket_ok": "Agents connect through the web address {address}: their encrypted channel (TLS 1.3, client certificate) travels inside a WebSocket. No other port to open.",
+	"deviceform_channelcheck_websocket_title": "The agent WebSocket does not answer at {address}",
+	"deviceform_channelcheck_websocket_body": "This address goes through a tunnel or a reverse proxy. It must forward WebSockets to DumbMonit (Upgrade and Connection headers, no response buffering, a long read timeout): see “Agents behind a proxy” in the documentation."
+}

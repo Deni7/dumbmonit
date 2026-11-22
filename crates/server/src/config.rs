@@ -198,6 +198,22 @@ pub struct Config {
     /// connexion d'agent du site, qu'elle passe par son propre tunnel ou par un
     /// flux de la connexion multiplexée du relais.
     pub relay_max_tunnels: usize,
+    /// Canal des agents par WebSocket à l'adresse de l'interface
+    /// (`DUMBMONIT_AGENT_WEBSOCKET`, ouvert par défaut ; `off` le ferme) :
+    /// `GET /api/agent/ws`, pour les agents derrière Cloudflare Tunnel, un
+    /// mandataire inverse qui termine TLS ou un mandataire d'entreprise. Il
+    /// suppose le port des agents ouvert : c'est sa session TLS (certificat
+    /// client compris) qui passe à l'intérieur.
+    pub agent_websocket: bool,
+    /// Connexions WebSocket d'agents simultanées au plus par adresse
+    /// (`DUMBMONIT_AGENT_WS_MAX_PER_IP`, 256 par défaut, de 1 à 65536). Derrière
+    /// un mandataire non déclaré dans `DUMBMONIT_TRUSTED_PROXIES`, l'adresse
+    /// est la sienne : tout le parc compte alors pour une.
+    pub agent_ws_max_per_ip: usize,
+    /// Débit entrant de chaque connexion WebSocket d'agent, en Kio/s
+    /// (`DUMBMONIT_AGENT_WS_RATE_KIB`, 16384 par défaut, au moins 64). La
+    /// connexion multiplexée d'un relais porte tout son site : de la marge.
+    pub agent_ws_rate_kib: u32,
     /// Certificat fourni (`DUMBMONIT_TLS_CERT`, chaîne PEM) et sa clé
     /// (`DUMBMONIT_TLS_KEY`). Absents : un certificat autosigné est créé au
     /// premier démarrage et gardé, clé chiffrée, dans la base.
@@ -476,6 +492,10 @@ impl Config {
             single_listen,
             relay_max_tunnels: env_parsed::<usize>("DUMBMONIT_RELAY_MAX_TUNNELS", "1024")?
                 .clamp(1, MAX_RELAY_TUNNELS),
+            agent_websocket: env_flag_or("DUMBMONIT_AGENT_WEBSOCKET", true),
+            agent_ws_max_per_ip: env_parsed::<usize>("DUMBMONIT_AGENT_WS_MAX_PER_IP", "256")?
+                .clamp(1, 65_536),
+            agent_ws_rate_kib: env_parsed::<u32>("DUMBMONIT_AGENT_WS_RATE_KIB", "16384")?.max(64),
             agent_legacy_days: env_var("DUMBMONIT_AGENT_LEGACY_DAYS")
                 .map(|raw| {
                     raw.trim().parse::<u32>().with_context(|| {

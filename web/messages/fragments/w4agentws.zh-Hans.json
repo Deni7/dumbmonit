@@ -1,0 +1,5 @@
+{
+	"deviceform_channelcheck_websocket_ok": "代理通过界面地址 {address} 连接：其加密通道（TLS 1.3，客户端证书）在 WebSocket 中传输。无需开放其他端口。",
+	"deviceform_channelcheck_websocket_title": "代理 WebSocket 在 {address} 无响应",
+	"deviceform_channelcheck_websocket_body": "此地址经过隧道或反向代理服务器。它必须将 WebSocket 转发到 DumbMonit（Upgrade 和 Connection 标头，不缓冲响应，较长的读取超时）：请参阅文档中的“位于代理服务器后的代理”。"
+}

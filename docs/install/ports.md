@@ -86,7 +86,9 @@ also reaches the server through it; its gateway on the site does not change.
 It does not make a reverse proxy that terminates TLS possible (Cloudflare
 Tunnel, a plain `reverse_proxy`): the agent's certificate must still reach
 DumbMonit untouched. A TCP proxy that passes the connection through (SNI
-passthrough) works.
+passthrough) works. Behind a proxy that terminates TLS, agents go through the
+web address instead, their TLS session inside a WebSocket: see
+[Agents behind a proxy](agents-behind-proxy.md).
 
 ### 5514: syslog
 

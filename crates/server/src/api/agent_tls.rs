@@ -4,7 +4,7 @@
 //! d'API) : exiger mTLS ou faire tourner l'autorité peut couper tout un parc.
 
 use axum::extract::State;
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
@@ -36,6 +36,9 @@ pub struct CheckPayload {
     pub relay_id: Option<dumbmonit_proto::TargetId>,
     #[serde(default)]
     pub relay_host: Option<String>,
+    /// Transport demandé pour la commande (le même que pour le jeton).
+    #[serde(default)]
+    pub transport: super::ingest::TransportWish,
 }
 
 /// Passerelle d'un relais, telle que le relais la déclare.
@@ -72,6 +75,10 @@ pub struct ChannelCheck {
     /// voit pas le réseau du site) ou quand le canal est fermé.
     pub outcome: Option<agent_tls::probe::Outcome>,
     pub relay: Option<RelayCheck>,
+    /// `websocket` : la commande fait passer les agents par l'adresse de
+    /// l'interface ; `url`, `host` et `port` sont alors ceux de la WebSocket,
+    /// et la tentative a été faite à travers elle.
+    pub transport: Option<&'static str>,
 }
 
 /// `POST /api/agent/tls/check` : le canal chiffré répond-il à l'adresse que
@@ -79,6 +86,7 @@ pub struct ChannelCheck {
 async fn check(
     _: AdminIdentity,
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(payload): Json<CheckPayload>,
 ) -> ApiResult<Json<ChannelCheck>> {
     let route = match payload.relay_id {
@@ -87,21 +95,37 @@ async fn check(
         ),
         None => None,
     };
-    let params =
-        super::ingest::install_parameters_via(&state, payload.base_url.as_deref(), route.clone())
-            .await;
-    let parsed = params.agent_url.as_deref().and_then(|url| reqwest::Url::parse(url).ok());
+    // Les mêmes paramètres que la commande affichée (en-têtes compris : c'est
+    // sur eux que se décide le passage par la WebSocket).
+    let params = super::ingest::install_parameters_for(
+        &state,
+        payload.base_url.as_deref(),
+        route.clone(),
+        Some(&headers),
+        false,
+        payload.transport,
+    )
+    .await;
+    let websocket = params.transport == Some(super::ingest::TRANSPORT_WEBSOCKET);
+    let url = if websocket {
+        Some(agent_tls::websocket::url_for(&params.base_url))
+    } else {
+        params.agent_url.clone()
+    };
+    let parsed = url.as_deref().and_then(|url| reqwest::Url::parse(url).ok());
     let host = parsed.as_ref().and_then(|url| url.host_str().map(str::to_string));
     let port = parsed.as_ref().and_then(reqwest::Url::port_or_known_default);
+    let pins = state.agent_tls().pins();
     let outcome = match (&route, &host, port) {
-        (None, Some(host), Some(port)) => {
-            Some(agent_tls::probe::check(host, port, &state.agent_tls().pins()).await)
+        (None, Some(_), Some(_)) if websocket => {
+            Some(agent_tls::probe::check_websocket(&params.base_url, &pins).await)
         }
+        (None, Some(host), Some(port)) => Some(agent_tls::probe::check(host, port, &pins).await),
         _ => None,
     };
     Ok(Json(ChannelCheck {
         enabled: state.config.agent_listen.is_some(),
-        url: params.agent_url.clone(),
+        url,
         host,
         port,
         listen_port: state.config.agent_listen.map(|listen| listen.port()),
@@ -116,6 +140,7 @@ async fn check(
             reachable: route.reachable,
             check_error: route.check_error,
         }),
+        transport: params.transport,
     }))
 }
 

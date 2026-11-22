@@ -14,8 +14,15 @@ use dumbmonit_proto::{
 };
 use tokio::sync::Notify;
 
-use crate::proxy::ProxyConfig;
+use crate::proxy::{ProxyConfig, ProxyMode};
 use crate::tls::{self, Pins};
+use crate::ws::{Route, Transport, TransportMode};
+
+/// Cible du canal chiffré : URL du port des agents, certificat et clé.
+type TlsTarget = (String, Option<(Vec<u8>, Vec<u8>)>);
+
+/// Délai de l'essai d'un autre transport (`transport: auto`).
+const PROBE_TIMEOUT: Duration = Duration::from_secs(15);
 
 /// Ce qui peut arriver à un envoi, et surtout ce qu'il faut en faire.
 ///
@@ -117,6 +124,12 @@ pub struct PushClient {
     /// client HTTP du canal le reprend, celui du canal chiffré compris — la
     /// session TLS de l'agent passe alors par `CONNECT`, de bout en bout.
     proxy: Arc<ProxyConfig>,
+    /// Transport du canal chiffré : le port des agents, ou la WebSocket de
+    /// l'interface par un pont local (voir `ws.rs`).
+    transport: Arc<Transport>,
+    /// Dernière cible du canal chiffré ([`PushClient::use_tls`]) : de quoi le
+    /// remonter sur l'autre transport.
+    target: Arc<Mutex<Option<TlsTarget>>>,
 }
 
 impl PushClient {
@@ -144,6 +157,8 @@ impl PushClient {
             reachable: Arc::new(Notify::new()),
             report_now: Arc::new(Notify::new()),
             proxy,
+            transport: Arc::new(Transport::default()),
+            target: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -209,21 +224,125 @@ impl PushClient {
         }
     }
 
+    /// Règle le transport du canal chiffré (`transport:` de agent.yaml).
+    /// `ws_url` : la WebSocket de l'interface (`None` sans adresse utilisable),
+    /// ouverte sous la clé épinglée `server_pin` s'il y en a une. À appeler
+    /// après [`PushClient::with_proxy`] et avant [`PushClient::use_tls`].
+    pub fn set_transport(
+        &self,
+        mode: TransportMode,
+        ws_url: Option<String>,
+        server_pin: Option<&str>,
+    ) -> Result<()> {
+        let connector = match ws_url {
+            Some(url) => Some(crate::ws::Connector::new(url, server_pin, &self.proxy)?),
+            None => None,
+        };
+        if mode == TransportMode::WebSocket && connector.is_none() {
+            tracing::warn!("transport: websocket needs an https:// server_url, using direct");
+        }
+        self.transport.configure(mode, connector);
+        Ok(())
+    }
+
+    /// Reprend le chemin qui a marché la dernière fois (`transport: auto`).
+    pub fn remember_route(&self, route: Option<Route>) {
+        if let Some(route) = route {
+            self.transport.remember(route);
+        }
+    }
+
+    /// Chemin courant du canal chiffré.
+    pub fn route(&self) -> Route {
+        self.transport.route()
+    }
+
+    /// Ligne de journal du transport : `direct …` ou `websocket wss://…`.
+    pub fn describe_transport(&self) -> String {
+        self.transport.describe()
+    }
+
     /// Passe au canal chiffré : `url` du port des agents, certificat client
     /// s'il y en a un. Plus aucune requête ne part en clair ensuite.
     pub fn use_tls(&self, url: &str, identity: Option<(Vec<u8>, Vec<u8>)>) -> Result<()> {
+        if let Ok(mut target) = self.target.lock() {
+            *target = Some((url.to_string(), identity.clone()));
+        }
+        self.install_tls(self.transport.route(), url, identity)
+    }
+
+    /// Monte le canal chiffré sur ce chemin.
+    fn install_tls(
+        &self,
+        route: Route,
+        url: &str,
+        identity: Option<(Vec<u8>, Vec<u8>)>,
+    ) -> Result<()> {
+        let (base_url, proxy) = self.dial(route, url)?;
         let config = tls::client_config(self.pins.clone(), identity.clone())?;
         let upgrade = tls::upgrade_config(self.pins.clone(), identity)?;
         let channel = Channel {
-            http: http_client(self.timeout, Some(config), &self.proxy)?,
-            upgrade: Some(upgrade_client(self.timeout, upgrade, &self.proxy)?),
-            base_url: url.trim_end_matches('/').to_string(),
+            http: http_client(self.timeout, Some(config), &proxy)?,
+            upgrade: Some(upgrade_client(self.timeout, upgrade, &proxy)?),
+            base_url,
             encrypted: true,
         };
         if let Ok(mut held) = self.channel.write() {
             *held = Arc::new(channel);
         }
         Ok(())
+    }
+
+    /// Racine et mandataire du canal chiffré par ce chemin : le port des agents
+    /// à travers le mandataire sortant, ou le pont local de la WebSocket, joint
+    /// sans mandataire (c'est la WebSocket qui le traverse).
+    fn dial(&self, route: Route, url: &str) -> Result<(String, Arc<ProxyConfig>)> {
+        match route {
+            Route::Direct => Ok((url.trim_end_matches('/').to_string(), self.proxy.clone())),
+            Route::WebSocket => {
+                let bridge = self.transport.bridge()?;
+                let local = ProxyConfig { mode: ProxyMode::Direct, no_proxy: Vec::new() };
+                Ok((bridge.base_url(), Arc::new(local)))
+            }
+        }
+    }
+
+    /// `transport: auto` : après `min_failures` échecs de connexion d'affilée
+    /// sur le canal chiffré, essaie l'autre chemin (port des agents ou
+    /// WebSocket de l'interface) et l'adopte s'il répond. Rend le chemin
+    /// adopté ; à l'appelant de le retenir.
+    pub async fn reconsider_route(&self, min_failures: u32) -> Option<Route> {
+        if !self.transport.can_switch()
+            || !self.is_encrypted()
+            || self.transport.unreachable() < min_failures.max(1)
+        {
+            return None;
+        }
+        let (url, identity) = self.target.lock().ok()?.clone()?;
+        let other = self.transport.route().other();
+        // L'essai suivant attendra autant d'échecs : pas de rafale d'essais
+        // quand le serveur est tout simplement arrêté.
+        self.transport.note_reachable();
+        if !self.reaches(other, &url).await {
+            tracing::debug!(?other, "agent channel: the other transport does not answer either");
+            return None;
+        }
+        if let Err(error) = self.install_tls(other, &url, identity) {
+            tracing::warn!(error = %format!("{error:#}"), "agent channel transport not switched");
+            return None;
+        }
+        self.transport.set_route(other);
+        Some(other)
+    }
+
+    /// Le canal répond-il par ce chemin ? Une poignée de main sans certificat
+    /// (l'autorité du serveur toujours vérifiée) et une requête quelconque :
+    /// toute réponse HTTP prouve le chemin entier.
+    async fn reaches(&self, route: Route, url: &str) -> bool {
+        let Ok((base, proxy)) = self.dial(route, url) else { return false };
+        let Ok(config) = tls::client_config(self.pins.clone(), None) else { return false };
+        let Ok(http) = http_client(PROBE_TIMEOUT, Some(config), &proxy) else { return false };
+        http.head(format!("{base}/")).send().await.is_ok()
     }
 
     /// Ancien canal (port de l'interface) vers un serveur au certificat
@@ -272,11 +391,14 @@ impl PushClient {
         url: &str,
         request: &TlsEnrolRequest,
     ) -> Result<TlsCertificate, PushError> {
+        let (base, proxy) = self
+            .dial(self.transport.route(), url)
+            .map_err(|error| PushError::Transport(format!("{error:#}")))?;
         let config = tls::client_config(self.pins.clone(), None)
             .map_err(|error| PushError::Transport(format!("{error:#}")))?;
-        let http = http_client(self.timeout, Some(config), &self.proxy)
+        let http = http_client(self.timeout, Some(config), &proxy)
             .map_err(|error| PushError::Transport(format!("{error:#}")))?;
-        let target = format!("{}{TLS_ENROL_PATH}", url.trim_end_matches('/'));
+        let target = format!("{base}{TLS_ENROL_PATH}");
         let response = self
             .identified(http.post(target).bearer_auth(&self.token))
             .json(request)
@@ -308,6 +430,7 @@ impl PushClient {
 
     /// Note une réponse favorable et réveille qui attendait le serveur.
     fn mark_reachable(&self) {
+        self.transport.note_reachable();
         self.reachable.notify_waiters();
     }
 
@@ -378,8 +501,20 @@ impl PushClient {
     }
 
     /// Erreur de transport lisible : la cause d'abord, l'URL sans paramètres.
+    /// Un échec de connexion est compté (`transport: auto`) ; par la WebSocket,
+    /// c'est la cause de son ouverture qui est dite, pas la poignée de main
+    /// interrompue qu'en voit le client.
     fn transport(&self, error: &reqwest::Error) -> PushError {
-        PushError::Transport(sanitise(&describe(error), &self.token))
+        let unreachable = error.is_connect() || error.is_timeout();
+        if unreachable {
+            self.transport.note_unreachable();
+        }
+        let message = self
+            .transport
+            .websocket_failure()
+            .filter(|_| unreachable)
+            .unwrap_or_else(|| describe(error));
+        PushError::Transport(sanitise(&message, &self.token))
     }
 
     /// Adopte le secret que le serveur vient d'attribuer.

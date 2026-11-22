@@ -1,0 +1,5 @@
+{
+	"deviceform_channelcheck_websocket_ok": "Os agentes ligam-se pelo endereço da interface {address}: o seu canal cifrado (TLS 1.3, certificado de cliente) segue dentro de um WebSocket. Nenhuma outra porta a abrir.",
+	"deviceform_channelcheck_websocket_title": "O WebSocket dos agentes não responde em {address}",
+	"deviceform_channelcheck_websocket_body": "Este endereço passa por um túnel ou proxy inverso. Este tem de encaminhar os WebSockets para o DumbMonit (cabeçalhos Upgrade e Connection, sem buffer das respostas, tempo de leitura longo): ver «Agentes atrás de um proxy» na documentação."
+}
