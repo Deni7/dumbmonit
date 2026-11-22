@@ -147,6 +147,7 @@
 			cost more than building them.
 		-->
 		<li
+			data-list-row
 			class={`relative flex min-w-0 items-stretch gap-1.5 first:rounded-t-[inherit] last:rounded-b-[inherit] ${layout === 'compact' ? `overflow-hidden [content-visibility:auto] ${ROW_INTRINSIC}` : ''}`}
 			{@attach (node) => {
 				reorder?.registerRow(id, node);

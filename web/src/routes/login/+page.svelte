@@ -13,7 +13,7 @@
 	import { page } from '$app/state';
 	import { ApiError } from '#lib/api/index.js';
 	import { auth, safeDestination } from '#lib/stores/auth.svelte.js';
-	import { Button, ClickSpark, DotField, ErrorNotice, Field, shake } from '#lib/ui/index.js';
+	import { Button, ClickSpark, DocLink, DotField, ErrorNotice, Field, shake } from '#lib/ui/index.js';
 	import { KeyRound, FingerprintPattern, Info } from 'lucide-svelte';
 	import { passkeysSupported } from '#lib/api/passkeys.js';
 	import { tick } from 'svelte';
@@ -22,9 +22,26 @@
 	import LanguageSelect from '#lib/components/LanguageSelect.svelte';
 	import PasswordInput from '#lib/components/settings/PasswordInput.svelte';
 	import Mascot from '#lib/components/Mascot.svelte';
+	import { onMount } from 'svelte';
 
+	// The last name that signed in on this browser, offered again next time.
+	const LAST_USER_KEY = 'dumbmonit-last-username';
 	let username = $state('');
 	let password = $state('');
+	onMount(() => {
+		try {
+			const last = localStorage.getItem(LAST_USER_KEY);
+			if (last && !username) username = last;
+		} catch {
+			// Storage blocked: nothing to prefill.
+		}
+	});
+
+	// Caps Lock is on while the password field has focus (read from the keyboard, so only once a key was pressed).
+	let capsLock = $state(false);
+	function trackCaps(event: KeyboardEvent) {
+		if (typeof event.getModifierState === 'function') capsLock = event.getModifierState('CapsLock');
+	}
 	let passwordForm = $state<HTMLFormElement | null>(null);
 
 	// Public demo: the account is shared and read-only, one click signs in.
@@ -127,6 +144,11 @@
 		try {
 			pending = await auth.login(username.trim(), password);
 			password = '';
+			try {
+				localStorage.setItem(LAST_USER_KEY, username.trim());
+			} catch {
+				// Not remembered: the field is just empty next time.
+			}
 			// Without a second factor, the layout guard notices the open session
 			// and sends us to `destination`. Otherwise the code form takes over.
 		} catch (cause) {
@@ -358,14 +380,19 @@
 				</Field>
 
 				<Field label={m.auth_login_password()} for="password" error={localError}>
-					<PasswordInput
-						id="password"
-						bind:value={password}
-						autocomplete="current-password"
-						disabled={sending}
-						invalid={localError !== null}
-						oninput={() => (localError = null)}
-					/>
+					<!-- Key events bubble up from the input; the wrapper is no control. -->
+					<div role="presentation" onkeydown={trackCaps} onkeyup={trackCaps} onfocusout={() => (capsLock = false)}>
+						<PasswordInput
+							id="password"
+							bind:value={password}
+							autocomplete="current-password"
+							disabled={sending}
+							invalid={localError !== null}
+							oninput={() => (localError = null)}
+						/>
+					</div>
+					<p role="status" class="text-[0.8125rem] text-warning-ink empty:hidden">{#if capsLock}{m.w2global_login_caps_lock()}{/if}</p>
+					<DocLink page="faq/#i-lost-the-password" label={m.w2global_login_forgot()} />
 				</Field>
 
 				{#if failure}

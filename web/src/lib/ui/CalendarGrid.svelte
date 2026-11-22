@@ -14,6 +14,7 @@
 	import { ChevronLeft, ChevronRight } from 'lucide-svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { getLocale } from '#lib/paraglide/runtime.js';
+	import { displayPrefs } from '#lib/stores/prefs.svelte.js';
 	import {
 		addDays,
 		addMonths,
@@ -63,7 +64,8 @@
 	}: Props = $props();
 
 	const locale = getLocale();
-	const firstDay = firstDayOfWeek(locale);
+	// The first day chosen in Settings › Appearance wins over the locale's.
+	const firstDay = displayPrefs.firstDay ?? firstDayOfWeek(locale);
 	const today = todayIso();
 	const uid = $props.id();
 

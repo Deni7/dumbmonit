@@ -9,6 +9,7 @@
 import { m } from '#lib/paraglide/messages.js';
 import { shareFlight } from './flight';
 import { notifyMutation } from './mutations';
+import { reportNetworkFailure, reportNetworkSuccess } from './connection';
 
 /** Normalised error, always carrying a message that can be displayed as is. */
 export class ApiError extends Error {
@@ -248,8 +249,11 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 		// A cancelled request is not an outage: propagate it as is so the caller
 		// can ignore it silently.
 		if (cause instanceof DOMException && cause.name === 'AbortError') throw cause;
+		reportNetworkFailure();
 		throw new ApiError(m.api_error_unreachable(), 0);
 	}
+	// Any answer, even an error status, proves the server is reachable.
+	reportNetworkSuccess();
 
 	if (!response.ok) {
 		const { message, demo, access } = readError(response);

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { docTitle } from '#lib/stores/page-title.svelte.js';
 	import { withBase } from '#lib/paths.js';
 	/**
 	 * Settings, in six tabs, each its own URL: My account (language,
@@ -166,7 +167,7 @@
 	}
 </script>
 
-<svelte:head><title>{tabLabel(tab)} · {m['settings.page.title']()} · DumbMonit</title></svelte:head>
+<svelte:head><title>{docTitle(`${tabLabel(tab)} · ${m['settings.page.title']()}`)}</title></svelte:head>
 
 {#snippet searchBox(id: string)}
 	<div class="relative">
@@ -175,6 +176,7 @@
 		<input
 			{id}
 			type="search"
+			data-page-search
 			class="input h-10 w-full !pl-9"
 			placeholder={m.settings_search_placeholder()}
 			autocomplete="off"

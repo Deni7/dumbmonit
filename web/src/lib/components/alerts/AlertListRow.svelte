@@ -225,7 +225,7 @@
 	}
 </script>
 
-<li class={`group/row relative ${selected ? 'row-selected bg-signal-soft/60' : ''}`}>
+<li data-list-row class={`group/row relative ${selected ? 'row-selected bg-signal-soft/60' : ''}`}>
 	<div class={`flex min-h-14 items-center gap-1 pr-1.5 pl-3 sm:gap-2 sm:pr-2 sm:pl-4 ${selecting ? '' : 'max-sm:flex-wrap'}`}>
 		{#if selecting}
 			<label class="-ml-1 inline-flex size-10 shrink-0 cursor-pointer items-center justify-center">

@@ -118,6 +118,7 @@
 				size="sm"
 				variant={alert.acked ? 'ghost' : 'secondary'}
 				loading={busy}
+				data-ack
 				aria-pressed={alert.acked}
 				title={alert.acked ? m.alerts_ack_unack() : m.alerts_actions_ack_title()}
 				class="max-sm:!w-10 max-sm:!px-0"
@@ -135,6 +136,7 @@
 				size="sm"
 				variant="ghost"
 				loading={busy}
+				data-ack
 				aria-pressed={alert.acked}
 				aria-label={alert.acked ? m.alerts_ack_unack() : m.alerts_actions_ack()}
 				title={alert.acked ? m.alerts_ack_unack() : m.alerts_actions_ack()}

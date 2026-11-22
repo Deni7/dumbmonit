@@ -8,6 +8,7 @@
 	 * always visible so people can see what they will paste before creating
 	 * anything; they carry the real token only while it is on screen.
 	 */
+	import { tick } from 'svelte';
 	import { Bot, FileJson, KeyRound } from 'lucide-svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { getLocale } from '#lib/paraglide/runtime.js';
@@ -70,6 +71,7 @@
 	let creating = $state(false);
 	let createError = $state<unknown>(null);
 	let created = $state<CreatedApiToken | null>(null);
+	let createdBlock = $state<HTMLDivElement | null>(null);
 
 	/** True once the last submit went through (the button confirms in green). */
 	let createdOk = $state(false);
@@ -91,6 +93,9 @@
 			name = '';
 			networks = '';
 			createdOk = true;
+			// Keyboard and screen-reader users land on the secret, shown only once.
+			await tick();
+			createdBlock?.focus();
 		} catch (cause) {
 			createError = cause;
 		} finally {
@@ -275,9 +280,15 @@
 			<ErrorNotice error={createError} title={m.settings_assistant_create_error()} class="mt-3" />
 		{/if}
 
-		<div aria-live="polite">
+		<div role="status" aria-live="polite">
 			{#if created}
-				<div class="rise-in mt-4 rounded-[var(--radius-card)] border border-advisory/40 bg-surface p-4">
+				<div
+					bind:this={createdBlock}
+					role="group"
+					tabindex="-1"
+					aria-label={m.w2global_token_created_aria({ name: created.name })}
+					class="rise-in mt-4 rounded-[var(--radius-card)] border border-advisory/40 bg-surface p-4 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
+				>
 					<div class="flex flex-wrap items-center justify-between gap-2">
 						<div class="flex min-w-0 flex-wrap items-center gap-2">
 							<p class="font-semibold text-ink">{m.settings_assistant_created_title({ name: created.name })}</p>
