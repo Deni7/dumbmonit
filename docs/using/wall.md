@@ -24,6 +24,26 @@ Open it with the **Wall mode** icon at the bottom of the left menu, from the com
 An account limited to some teams or clients does not get the wall, since it
 shows the whole fleet.
 
+## Keys, options and links
+
+- ++f++ toggles fullscreen (a discreet button next to Exit does the same) and
+  ++t++ switches between the dark wall and a plain light board. The pointer
+  disappears after 3 seconds without a move and comes back with the next one.
+- **Settings → Wall display** sets, for this browser, the clock's format (24 h or
+  12 h) and whether it shows seconds, an optional short **beep when a new
+  critical problem appears** (off by default; browsers only allow sound after a
+  click or key press on the wall, and the speaker button on the wall counts as
+  one), and an optional **rotation of the monitors**: when there are more
+  monitors than fit on the screen, the tiles change page every 15, 30 or 60
+  seconds instead of ending with "and N more" (off by default; problems come
+  first).
+- A line under the verdict announces the incident or maintenance published on a
+  status page that is in progress, or a maintenance window covering now.
+- `?theme=dark|light`, `?scene=paris|none` (the same as `?city=`) and `?music=0`
+  (no music dock, no music requests) configure one display from its address
+  without changing what is remembered. `?speaker=`, `?city=` and `?weather=` work
+  as described below.
+
 ## Backdrop
 
 The wall shares the console's dark look. The **Backdrop** button (top right,

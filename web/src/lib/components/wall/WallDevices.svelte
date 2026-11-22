@@ -8,7 +8,9 @@
 	 * tone. When there are more devices than the space can show, the tail
 	 * (always healthy ones, given the order) folds into "and N more".
 	 */
+	import { untrack } from 'svelte';
 	import { m } from '#lib/paraglide/messages.js';
+	import { nextPage } from '#lib/components/wall/wallPrefs.js';
 	import { AlertTriangle, CircleAlert, CircleCheck, CircleDashed, Info } from 'lucide-svelte';
 	import type { Sky } from '#lib/components/overview/sky.js';
 	import type { Target, TargetId } from '#lib/api/index.js';
@@ -22,9 +24,11 @@
 		skip?: Set<TargetId>;
 		/** Devices whose only alerts are building up or acknowledged: not shown as a problem. */
 		quieted?: Set<TargetId>;
+		/** Seconds between two pages when the monitors overflow; 0 keeps the first page and "and N more". */
+		rotateSeconds?: number;
 	}
 
-	let { targets, probes, sky, skip = new Set(), quieted = new Set() }: Props = $props();
+	let { targets, probes, sky, skip = new Set(), quieted = new Set(), rotateSeconds = 0 }: Props = $props();
 
 	type ChipTone = 'warning' | 'advisory' | 'info' | 'ghost' | 'signal';
 	interface Chip {
@@ -91,10 +95,26 @@
 		});
 		return () => cancelAnimationFrame(frame);
 	});
-	const shown = $derived(fits === Infinity ? chips : chips.slice(0, fits));
+	// Rotation: each page is as many chips as fit, the problems on the first.
+	let pageIndex = $state(0);
+	const pages = $derived(fits === Infinity || fits <= 0 ? 1 : Math.ceil(chips.length / fits));
+	$effect(() => {
+		const count = pages;
+		if (!rotateSeconds || count <= 1) {
+			untrack(() => (pageIndex = 0));
+			return;
+		}
+		const timer = setInterval(() => (pageIndex = nextPage(pageIndex, count)), rotateSeconds * 1000);
+		return () => clearInterval(timer);
+	});
+	const first = $derived(rotateSeconds && pages > 1 ? Math.min(pageIndex, pages - 1) * fits : 0);
+	const shown = $derived(fits === Infinity ? chips : chips.slice(first, first + fits));
 	const more = $derived(chips.length - shown.length);
 	/** Hidden chips in trouble: the count never says "all reporting" when some are not. */
-	const moreTrouble = $derived(chips.slice(shown.length).filter((chip) => chip.tone !== 'signal').length);
+	const moreTrouble = $derived.by(() => {
+		const visible = new Set(shown.map((chip) => chip.id));
+		return chips.filter((chip) => !visible.has(chip.id) && chip.tone !== 'signal').length;
+	});
 	const moreText = $derived(
 		moreTrouble > 0 ? m.wall_devices_more_trouble({ count: more, trouble: moreTrouble }) : m.wall_devices_more({ count: more })
 	);

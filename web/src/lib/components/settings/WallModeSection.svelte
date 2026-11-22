@@ -7,13 +7,31 @@
 	 */
 	import { Tv } from 'lucide-svelte';
 	import { m } from '#lib/paraglide/messages.js';
-	import { Button, DocLink, Panel } from '#lib/ui/index.js';
+	import { Button, DocLink, Panel, Segmented, Toggle } from '#lib/ui/index.js';
+	import { ROTATE_CHOICES, readWallPrefs, writeWallPrefs, type ClockFormat } from '#lib/components/wall/wallPrefs.js';
 	import { wallSceneOptions } from '#lib/components/wall/wallOptions.js';
 	import { DEFAULT_WALL_SCENE, readWallScene, writeWallScene, type WallSceneChoice } from '#lib/components/wall/wallScene.js';
 
 	let scene = $state<WallSceneChoice>(readWallScene(DEFAULT_WALL_SCENE));
 
 	const SCENE_OPTIONS = $derived(wallSceneOptions());
+
+	// The clock, the sound and the rotation: per browser, like the scene.
+	let prefs = $state(readWallPrefs());
+	function save() {
+		writeWallPrefs(prefs);
+	}
+	const CLOCK_OPTIONS = $derived([
+		{ value: '24h', label: m.w1wall_settings_clock_24h() },
+		{ value: '12h', label: m.w1wall_settings_clock_12h() }
+	]);
+	const ROTATE_OPTIONS = $derived(
+		ROTATE_CHOICES.map((seconds) => ({
+			value: String(seconds),
+			label: seconds === 0 ? m.w1wall_settings_rotate_off() : m.w1wall_settings_rotate_seconds({ seconds })
+		}))
+	);
+	let rotate = $state(String(prefs.rotateSeconds));
 
 	function pickScene(value: WallSceneChoice) {
 		scene = value;
@@ -53,6 +71,42 @@
 				{/each}
 			</div>
 		</div>
+
+		<Segmented
+			legend={m.w1wall_settings_clock_label()}
+			name="wall-clock-format"
+			options={CLOCK_OPTIONS}
+			value={prefs.clock}
+			onchange={(value) => {
+				prefs.clock = value as ClockFormat;
+				save();
+			}}
+		/>
+
+		<div class="flex items-center justify-between gap-4">
+			<label for="wall-clock-seconds" class="text-sm font-semibold text-ink">{m.w1wall_settings_seconds_label()}</label>
+			<Toggle id="wall-clock-seconds" bind:checked={prefs.seconds} onchange={save} />
+		</div>
+
+		<div class="grid gap-1">
+			<div class="flex items-center justify-between gap-4">
+				<label for="wall-critical-sound" class="text-sm font-semibold text-ink">{m.w1wall_settings_sound_label()}</label>
+				<Toggle id="wall-critical-sound" bind:checked={prefs.criticalSound} onchange={save} />
+			</div>
+			<p class="m-0 text-[0.8125rem] text-ink-3">{m.w1wall_settings_sound_help()}</p>
+		</div>
+
+		<Segmented
+			legend={m.w1wall_settings_rotate_label()}
+			name="wall-rotate"
+			options={ROTATE_OPTIONS}
+			bind:value={rotate}
+			help={m.w1wall_settings_rotate_help()}
+			onchange={(value) => {
+				prefs.rotateSeconds = Number(value);
+				save();
+			}}
+		/>
 
 		<p class="m-0 text-[0.8125rem] text-ink-3">{m.settings_wall_remembered()}</p>
 
