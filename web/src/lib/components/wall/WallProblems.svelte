@@ -16,10 +16,12 @@
 	 *
 	 * Same rows as the Overview's "Needs you" (`readSky`): the two can never
 	 * disagree. Nothing to act on here — a wall is read, not operated — but
-	 * each line opens its device for whoever walks up with a mouse.
+	 * each line opens its device for whoever walks up with a mouse (never on a
+	 * wall-display account, which has no other page to open).
 	 */
 	import { untrack } from 'svelte';
 	import { m } from '#lib/paraglide/messages.js';
+	import { auth } from '#lib/stores/auth.svelte.js';
 	import type { TargetId } from '#lib/api/index.js';
 	import type { Sky, SkyRow } from '#lib/components/overview/sky.js';
 	import { formatDuration, formatRelative } from '#lib/format.js';
@@ -149,6 +151,7 @@
 	}
 
 	function href(line: ProblemLine): string | null {
+		if (auth.isWall) return null;
 		return line.targetIds.length === 1 ? `/targets/${line.targetIds[0]}` : null;
 	}
 
@@ -219,14 +222,14 @@
 				{/each}
 				{#if hiddenCount > 0}
 					<li class="shrink-0 px-4 text-[1.0625rem] font-semibold text-ink" data-row>
-						<a href={withBase('/alerts')} class="underline decoration-line-strong underline-offset-4">{m.wall_problems_more({ count: hiddenCount })}</a>
+						<svelte:element this={auth.isWall ? 'span' : 'a'} href={auth.isWall ? undefined : withBase('/alerts')} class="underline decoration-line-strong underline-offset-4">{m.wall_problems_more({ count: hiddenCount })}</svelte:element>
 					</li>
 				{/if}
 				{#if summary}
 					<li class="shrink-0" data-row>
-						<a href={withBase('/alerts')} class="summary flex min-w-0 items-center gap-3 rounded-[10px] bg-surface/80 px-4 py-2 text-ink-2 shadow-lift">
+						<svelte:element this={auth.isWall ? 'div' : 'a'} href={auth.isWall ? undefined : withBase('/alerts')} class="summary flex min-w-0 items-center gap-3 rounded-[10px] bg-surface/80 px-4 py-2 text-ink-2 shadow-lift">
 							<span class="line-clamp-2 min-w-0" title={summary}>{summary}</span>
-						</a>
+						</svelte:element>
 					</li>
 				{/if}
 			</ul>
