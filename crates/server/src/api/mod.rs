@@ -10,6 +10,7 @@ mod agent_tls;
 mod agent_updates;
 mod alert_actions;
 pub(crate) mod alerts;
+mod annotations;
 mod auth;
 mod backends;
 mod backup;
@@ -320,6 +321,8 @@ pub fn router_with_hubs(
         .merge(status_pages::routes())
         // Objectifs de niveau de service et budgets d'erreur (`slos.rs`).
         .merge(slos::routes())
+        // Repères de changement posés sur les graphiques (`annotations.rs`).
+        .merge(annotations::routes())
         // Jeton du calendrier iCal privé des maintenances (`ical.rs`).
         .merge(ical::routes())
         // Calendrier des sauvegardes et travaux d'un Proxmox Backup Server (`pbs.rs`).

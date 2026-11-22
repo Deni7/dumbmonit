@@ -245,6 +245,9 @@ pub struct Bundle {
     /// désigné par référence comme celui des rapports SLA.
     #[serde(default)]
     pub slos: Vec<BundleSlo>,
+    /// Repères de changement (migration 0288), moniteurs désignés par référence.
+    #[serde(default)]
+    pub annotations: Vec<crate::backup::annotations::BundleAnnotation>,
     /// Politique d'authentification : second facteur exigé des administrateurs
     /// et des opérateurs (clé `auth.policy` de `settings`). Absente tant
     /// qu'elle n'a jamais été réglée.
@@ -294,6 +297,7 @@ impl Bundle {
             ("lun_links".to_string(), self.lun_links.len()),
             ("upgrade_notes_closed".to_string(), self.upgrade_notes_closed.len()),
             ("slos".to_string(), self.slos.len()),
+            ("annotations".to_string(), self.annotations.len()),
         ])
     }
 }

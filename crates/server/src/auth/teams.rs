@@ -459,6 +459,12 @@ pub const SCOPED_ROUTES: &[(&str, &str, RouteRule)] = &[
     ("GET", "/alerts/silences", RouteRule::Open),
     ("POST", "/alerts/silences", RouteRule::Open),
     ("GET", "/topology", RouteRule::Open),
+    // Repères de changement : le gestionnaire filtre la lecture et exige le
+    // niveau `operate` sur chaque moniteur concerné pour écrire.
+    ("GET", "/annotations", RouteRule::Open),
+    ("POST", "/annotations", RouteRule::Open),
+    ("PATCH", "/annotations/*", RouteRule::Open),
+    ("DELETE", "/annotations/*", RouteRule::Open),
     ("GET", "/status-pages", RouteRule::Open),
     // SLO : le gestionnaire ne montre et n'accepte que ceux dont tous les
     // moniteurs sont dans les équipes du compte.

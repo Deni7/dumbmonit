@@ -179,6 +179,8 @@ tags:
     description: Incidents and maintenance announcements shown on status pages.
   - name: SLOs
     description: Service level objectives, their error budget and burn rates.
+  - name: Annotations
+    description: Change markers (deployments, updates, maintenance) drawn on the charts.
   - name: Public status
     description: What a published status page exposes, without authentication.
   - name: Agents
@@ -5298,6 +5300,129 @@ paths:
       x-token-scope: write
       responses:
         "204": { description: SLO deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # -------------------------------------------------- repères de changement
+  /api/annotations:
+    get:
+      operationId: listAnnotations
+      tags: [Annotations]
+      summary: Change markers (deployments, updates, maintenance) in a time window
+      description: >-
+        Markers whose instant or window touches `[from, to]`, oldest first (the
+        500 most recent at most). With `target`, only the markers that apply to
+        that monitor: global ones, and those naming it, its folder or one of its
+        tags. Team-restricted accounts see the global markers and those that
+        touch a monitor they can see.
+      x-token-scope: read
+      parameters:
+        - name: from
+          in: query
+          description: Start of the window, RFC 3339 (`2026-11-22T10:00:00Z`).
+          schema: { type: string }
+        - name: to
+          in: query
+          description: End of the window, RFC 3339.
+          schema: { type: string }
+        - name: target
+          in: query
+          description: Monitor id.
+          schema: { type: integer, format: int64 }
+        - name: limit
+          in: query
+          description: At most this many markers (500 by default and at most).
+          schema: { type: integer, minimum: 1, maximum: 500 }
+      responses:
+        "200":
+          description: Markers, oldest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Annotation" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: createAnnotation
+      tags: [Annotations]
+      summary: Add a change marker
+      description: >-
+        Meant for pipelines: an API token with the `write` scope can call it.
+        `at` defaults to now; `until` makes the marker a window. A
+        team-restricted account may only target monitors it can handle (never the
+        whole instance).
+      x-token-scope: write
+      x-roles: [admin, operator]
+      x-codeSamples:
+        - lang: Shell
+          label: curl
+          source: |
+            curl -sk -X POST https://dumbmonit.example:8080/api/annotations \
+              -H "Authorization: Bearer $DUMBMONIT_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d '{"title": "Deploy v2.4.1", "source": "ci", "link": "https://ci.example/runs/42"}'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AnnotationPayload" }
+            example:
+              title: Deploy v2.4.1
+              text: Rolled out by the pipeline.
+              at: "2026-11-22T10:00:00Z"
+              until: "2026-11-22T10:10:00Z"
+              link: https://ci.example/runs/42
+              tags: [deploy]
+              scope: { kind: folder, folder: Production }
+              source: ci
+      responses:
+        "201":
+          description: The marker.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Annotation" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/annotations/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    patch:
+      operationId: updateAnnotation
+      tags: [Annotations]
+      summary: Change a marker
+      description: Only the fields sent change; `until: null` removes the window.
+      x-token-scope: write
+      x-roles: [admin, operator]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AnnotationUpdate" }
+      responses:
+        "200":
+          description: The marker.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Annotation" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteAnnotation
+      tags: [Annotations]
+      summary: Delete a marker
+      x-token-scope: write
+      x-roles: [admin, operator]
+      responses:
+        "204": { description: Marker deleted. }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -13952,6 +14077,11 @@ components:
           type: array
           description: Tickets opened for this alert by the Jira, GLPI, Zammad, GitHub Issues and GitLab Issues channels.
           items: { $ref: "#/components/schemas/AlertTicket" }
+        after_change:
+          oneOf:
+            - { $ref: "#/components/schemas/AlertAfterChange" }
+            - { type: "null" }
+          description: The change marker that preceded this alert by less than 30 minutes, if any.
     AlertTicket:
       type: object
       required: [channel_id, channel_name, kind, label, url, state]
@@ -14968,6 +15098,76 @@ components:
                 minItems: 2
                 maxItems: 2
                 items: { type: number }
+    AnnotationScope:
+      description: >-
+        Where a marker applies: the whole instance (`global`), these monitors, a
+        folder with its subfolders, or the monitors carrying one of these tags
+        (`key` or `key=value`).
+      oneOf:
+        - type: object
+          required: [kind]
+          properties:
+            kind: { type: string, enum: [global] }
+        - type: object
+          required: [kind, targets]
+          properties:
+            kind: { type: string, enum: [monitors] }
+            targets: { type: array, items: { type: integer, format: int64 } }
+        - type: object
+          required: [kind, folder]
+          properties:
+            kind: { type: string, enum: [folder] }
+            folder: { type: string }
+        - type: object
+          required: [kind, tags]
+          properties:
+            kind: { type: string, enum: [tags] }
+            tags: { type: array, items: { type: string } }
+    Annotation:
+      type: object
+      required: [id, at, until, title, text, link, tags, scope, source, author, created_at]
+      properties:
+        id: { type: integer, format: int64 }
+        at: { type: string, description: "UTC without suffix, `2026-11-22 10:00:00`." }
+        until: { type: [string, "null"], description: End of the window; null for a single instant. }
+        title: { type: string }
+        text: { type: string }
+        link: { type: string, description: An http(s) address, or empty. }
+        tags: { type: array, items: { type: string } }
+        scope: { $ref: "#/components/schemas/AnnotationScope" }
+        source: { type: string, enum: [api, ui, ci] }
+        author: { type: string, description: "Account, or `token:name` for an API token." }
+        created_at: { type: string }
+    AnnotationPayload:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, maxLength: 200 }
+        text: { type: string, maxLength: 4000 }
+        at: { type: string, description: RFC 3339; now when omitted. }
+        until: { type: [string, "null"], description: RFC 3339; makes the marker a window. }
+        link: { type: string, description: An http(s) address. }
+        tags: { type: array, maxItems: 10, items: { type: string } }
+        scope: { $ref: "#/components/schemas/AnnotationScope" }
+        source: { type: string, enum: [api, ui, ci], description: "`api` for a token, `ui` for a session by default." }
+    AnnotationUpdate:
+      type: object
+      properties:
+        title: { type: string }
+        text: { type: string }
+        at: { type: string }
+        until: { type: [string, "null"] }
+        link: { type: string }
+        tags: { type: array, items: { type: string } }
+        scope: { $ref: "#/components/schemas/AnnotationScope" }
+    AlertAfterChange:
+      type: object
+      required: [id, title, at]
+      description: The marker of the same monitor that precedes the alert by less than 30 minutes.
+      properties:
+        id: { type: integer, format: int64 }
+        title: { type: string }
+        at: { type: string }
     IncidentPayload:
       type: object
       required: [title]
