@@ -57,6 +57,10 @@ pub struct OidcConfig {
     /// avant son apparition : vide.
     #[serde(default)]
     pub operator_groups: Vec<String>,
+    /// Groupes qui donnent le rôle `wall` (écran mural). Absent d'un réglage
+    /// enregistré avant son apparition : vide.
+    #[serde(default)]
+    pub wall_groups: Vec<String>,
     pub groups_claim: String,
     pub public_url: String,
 }
@@ -89,6 +93,7 @@ impl OidcConfig {
         self.groups_claim = self.groups_claim.trim().to_string();
         self.admin_groups = split_groups(&self.admin_groups);
         self.operator_groups = split_groups(&self.operator_groups);
+        self.wall_groups = split_groups(&self.wall_groups);
         self
     }
 
@@ -133,6 +138,7 @@ impl OidcEnv {
             auto_create: flag(&auto_create),
             admin_groups: vec![var("DUMBMONIT_OIDC_ADMIN_GROUPS")],
             operator_groups: vec![var("DUMBMONIT_OIDC_OPERATOR_GROUPS")],
+            wall_groups: vec![var("DUMBMONIT_OIDC_WALL_GROUPS")],
             groups_claim: var("DUMBMONIT_OIDC_GROUPS_CLAIM"),
             public_url: var("DUMBMONIT_PUBLIC_URL"),
         }
@@ -235,6 +241,7 @@ mod tests {
             auto_create: true,
             admin_groups: vec!["ops, admins".into(), "".into(), "sre".into()],
             operator_groups: vec!["noc, ".into()],
+            wall_groups: vec![" screens ,lobby".into()],
             groups_claim: "".into(),
             public_url: "https://monit.example.org/".into(),
         }
@@ -245,6 +252,7 @@ mod tests {
         assert_eq!(config.groups_claim, DEFAULT_GROUPS_CLAIM);
         assert_eq!(config.admin_groups, vec!["ops", "admins", "sre"]);
         assert_eq!(config.operator_groups, vec!["noc"]);
+        assert_eq!(config.wall_groups, vec!["screens", "lobby"]);
         assert_eq!(
             config.redirect_uri("http://ignored"),
             "https://monit.example.org/api/auth/oidc/callback"

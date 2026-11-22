@@ -35,6 +35,7 @@
 	import { hostedStatusSlug } from '#lib/status-host.js';
 	import PublicStatusPage from '#lib/components/status/PublicStatusPage.svelte';
 	import TotpSetupGate from '#lib/components/security/TotpSetupGate.svelte';
+	import { wallDestination } from '#lib/wall/route.js';
 
 	let { children } = $props();
 
@@ -168,7 +169,7 @@
 
 	const publicPath = $derived(isPublicRoute(routePath(page.url)));
 	// The branch below that renders `EnterpriseShell`.
-	const inShell = $derived(!statusHost && !publicPath && auth.canUseApi && !auth.totpSetupRequired && !onWelcome);
+	const inShell = $derived(!statusHost && !publicPath && auth.canUseApi && !auth.totpSetupRequired && !auth.isWall && !onWelcome);
 
 	// Three situations: fresh instance, no session, valid session.
 	$effect(() => {
@@ -192,6 +193,15 @@
 				const target = path + page.url.search;
 				void goto(`/login?redirect=${encodeURIComponent(target)}`, { replace: true });
 			}
+			return;
+		}
+		// Right after sign-in the account is not read yet: its role decides where it lands.
+		if (!auth.user) return;
+		// A wall-display account has the wall and nothing else, teams or not
+		// (the server refuses the rest): every page, sign-in included, leads there.
+		if (auth.isWall) {
+			const to = wallDestination(path, isPublicRoute(path) ? page.url.searchParams.get('redirect') : null);
+			if (to) void goto(to, { replace: true });
 			return;
 		}
 		// An account limited by its teams has no overview or wall: devices first.
@@ -249,6 +259,13 @@
 		});
 	});
 
+	// A wall-display account never gets the shell, which would otherwise read the
+	// instance name for the wall's heading.
+	$effect(() => {
+		if (statusHost || !auth.canUseApi || !auth.isWall) return;
+		void instanceStore.loadSettings();
+	});
+
 	// The alert count is shared by the whole app; it only polls once a session exists.
 	$effect(() => {
 		// Held at two-factor enrolment, every other route answers 403: nothing to poll.
@@ -287,6 +304,11 @@
 		<!-- The instance policy requires two-factor first: the server refuses everything else. -->
 		<CleartextBanner />
 		<TotpSetupGate />
+	{:else if auth.isWall}
+		<!-- A wall display: the wall alone, no shell, no palette, no notes (the layout guard keeps it on /wall). -->
+		{#if onWall}
+			{@render children()}
+		{/if}
 	{:else}
 		{#snippet banners()}
 			{#if auth.demo}

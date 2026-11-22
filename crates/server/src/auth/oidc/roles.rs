@@ -1,10 +1,14 @@
 //! Du groupe au rôle.
 //!
 //! La règle : membre d'un groupe administrateur → `admin`, sinon d'un groupe
-//! opérateur → `operator`, sinon `viewer`. Sans aucune liste, le fournisseur ne
-//! dit rien du rôle et l'on garde celui que le compte a déjà. Sans liste
-//! d'administrateurs, les groupes ne disent rien non plus du rôle `admin` : un
-//! administrateur le reste.
+//! opérateur → `operator`, sinon d'un groupe d'écrans muraux → `wall`, sinon
+//! `viewer`. Sans aucune liste, le fournisseur ne dit rien du rôle et l'on garde
+//! celui que le compte a déjà. Sans liste d'administrateurs, les groupes ne
+//! disent rien non plus du rôle `admin` : un administrateur le reste.
+//!
+//! La liste des écrans muraux seule (ni administrateurs ni opérateurs) ne décide
+//! que du rôle `wall` : ses membres le prennent, un compte `wall` qui n'en est
+//! plus membre redevient `viewer`, et les autres comptes gardent leur rôle.
 
 use serde_json::Value;
 
@@ -17,19 +21,36 @@ pub fn role_for_groups(
     groups: &[String],
     admin_groups: &[String],
     operator_groups: &[String],
+    wall_groups: &[String],
     current: Option<Role>,
 ) -> Option<Role> {
-    if admin_groups.is_empty() && operator_groups.is_empty() {
+    if admin_groups.is_empty() && operator_groups.is_empty() && wall_groups.is_empty() {
         return None;
     }
     let member = |listed: &[String]| groups.iter().any(|group| listed.contains(group));
+    if admin_groups.is_empty() && operator_groups.is_empty() {
+        // Seule la liste des écrans muraux est remplie : elle ne parle que d'eux.
+        return if member(wall_groups) {
+            (current != Some(Role::Admin)).then_some(Role::Wall)
+        } else if current == Some(Role::Wall) {
+            Some(Role::Viewer)
+        } else {
+            None
+        };
+    }
     if member(admin_groups) {
         return Some(Role::Admin);
     }
     if admin_groups.is_empty() && current == Some(Role::Admin) {
         return None;
     }
-    Some(if member(operator_groups) { Role::Operator } else { Role::Viewer })
+    Some(if member(operator_groups) {
+        Role::Operator
+    } else if member(wall_groups) {
+        Role::Wall
+    } else {
+        Role::Viewer
+    })
 }
 
 /// Lit la revendication de groupes, quelle que soit sa forme : tableau de chaînes
@@ -62,7 +83,8 @@ mod tests {
     #[test]
     fn a_member_of_a_listed_group_is_admin_and_the_others_are_viewers() {
         let admin_groups = strings(&["dumbmonit-admins", "ops"]);
-        let check = |groups: &[&str]| role_for_groups(&strings(groups), &admin_groups, &[], None);
+        let check =
+            |groups: &[&str]| role_for_groups(&strings(groups), &admin_groups, &[], &[], None);
         assert_eq!(check(&["dev", "ops"]), Some(Role::Admin));
         assert_eq!(check(&["dev"]), Some(Role::Viewer));
         assert_eq!(check(&[]), Some(Role::Viewer));
@@ -73,7 +95,7 @@ mod tests {
         let admins = strings(&["admins"]);
         let operators = strings(&["noc"]);
         let check = |groups: &[&str], current| {
-            role_for_groups(&strings(groups), &admins, &operators, current)
+            role_for_groups(&strings(groups), &admins, &operators, &[], current)
         };
         assert_eq!(check(&["noc"], None), Some(Role::Operator));
         assert_eq!(check(&["noc", "admins"], None), Some(Role::Admin));
@@ -84,8 +106,9 @@ mod tests {
     #[test]
     fn without_an_admin_list_the_groups_never_demote_an_admin() {
         let operators = strings(&["noc"]);
-        let check =
-            |groups: &[&str], current| role_for_groups(&strings(groups), &[], &operators, current);
+        let check = |groups: &[&str], current| {
+            role_for_groups(&strings(groups), &[], &operators, &[], current)
+        };
         assert_eq!(check(&["noc"], Some(Role::Admin)), None);
         assert_eq!(check(&["dev"], Some(Role::Admin)), None);
         assert_eq!(check(&["noc"], Some(Role::Viewer)), Some(Role::Operator));
@@ -93,8 +116,35 @@ mod tests {
     }
 
     #[test]
+    fn wall_groups_make_wall_displays_below_operators() {
+        let admins = strings(&["admins"]);
+        let operators = strings(&["noc"]);
+        let walls = strings(&["screens"]);
+        let check = |groups: &[&str], current| {
+            role_for_groups(&strings(groups), &admins, &operators, &walls, current)
+        };
+        assert_eq!(check(&["screens"], None), Some(Role::Wall));
+        assert_eq!(check(&["screens", "noc"], None), Some(Role::Operator));
+        assert_eq!(check(&["screens", "admins"], None), Some(Role::Admin));
+        assert_eq!(check(&["dev"], Some(Role::Wall)), Some(Role::Viewer));
+    }
+
+    #[test]
+    fn a_wall_list_alone_only_speaks_of_wall_displays() {
+        let walls = strings(&["screens"]);
+        let check =
+            |groups: &[&str], current| role_for_groups(&strings(groups), &[], &[], &walls, current);
+        assert_eq!(check(&["screens"], None), Some(Role::Wall));
+        assert_eq!(check(&["screens"], Some(Role::Operator)), Some(Role::Wall));
+        assert_eq!(check(&["screens"], Some(Role::Admin)), None, "un administrateur le reste");
+        assert_eq!(check(&["dev"], Some(Role::Wall)), Some(Role::Viewer));
+        assert_eq!(check(&["dev"], Some(Role::Operator)), None);
+        assert_eq!(check(&["dev"], None), None);
+    }
+
+    #[test]
     fn without_a_configured_list_the_provider_says_nothing() {
-        assert_eq!(role_for_groups(&strings(&["ops"]), &[], &[], None), None);
+        assert_eq!(role_for_groups(&strings(&["ops"]), &[], &[], &[], None), None);
     }
 
     #[test]

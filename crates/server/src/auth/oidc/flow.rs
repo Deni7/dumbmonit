@@ -290,7 +290,13 @@ async fn map_identity(
     let issuer = config.issuer.as_str();
     let groups = roles::groups_from_claim(claims.extra.get(&config.groups_claim));
     let role_for = |current| {
-        roles::role_for_groups(&groups, &config.admin_groups, &config.operator_groups, current)
+        roles::role_for_groups(
+            &groups,
+            &config.admin_groups,
+            &config.operator_groups,
+            &config.wall_groups,
+            current,
+        )
     };
 
     let mut user = match users::by_oidc(pool, issuer, &claims.sub).await? {

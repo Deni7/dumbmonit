@@ -72,7 +72,7 @@ impl Level {
     /// Le plafond qu'impose un rôle global.
     pub fn ceiling(role: Role) -> Self {
         match role {
-            Role::Viewer => Self::Read,
+            Role::Viewer | Role::Wall => Self::Read,
             Role::Operator | Role::Admin => Self::Manage,
         }
     }
@@ -442,6 +442,11 @@ pub const SCOPED_ROUTES: &[(&str, &str, RouteRule)] = &[
     ("GET", "/geoip", RouteRule::Open),
     ("GET", "/locations", RouteRule::Open),
     ("GET", "/locations/basemap", RouteRule::Open),
+    // Le nom de l'instance et la météo du mode mur : aucune donnée
+    // d'équipement. Un écran mural limité à une équipe en a besoin (voir
+    // `wall::WALL_ROUTES`).
+    ("GET", "/instance/settings", RouteRule::Open),
+    ("GET", "/wall/weather", RouteRule::Open),
     // Filtrées par le gestionnaire.
     ("GET", "/targets", RouteRule::Open),
     ("POST", "/targets", RouteRule::Open),

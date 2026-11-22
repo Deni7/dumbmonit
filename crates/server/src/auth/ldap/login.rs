@@ -66,6 +66,7 @@ pub async fn provision(
         &config.admin_groups,
         &config.operator_groups,
         &config.viewer_groups,
+        &config.wall_groups,
         current,
     );
 

@@ -91,6 +91,7 @@ mod tests {
 
     use super::*;
     use crate::auth::middleware::{TOKEN_DENIED, is_operator_route};
+    use crate::auth::wall::is_wall_route;
 
     /// Routes que la spécification ne décrit volontairement pas :
     ///
@@ -358,6 +359,36 @@ mod tests {
                 if documented != guarded {
                     problems.push(format!(
                         "{} {path} : x-roles {roles:?}, garde opérateur {guarded}",
+                        method.to_uppercase()
+                    ));
+                }
+            }
+        }
+        assert!(problems.is_empty(), "{}", problems.join("\n"));
+    }
+
+    /// `x-wall: true` est posé exactement sur les opérations que le garde ouvre
+    /// aux écrans muraux (`WALL_ROUTES`) : la liste publiée et la liste
+    /// appliquée ne peuvent pas diverger.
+    #[test]
+    fn the_wall_operations_match_the_guard() {
+        let spec = spec_value();
+        let mut problems = Vec::new();
+        for (path, item) in spec["paths"].as_object().expect("paths") {
+            let concrete: String = path
+                .split('/')
+                .map(|segment| if segment.starts_with('{') { "x" } else { segment })
+                .collect::<Vec<_>>()
+                .join("/");
+            for method in METHODS {
+                let Some(op) = item.get(method) else { continue };
+                let documented = op["x-wall"].as_bool().unwrap_or(false);
+                let http = axum::http::Method::from_bytes(method.to_uppercase().as_bytes())
+                    .expect("méthode");
+                let guarded = path.starts_with("/api/") && is_wall_route(&http, &concrete);
+                if documented != guarded {
+                    problems.push(format!(
+                        "{} {path} : x-wall {documented}, garde du mur {guarded}",
                         method.to_uppercase()
                     ));
                 }

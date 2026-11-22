@@ -311,14 +311,30 @@ pub async fn authenticate(pool: &SqlitePool, token: &SessionToken) -> Result<Opt
 /// Note l'activité d'une session : l'heure, et l'adresse d'où elle vient
 /// maintenant (un portable change de réseau). À n'appeler que si
 /// [`Verified::needs_touch`] le demande.
-pub async fn touch(pool: &SqlitePool, id: &str, ip: Option<IpAddr>) -> Result<()> {
-    sqlx::query("UPDATE auth_sessions SET last_seen_at = ?, ip = COALESCE(?, ip) WHERE id = ?")
-        .bind(to_sql(Utc::now()))
-        .bind(ip.map(|ip| ip.to_canonical().to_string()))
-        .bind(id)
-        .execute(pool)
-        .await
-        .context("activité de la session")?;
+///
+/// `slide` prolonge en plus la session de [`lifetime_days`] à compter de
+/// maintenant : c'est le régime des écrans muraux (rôle `wall`). Un écran fixé
+/// au mur n'a personne pour retaper un mot de passe ; tant qu'il affiche le
+/// mur, sa session se renouvelle, et `DUMBMONIT_SESSION_DAYS` devient le délai
+/// d'inactivité au-delà duquel elle se ferme. Jamais plus long que ce délai :
+/// un écran éteint ou débranché finit par se déconnecter comme un autre poste.
+pub async fn touch(pool: &SqlitePool, id: &str, ip: Option<IpAddr>, slide: bool) -> Result<()> {
+    let now = Utc::now();
+    let ip = ip.map(|ip| ip.to_canonical().to_string());
+    let query = if slide {
+        sqlx::query(
+            "UPDATE auth_sessions SET last_seen_at = ?, ip = COALESCE(?, ip), expires_at = ?
+             WHERE id = ?",
+        )
+        .bind(to_sql(now))
+        .bind(ip)
+        .bind(to_sql(now + Duration::days(lifetime_days())))
+    } else {
+        sqlx::query("UPDATE auth_sessions SET last_seen_at = ?, ip = COALESCE(?, ip) WHERE id = ?")
+            .bind(to_sql(now))
+            .bind(ip)
+    };
+    query.bind(id).execute(pool).await.context("activité de la session")?;
     Ok(())
 }
 

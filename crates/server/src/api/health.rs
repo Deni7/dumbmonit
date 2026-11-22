@@ -75,7 +75,8 @@ fn build_id() -> Option<&'static str> {
 ///
 /// Le texte d'une panne (message d'erreur de SQLite ou de `reqwest`, qui peut
 /// recopier l'URL de `DUMBMONIT_VM_URL` et ses identifiants) n'est rendu qu'à une
-/// session ouverte ; un appel anonyme ne lit que `ok`.
+/// session ouverte ; un appel anonyme ne lit que `ok`, un écran mural (rôle
+/// `wall`) non plus : il ne lit que ce que montre le mur.
 pub async fn health(State(state): State<AppState>, headers: HeaderMap) -> Json<Health> {
     let database =
         sqlx::query("SELECT 1").execute(&state.pool).await.map(|_| ()).map_err(anyhow::Error::from);
@@ -85,7 +86,7 @@ pub async fn health(State(state): State<AppState>, headers: HeaderMap) -> Json<H
     let all_ok = database.is_ok() && victoria.is_ok();
     let signed_in = matches!(
         crate::auth::middleware::current_session(&state.pool, &headers).await,
-        Ok(Some(_))
+        Ok(Some((_, user))) if !user.role.is_wall()
     );
     let shown = |component: ComponentHealth| {
         if signed_in { component } else { component.anonymous() }
