@@ -4,7 +4,7 @@ Settings holds what is administrative: the instance itself, your account, who ca
 
 | Tab | Address | What it holds |
 |---|---|---|
-| My account | `/settings/account` | Appearance (language), Account & security (change password, sign out, two-factor, passkeys, security log), Push notifications |
+| My account | `/settings/account` | Appearance (language), Account & security (change password, sign out, two-factor, passkeys, signed-in devices, security log), Push notifications |
 | Team & access | `/settings/team` | Users, Teams, Clients, Single sign-on, SAML, SCIM, LDAP |
 | Monitoring | `/settings/monitoring` | Agents, Integration packs, [Security score](security-score.md), Locations |
 | Notifications | `/settings/notifications` | Channels, Notification policy, quiet hours ([Notification channels](../notifications.md)). Optional on-call schedules (turned on in System) have their tab on the Alerts page: [On-call](../alerting/oncall.md) |
@@ -42,7 +42,8 @@ Login is rate-limited per client address and per account: after five failed
 attempts, each further attempt waits longer (30 s, doubling, up to 5 minutes).
 Behind a reverse proxy, set `DUMBMONIT_TRUSTED_PROXIES` so the limiter sees
 the real client address rather than the proxy's (see
-[Configuration](../reference/configuration.md)). Sessions last 30 days. A
+[Configuration](../reference/configuration.md)). Sessions last 30 days
+(`DUMBMONIT_SESSION_DAYS` changes it, from 1 to 365). A
 forgotten password is reset with `DUMBMONIT_RESET_PASSWORD=1`: see the
 [FAQ](../faq.md#i-lost-the-password).
 
@@ -60,13 +61,24 @@ the usual sign-in rate limit keeps counting across attempts. A code is
 accepted once: the one you just used (including the one that enabled the
 second factor) does not sign you in again — wait for the next one.
 
-**Disable** asks for the password again. Recovery codes cannot be regenerated
-on their own: disable and set up again to get a fresh set. An admin can reset
+**Download .txt** next to **Copy codes** saves them as a text file, built in
+the browser. **Replace recovery codes** gives a fresh set without turning the
+second factor off: confirm with a code from the app (or your password), and
+the old codes stop working at once. **Disable** asks for the password again. An admin can reset
 another user's second factor from **Users** (*Reset 2FA*) when both the phone
 and the codes are gone — that signs the user out everywhere and leaves the
 password alone. The secret is stored encrypted with the instance secret;
 codes are hashed. Single sign-on accounts get their second factor from the
 identity provider, not here.
+
+### Signed-in devices
+
+Every browser where your account is signed in: browser and system, how it
+signed in (password, passkey, SSO, LDAP), when, the last activity (updated at
+most every five minutes) and the address it came from. The one you are using
+is marked *This device* and closes with **Sign out**; **Sign out** on another
+row closes that one, and **Sign out my other sessions** closes them all at
+once. Changing your password does the same.
 
 Admins also find the **security log** in this section: sign-ins and failures,
 password and two-factor changes, token and account changes, with the client
@@ -106,14 +118,31 @@ optional display name, a role and a password; the button beside the password
 field makes up a random one. The password is shown once, to hand over.
 
 Each row carries the role, whether the account signs in with a password or
-through the identity provider, whether two-factor is on, and the last sign-in.
-**Edit** changes the display name, the role and the password (a reset signs
-that user out everywhere and shows the new password once). The **Enabled**
+through the identity provider, whether two-factor is on, the email address
+when there is one, and the last sign-in. Above the list, search by name,
+username or email, show only the accounts **Without 2FA**, and sort by name,
+role or last sign-in. **Edit** changes the display name, the optional email
+address (to know whom to reach; it is never used to sign in), the role and
+the password (a reset signs that user out everywhere and shows the new
+password once). **Sign out everywhere** closes every session of the account
+(for your own, the one you are using stays open). The **Enabled**
 switch suspends an account without deleting it; **Reset 2FA** appears when the
 account has a second factor; **Delete** removes it for good. The server keeps
 at least one active admin, and the controls reflect that rule rather than
 reporting it as an error: the last admin cannot be demoted, disabled or
 deleted, and you cannot disable or delete your own account.
+
+### Require two-factor for admins and operators
+
+The switch at the top of **Users** makes two-factor authentication mandatory
+for admins and operators who sign in with a local password. One of them
+without a second factor can, after signing in, only set it up (or sign out):
+the rest of the interface waits, and the API answers `403` with
+`"code": "totp_setup_required"` until it is done. Viewers are not concerned.
+Sign-ins through single sign-on (OIDC, SAML) and LDAP are exempt — the
+identity provider handles their multi-factor authentication — and so are
+passkey sign-ins, which already prove possession and the user. API tokens
+are not affected. The setting is part of the backup.
 
 ## Single sign-on
 

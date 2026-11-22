@@ -276,25 +276,33 @@ Every other write is admin only and answers `403` to an operator.
 | `POST` | `/api/auth/login/totp` | public | `{"pending": "…", "code": "123456"}` — the ticket from the first step and a code (or a recovery code). `204` with the session cookie. |
 | `GET` | `/api/auth/oidc/start` | public | Redirects the browser to the identity provider. |
 | `GET` | `/api/auth/oidc/callback` | public | Return from the provider (`code`, `state`): opens the session and redirects to the UI. |
-| `GET` | `/api/auth/me` | session only | The current account: `id`, `username`, `display_name`, `role` (`admin`, `operator`, `viewer`), `auth` (`password`, `oidc`), `disabled`, `totp_enabled`, `created_at`, `last_login_at`. |
+| `GET` | `/api/auth/me` | session only | The current account: `id`, `username`, `display_name`, `email` (optional, never used to sign in), `role` (`admin`, `operator`, `viewer`), `auth` (`password`, `oidc`), `disabled`, `totp_enabled`, `created_at`, `last_login_at`. |
 | `POST` | `/api/auth/logout` | session only | Ends the session and clears the cookie. |
 | `POST` | `/api/auth/password` | session only | `{"current_password": "…", "new_password": "…"}`. Signs out every other session. |
 | `GET` | `/api/auth/totp` | session only | Two-factor state of the current account: `enabled`, `pending`, `recovery_codes_left`. |
 | `POST` | `/api/auth/totp/enroll` | session only | `{"password": "…"}`. Proposes a secret: `secret` (base32), `otpauth_uri`, `issuer`, `account`. Nothing is enforced until verified. |
 | `POST` | `/api/auth/totp/verify` | session only | `{"code": "123456"}`. Confirms the enrolment and returns `{"recovery_codes": […]}` — shown once. |
 | `DELETE` | `/api/auth/totp` | session only | `{"password": "…"}`. Removes the second factor. `204`. |
+| `POST` | `/api/auth/totp/recovery-codes` | session only | `{"code": "123456"}` (a current code from the app) or `{"password": "…"}`. Replaces the recovery codes without turning two-factor off; the old ones stop working. Returns `{"recovery_codes": […]}` — shown once. `409` when two-factor is off. |
+| `GET` | `/api/auth/sessions` | session only | The open sessions of the current account, most recently active first: `id` (public part of the cookie, it cannot open the session), `created_at`, `last_seen_at` (updated at most every five minutes), `expires_at`, `ip`, `user_agent`, `browser`, `os`, `via` (`password`, `passkey`, `ldap`, `oidc`, `saml`), `current`. |
+| `DELETE` | `/api/auth/sessions/{id}` | session only | Signs out one of your other sessions. `204`; `404` for a session that is not yours; `409` for the current one (use logout). |
+| `POST` | `/api/auth/sessions/revoke-others` | session only | Signs out every other session of the current account. `{"closed": n}`. |
+| `GET` | `/api/auth/policy` | admin, session only | `{"require_totp": bool}`. |
+| `PUT` | `/api/auth/policy` | admin, session only | `{"require_totp": true}` requires two-factor from admins and operators who sign in with a local password; an absent field means off. Held accounts get `403` with `"code": "totp_setup_required"` on every route but `GET /api/auth/me`, `GET /api/auth/totp`, `POST /api/auth/totp/enroll`, `POST /api/auth/totp/verify` and logout; `/api/auth/status` says `totp_setup_required: true`. Single sign-on (OIDC, SAML), LDAP and passkey sessions are exempt. |
 | `GET` | `/api/auth/audit?limit=200` | admin, session only | The latest security events: `id`, `at`, `actor`, `action` (`login`, `login.failed`, `password.changed`, `token.created`, `user.updated`, …), `subject`, `ip`. |
 | `GET` | `/api/auth/oidc/config` | admin, session only | The SSO settings and where they come from (environment or database); the client secret is never returned. |
 | `PUT` | `/api/auth/oidc/config` | admin, session only | `{"issuer", "client_id", "client_secret", "provider_name", "scopes", "auto_create", "admin_groups", "groups_claim", "public_url"}`. An absent or empty `client_secret` keeps the stored one; an absent `auto_create` means off. |
 | `DELETE` | `/api/auth/oidc/config` | admin, session only | Forgets the stored SSO settings (environment variables, if any, apply again). `204`. |
 | `POST` | `/api/auth/oidc/test` | admin, session only | Fetches the provider's discovery document and reports what it found. |
 | `GET` | `/api/users` | admin, session only | Every account, in the shape of `/api/auth/me`. |
-| `POST` | `/api/users` | admin, session only | `{"username", "display_name", "role", "password"}`. `password` may be omitted only when SSO is enabled. `201`. |
-| `PUT` | `/api/users/{id}` | admin, session only | Any of `display_name`, `role`, `disabled`, `password`; an omitted field keeps its value. Cannot demote or disable the last administrator. |
+| `POST` | `/api/users` | admin, session only | `{"username", "display_name", "email", "role", "password"}`. `password` may be omitted only when SSO is enabled; `email` is optional (`400` when it is not an address). `201`. |
+| `PUT` | `/api/users/{id}` | admin, session only | Any of `display_name`, `email` (blank clears it), `role`, `disabled`, `password`; an omitted field keeps its value. Cannot demote or disable the last administrator. |
 | `DELETE` | `/api/users/{id}` | admin, session only | `204`. Not yourself, not the last administrator. |
 | `DELETE` | `/api/users/{id}/totp` | admin, session only | Resets another account's second factor (a locked-out colleague). `204`. |
+| `DELETE` | `/api/users/{id}/sessions` | admin, session only | Signs the account out everywhere (for your own account, the session making the request stays). `{"closed": n}`. |
 | `GET` | `/api/tokens` | session only | Every API token: `id`, `name`, `prefix`, `scope`, `created_at`, `created_by` (the account that created it), `expires_at` (`null`: never), `expired`, `allowed_networks` (empty: anywhere), `last_used_at`, `last_used_ip`, `revoked_at`. Never the secret. |
 | `POST` | `/api/tokens` | admin, session only | `{"name": "Grafana", "scope": "read", "expires_in_days": 90, "allowed_networks": ["192.168.1.0/24"]}`. `name` is required (80 characters at most); `scope` is `read` (default) or `write`; `expires_in_days` runs from 1 to 3650, `null` or absent for a token that never expires; `allowed_networks` takes up to 32 addresses or CIDR ranges, stored in network form (`192.168.1.7/24` becomes `192.168.1.0/24`), empty or absent for anywhere. `201` with the token fields plus `secret` (shown once). `400` names an invalid network. |
+| `PATCH` | `/api/tokens/{id}` | admin, session only | Any of `name`, `allowed_networks` (replaces the list; empty: anywhere) and `expires_in_days` (a new expiry counted from now, 1 to 3650; `null`: never expires), checked as on creation; an omitted field keeps its value. The secret and the scope never change. Returns the token; `404` when unknown or revoked. |
 | `DELETE` | `/api/tokens/{id}` | admin, session only | Revoke. `204`; `404` when unknown or already revoked. |
 
 A token as listed:

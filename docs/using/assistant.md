@@ -24,12 +24,17 @@ the assistant or the machine it runs on ("Claude on my laptop"), then choose:
 | Setting | Choices |
 | --- | --- |
 | **Scope** | **Read**: look — status, monitors, alerts, history, metrics, rules, agents, status pages. It can never change anything. **Read and write**: also act — silence, acknowledge, probe, add a monitor, restart a container, post an incident… (the [write tools](#what-the-assistant-can-call)). |
-| **Expires** | 30 days, 90 days (the default), 1 year or never. An expired token stops working; create a new one. |
+| **Expires** | 30 days, 90 days (the default), 1 year or never. An expired token stops working. A week before, the token list marks it and the built-in rule *DumbMonit API token expiring soon* raises an advisory alert. |
 | **Allowed networks** | Optional. Addresses or CIDR ranges the token may be used from (`192.168.1.0/24, 10.8.0.5`). Empty: anywhere. |
 
 The token looks like `dmt_` followed by 32 hexadecimal characters. It is shown
 **once**, right after creation; DumbMonit only keeps a hash. Lose it, revoke it
 and create another one.
+
+**Edit** on a token in the list renames it, changes its allowed networks, or
+gives it a new expiry counted from today (30 days, 90 days, 1 year or never),
+expired tokens included. The secret and the scope stay the same, so the
+clients that use it keep working; for another scope, create another token.
 
 Prefer a read token unless you actually want the assistant to act.
 
