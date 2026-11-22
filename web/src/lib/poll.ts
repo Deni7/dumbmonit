@@ -62,9 +62,13 @@ export function startPolling(load: PollLoad, ms: number, options: PollOptions = 
 	let failures = 0;
 	let lastEnd = 0;
 
-	function schedule(wait: number) {
-		clearTimeout(timer);
+	function cancel() {
+		if (timer !== undefined) clearTimeout(timer);
 		timer = undefined;
+	}
+
+	function schedule(wait: number) {
+		cancel();
 		if (stopped || (hasDocument && document.hidden)) return;
 		timer = setTimeout(run, wait);
 	}
@@ -89,8 +93,7 @@ export function startPolling(load: PollLoad, ms: number, options: PollOptions = 
 	function onVisibility() {
 		if (stopped) return;
 		if (document.hidden) {
-			clearTimeout(timer);
-			timer = undefined;
+			cancel();
 		} else if (!running) {
 			schedule(pollRemaining(pollDelay(ms, failures), lastEnd, Date.now()));
 		}
@@ -106,7 +109,7 @@ export function startPolling(load: PollLoad, ms: number, options: PollOptions = 
 
 	return () => {
 		stopped = true;
-		clearTimeout(timer);
+		cancel();
 		if (hasDocument) document.removeEventListener('visibilitychange', onVisibility);
 		controller.abort();
 	};
