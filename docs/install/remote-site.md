@@ -195,8 +195,44 @@ the rule; `--no-firewall` (`-NoFirewall`) leaves the firewall alone. On a Docker
 relay, `docker-compose.agent.yml` publishes 8443
 (`DUMBMONIT_AGENT_GATEWAY_PUBLISH=192.168.10.5:8443` keeps it on the LAN
 address). `gateway_listen: 0.0.0.0:9443` in the relay's `agent.yaml`
-(`DUMBMONIT_AGENT_GATEWAY_LISTEN`) wins over the setting in the UI. Relays
-installed before this behaviour keep a gateway they never opened closed.
+(`DUMBMONIT_AGENT_GATEWAY_LISTEN`) wins over the setting in the UI; the
+command shown for the site then uses the port the relay really listens on.
+Without `gateway_listen`, the gateway listens on **every interface** of the
+relay. Relays installed before this behaviour keep a gateway they never opened
+closed.
+
+The relay reports what it **really** opened: the bound address
+(`0.0.0.0:8443`), or why it could not listen (port already used by another
+program, permission denied, an address the machine does not have). The add
+screen shows the command for the site only when the gateway listens and has
+passed the relay's own test. Otherwise it says why, with the fix:
+
+| The add screen says | What to do |
+|---|---|
+| *The gateway is switched off* | On the relay's page, *Relay* panel, turn on *Gateway for the agents of this site* and save. The relay opens it within seconds. |
+| *Runs agent X, which has no gateway* | The relay agent predates the gateway (0.14.2). Update it (from its page, or by running its install command again). |
+| *Is not connected* | The relay has not reported for three periods: check that its agent runs and reaches the server. |
+| *Cannot open port 8443* | Another program holds the port on the relay (`sudo ss -ltnp 'sport = :8443'`, or `Get-NetTCPConnection -LocalPort 8443 -State Listen` on Windows). Free it, or choose another gateway port in the *Relay* panel. |
+| *Listens on 127.0.0.1:8443 only* | `gateway_listen` binds the gateway to the loopback. Use `gateway_listen: 0.0.0.0:8443`, or remove the line, then restart the agent. |
+| *Is not on the encrypted agent channel* | The relay itself reaches the server over the web port only, so it cannot open tunnels. Publish and open the server's agent port (8443) towards the relay; it switches to it on its own. |
+| *Does not answer at 192.168.10.5:8443* | The relay's own test at the site's address failed: wrong address, or (relay in Docker) port not published. |
+
+The relay's test is labelled as such on the screen (*Tested by the relay
+itself at …, 2 min ago*): it proves the gateway listens, the port is
+published and the tunnel works, but it does not cross a firewall **between**
+the site's machines and the relay. If the machines still get *Unable to
+connect to the remote server* (Windows) or *Failed to connect* (`curl`) while
+the relay answers ping, open the port on the relay's host firewall, to the
+site's network:
+
+```bash
+sudo firewall-cmd --add-port=8443/tcp --permanent && sudo firewall-cmd --reload   # firewalld
+sudo ufw allow 8443/tcp                                                           # ufw
+```
+
+```powershell
+New-NetFirewallRule -DisplayName "DumbMonit agents" -Direction Inbound -Protocol TCP -LocalPort 8443 -Action Allow
+```
 
 What travels through the relay:
 
@@ -301,6 +337,8 @@ A monitor does not have to choose between the server and one relay: it can be pr
 | A monitor shows *Timed out: relay agent … did not pick up the probe* | The relay is stopped or not in relay mode. Check the service on the relay machine and that `relay: true` is set. |
 | A monitor shows a red message under its address | The relay cannot reach the device. The address must be the one **seen from the remote site**, and the relay needs the same access the server would. |
 | Agents installed behind the relay do not appear | Run the command copied from the relay's *Install an agent behind this relay* page, not the direct one. The relay opens its gateway within seconds; the add screen says whether the relay could reach it at the site's address. |
+| `irm https://<relay>:8443/install.ps1` says *Unable to connect to the remote server*, or `curl` says *Failed to connect*, while the relay answers ping | Nothing accepts TCP 8443 on the relay for that machine. Open the relay's page: the *Relay* panel says whether the gateway listens and, if not, why (switched off, port already used, loopback only, agent too old). If it listens and the relay's own test passes, a firewall between the machine and the relay drops the port: open it on the relay's host (commands above). A relay in Docker must publish 8443. |
+| The relay's page says *Not on the encrypted agent channel* | The server's agent port (8443) is not reachable from the relay: see [Network ports](ports.md). |
 
 ## Limits
 

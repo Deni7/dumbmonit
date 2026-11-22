@@ -209,6 +209,7 @@ pub async fn push_agent_batch(
         self_update: None,
         relay_gateway: host.gateway,
         relay_gateway_check: None,
+        relay_gateway_state: None,
         server_link: None,
         remediation: None,
     };

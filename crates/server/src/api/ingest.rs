@@ -603,6 +603,18 @@ pub struct RelayRoute {
     /// `Some(false)`, voir `check_error` ; `None`, pas encore essayée là.
     pub reachable: Option<bool>,
     pub check_error: Option<String>,
+    /// Instant de cet essai, en millisecondes depuis l'époque Unix.
+    pub checked_at_ms: Option<i64>,
+    /// Ce qui empêche la passerelle d'accepter le site, quand le serveur le
+    /// sait : fermée, relais trop ancien ou muet, port impossible à ouvrir,
+    /// écoute sur la boucle locale, pas de canal chiffré.
+    pub problem: Option<agent::gateway::GatewayProblem>,
+    /// Adresse que le relais a vraiment liée (`0.0.0.0:8443`).
+    pub listen: Option<String>,
+    /// Pourquoi le relais n'a pas pu ouvrir le port, tel qu'il le rapporte.
+    pub bind_error: Option<String>,
+    /// Version de l'agent du relais.
+    pub agent_version: String,
 }
 
 /// Résout le passage par `relay` : un agent en mode relais, du client donné
@@ -639,10 +651,9 @@ pub async fn relay_route(
             }
         },
     };
-    let port = info
-        .relay_gateway_wanted
-        .or(info.relay_gateway_port)
-        .unwrap_or(dumbmonit_proto::DEFAULT_RELAY_GATEWAY_PORT);
+    let port = agent::gateway::dialed_port(&info);
+    let offline = agent::gateway::offline(&state.pool, relay).await?;
+    let problem = agent::gateway::problem(&info, offline);
     let relay_name: String = sqlx::query_scalar("SELECT name FROM targets WHERE id = ?")
         .bind(relay)
         .fetch_one(&state.pool)
@@ -661,6 +672,11 @@ pub async fn relay_route(
         self_check: info.relay_gateway_check.is_some(),
         reachable: check.map(|check| check.ok),
         check_error: check.and_then(|check| check.error.clone()),
+        checked_at_ms: check.map(|check| check.checked_at_ms),
+        problem,
+        listen: info.relay_gateway_state.as_ref().and_then(|state| state.listen.clone()),
+        bind_error: info.relay_gateway_state.as_ref().and_then(|state| state.error.clone()),
+        agent_version: info.agent_version.clone(),
         host,
         port,
     })

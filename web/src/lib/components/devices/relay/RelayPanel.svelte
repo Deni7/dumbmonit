@@ -224,10 +224,23 @@
 										: m.devicesb_relay_panel_gateway_check_failed({ address: host.gateway_check.address, error: host.gateway_check.error ?? '' })}
 								</span>
 							{/if}
+						{:else if host.gateway_problem === 'bind_failed' && host.gateway_state}
+							<span class="block break-words text-warning-ink">
+								{m.devicesb_relay_panel_gateway_bind_failed({ address: host.gateway_state.wanted, error: host.gateway_state.error ?? '' })}
+							</span>
+						{:else if host.gateway_problem === 'too_old'}
+							<span class="block break-words text-warning-ink">{m.devicesb_relay_panel_gateway_too_old({ version: host.agent_version })}</span>
 						{:else if host.gateway_wanted != null}
 							{m.devicesb_relay_panel_gateway_opening()}
 						{:else}
 							{m.devicesb_relay_panel_gateway_closed()}
+						{/if}
+						{#if host.gateway_port != null && host.gateway_problem === 'loopback'}
+							<span class="block break-words text-warning-ink">
+								{m.devicesb_relay_panel_gateway_loopback({ address: host.gateway_state?.listen ?? '', line: `gateway_listen: 0.0.0.0:${host.gateway_port}` })}
+							</span>
+						{:else if host.gateway_port != null && host.gateway_problem === 'no_tunnel'}
+							<span class="block break-words text-warning-ink">{m.devicesb_relay_panel_gateway_no_tunnel()}</span>
 						{/if}
 					</dd>
 				{/if}

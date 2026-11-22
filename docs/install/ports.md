@@ -64,7 +64,34 @@ the Internet, but it still deserves a source filter. Change it with
   default, as soon as it connects. Its install command opens that port on the
   relay's firewall (firewalld, ufw or the Windows firewall) to the local subnet
   only, and `--uninstall` closes it again. A relay in Docker publishes it
-  through `docker-compose.agent.yml`.
+  through `docker-compose.agent.yml`. The relay reports the address it really
+  listens on, or why it cannot (see
+  [Monitor a remote site](remote-site.md#5-install-agents-behind-the-relay)).
+
+#### Troubleshooting the agent channel
+
+**The port is not published.** The most common case: the web interface is
+published (`8090:8080` for instance) but the agent channel is not. Agents and
+TLS enrolment then fail with *Connection refused*. Before it shows an install
+command, the add screen dials the channel at the address the command will
+carry and says *Port 8443 is not published*, with the line to add under
+`ports:` in `docker-compose.yml`:
+
+```yaml
+    ports:
+      - "8090:8080"
+      - "8443:8443"   # agent channel (DUMBMONIT_AGENT_PUBLIC_PORT if published as another number)
+```
+
+then `docker compose up -d`. The install scripts print the same hint when the
+TLS connection is refused, and *no answer* (timeout) when a firewall drops it.
+The check runs from the server itself: behind a NAT without hairpin it can fail
+although machines outside connect fine (**Show the command anyway**).
+
+**Through a relay**, the port the site's machines need is the relay's gateway,
+not the server's: see the table in
+[Monitor a remote site](remote-site.md#5-install-agents-behind-the-relay). The
+relay itself still needs the server's 8443.
 
 See [Agent channel security](agent-security.md).
 
