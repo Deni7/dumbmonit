@@ -22,6 +22,20 @@ export type Prefill = Record<string, Scalar | Record<string, Scalar>>;
 const isScalar = (value: unknown): value is Scalar =>
 	typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
 
+const SECRET_WORDS = new Set(['secret', 'password', 'passwd', 'pass', 'token', 'cert', 'key', 'apikey', 'credential', 'credentials', 'pem', 'private']);
+
+/**
+ * The tags of a monitor without the ones that hold a secret (a copy never
+ * carries them): the word list of `looks_secret` in `crates/proto/src/target.rs`
+ * (`api_key` yes, `keyword` no), plus the HTTP `headers`, where an
+ * `Authorization` slips in.
+ */
+export function withoutSecretTags(tags: Record<string, string>): Record<string, string> {
+	const secret = (key: string) =>
+		key.toLowerCase() === 'headers' || key.toLowerCase().split(/[^a-z0-9]+/).some((word) => SECRET_WORDS.has(word));
+	return Object.fromEntries(Object.entries(tags).filter(([key]) => !secret(key)));
+}
+
 /** Keeps the scalar, non-secret entries of a server-provided object. */
 export function cleanPrefill(raw: unknown): Prefill {
 	const out: Prefill = {};

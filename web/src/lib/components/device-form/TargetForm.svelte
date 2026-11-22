@@ -57,6 +57,9 @@
 		type CredentialErrors
 	} from './credentials';
 	import { DEFAULT_INTERVAL, INTERVALS, SNMP_KIND, suggestName } from './kinds';
+	import { INTERVAL_UNITS, MIN_INTERVAL_SECS, intervalProblem, intervalSeconds, splitInterval, type IntervalUnit } from './interval';
+	import { withoutSecretTags } from './discovery-prefill';
+	import { useDirtyTracker } from '#lib/settings/unsaved.svelte.js';
 	import { firstReason, identitySummary, testBlocker } from './test-connection';
 	import { seedFromPrefill, type Prefill } from './discovery-prefill';
 
@@ -64,6 +67,11 @@
 		collector: CollectorInfo;
 		/** Present on edit, absent on add. */
 		target?: Target;
+		/**
+		 * Add only: the monitor this one is copied from. Its settings seed the form
+		 * (the name gets " (copy)"); no secret comes along, they are typed again.
+		 */
+		duplicateOf?: Target;
 		/** Candidates for "Parent device". The target itself is filtered out. */
 		targets?: Target[];
 		onsaved: (target: Target) => void;
@@ -77,17 +85,22 @@
 		folderDefault?: string;
 	}
 
-	let { collector, target, targets = [], onsaved, cancelHref, prefill = null, viaAgentDefault = null, locationDefault = null, folderDefault = '' }: Props = $props();
+	let { collector, target, duplicateOf, targets = [], onsaved, cancelHref, prefill = null, viaAgentDefault = null, locationDefault = null, folderDefault = '' }: Props = $props();
+
+	/** Value of the interval select that opens the number and unit fields. */
+	const CUSTOM_INTERVAL = 'custom';
 
 	// The scan's findings, folded into this kind's fields. Seeds once, like the rest.
-	const seed = untrack(() => seedFromPrefill(target ? null : prefill, collector));
+	const seed = untrack(() => seedFromPrefill(target || duplicateOf ? null : prefill, collector));
+	/** What the fields are seeded from: the edited monitor, or the one being copied. */
+	const base = untrack(() => target ?? duplicateOf);
 
 	const editing = $derived(target !== undefined);
 	/** The credential families this kind accepts, field by field, from the server. */
 	const views = $derived(collector.credentials);
 
 	// --- Seed once from the target -------------------------------------------
-	const initialCredential: CredentialView = untrack(() => initialView(collector.credentials, target?.credential_kind));
+	const initialCredential: CredentialView = untrack(() => initialView(collector.credentials, base?.credential_kind));
 	/** The saved credential as the API describes it: kind, whether a secret is stored, its public parts. */
 	const saved: SavedCredential | null = untrack(() =>
 		target
@@ -102,33 +115,70 @@
 	const initialDraft: CredentialDraft = untrack(() =>
 		target
 			? prefillDraft(initialCredential, saved)
-			: {
+			: duplicateOf
+				? // The copy keeps the user name and token ID, never a secret.
+					prefillDraft(initialCredential, {
+						kind: kindFromLabel(duplicateOf.credential_kind, ''),
+						has_secret: false,
+						public: duplicateOf.credential_public ?? {}
+					})
+				: {
 					...emptyDraft(initialCredential),
 					// "public" is the factory community of nearly every device: pre-filled on add.
 					...(initialCredential.kind === 'snmp_community' ? { community: 'public' } : {})
 				}
 	);
 
-	let name = $state(untrack(() => target?.name ?? seed.name));
-	let address = $state(untrack(() => target?.address ?? seed.address));
-	let intervalSecs = $state(untrack(() => target?.interval_secs ?? DEFAULT_INTERVAL));
-	let parentId = $state<number | null>(untrack(() => target?.parent_id ?? null));
-	let viaAgent = $state<number | null>(untrack(() => (target ? target.via_agent : viaAgentDefault) ?? null));
+	let name = $state(untrack(() => (duplicateOf ? m.w1monitors_form_copy_name({ name: duplicateOf.name }) : (target?.name ?? seed.name))));
+	let address = $state(untrack(() => base?.address ?? seed.address));
+	// The interval: one of the presets, or a number and a unit ("Custom").
+	const initialInterval = untrack(() => base?.interval_secs ?? DEFAULT_INTERVAL);
+	const initialSplit = splitInterval(initialInterval);
+	let intervalChoice = $state(INTERVALS.some((o) => o.value === initialInterval) ? String(initialInterval) : CUSTOM_INTERVAL);
+	let customValue = $state(String(initialSplit.value));
+	let customUnit = $state<IntervalUnit>(initialSplit.unit);
+	/** Seconds between two checks; `null` while the custom value is not a number. */
+	const intervalSecs = $derived(intervalChoice === CUSTOM_INTERVAL ? intervalSeconds(customValue, customUnit) : Number(intervalChoice));
+	const intervalIssue = $derived(intervalProblem(intervalSecs));
+	const intervalError = $derived(
+		intervalIssue === 'min'
+			? m.w1monitors_form_interval_err_min({ min: MIN_INTERVAL_SECS })
+			: intervalIssue === 'max'
+				? m.w1monitors_form_interval_err_max()
+				: intervalIssue === 'invalid'
+					? m.w1monitors_form_interval_err_invalid()
+					: null
+	);
+	const unitLabel = (unit: IntervalUnit) =>
+		({ s: m.w1monitors_form_unit_seconds(), m: m.w1monitors_form_unit_minutes(), h: m.w1monitors_form_unit_hours(), d: m.w1monitors_form_unit_days() })[unit];
+	function chooseInterval(choice: string) {
+		// Opening "Custom" starts from the preset just left, so the number means something.
+		if (choice === CUSTOM_INTERVAL && intervalChoice !== CUSTOM_INTERVAL && intervalSecs !== null) {
+			const split = splitInterval(intervalSecs);
+			customValue = String(split.value);
+			customUnit = split.unit;
+		}
+		intervalChoice = choice;
+	}
+	/** Free text for the team, shown on the monitor's page. */
+	let note = $state(untrack(() => base?.note ?? ''));
+	let parentId = $state<number | null>(untrack(() => base?.parent_id ?? null));
+	let viaAgent = $state<number | null>(untrack(() => (base ? base.via_agent : viaAgentDefault) ?? null));
 	// Probe from several locations (uptime kinds). Exclusive with `viaAgent`.
-	let msOn = $state(untrack(() => !!target?.multisite));
-	let msServer = $state(untrack(() => target?.multisite?.server ?? true));
-	let msAgents = $state<number[]>(untrack(() => [...(target?.multisite?.agents ?? [])]));
-	let msQuorum = $state<number | null>(untrack(() => target?.multisite?.quorum ?? null));
-	let enabled = $state(untrack(() => target?.enabled ?? true));
-	let cveScan = $state(untrack(() => target?.cve_scan ?? true));
-	let groupName = $state(untrack(() => target?.group_name ?? folderDefault));
+	let msOn = $state(untrack(() => !!base?.multisite));
+	let msServer = $state(untrack(() => base?.multisite?.server ?? true));
+	let msAgents = $state<number[]>(untrack(() => [...(base?.multisite?.agents ?? [])]));
+	let msQuorum = $state<number | null>(untrack(() => base?.multisite?.quorum ?? null));
+	let enabled = $state(untrack(() => base?.enabled ?? true));
+	let cveScan = $state(untrack(() => base?.cve_scan ?? true));
+	let groupName = $state(untrack(() => base?.group_name ?? folderDefault));
 	// MSP mode: the client of the target. Offered when there is a choice; only
 	// the MSP administrator moves an existing target (its dependents follow).
 	const clientChoices = $derived(auth.mspOn ? (auth.msp?.clients ?? []) : []);
 	const showClient = $derived(clientChoices.length > 1 || (auth.msp?.admin === true && clientChoices.length > 0));
 	const clientLocked = $derived(!!target && auth.msp?.admin !== true);
 	let clientId = $state<number | null>(untrack(() => target?.client_id ?? auth.currentClient ?? null));
-	let locationId = $state<number | null>(untrack(() => target ? (target.location_id ?? null) : locationDefault));
+	let locationId = $state<number | null>(untrack(() => base ? (base.location_id ?? null) : locationDefault));
 	/** Locations of the world map; the field only shows once there is one. */
 	let locations = $state<MapLocation[]>([]);
 	$effect(() => {
@@ -145,7 +195,13 @@
 	// (the major blocklists, say); an existing one keeps what it has, and no tag
 	// there means every box.
 	let tags = $state<Record<string, string>>(
-		untrack(() => (target ? { ...target.tags } : seedChecklists(collector.options, seed.tags)))
+		untrack(() =>
+			target
+				? { ...target.tags }
+				: duplicateOf
+					? withoutSecretTags(duplicateOf.tags)
+					: seedChecklists(collector.options, seed.tags)
+		)
 	);
 	let credential = $state<CredentialView>(initialCredential);
 	let draft = $state<CredentialDraft>(untrack(() => ({ ...initialDraft })));
@@ -277,7 +333,7 @@
 	});
 
 	const valid = $derived(
-		!nameError && !addressError && Object.keys(credentialErrors).length === 0 && Object.keys(optionErrors).length === 0
+		!nameError && !addressError && !intervalError && Object.keys(credentialErrors).length === 0 && Object.keys(optionErrors).length === 0
 	);
 
 	function shown(field: string, error: string | null | undefined): string | undefined {
@@ -368,7 +424,8 @@
 			...(canMultisite && (msOn || target?.multisite)
 				? { multisite: msOn ? { server: msServer, agents: msAgents, quorum: msQuorum } : null }
 				: {}),
-			interval_secs: intervalSecs,
+			interval_secs: intervalSecs ?? DEFAULT_INTERVAL,
+			note: note.trim(),
 			enabled,
 			cve_scan: cveScan,
 			group_name: groupName.trim(),
@@ -385,6 +442,36 @@
 	let ruleChoices = $state<Record<number, boolean>>({});
 	let monitoredRules = $state<TargetRule[]>([]);
 	let rulesError = $state<unknown>(null);
+
+	// Leaving with edits not saved asks first (navigation and tab close alike).
+	// The switches of the monitored alerts count too.
+	const tracker = useDirtyTracker(() => ({
+		name,
+		address,
+		intervalChoice,
+		customValue,
+		customUnit,
+		note,
+		parentId,
+		viaAgent,
+		msOn,
+		msServer,
+		msAgents,
+		msQuorum,
+		enabled,
+		cveScan,
+		groupName,
+		clientId,
+		locationId,
+		tags,
+		credential: credential.kind,
+		draft,
+		rules: ruleChoices
+	}));
+	// The form starts clean: the baseline is taken once the seed and the first effects have run.
+	$effect(() => {
+		untrack(() => tracker.markClean());
+	});
 
 	/** Saves the moved switches as overrides; each one that lands is folded into the loaded state. */
 	async function saveRuleChoices(targetId: number) {
@@ -461,6 +548,7 @@
 			: firstReason([
 					nameError,
 					addressError,
+					intervalError,
 					...Object.values(credentialErrors),
 					...Object.values(optionErrors)
 				])
@@ -485,6 +573,8 @@
 					return;
 				}
 			}
+			// Saved: the page may now navigate away without asking.
+			tracker.markClean();
 			onsaved(saved);
 		} catch (cause) {
 			serverError = cause;
@@ -495,6 +585,11 @@
 </script>
 
 <form onsubmit={submit} class="grid gap-5" novalidate>
+	{#if duplicateOf}
+		<p class="rounded-[var(--radius-card)] border border-line bg-surface-2/60 px-3 py-2 text-sm text-ink-2" role="note">
+			{m.w1monitors_form_copy_notice({ name: duplicateOf.name })}
+		</p>
+	{/if}
 	<RequirementNotice requirements={collector.requirements} />
 	{#if agentOption}
 		<AgentLink {collector} option={agentOption} {targets} value={tags[agentOption.key] ?? ''} guessed={agentGuessed} onchange={chooseAgent} />
@@ -591,15 +686,32 @@
 			{/if}
 
 			<div class="grid gap-4 sm:grid-cols-2">
-				<Field label={m.deviceform_form_interval_label()} for="target-interval" help={m.deviceform_form_interval_help()}>
-					<select id="target-interval" class="input tnum" bind:value={intervalSecs}>
+				<Field label={m.deviceform_form_interval_label()} for="target-interval" help={m.deviceform_form_interval_help()} error={intervalChoice === CUSTOM_INTERVAL ? intervalError : null}>
+					<select id="target-interval" class="input tnum" value={intervalChoice} onchange={(e) => chooseInterval(e.currentTarget.value)}>
 						{#each INTERVALS as option (option.value)}
-							<option value={option.value}>{option.label}</option>
+							<option value={String(option.value)}>{option.label}</option>
 						{/each}
-						{#if !INTERVALS.some((o) => o.value === intervalSecs)}
-							<option value={intervalSecs}>{m.deviceform_interval_seconds({ value: intervalSecs })}</option>
-						{/if}
+						<option value={CUSTOM_INTERVAL}>{m.w1monitors_form_interval_custom()}</option>
 					</select>
+					{#if intervalChoice === CUSTOM_INTERVAL}
+						<div class="mt-2 flex items-center gap-2">
+							<input
+								class="input tnum !w-28"
+								type="number"
+								inputmode="numeric"
+								min="1"
+								step="1"
+								bind:value={customValue}
+								aria-label={m.w1monitors_form_interval_value_aria()}
+								aria-invalid={intervalError ? 'true' : undefined}
+							/>
+							<select class="input !w-auto" bind:value={customUnit} aria-label={m.w1monitors_form_interval_unit_aria()}>
+								{#each INTERVAL_UNITS as unit (unit)}
+									<option value={unit}>{unitLabel(unit)}</option>
+								{/each}
+							</select>
+						</div>
+					{/if}
 				</Field>
 
 				{#if showClient}
@@ -736,6 +848,17 @@
 			</div>
 
 			<TagsEditor tags={freeTags} reserved={optionKeys} onchange={setFreeTags} />
+
+			<Field label={m.w1monitors_form_note_label()} for="target-note" help={m.w1monitors_form_note_help()}>
+				<textarea
+					id="target-note"
+					class="input min-h-24 resize-y"
+					rows="3"
+					maxlength="2000"
+					bind:value={note}
+					placeholder={m.w1monitors_form_note_placeholder()}
+				></textarea>
+			</Field>
 
 			<Field label={m.deviceform_form_enabled_label()} for="target-enabled" inline help={m.deviceform_form_enabled_help()}>
 				<Toggle id="target-enabled" bind:checked={enabled} label={m.deviceform_form_enabled_label()} />

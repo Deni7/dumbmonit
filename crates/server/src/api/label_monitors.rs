@@ -155,6 +155,7 @@ pub async fn reconcile(
             enabled: Some(true),
             tags: sanitized_tags(&item.tags),
             group_name: Some(Some(item.folder.clone())),
+            note: None,
             location_id: None,
             credential: None,
             cve_scan: None,

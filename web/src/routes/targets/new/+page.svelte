@@ -22,7 +22,7 @@
 	import { afterNavigate } from '$app/navigation';
 	import { goto } from '#lib/navigation.js';
 	import { ArrowLeft, BookOpen, CalendarClock, ChevronRight, FileSpreadsheet, Globe, Plug, Radar, Upload } from 'lucide-svelte';
-	import { ApiError, listCollectors, listTargets, type CollectorInfo, type Target } from '#lib/api/index.js';
+	import { ApiError, getTarget, listCollectors, listTargets, type CollectorInfo, type Target } from '#lib/api/index.js';
 	import { Button, DocLink, EmptyState, ErrorNotice, PageHeader, Panel, Plate, Skeleton } from '#lib/ui/index.js';
 	import ImportWebsites from '#lib/components/device-form/ImportWebsites.svelte';
 	import ImportKuma from '#lib/components/device-form/ImportKuma.svelte';
@@ -114,6 +114,25 @@
 		return Number.isInteger(value) && value > 0 ? value : null;
 	}
 	const selected = $derived(collectors.find((c) => c.kind === requestedKind) ?? null);
+	/** `?duplicate=<id>`: the monitor whose settings seed the form (secrets are never copied). */
+	const duplicateId = $derived(idParam('duplicate'));
+	let duplicateSource = $state<Target | null>(null);
+	/** Set once the monitor to copy was read (or could not be), so the form never flashes empty first. */
+	let duplicateRead = $state(false);
+	$effect(() => {
+		const wanted = duplicateId;
+		duplicateSource = null;
+		duplicateRead = wanted === null;
+		if (wanted === null) return;
+		const controller = new AbortController();
+		getTarget(wanted, controller.signal)
+			.then((found) => (duplicateSource = found))
+			.catch(() => {})
+			.finally(() => {
+				if (!controller.signal.aborted) duplicateRead = true;
+			});
+		return () => controller.abort();
+	});
 	/** `?scan=1` opens the network scan: the first-run guide and the command palette link to it. */
 	const scanning = $derived(!requestedKind && params.get('scan') === '1');
 	const snmp = $derived(collectors.find((c) => c.kind === SNMP_KIND) ?? null);
@@ -529,8 +548,12 @@
 									{m.deviceform_new_prefilled()}
 								</p>
 							{/if}
+							{#if !duplicateRead}
+								<Skeleton class="h-40 w-full" />
+							{:else}
 							<TargetForm
 								collector={selected}
+								duplicateOf={duplicateSource && duplicateSource.kind === selected.kind ? duplicateSource : undefined}
 								{prefill}
 								viaAgentDefault={idParam('via_agent')}
 								locationDefault={idParam('location')}
@@ -543,6 +566,7 @@
 										state: { firstDevice: targetsKnown && targets.length === 0 } as App.PageState
 									})}
 							/>
+							{/if}
 						{/if}
 					{/key}
 				</Panel>

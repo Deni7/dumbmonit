@@ -432,6 +432,7 @@ async fn add_one(
         enabled: if pending { Some(false) } else { None },
         tags,
         group_name: None,
+        note: None,
         location_id: None,
         multisite: None,
         credential: None,

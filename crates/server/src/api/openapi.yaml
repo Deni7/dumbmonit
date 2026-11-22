@@ -12887,6 +12887,8 @@ components:
           description: "Non-secret parts of the credential, under the form's field keys (`username`, `token_id` for a Proxmox `user@realm!name` token, `auth_protocol`, `privacy_protocol`, `context`), to pre-fill the edit form. Never a secret; empty for a reader."
           additionalProperties: { type: string }
         group_name: { type: string, description: "Flat folder shown on `/targets`; empty: no folder." }
+        note: { type: string, description: "Free-text note for humans (owner, location, what to do when it is down). Empty: none." }
+        created_at: { type: [string, "null"], description: "Creation date, UTC without suffix." }
         position: { type: integer, format: int64, description: "Manual rank, tiebreaking only within the same state and folder." }
         location_id: { type: [integer, "null"], format: int64, description: "Location assigned on the world map; null: none (the device may still sit at one through its site, see `GET /api/locations`)." }
         multisite:
@@ -13028,8 +13030,9 @@ components:
         parent_id: { type: [integer, "null"], format: int64 }
         via_agent: { type: [integer, "null"], format: int64, description: "Absent on `PUT` keeps the relay; `null` means direct probing." }
         client_id: { type: integer, format: int64, description: "MSP mode: the client of the target. Absent on `POST`: the client chosen in the header, the only client of the account, or the default client. Only an MSP administrator changes it on `PUT`; the targets depending on it move along." }
-        interval_secs: { type: integer, minimum: 10, default: 60 }
+        interval_secs: { type: integer, minimum: 10, maximum: 604800, default: 60 }
         enabled: { type: boolean, default: true }
+        note: { type: string, maxLength: 2000, description: "Free-text note. Absent on `PUT` keeps it; empty clears it." }
         cve_scan: { type: boolean, default: true, description: "Known-vulnerability (CVE) check of this device. Absent on `PUT` keeps the setting. For several devices at once, see `POST /api/security/cves/targets`." }
         tags:
           type: object

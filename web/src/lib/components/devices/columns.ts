@@ -7,6 +7,9 @@
  * the site and the last 24 h; then the security grade. Hidden cells use the
  * same breakpoints (`SHOW`).
  *
+ * The last track is the row's quick actions (a 40 px menu button), on every
+ * width, so a phone reaches them without hovering.
+ *
  * The site column only exists when it can tell two monitors apart: with fewer
  * than two locations (or the list filtered to one), the grid has no site track
  * at all, header and rows alike (`gridFor`).
@@ -18,16 +21,16 @@
 import type { TargetState } from '#lib/format.js';
 
 const GRID_WITH_SITE =
-	'grid items-center gap-x-3 px-3 sm:px-4 grid-cols-[1.25rem_minmax(0,1fr)_3rem] ' +
-	'@xl:grid-cols-[1.25rem_minmax(0,1fr)_2.5rem_9rem_3rem] ' +
-	'@3xl:grid-cols-[1.25rem_minmax(0,1fr)_2.5rem_11rem_2.75rem_3rem] ' +
-	'@5xl:grid-cols-[1.25rem_minmax(0,1fr)_2.5rem_16rem_2.75rem_3rem]';
+	'grid items-center gap-x-3 px-3 sm:px-4 grid-cols-[1.25rem_minmax(0,1fr)_3rem_2.5rem] ' +
+	'@xl:grid-cols-[1.25rem_minmax(0,1fr)_2.5rem_9rem_3rem_2.5rem] ' +
+	'@3xl:grid-cols-[1.25rem_minmax(0,1fr)_2.5rem_11rem_2.75rem_3rem_2.5rem] ' +
+	'@5xl:grid-cols-[1.25rem_minmax(0,1fr)_2.5rem_16rem_2.75rem_3rem_2.5rem]';
 
 const GRID_WITHOUT_SITE =
-	'grid items-center gap-x-3 px-3 sm:px-4 grid-cols-[1.25rem_minmax(0,1fr)_3rem] ' +
-	'@xl:grid-cols-[1.25rem_minmax(0,1fr)_9rem_3rem] ' +
-	'@3xl:grid-cols-[1.25rem_minmax(0,1fr)_11rem_2.75rem_3rem] ' +
-	'@5xl:grid-cols-[1.25rem_minmax(0,1fr)_16rem_2.75rem_3rem]';
+	'grid items-center gap-x-3 px-3 sm:px-4 grid-cols-[1.25rem_minmax(0,1fr)_3rem_2.5rem] ' +
+	'@xl:grid-cols-[1.25rem_minmax(0,1fr)_9rem_3rem_2.5rem] ' +
+	'@3xl:grid-cols-[1.25rem_minmax(0,1fr)_11rem_2.75rem_3rem_2.5rem] ' +
+	'@5xl:grid-cols-[1.25rem_minmax(0,1fr)_16rem_2.75rem_3rem_2.5rem]';
 
 /** The grid of the header line and of every row, with or without the site column. */
 export function gridFor(site: boolean): string {
