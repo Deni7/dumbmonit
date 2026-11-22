@@ -37,6 +37,7 @@
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import { displayState } from '#lib/format.js';
 	import { alertsStore } from '#lib/stores/alerts.svelte.js';
+	import { startPolling } from '#lib/poll.js';
 	import { Button, EmptyState, ErrorNotice, Menu, Skeleton, Toggle } from '#lib/ui/index.js';
 	import Segmented from '#lib/components/devices/Segmented.svelte';
 	import TopologyCanvas from '#lib/components/topology/TopologyCanvas.svelte';
@@ -185,20 +186,11 @@
 		} catch (error) {
 			if (signal?.aborted) return;
 			loadError = error;
+			return false;
 		}
 	}
 
-	$effect(() => {
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => {
-			if (document.visibilityState === 'visible') void load(controller.signal);
-		}, 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
-	});
+	$effect(() => startPolling(load, 60_000));
 
 	const targets = $derived(new Map(alertsStore.targets.map((t) => [t.id, t])));
 

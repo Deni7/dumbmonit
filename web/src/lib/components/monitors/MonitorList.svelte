@@ -1196,12 +1196,13 @@
 		const monitors = untrack(() => targets);
 		const cells = await loadRiver(DAY_SECONDS, signal, 24, monitors).catch(() => null);
 		if (cells) river = cells;
+		return cells !== null;
 	}
 
 	async function loadSecurity(signal?: AbortSignal) {
 		// Decoration too: no badge rather than an error when it cannot be read.
 		const summary = await getSecuritySummary(signal).catch(() => null);
-		if (!summary) return;
+		if (!summary) return false;
 		security = new Map(
 			summary.enabled ? summary.devices.map((d) => [d.target_id, { grade: d.grade, score: d.score }]) : []
 		);
@@ -1220,12 +1221,11 @@
 	$effect(() => {
 		const controller = new AbortController();
 		void loadKinds(controller.signal);
-		void loadSecurity(controller.signal);
 		// Scores move slowly (recomputed every 15 min server-side).
-		const securityTimer = setInterval(() => void loadSecurity(controller.signal), 120_000);
+		const stopSecurity = startPolling(loadSecurity, 120_000);
 		return () => {
 			controller.abort();
-			clearInterval(securityTimer);
+			stopSecurity();
 		};
 	});
 
@@ -1235,13 +1235,7 @@
 	// every minute (a slot is an hour).
 	$effect(() => {
 		if (view !== 'compact') return;
-		const controller = new AbortController();
-		void loadBars(controller.signal);
-		const timer = setInterval(() => void loadBars(controller.signal), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(loadBars, 60_000);
 	});
 
 	// Sparklines are drawn by the tiles only: the compact list (the default)
