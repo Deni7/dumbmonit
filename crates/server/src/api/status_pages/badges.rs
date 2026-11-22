@@ -318,8 +318,7 @@ pub async fn item_response(
     let item = find_item(&doc, &key)?;
     let label = item.get("label").and_then(Value::as_str).unwrap_or("service");
     let (value, colour) = latency_value(item.get("latency_ms").and_then(Value::as_f64));
-    let svg =
-        svg_response(render_styled(&format!("{label} · response"), &value, colour, style));
+    let svg = svg_response(render_styled(&format!("{label} · response"), &value, colour, style));
     Ok(access::seal(svg, private))
 }
 

@@ -1741,11 +1741,12 @@ pub async fn update_silence(
     Path(id): Path<i64>,
     Json(payload): Json<SilencePayload>,
 ) -> ApiResult<Json<SilenceView>> {
-    let existing = db::alerts::list_silences(&state.pool)
-        .await?
-        .into_iter()
-        .find(|s| s.id == id)
-        .ok_or_else(|| ApiError::NotFound(format!("Maintenance window {id} not found.")))?;
+    let existing =
+        db::alerts::list_silences(&state.pool)
+            .await?
+            .into_iter()
+            .find(|s| s.id == id)
+            .ok_or_else(|| ApiError::NotFound(format!("Maintenance window {id} not found.")))?;
     // Un compte restreint ne touche qu'aux fenêtres de ses équipements, et ne
     // les déplace que vers un équipement qu'il peut traiter.
     check_team_silence(&state, &access, existing.target_id).await?;

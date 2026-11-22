@@ -728,14 +728,10 @@ async fn team_accounts_only_reach_slos_made_of_their_own_monitors() {
     let lab = lab().await;
     let admin = lab.admin.as_str();
     let reply = lab.app.get("/api/teams", Some(admin)).await;
-    let lyon_team = reply.body["teams"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|t| t["name"] == "Lyon")
-        .unwrap()["id"]
-        .as_i64()
-        .unwrap();
+    let lyon_team =
+        reply.body["teams"].as_array().unwrap().iter().find(|t| t["name"] == "Lyon").unwrap()["id"]
+            .as_i64()
+            .unwrap();
     let (operator, op) = create_user(&lab.app, admin, "olga", "operator").await;
     join(&lab, lyon_team, operator).await;
     let (viewer, reader) = create_user(&lab.app, admin, "anna", "viewer").await;
@@ -785,10 +781,8 @@ async fn team_accounts_only_reach_slos_made_of_their_own_monitors() {
     }
 
     // Modification : ni vers l'extérieur, ni sur celui d'une autre équipe.
-    let reply = lab
-        .app
-        .put(&format!("/api/slos/{mine}"), slo_body("mine", &[lab.paris]), Some(&op))
-        .await;
+    let reply =
+        lab.app.put(&format!("/api/slos/{mine}"), slo_body("mine", &[lab.paris]), Some(&op)).await;
     assert_eq!(reply.status, StatusCode::FORBIDDEN, "{}", reply.body);
     let reply = lab
         .app

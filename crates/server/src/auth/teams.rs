@@ -1102,8 +1102,9 @@ mod tests {
             [("GET", "/slos"), ("POST", "/slos"), ("GET", "/slos/4"), ("PUT", "/slos/4")]
         {
             assert!(
-                SCOPED_ROUTES.iter().any(|(m, pattern, _)| *m == method
-                    && path_matches(pattern, path)),
+                SCOPED_ROUTES
+                    .iter()
+                    .any(|(m, pattern, _)| *m == method && path_matches(pattern, path)),
                 "{method} {path}"
             );
         }

@@ -1438,10 +1438,7 @@ mod tests {
             comment: String::new(),
             target_id: None,
             matchers: Default::default(),
-            schedule: Schedule::Once {
-                starts_at: now,
-                ends_at: now + chrono::TimeDelta::hours(2),
-            },
+            schedule: Schedule::Once { starts_at: now, ends_at: now + chrono::TimeDelta::hours(2) },
             enabled: true,
         };
         silence.id = create_silence(&pool, &silence).await.unwrap();
