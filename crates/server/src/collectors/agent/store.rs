@@ -1594,10 +1594,7 @@ mod tests {
         let failed = state().await.expect("état");
         assert_eq!(failed.wanted, "0.0.0.0:8443");
         assert_eq!(failed.listen, None);
-        assert_eq!(
-            failed.error.unwrap().chars().count(),
-            dumbmonit_proto::MAX_GATEWAY_CHECK_ERROR
-        );
+        assert_eq!(failed.error.unwrap().chars().count(), dumbmonit_proto::MAX_GATEWAY_CHECK_ERROR);
 
         // Un agent qui n'est plus relais ne garde rien.
         relay.relay = false;

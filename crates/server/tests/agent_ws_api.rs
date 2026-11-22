@@ -155,10 +155,8 @@ async fn bridge(lab: &Lab) -> SocketAddr {
     tokio::spawn(async move {
         while let Ok((mut socket, _)) = listener.accept().await {
             tokio::spawn(async move {
-                let response = ask_upgrade_with(web, AGENT_WS_PROTOCOL)
-                    .send()
-                    .await
-                    .expect("mise à niveau");
+                let response =
+                    ask_upgrade_with(web, AGENT_WS_PROTOCOL).send().await.expect("mise à niveau");
                 assert_eq!(response.status(), StatusCode::SWITCHING_PROTOCOLS);
                 let upgraded = response.upgrade().await.expect("flux");
                 let config = agent_tls::websocket::config();

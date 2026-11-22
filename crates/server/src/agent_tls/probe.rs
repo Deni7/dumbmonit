@@ -243,9 +243,8 @@ mod tests {
             while let Ok((mut socket, _)) = listener.accept().await {
                 let mut request = [0u8; 2048];
                 let _ = socket.read(&mut request).await;
-                let _ = socket
-                    .write_all(b"HTTP/1.1 404 Not Found\r\ncontent-length: 0\r\n\r\n")
-                    .await;
+                let _ =
+                    socket.write_all(b"HTTP/1.1 404 Not Found\r\ncontent-length: 0\r\n\r\n").await;
             }
         });
         let base = format!("http://127.0.0.1:{port}");

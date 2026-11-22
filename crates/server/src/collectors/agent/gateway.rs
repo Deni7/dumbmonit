@@ -111,11 +111,12 @@ pub fn silent(last_seen_ms: Option<i64>, now_ms: i64, interval_secs: i64) -> boo
 
 /// Le relais `target` est-il muet en ce moment ?
 pub async fn offline(pool: &SqlitePool, target: TargetId) -> Result<bool> {
-    let interval: Option<i64> = sqlx::query_scalar("SELECT interval_secs FROM targets WHERE id = ?")
-        .bind(target)
-        .fetch_optional(pool)
-        .await
-        .context("reading the relay's period")?;
+    let interval: Option<i64> =
+        sqlx::query_scalar("SELECT interval_secs FROM targets WHERE id = ?")
+            .bind(target)
+            .fetch_optional(pool)
+            .await
+            .context("reading the relay's period")?;
     let seen = store::last_seen_ms(pool, target).await?;
     Ok(silent(seen, chrono::Utc::now().timestamp_millis(), interval.unwrap_or(60)))
 }

@@ -286,10 +286,14 @@ fn refusal(status: reqwest::StatusCode, body: &str) -> String {
         .ok()
         .and_then(|value| value.get("error")?.as_str().map(str::to_string));
     let hint = match status.as_u16() {
-        404 | 405 => "the server predates the agent WebSocket, or the proxy does not forward \
-                      /api/agent/ws",
-        400 | 426 => "the proxy did not pass the WebSocket upgrade through \
-                      (Upgrade and Connection headers)",
+        404 | 405 => {
+            "the server predates the agent WebSocket, or the proxy does not forward \
+                      /api/agent/ws"
+        }
+        400 | 426 => {
+            "the proxy did not pass the WebSocket upgrade through \
+                      (Upgrade and Connection headers)"
+        }
         429 => "too many agent connections from this address",
         502..=504 => "the proxy or tunnel cannot reach DumbMonit",
         _ => "no WebSocket at this address",

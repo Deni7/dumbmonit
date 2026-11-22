@@ -44,8 +44,7 @@ async fn lab() -> Lab {
     app.create_admin().await;
     let admin = app.admin_cookie().await;
 
-    for (name, address, folder) in [("nas", "10.0.0.7", "Paris"), ("router", "10.0.0.1", "Lyon")]
-    {
+    for (name, address, folder) in [("nas", "10.0.0.7", "Paris"), ("router", "10.0.0.1", "Lyon")] {
         let reply = app
             .post(
                 "/api/targets",
@@ -207,13 +206,8 @@ async fn a_wall_display_limited_to_a_team_shows_only_its_monitors() {
     assert_eq!(me.body["access"]["scoped"], json!(true), "{}", me.body);
     let targets = app.get("/api/targets", Some(&lab.wall)).await;
     assert_eq!(targets.status, StatusCode::OK, "{}", targets.body);
-    let names: Vec<&str> = targets
-        .body
-        .as_array()
-        .expect("liste")
-        .iter()
-        .filter_map(|t| t["name"].as_str())
-        .collect();
+    let names: Vec<&str> =
+        targets.body.as_array().expect("liste").iter().filter_map(|t| t["name"].as_str()).collect();
     assert_eq!(names, ["nas"]);
     // Le reste du mur répond aussi sous le garde des équipes.
     for uri in ["/api/alerts", "/api/alerts/rules", "/api/instance/settings", "/api/wall/weather"] {
