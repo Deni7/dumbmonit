@@ -14,8 +14,16 @@ export type Segment = 'all' | 'attention' | 'reporting' | 'disabled';
 export const SEGMENTS: readonly Segment[] = ['all', 'attention', 'reporting', 'disabled'];
 
 /** `default` is the rack order (folders, state tier, manual position, name). */
-export type SortKey = 'default' | 'name' | 'status' | 'kind' | 'checked';
-export const SORT_KEYS: readonly SortKey[] = ['default', 'name', 'status', 'kind', 'checked'];
+export type SortKey = 'default' | 'name' | 'status' | 'kind' | 'checked' | 'availability' | 'created';
+export const SORT_KEYS: readonly SortKey[] = [
+	'default',
+	'name',
+	'status',
+	'kind',
+	'checked',
+	'availability',
+	'created'
+];
 export type SortDir = 'asc' | 'desc';
 
 export interface ListQuery {
@@ -67,6 +75,46 @@ export function serializeListQuery(query: ListQuery): string {
 	if (query.view) params.set('view', query.view);
 	const text = params.toString();
 	return text ? `?${text}` : '';
+}
+
+const QUERY_KEY = 'dumbmonit-targets-list';
+
+/**
+ * Remembers the filters, sort and layout of the list in this browser (never
+ * the search text: a stale search would look like a broken list). A pristine
+ * state forgets it. Every access is guarded: private windows throw.
+ */
+export function saveListQuery(query: ListQuery): void {
+	try {
+		const text = serializeListQuery({ ...query, search: '' });
+		if (text) localStorage.setItem(QUERY_KEY, text);
+		else localStorage.removeItem(QUERY_KEY);
+	} catch {
+		/* Storage unavailable: the list just starts fresh next time. */
+	}
+}
+
+/** The remembered state, or `null` when there is none (or storage is blocked). */
+export function loadListQuery(): ListQuery | null {
+	try {
+		const text = localStorage.getItem(QUERY_KEY);
+		return text ? parseListQuery(new URLSearchParams(text)) : null;
+	} catch {
+		return null;
+	}
+}
+
+/** Share of the hours with data in which the monitor was up (0..1), `null` without any data. */
+export function availabilityOf(cells: readonly string[] | null | undefined): number | null {
+	if (!cells) return null;
+	let up = 0;
+	let known = 0;
+	for (const cell of cells) {
+		if (cell === 'none') continue;
+		known += 1;
+		if (cell === 'up') up += 1;
+	}
+	return known === 0 ? null : up / known;
 }
 
 /**
@@ -134,18 +182,34 @@ const byName = (a: Target, b: Target) => a.name.localeCompare(b.name, 'en', { se
 /**
  * Flat, sorted rows for any explicit sort (no folders, no tree: a sorted
  * list is a flat one). `kindLabel` gives the label the kind column shows.
- * A missing last check always sorts last, whatever the direction.
+ * A missing last check, availability or creation date always sorts last,
+ * whatever the direction. Availability ascending puts the worst first;
+ * creation ascending puts the oldest first.
  */
 export function sortTargets(
 	targets: Target[],
 	stateOf: (target: Target) => TargetState,
 	kindLabel: (kind: string) => string,
 	sort: Exclude<SortKey, 'default'>,
-	dir: SortDir
+	dir: SortDir,
+	/** Availability over the last day (0..1), `null` without data; only the `availability` sort reads it. */
+	availability: (target: Target) => number | null = () => null
 ): RackRow[] {
 	const sign = dir === 'desc' ? -1 : 1;
 	const states = new Map(targets.map((t) => [t.id, stateOf(t)]));
 	const when = (t: Target) => (t.last_probe_at ? Date.parse(t.last_probe_at) : NaN);
+	/** Orders two optional numbers, the missing ones last whatever the direction. */
+	const byOptional = (a: number | null, b: number | null, a2: Target, b2: Target): number => {
+		if (a === null || b === null) {
+			if (a === null && b === null) return byName(a2, b2);
+			return a === null ? 1 : -1;
+		}
+		return a === b ? byName(a2, b2) : sign * (a - b);
+	};
+	const created = (t: Target) => {
+		const at = t.created_at ? Date.parse(`${t.created_at}${/(Z|[+-]\d\d:?\d\d)$/.test(t.created_at) ? '' : 'Z'}`) : NaN;
+		return Number.isNaN(at) ? null : at;
+	};
 	const compare = (a: Target, b: Target): number => {
 		switch (sort) {
 			case 'name':
@@ -168,6 +232,10 @@ export function sortTargets(
 				// Ascending: most recently checked first.
 				return wa === wb ? byName(a, b) : sign * (wb - wa);
 			}
+			case 'availability':
+				return byOptional(availability(a), availability(b), a, b);
+			case 'created':
+				return byOptional(created(a), created(b), a, b);
 		}
 	};
 	return targets

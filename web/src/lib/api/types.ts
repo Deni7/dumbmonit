@@ -145,6 +145,10 @@ export interface Target {
 	credential_public: Record<string, string>;
 	/** Flat folder shown on `/targets`. Empty: no folder. */
 	group_name: string;
+	/** Free-text note for humans; empty or absent: none. Older servers omit it. */
+	note?: string;
+	/** Creation date (UTC); older servers omit it. */
+	created_at?: string | null;
 	/** Manual rank, tiebreaking only within the same state and folder. */
 	position: number;
 	/** Location assigned on the world map; `null`: none (it may still sit at one through its site). */
@@ -233,6 +237,8 @@ export interface TargetPayload {
 	tags?: Record<string, string>;
 	/** Flat folder shown on `/targets`. Absent or empty: no folder. */
 	group_name?: string;
+	/** Free-text note (at most 2000 characters). Absent on edit keeps it; empty clears it. */
+	note?: string;
 	/** Location on the world map; `null`: none. Absent on edit keeps it. */
 	location_id?: LocationId | null;
 	credential?: Credential;

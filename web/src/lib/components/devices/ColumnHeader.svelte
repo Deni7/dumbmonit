@@ -40,6 +40,7 @@
 					<ShieldCheck class="size-3.5 shrink-0" aria-hidden="true" />
 				</span>
 				<span class="flex justify-end">{m.devices_cols_checked()}</span>
+				<span></span>
 			</div>
 		</div>
 	</div>

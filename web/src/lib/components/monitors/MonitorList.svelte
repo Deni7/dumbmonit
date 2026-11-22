@@ -22,8 +22,10 @@
 	import { page } from '$app/state';
 	import { goto } from '#lib/navigation.js';
 	import {
+		createSilence,
 		deleteTarget,
 		listCollectors,
+		probeTarget,
 		reorderTargets,
 		renameTargetFolder,
 		updateTarget,
@@ -32,6 +34,9 @@
 		type TargetPayload
 	} from '#lib/api/index.js';
 	import { displayState } from '#lib/format.js';
+	import { tagChip } from '#lib/tag-chip.js';
+	import { quickSilencePayload } from '#lib/components/alerts/helpers.js';
+	import type { RowActionHandlers } from '#lib/components/devices/RowActions.svelte';
 	import { loadSparklines } from '#lib/metrics.js';
 	import { loadRiver, DAY_SECONDS, type RiverCell } from '#lib/components/enterprise/fleet.js';
 	import { getSecuritySummary } from '#lib/api/security.js';
@@ -62,9 +67,13 @@
 	} from '#lib/components/devices/nesting.js';
 	import {
 		SORT_KEYS,
+		availabilityOf,
 		cveScanChanges,
+		freeTags,
 		hasAllTags,
+		loadListQuery,
 		matchesSite,
+		saveListQuery,
 		parseListQuery,
 		runBulk,
 		serializeListQuery,
@@ -93,6 +102,7 @@
 		FolderInput,
 		FolderPlus,
 		ListChecks,
+		BellOff,
 		Power,
 		PowerOff,
 		Search,
@@ -128,7 +138,11 @@
 	// Filters, sort and layout live in the URL (`?q=&state=&kind=&sort=&dir=&view=`):
 	// a filtered view is linkable and survives a reload. The URL is read once
 	// here, then kept in step in both directions by the two effects below.
-	const initial = untrack(() => parseListQuery(page.url.searchParams));
+	// Opened with no parameter at all, the list comes back as this viewer left it
+	// (view, filters and sort, never the search text); `saveListQuery` below keeps it.
+	const initial = untrack(() =>
+		page.url.search === '' ? (loadListQuery() ?? parseListQuery(page.url.searchParams)) : parseListQuery(page.url.searchParams)
+	);
 	let search = $state(initial.search);
 	let segment = $state<Segment>(initial.segment);
 	let kind = $state(initial.kind);
@@ -157,6 +171,9 @@
 			view: view === 'compact' ? null : view
 		})
 	);
+	$effect(() => {
+		saveListQuery({ search: '', segment, kind, tags: tagFilter, site, sort, dir: sortDir, view: view === 'compact' ? null : view });
+	});
 	// Writes still in flight: when one lands, the URL differs from a newer
 	// state for a moment, which must not be mistaken for an outside navigation.
 	const inflight = new Set<string>();
@@ -169,8 +186,15 @@
 			reset: false
 		}).finally(() => inflight.delete(want));
 	});
+	// The first run only sees the URL this page was opened on: when the state was
+	// restored from this browser (no parameter in the URL), it must not be undone.
+	let firstSync = true;
 	$effect(() => {
 		const have = page.url.search;
+		if (firstSync) {
+			firstSync = false;
+			return;
+		}
 		if (have === untrack(() => urlSearch) || inflight.has(have)) return;
 		const next = parseListQuery(page.url.searchParams);
 		search = next.search;
@@ -225,7 +249,9 @@
 				target.name.toLowerCase().includes(term) ||
 				target.address.toLowerCase().includes(term) ||
 				target.kind.toLowerCase().includes(term) ||
-				label.toLowerCase().includes(term)
+				label.toLowerCase().includes(term) ||
+				// The free tags (`key=value`) only: an option of the type may hold a secret.
+				freeTags(target.tags, optionKeysOf(target.kind)).some((tag) => tag.toLowerCase().includes(term))
 			);
 		});
 	});
@@ -293,6 +319,8 @@
 	const disabledListed = $derived(nested ? withAncestors(shownTargets, disabledVisible, split.disabled) : disabledVisible);
 	const nest = (rows: RackRow[]): RackRow[] => (nested ? nestSorted(rows) : rows);
 	const kindText = (value: string) => kindLabels.get(value) ?? value;
+	/** Availability over the last day, from the bars of the list; `null` without data. */
+	const availabilityFor = (target: Target) => availabilityOf(river.get(target.id));
 	const folderSections = $derived.by(() => {
 		if (sorted) {
 			const rows = markContext(
@@ -302,7 +330,8 @@
 						stateOf,
 						kindText,
 						sort as Exclude<SortKey, 'default'>,
-						sortDir
+						sortDir,
+						availabilityFor
 					)
 				),
 				activeVisible
@@ -329,7 +358,8 @@
 							stateOf,
 							kindText,
 							sort as Exclude<SortKey, 'default'>,
-							sortDir
+							sortDir,
+							availabilityFor
 						)
 					)
 				: buildRack(shownTargets, stateOf, disabledListed, hosted.inferred),
@@ -421,10 +451,51 @@
 				name: m.devices_list_sort_name(),
 				status: m.devices_list_sort_status(),
 				kind: m.devices_list_sort_kind(),
-				checked: m.devices_list_sort_checked()
+				checked: m.devices_list_sort_checked(),
+				availability: m.w1monitors_list_sort_availability(),
+				created: m.w1monitors_list_sort_created()
 			}[id]
 		}))
 	);
+
+	/** Free tags of each monitor as chips on its line (the options of its type are not tags). */
+	const rowTags = $derived(
+		new Map(
+			targets.map((target) => [
+				target.id,
+				freeTags(target.tags, optionKeysOf(target.kind)).map((pair) => {
+					const at = pair.indexOf('=');
+					return tagChip(pair.slice(0, at), pair.slice(at + 1));
+				})
+			])
+		)
+	);
+
+	// --- Quick actions of a row: check now, enable or disable. A failure is shown
+	// above the list like any other action's; the result of a check is a toast. ---
+	let rowToast = $state<{ key: number; message: string } | null>(null);
+	let rowToastKey = 0;
+	const rowActions: RowActionHandlers = {
+		probe: async (target) => {
+			try {
+				await probeTarget(target.id);
+				actionError = null;
+				await alertsStore.refresh();
+				rowToast = { key: ++rowToastKey, message: m.w1monitors_row_probe_done({ name: target.name }) };
+			} catch (cause) {
+				actionError = cause;
+			}
+		},
+		setEnabled: async (target, enabled) => {
+			try {
+				await updateTarget(target.id, targetToPayload(target, { enabled }));
+				actionError = null;
+				await alertsStore.refresh();
+			} catch (cause) {
+				actionError = cause;
+			}
+		}
+	};
 
 	// --- Folders & manual order (admin only, and only while unfiltered: the
 	// reorder scope is computed from the full fleet, not the narrowed view) ---
@@ -674,6 +745,26 @@
 			(t) => updateTarget(t.id, targetToPayload(t, { group_name: group }))
 		);
 	const bulkDelete = () => bulk(selectedTargets, (t) => deleteTarget(t.id));
+
+	/** Durations offered by "Silence": a one-off window from now, per monitor of the selection. */
+	const silenceChoices = $derived([
+		{ secs: 3600, label: m.w1monitors_list_silence_1h() },
+		{ secs: 8 * 3600, label: m.w1monitors_list_silence_8h() },
+		{ secs: 24 * 3600, label: m.w1monitors_list_silence_1d() },
+		{ secs: 7 * 24 * 3600, label: m.w1monitors_list_silence_7d() }
+	]);
+	async function bulkSilence(secs: number, label: string) {
+		const picked = selectedTargets;
+		if (bulkBusy || picked.length === 0) return;
+		const ends = new Date(Date.now() + secs * 1000);
+		// The same window the monitor's own "Snooze" creates, one per monitor.
+		await bulk(picked, (t) => createSilence({ ...quickSilencePayload(t, ends), name: m.devices_silence_name({ name: t.name }) }));
+		if (bulkReport === null) {
+			rowToast = { key: ++rowToastKey, message: m.w1monitors_list_silence_done({ duration: label }) };
+			// Leaves the selection mode so the toast is not hidden behind the bar.
+			stopSelecting();
+		}
+	}
 
 	// Menu rows of the selection bar.
 	const bulkItem = 'flex min-h-10 w-full items-center rounded-lg px-3 text-left text-[0.8125rem] text-ink hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-signal';
@@ -1412,6 +1503,25 @@
 				<PowerOff class="size-4" aria-hidden="true" />
 				{m.devices_list_bulk_disable()}
 			</Button>
+			<Menu label={m.w1monitors_list_bulk_silence()} align="left" placement="up">
+				{#snippet trigger({ toggle, open })}
+					<Button size="sm" variant="ghost" disabled={bulkBusy || selectedTargets.length === 0} aria-haspopup="menu" aria-expanded={open} onclick={toggle}>
+						<BellOff class="size-4" aria-hidden="true" />
+						{m.w1monitors_list_bulk_silence()}
+					</Button>
+				{/snippet}
+				{#snippet children({ close })}
+					<ul class="flex min-w-48 flex-col gap-0.5">
+						{#each silenceChoices as choice (choice.secs)}
+							<li>
+								<button type="button" role="menuitem" class={bulkItem} onclick={() => { close(); void bulkSilence(choice.secs, choice.label); }}>
+									{choice.label}
+								</button>
+							</li>
+						{/each}
+					</ul>
+				{/snippet}
+			</Menu>
 			<Menu label={m.devices_list_bulk_move()} align="left" placement="up">
 				{#snippet trigger({ toggle, open })}
 					<Button size="sm" variant="ghost" disabled={bulkBusy || selectedTargets.length === 0} aria-haspopup="menu" aria-expanded={open} onclick={() => { bulkFolderDraft = ''; toggle(); }}>
@@ -1523,6 +1633,11 @@
 			<Button size="sm" variant="ghost" onclick={() => { relaySkipped = 0; relayPlace = null; }}>{m.devices_list_bulk_dismiss()}</Button>
 		</div>
 	{/if}
+	{#if rowToast}
+		{#key rowToast.key}
+			<Toast message={rowToast.message} onclose={() => (rowToast = null)} durationMs={6000} />
+		{/key}
+	{/if}
 	{#if cveToast}
 		{#key cveToast.key}
 			<Toast
@@ -1584,6 +1699,8 @@
 						{selection}
 						{river}
 						ontoggle={toggleOpen}
+						tags={rowTags}
+						{rowActions}
 					/>
 				{/if}
 			</div>
@@ -1609,7 +1726,7 @@
 					</button>
 				{/if}
 				{#if disabledExpanded}
-					<RackList rows={shownDisabledRows} {sparklines} {kindLabels} {sites} {showSite} layout={view} {names} {alertCounts} {selection} {river} ontoggle={toggleOpen} />
+					<RackList rows={shownDisabledRows} {sparklines} {kindLabels} {sites} {showSite} layout={view} {names} {alertCounts} {selection} {river} ontoggle={toggleOpen} tags={rowTags} {rowActions} />
 				{/if}
 			</section>
 		{/if}

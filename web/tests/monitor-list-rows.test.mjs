@@ -67,12 +67,12 @@ test('the table grid and its hidden cells fold on the same breakpoints', () => {
 	const columns = readFileSync(new URL('../src/lib/components/devices/columns.ts', import.meta.url), 'utf8');
 	assert.doesNotMatch(columns, /response/);
 	const tracks = (grid) => [...grid.matchAll(/(?:^|\s)(?:(@\w+):)?grid-cols-\[([^\]]+)\]/g)].map((m) => [m[1] ?? '', m[2].split('_').length]);
-	// Visible columns: mark, name (alerts and sub-monitors inline) and checked
-	// narrow; + site and the bars from @xl; + security from @3xl and @5xl (only
+	// Visible columns: mark, name (alerts and sub-monitors inline), checked and
+	// the quick-actions button narrow; + site and the bars from @xl; + security from @3xl and @5xl (only
 	// the bars widen). No response nor alert column any more.
-	assert.deepEqual(tracks(gridFor(true)), [['', 3], ['@xl', 5], ['@3xl', 6], ['@5xl', 6]]);
+	assert.deepEqual(tracks(gridFor(true)), [['', 4], ['@xl', 6], ['@3xl', 7], ['@5xl', 7]]);
 	// Fewer than two locations: no site track at all, the same breakpoints otherwise.
-	assert.deepEqual(tracks(gridFor(false)), [['', 3], ['@xl', 4], ['@3xl', 5], ['@5xl', 5]]);
+	assert.deepEqual(tracks(gridFor(false)), [['', 4], ['@xl', 5], ['@3xl', 6], ['@5xl', 6]]);
 	// The hidden cells appear where their tracks do.
 	assert.equal(SHOW.site, 'hidden @xl:flex');
 	assert.equal(SHOW.river, 'hidden @xl:flex');
