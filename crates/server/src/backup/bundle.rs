@@ -250,6 +250,10 @@ pub struct Bundle {
     /// qu'elle n'a jamais été réglée.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auth_policy: Option<Value>,
+    /// Destinations hors site des sauvegardes locales (migration 0286), leurs
+    /// secrets en clair dans le lot, lui-même chiffré par la phrase de passe.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub backup_destinations: Vec<crate::backup::offsite::bundle::BundleBackupDestination>,
 }
 
 /// Serveur de courriel enregistré et son mot de passe.
@@ -294,6 +298,7 @@ impl Bundle {
             ("lun_links".to_string(), self.lun_links.len()),
             ("upgrade_notes_closed".to_string(), self.upgrade_notes_closed.len()),
             ("slos".to_string(), self.slos.len()),
+            ("backup_destinations".to_string(), self.backup_destinations.len()),
         ])
     }
 }

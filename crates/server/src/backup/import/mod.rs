@@ -141,6 +141,8 @@ pub async fn restore(
     report.push(restore_auth_policy(&mut tx, bundle).await?);
     report.push(restore_agent_update_rollout(&mut tx, bundle).await?);
     report.push(restore_mail_server(&mut tx, cipher, bundle).await?);
+    let destinations = &bundle.backup_destinations;
+    report.push(crate::backup::offsite::bundle::restore(&mut tx, cipher, destinations).await?);
     report.push(restore_instance(&mut tx, bundle).await?);
     report.push(restore_silences(&mut tx, bundle, &refs).await?);
     report.push(restore_status_pages(&mut tx, bundle, &refs).await?);

@@ -121,6 +121,7 @@ pub async fn collect(pool: &SqlitePool, cipher: &Cipher, options: ExportOptions)
         slos: slos(pool, &refs).await?,
         auth_policy: crate::auth::settings::get::<Value>(pool, crate::auth::policy::SETTINGS_KEY)
             .await?,
+        backup_destinations: crate::backup::offsite::bundle::collect(pool, cipher).await?,
     })
 }
 
@@ -1203,6 +1204,7 @@ pub fn sections() -> BTreeMap<&'static str, &'static str> {
         ),
         ("instance", "Instance name, language, time zone and setup state."),
         ("backup_schedule", "The schedule of the local backups, when you changed it."),
+        ("backup_destinations", "Off-site backup destinations and their credentials."),
         ("clients", "MSP clients, their members, branding, and what belongs to each."),
         (
             "netscan_schedules",
