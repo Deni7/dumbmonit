@@ -883,7 +883,7 @@ impl RulePayload {
     ///
     /// `current` porte la règle existante lors d'une modification : c'est d'elle que
     /// proviennent l'`uid` et le drapeau `builtin`, jamais du corps de la requête.
-    async fn validate(
+    pub(crate) async fn validate(
         self,
         state: &AppState,
         current: Option<&Rule>,

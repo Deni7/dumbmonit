@@ -3773,6 +3773,43 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
 
+  /api/alerts/rules/backtest:
+    post:
+      operationId: backtestRule
+      tags: [Rules]
+      summary: Test a rule on history
+      description: >-
+        Replays the rule as submitted (saved or not, same body as a rule
+        creation) over the last 1, 7 or 30 days of stored metrics, at the
+        engine's evaluation step, with the engine's own threshold, clear
+        threshold and hold-duration logic, and says what it would have done:
+        firing periods per series (start, end, peak value), notifications
+        (firing, reminders, escalation, resolution — before maintenance
+        windows, dependencies and channel policies), and the breaches the hold
+        duration absorbed. Nothing is written. The cost is bounded: past
+        10,000 steps the step is widened (`coarsened`), past 100 series only
+        the ones most often over the threshold are replayed (`truncated`), and
+        the metrics read gives up after 20 seconds (502). Anomaly, log
+        pattern, forecast, drift and error budget rules cannot be replayed:
+        the answer is then `replayable: false` with the reason.
+      x-token-scope: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RuleBacktestRequest" }
+      responses:
+        "200":
+          description: What the rule would have done.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuleBacktest" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
   /api/alerts/rules/{id}:
     parameters:
       - $ref: "#/components/parameters/Id"
@@ -13960,6 +13997,76 @@ components:
           type: array
           items: { $ref: "#/components/schemas/RuleOverride" }
         last_fired_at: { type: [string, "null"], description: "Last time the rule went to firing according to the alert history (RFC 3339, UTC); `null` when it never fired within the retained history." }
+    RuleBacktestRequest:
+      type: object
+      required: [rule]
+      properties:
+        rule: { $ref: "#/components/schemas/RulePayload" }
+        rule_id:
+          type: [integer, "null"]
+          format: int64
+          description: >-
+            The saved rule being edited: its identifier and per-device
+            overrides apply. Omitted for a rule not saved yet.
+        days: { type: integer, enum: [1, 7, 30], default: 7 }
+    RuleBacktestPeriod:
+      type: object
+      required: [start, end, peak]
+      properties:
+        start: { type: integer, format: int64, description: Unix seconds. }
+        end:
+          type: [integer, "null"]
+          format: int64
+          description: Unix seconds; null while still firing at the end of the window.
+        peak:
+          type: number
+          description: The worst value of the period (highest for > and >=, lowest for < and <=).
+    RuleBacktestSeries:
+      type: object
+      required: [series_key, target_id, target_name, threshold, clear_threshold, periods, notifications, absorbed, firing_secs, spark]
+      properties:
+        series_key: { type: string }
+        target_id: { type: [integer, "null"], format: int64 }
+        target_name: { type: string }
+        threshold: { type: number, description: Per-device override included. }
+        clear_threshold: { type: [number, "null"] }
+        periods:
+          type: array
+          items: { $ref: "#/components/schemas/RuleBacktestPeriod" }
+        notifications: { type: integer }
+        absorbed: { type: integer, description: Breaches that cleared before the hold duration. }
+        firing_secs: { type: integer, format: int64 }
+        spark:
+          type: array
+          description: The window summed up in at most 96 values (worst of each slice).
+          items: { type: number }
+    RuleBacktest:
+      type: object
+      required: [replayable, not_replayable, days, start, end, step_secs, interval_secs, coarsened, series_total, truncated, fired, notifications, absorbed, quiet_series, series]
+      properties:
+        replayable: { type: boolean }
+        not_replayable:
+          type: [object, "null"]
+          required: [code, reason]
+          properties:
+            code: { type: string, enum: [anomaly, log_pattern, forecast, drift, slo_burn] }
+            reason: { type: string }
+        days: { type: integer }
+        start: { type: integer, format: int64, description: Unix seconds. }
+        end: { type: integer, format: int64, description: Unix seconds. }
+        step_secs: { type: integer, description: Step of the replay. }
+        interval_secs: { type: integer, description: Evaluation interval of the engine. }
+        coarsened: { type: boolean, description: The step was widened to bound the cost. }
+        series_total: { type: integer, description: Series returned by the query after selector and overrides. }
+        truncated: { type: boolean, description: Not every series was replayed. }
+        fired: { type: integer, description: "Firing periods, all replayed series together." }
+        notifications: { type: integer }
+        absorbed: { type: integer }
+        quiet_series: { type: integer, description: Replayed series that would never have fired. }
+        series:
+          type: array
+          description: Series that would have fired, noisiest first.
+          items: { $ref: "#/components/schemas/RuleBacktestSeries" }
     RulePayload:
       type: object
       required: [name, query]
