@@ -107,6 +107,7 @@
 	import { buildFolders } from '#lib/components/devices/folders.js';
 	import { splitDisabled, freeTags } from '#lib/components/devices/listState.js';
 	import { alertsStore } from '#lib/stores/alerts.svelte.js';
+	import { startPolling } from '#lib/poll.js';
 	import { tagChip } from '#lib/tag-chip.js';
 	import TargetMenu from '#lib/components/devices/TargetMenu.svelte';
 	import ManagedNotice from '#lib/components/devices/ManagedNotice.svelte';
@@ -242,17 +243,16 @@
 		const targetId = id;
 		security = null;
 		securityOpen = untrack(() => page.url.hash === '#security');
-		const controller = new AbortController();
-		const load = () =>
-			getTargetSecurity(targetId, controller.signal)
-				.then((report) => (security = report))
-				.catch(() => {});
-		void load();
-		const timer = setInterval(() => void load(), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(
+			(signal) =>
+				getTargetSecurity(targetId, signal)
+					.then((report) => {
+						security = report;
+						return true;
+					})
+					.catch(() => false),
+			60_000
+		);
 	});
 
 	/** Scrolls the report into view once it is there (opened from a link or the badge). */
@@ -560,6 +560,7 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
+			return false;
 		} finally {
 			loading = false;
 		}
@@ -658,19 +659,19 @@
 		osInfo = null;
 		probeResult = null;
 		probeError = null;
-		const controller = new AbortController();
-		void loadTarget(controller.signal);
-		void loadContext(controller.signal);
-		const timer = setInterval(() => {
-			void loadTarget(controller.signal);
-			void loadContext(controller.signal);
-			void loadInstruments(controller.signal);
-			refreshKey += 1;
+		// The instruments load in their own effect at first, then here with the
+		// rest; only the device itself decides whether the page backs off.
+		let first = true;
+		return startPolling(async (signal) => {
+			const reads: Promise<unknown>[] = [loadTarget(signal), loadContext(signal)];
+			if (!first) {
+				reads.push(loadInstruments(signal));
+				refreshKey += 1;
+			}
+			first = false;
+			const [targetOk] = await Promise.all(reads);
+			return targetOk !== false;
 		}, 30_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
 	});
 
 	// Instruments need the kind (service or device) and follow the range.

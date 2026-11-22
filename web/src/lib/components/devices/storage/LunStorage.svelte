@@ -77,6 +77,7 @@
 				return;
 			}
 			error = cause;
+			return false;
 		}
 	}
 

@@ -11,7 +11,23 @@
  *   });
  *
  * `load` receives the AbortSignal. It reports a failure by rejecting or by
- * returning `false`; any other result is a success.
+ * returning `false`; any other result (`undefined` included) is a success.
+ * A panel that catches its own errors to show them must therefore still say
+ * so, or the backoff never starts:
+ *
+ *   async function load(signal?: AbortSignal) {
+ *     try {
+ *       view = await getView(target.id, signal);
+ *       error = null;
+ *     } catch (cause) {
+ *       if (signal?.aborted) return;
+ *       error = cause;
+ *       return false;
+ *     }
+ *   }
+ *
+ * `{ immediate: false }` waits one interval before the first load, for a
+ * panel whose data was just read by something else.
  */
 
 /** Longest wait between two loads while they keep failing. */
@@ -31,8 +47,13 @@ export function pollRemaining(delay: number, lastEnd: number, now: number): numb
 
 export type PollLoad = (signal: AbortSignal) => unknown;
 
+export interface PollOptions {
+	/** Load at once (the default), or only after a first interval. */
+	immediate?: boolean;
+}
+
 /** Starts polling; returns the cleanup to hand back from `$effect`. */
-export function startPolling(load: PollLoad, ms: number): () => void {
+export function startPolling(load: PollLoad, ms: number, options: PollOptions = {}): () => void {
 	const controller = new AbortController();
 	const hasDocument = typeof document !== 'undefined';
 	let timer: ReturnType<typeof setTimeout> | undefined;
@@ -41,9 +62,13 @@ export function startPolling(load: PollLoad, ms: number): () => void {
 	let failures = 0;
 	let lastEnd = 0;
 
-	function schedule(wait: number) {
-		clearTimeout(timer);
+	function cancel() {
+		if (timer !== undefined) clearTimeout(timer);
 		timer = undefined;
+	}
+
+	function schedule(wait: number) {
+		cancel();
 		if (stopped || (hasDocument && document.hidden)) return;
 		timer = setTimeout(run, wait);
 	}
@@ -68,19 +93,23 @@ export function startPolling(load: PollLoad, ms: number): () => void {
 	function onVisibility() {
 		if (stopped) return;
 		if (document.hidden) {
-			clearTimeout(timer);
-			timer = undefined;
+			cancel();
 		} else if (!running) {
 			schedule(pollRemaining(pollDelay(ms, failures), lastEnd, Date.now()));
 		}
 	}
 
 	if (hasDocument) document.addEventListener('visibilitychange', onVisibility);
-	void run();
+	if (options.immediate === false) {
+		lastEnd = Date.now();
+		schedule(ms);
+	} else {
+		void run();
+	}
 
 	return () => {
 		stopped = true;
-		clearTimeout(timer);
+		cancel();
 		if (hasDocument) document.removeEventListener('visibilitychange', onVisibility);
 		controller.abort();
 	};

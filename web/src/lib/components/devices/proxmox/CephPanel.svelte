@@ -37,6 +37,7 @@
 		} catch (cause) {
 			if (signal?.aborted) return;
 			error = cause;
+			return false;
 		} finally {
 			if (!signal?.aborted) loading = false;
 		}

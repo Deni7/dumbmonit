@@ -15,6 +15,7 @@
 	import type { Basemap, Locations, MapLocation, Target, TargetId } from '#lib/api/index.js';
 	import { displayState, STATE_LABEL, STATE_TONE, type TargetState } from '#lib/format.js';
 	import { alertsStore } from '#lib/stores/alerts.svelte.js';
+	import { startPolling } from '#lib/poll.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import { Button, EmptyState, ErrorNotice, Led, Skeleton } from '#lib/ui/index.js';
 	import { pinCount, sortByVerdict, tally, verdict, type Tally, type Verdict } from '#lib/map/aggregate.js';
@@ -36,20 +37,11 @@
 		} catch (error) {
 			if (signal?.aborted) return;
 			loadError = error;
+			return false;
 		}
 	}
 
-	$effect(() => {
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => {
-			if (document.visibilityState === 'visible') void load(controller.signal);
-		}, 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
-	});
+	$effect(() => startPolling(load, 60_000));
 
 	const targets = $derived(new Map(alertsStore.targets.map((t) => [t.id, t])));
 
