@@ -115,6 +115,8 @@ pub async fn collect(pool: &SqlitePool, cipher: &Cipher, options: ExportOptions)
             .await?
             .map(|(logo_type, bytes)| BundleReportLogo { logo_type, data: BASE64.encode(bytes) }),
         slos: slos(pool, &refs).await?,
+        auth_policy: crate::auth::settings::get::<Value>(pool, crate::auth::policy::SETTINGS_KEY)
+            .await?,
     })
 }
 
@@ -1000,7 +1002,7 @@ async fn users(
     let rows = sqlx::query(
         "SELECT id, username, display_name, role, password_hash, oidc_subject, oidc_issuer,
                 saml_subject, saml_issuer, created_at, disabled, totp_secret, totp_enabled,
-                scim_id, scim_external_id, scim_email, disabled_by_scim
+                scim_id, scim_external_id, scim_email, disabled_by_scim, email
          FROM users ORDER BY id",
     )
     .fetch_all(pool)
@@ -1028,6 +1030,7 @@ async fn users(
             scim_external_id: row.try_get("scim_external_id")?,
             scim_email: row.try_get("scim_email")?,
             disabled_by_scim: row.try_get::<i64, _>("disabled_by_scim")? != 0,
+            email: row.try_get("email")?,
         };
 
         if options.include_account_secrets {
@@ -1168,7 +1171,8 @@ pub fn sections() -> BTreeMap<&'static str, &'static str> {
         ("status_pages", "Public status pages and the services they list."),
         ("incidents", "Incidents and maintenance announcements, with their post-mortems."),
         ("slos", "Service level objectives: target, window and the monitors they cover."),
-        ("users", "Accounts, their role and their SSO link."),
+        ("users", "Accounts, their role, email address and SSO link."),
+        ("auth_policy", "Authentication policy: two-factor required for admins and operators."),
         ("agent_tokens", "Agent enrolment tokens, as hashes: installed agents keep working."),
         ("api_tokens", "API tokens, as hashes: existing tokens keep working."),
         ("push_monitors", "Heartbeat tokens, so the URLs your cron jobs call stay the same."),

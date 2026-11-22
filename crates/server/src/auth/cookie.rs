@@ -14,9 +14,12 @@ use crate::auth::session::SessionToken;
 /// ni l'écraser. Le port ne sert que HTTPS : c'est le seul nom.
 pub const NAME: &str = "__Host-dumbmonit_session";
 
-/// Trente jours, en accord avec la durée de vie de la session en base. Le
-/// navigateur oublie le cookie au moment même où le serveur oublie la session.
-const MAX_AGE_SECS: i64 = 30 * 24 * 60 * 60;
+/// La durée de vie de la session en base (`DUMBMONIT_SESSION_DAYS`, trente
+/// jours par défaut) : le navigateur oublie le cookie au moment même où le
+/// serveur oublie la session.
+fn max_age_secs() -> i64 {
+    crate::auth::session::lifetime_days() * 24 * 60 * 60
+}
 
 /// Construit l'en-tête `Set-Cookie` d'une session ouverte.
 ///
@@ -30,8 +33,9 @@ const MAX_AGE_SECS: i64 = 30 * 24 * 60 * 60;
 /// `Secure` toujours : le cookie ne part jamais sur un lien `http://`.
 pub fn set(token: &SessionToken) -> HeaderValue {
     header_value(format!(
-        "{NAME}={}; Path=/; HttpOnly; SameSite=Strict; Max-Age={MAX_AGE_SECS}; Secure",
-        token.cookie_value()
+        "{NAME}={}; Path=/; HttpOnly; SameSite=Strict; Max-Age={}; Secure",
+        token.cookie_value(),
+        max_age_secs()
     ))
 }
 
@@ -129,7 +133,8 @@ mod tests {
         assert!(posed.contains("HttpOnly"), "{posed}");
         assert!(posed.contains("SameSite=Strict"), "{posed}");
         assert!(posed.contains("Path=/"), "{posed}");
-        assert!(posed.contains("Max-Age=2592000"), "{posed}");
+        // Trente jours sans `DUMBMONIT_SESSION_DAYS`.
+        assert!(posed.contains(&format!("Max-Age={}", max_age_secs())), "{posed}");
         assert!(posed.contains("; Secure"), "{posed}");
         assert!(!posed.contains("Domain="), "{posed}");
 

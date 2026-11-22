@@ -27,6 +27,7 @@ use crate::auth::client_ip::ClientIp;
 use crate::auth::middleware::Authenticated;
 use crate::auth::passkeys::{self, Ceremony, MAX_NAME_CHARS, MAX_PER_USER, NewPasskey};
 use crate::auth::rate_limit::Key;
+use crate::auth::session::{SignIn, UserAgent, Via};
 use crate::auth::users::{self, User};
 use crate::auth::webauthn::{self, RelyingParty, base64url_decode, base64url_encode};
 use crate::auth::{AuthError, AuthResult, AuthState, audit, password};
@@ -338,6 +339,7 @@ pub async fn login_finish(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthState>,
     ClientIp(ip): ClientIp,
+    UserAgent(user_agent): UserAgent,
     Json(payload): Json<LoginFinish>,
 ) -> AuthResult<Response> {
     let keys = anonymous_keys(ip);
@@ -372,7 +374,8 @@ pub async fn login_finish(
     };
     auth.limiter().lock().await.record_success(&keys);
     audit::record(&state.pool, Some(&user.username), "login.passkey", None, ip).await;
-    open_session(&state, &user, ip).await
+    let origin = SignIn { via: Via::Passkey, ip, user_agent: user_agent.as_deref() };
+    open_session(&state, &user, &origin).await
 }
 
 /// Retrouve la clé, le compte, et vérifie l'assertion. L'erreur est la raison

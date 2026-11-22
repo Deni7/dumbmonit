@@ -76,6 +76,9 @@ pub struct User {
     /// (voir [`crate::auth::saml`]).
     pub saml_subject: Option<String>,
     pub saml_issuer: Option<String>,
+    /// Adresse électronique facultative, pour savoir qui joindre. Jamais un
+    /// moyen de se connecter.
+    pub email: Option<String>,
 }
 
 impl User {
@@ -120,6 +123,7 @@ fn read(row: SqliteRow) -> Result<User> {
         disabled_by_ldap: row.try_get::<i64, _>("disabled_by_ldap")? != 0,
         saml_subject: row.try_get("saml_subject")?,
         saml_issuer: row.try_get("saml_issuer")?,
+        email: row.try_get("email")?,
     })
 }
 
@@ -135,7 +139,7 @@ pub async fn list(pool: &SqlitePool) -> Result<Vec<User>> {
     let rows = sqlx::query(
         "SELECT id, username, display_name, role, password_hash, oidc_subject, oidc_issuer,
                 created_at, last_login_at, disabled, totp_secret, totp_enabled,
-                ldap_id, ldap_dn, disabled_by_ldap, saml_subject, saml_issuer
+                ldap_id, ldap_dn, disabled_by_ldap, saml_subject, saml_issuer, email
          FROM users ORDER BY username COLLATE NOCASE",
     )
     .fetch_all(pool)
@@ -148,7 +152,7 @@ pub async fn get(pool: &SqlitePool, id: i64) -> Result<Option<User>> {
     let row = sqlx::query(
         "SELECT id, username, display_name, role, password_hash, oidc_subject, oidc_issuer,
                 created_at, last_login_at, disabled, totp_secret, totp_enabled,
-                ldap_id, ldap_dn, disabled_by_ldap, saml_subject, saml_issuer
+                ldap_id, ldap_dn, disabled_by_ldap, saml_subject, saml_issuer, email
          FROM users WHERE id = ?",
     )
     .bind(id)
@@ -162,7 +166,7 @@ pub async fn by_username(pool: &SqlitePool, username: &str) -> Result<Option<Use
     let row = sqlx::query(
         "SELECT id, username, display_name, role, password_hash, oidc_subject, oidc_issuer,
                 created_at, last_login_at, disabled, totp_secret, totp_enabled,
-                ldap_id, ldap_dn, disabled_by_ldap, saml_subject, saml_issuer
+                ldap_id, ldap_dn, disabled_by_ldap, saml_subject, saml_issuer, email
          FROM users WHERE username = ?",
     )
     .bind(username)
@@ -176,7 +180,7 @@ pub async fn by_oidc(pool: &SqlitePool, issuer: &str, subject: &str) -> Result<O
     let row = sqlx::query(
         "SELECT id, username, display_name, role, password_hash, oidc_subject, oidc_issuer,
                 created_at, last_login_at, disabled, totp_secret, totp_enabled,
-                ldap_id, ldap_dn, disabled_by_ldap, saml_subject, saml_issuer
+                ldap_id, ldap_dn, disabled_by_ldap, saml_subject, saml_issuer, email
          FROM users WHERE oidc_issuer = ? AND oidc_subject = ?",
     )
     .bind(issuer)
@@ -191,7 +195,7 @@ pub async fn by_saml(pool: &SqlitePool, issuer: &str, subject: &str) -> Result<O
     let row = sqlx::query(
         "SELECT id, username, display_name, role, password_hash, oidc_subject, oidc_issuer,
                 created_at, last_login_at, disabled, totp_secret, totp_enabled,
-                ldap_id, ldap_dn, disabled_by_ldap, saml_subject, saml_issuer
+                ldap_id, ldap_dn, disabled_by_ldap, saml_subject, saml_issuer, email
          FROM users WHERE saml_issuer = ? AND saml_subject = ?",
     )
     .bind(issuer)
@@ -244,7 +248,7 @@ pub async fn by_ldap(pool: &SqlitePool, ldap_id: &str) -> Result<Option<User>> {
     let row = sqlx::query(
         "SELECT id, username, display_name, role, password_hash, oidc_subject, oidc_issuer,
                 created_at, last_login_at, disabled, totp_secret, totp_enabled,
-                ldap_id, ldap_dn, disabled_by_ldap, saml_subject, saml_issuer
+                ldap_id, ldap_dn, disabled_by_ldap, saml_subject, saml_issuer, email
          FROM users WHERE ldap_id = ?",
     )
     .bind(ldap_id)
@@ -314,7 +318,7 @@ pub async fn sole_password_user(pool: &SqlitePool) -> Result<Option<User>> {
     let rows = sqlx::query(
         "SELECT id, username, display_name, role, password_hash, oidc_subject, oidc_issuer,
                 created_at, last_login_at, disabled, totp_secret, totp_enabled,
-                ldap_id, ldap_dn, disabled_by_ldap, saml_subject, saml_issuer
+                ldap_id, ldap_dn, disabled_by_ldap, saml_subject, saml_issuer, email
          FROM users WHERE password_hash IS NOT NULL LIMIT 2",
     )
     .fetch_all(pool)
@@ -399,6 +403,18 @@ pub async fn set_display_name(pool: &SqlitePool, id: i64, display_name: &str) ->
     Ok(())
 }
 
+/// Adresse électronique du compte, déjà passée par [`normalize_email`] ;
+/// `None` l'efface.
+pub async fn set_email(pool: &SqlitePool, id: i64, email: Option<&str>) -> Result<()> {
+    sqlx::query("UPDATE users SET email = ? WHERE id = ?")
+        .bind(email)
+        .bind(id)
+        .execute(pool)
+        .await
+        .context("mise à jour de l'adresse électronique")?;
+    Ok(())
+}
+
 pub async fn set_role(pool: &SqlitePool, id: i64, role: Role) -> Result<()> {
     sqlx::query("UPDATE users SET role = ? WHERE id = ?")
         .bind(role.as_str())
@@ -426,6 +442,8 @@ pub async fn set_disabled(pool: &SqlitePool, id: i64, disabled: bool) -> Result<
 #[derive(Default)]
 pub struct AccountChanges<'a> {
     pub display_name: Option<&'a str>,
+    /// `Some(None)` efface l'adresse ; `None` n'y touche pas.
+    pub email: Option<Option<&'a str>>,
     pub role: Option<Role>,
     pub password_hash: Option<&'a str>,
     pub disabled: Option<bool>,
@@ -444,6 +462,14 @@ pub async fn apply_changes(pool: &SqlitePool, id: i64, changes: &AccountChanges<
             .execute(&mut *tx)
             .await
             .context("mise à jour du nom affiché")?;
+    }
+    if let Some(email) = changes.email {
+        sqlx::query("UPDATE users SET email = ? WHERE id = ?")
+            .bind(email)
+            .bind(id)
+            .execute(&mut *tx)
+            .await
+            .context("mise à jour de l'adresse électronique")?;
     }
     if let Some(role) = changes.role {
         sqlx::query("UPDATE users SET role = ? WHERE id = ?")
@@ -648,9 +674,64 @@ pub fn validate_username(username: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Longueur maximale d'une adresse électronique (RFC 5321 : 254 utiles).
+pub const EMAIL_MAX_LEN: usize = 254;
+
+/// Vérifie et normalise une adresse électronique saisie : vide vaut « aucune ».
+///
+/// La vérification reste celle qu'un humain attend — une partie locale, un `@`,
+/// un domaine avec un point, ni espace ni caractère de contrôle — sans prétendre
+/// valider la RFC 5322 : l'adresse ne sert qu'à savoir qui joindre.
+pub fn normalize_email(raw: &str) -> Result<Option<String>, String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+    let invalid = || format!("\"{trimmed}\" is not a valid email address.");
+    if trimmed.chars().count() > EMAIL_MAX_LEN {
+        return Err(format!("The email address must be {EMAIL_MAX_LEN} characters or fewer."));
+    }
+    if trimmed.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return Err(invalid());
+    }
+    let Some((local, domain)) = trimmed.rsplit_once('@') else { return Err(invalid()) };
+    let domain_ok = domain.contains('.')
+        && !domain.starts_with('.')
+        && !domain.ends_with('.')
+        && !domain.contains("..")
+        && !domain.contains('@');
+    if local.is_empty() || local.contains('@') || !domain_ok {
+        return Err(invalid());
+    }
+    Ok(Some(format!("{local}@{}", domain.to_lowercase())))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn emails_are_optional_checked_and_normalised() {
+        assert_eq!(normalize_email(""), Ok(None));
+        assert_eq!(normalize_email("   "), Ok(None));
+        assert_eq!(
+            normalize_email(" Jane.Doe@Example.ORG "),
+            Ok(Some("Jane.Doe@example.org".to_string()))
+        );
+        for bad in [
+            "jane",
+            "jane@",
+            "@example.org",
+            "jane@localhost",
+            "ja ne@example.org",
+            "jane@example..org",
+            "jane@.example.org",
+            "a@b@example.org",
+        ] {
+            assert!(normalize_email(bad).is_err(), "{bad}");
+        }
+        assert!(normalize_email(&format!("{}@example.org", "a".repeat(250))).is_err());
+    }
 
     #[test]
     fn roles_round_trip_through_their_text_form() {

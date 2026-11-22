@@ -16,9 +16,11 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
+use crate::auth::client_ip::ClientIp;
 use crate::auth::middleware::AdminUser;
 use crate::auth::oidc::flow::{self, CallbackParams, FlowError};
 use crate::auth::oidc::{self, OidcConfig, Source, discovery};
+use crate::auth::session::{SignIn, Via};
 use crate::auth::{AuthResult, AuthState, cookie, session};
 use crate::state::AppState;
 
@@ -100,6 +102,7 @@ pub async fn start(
 pub async fn callback(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthState>,
+    ClientIp(ip): ClientIp,
     headers: HeaderMap,
     Query(params): Query<CallbackParams>,
 ) -> Response {
@@ -114,7 +117,9 @@ pub async fn callback(
         Ok(found) => found,
         Err(error) => return failure(error),
     };
-    let token = match session::create(&state.pool, user.id).await {
+    let user_agent = session::user_agent(&headers);
+    let signin = SignIn { via: Via::Oidc, ip, user_agent: user_agent.as_deref() };
+    let token = match session::create(&state.pool, user.id, &signin).await {
         Ok(token) => token,
         Err(error) => return failure(FlowError::Internal(error)),
     };

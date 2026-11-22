@@ -73,6 +73,7 @@ mod scim;
 mod security;
 mod self_monitoring;
 mod seo_files;
+mod sessions;
 mod skipped_features;
 mod slos;
 pub(crate) mod spa;
@@ -169,6 +170,8 @@ pub fn router_with_hubs(
         .route("/auth/me", get(auth::me))
         // Second facteur et journal d'audit (`totp.rs`).
         .merge(totp::routes())
+        // Sessions ouvertes, déconnexion d'un compte, politique (`sessions.rs`).
+        .merge(sessions::routes())
         // Clés d'accès : liste, ajout, renommage, suppression (`passkeys.rs`).
         .merge(passkeys::routes())
         .route(
@@ -277,7 +280,7 @@ pub fn router_with_hubs(
         // Mise à jour automatique des agents : réglages, état, « Update now ».
         .merge(agent_updates::routes())
         .route("/tokens", get(tokens::list).post(tokens::create))
-        .route("/tokens/{id}", delete(tokens::revoke))
+        .route("/tokens/{id}", delete(tokens::revoke).patch(tokens::update))
         // Actions sur les conteneurs d'une machine (`agent_commands.rs`).
         .merge(agent_commands::ui_routes())
         // Journal d'événements Windows d'une machine : règles et événements (`agent_events.rs`).

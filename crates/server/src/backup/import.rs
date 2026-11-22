@@ -137,6 +137,7 @@ pub async fn restore(
     report.push(restore_notify_policy(&mut tx, bundle).await?);
     report.push(restore_agent_enrolment(&mut tx, bundle).await?);
     report.push(restore_wall_weather(&mut tx, bundle).await?);
+    report.push(restore_auth_policy(&mut tx, bundle).await?);
     report.push(restore_agent_update_rollout(&mut tx, bundle).await?);
     report.push(restore_mail_server(&mut tx, cipher, bundle).await?);
     report.push(restore_instance(&mut tx, bundle).await?);
@@ -1093,6 +1094,57 @@ async fn restore_agent_enrolment(
     .execute(&mut **tx)
     .await
     .context("écriture de la garde de l'enrôlement")?;
+    report.count(if existing.is_some() {
+        RestoreOutcome::Updated
+    } else {
+        RestoreOutcome::Created
+    });
+    Ok(report)
+}
+
+/// Politique d'authentification (`auth::policy`) : remplacée par celle du lot.
+/// Un réglage illisible est signalé et laissé de côté ; un lot d'avant cette
+/// section, ou qui n'en a pas, ne touche pas à celle de l'instance.
+async fn restore_auth_policy(
+    tx: &mut Transaction<'_, Sqlite>,
+    bundle: &Bundle,
+) -> Result<SectionReport> {
+    use crate::auth::policy::{Policy, SETTINGS_KEY};
+    let mut report = SectionReport::new("auth_policy");
+    let Some(raw) = &bundle.auth_policy else { return Ok(report) };
+    let Ok(policy) = serde_json::from_value::<Policy>(raw.clone()) else {
+        report.skipped += 1;
+        report.notes.push("The authentication policy of the backup is unreadable".into());
+        return Ok(report);
+    };
+    let value = serde_json::to_vec(&policy)?;
+    let existing = sqlx::query("SELECT value FROM settings WHERE key = ?")
+        .bind(SETTINGS_KEY)
+        .fetch_optional(&mut **tx)
+        .await
+        .context("lecture de la politique d'authentification")?;
+    match &existing {
+        Some(row) if row.try_get::<Vec<u8>, _>("value")? == value => {
+            report.skipped += 1;
+            return Ok(report);
+        }
+        // Rien de rangé et la politique par défaut : rien à restaurer.
+        None if policy == Policy::default() => {
+            report.skipped += 1;
+            return Ok(report);
+        }
+        _ => {}
+    }
+    sqlx::query(
+        "INSERT INTO settings (key, value) VALUES (?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value,
+             updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')",
+    )
+    .bind(SETTINGS_KEY)
+    .bind(&value)
+    .execute(&mut **tx)
+    .await
+    .context("écriture de la politique d'authentification")?;
     report.count(if existing.is_some() {
         RestoreOutcome::Updated
     } else {
@@ -2197,13 +2249,26 @@ async fn restore_users(
             .and_then(|raw| BASE64.decode(raw).ok())
             .map(|plain| cipher.encrypt(&plain))
             .transpose()?;
+        // Une adresse illisible (lot édité à la main) est laissée de côté, pas
+        // le compte.
+        let email = match user.email.as_deref().map(crate::auth::users::normalize_email) {
+            Some(Ok(email)) => email,
+            Some(Err(_)) => {
+                report.notes.push(format!(
+                    "Account \"{}\": its email address is not valid and was not restored.",
+                    user.username
+                ));
+                None
+            }
+            None => None,
+        };
 
         let row = sqlx::query(
             "INSERT INTO users (username, display_name, role, password_hash, oidc_subject,
                                 oidc_issuer, saml_subject, saml_issuer, disabled, totp_secret,
                                 totp_enabled, scim_id, scim_external_id, scim_email,
-                                disabled_by_scim)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+                                disabled_by_scim, email)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
         )
         .bind(&user.username)
         .bind(&user.display_name)
@@ -2220,6 +2285,7 @@ async fn restore_users(
         .bind(scim_id.as_ref().and(user.scim_external_id.as_ref()))
         .bind(scim_id.as_ref().and(user.scim_email.as_ref()))
         .bind(i64::from(user.disabled && user.disabled_by_scim))
+        .bind(email)
         .fetch_one(&mut **tx)
         .await
         .context("création du compte")?;

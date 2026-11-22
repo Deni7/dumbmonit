@@ -26,6 +26,7 @@ pub mod middleware;
 pub mod oidc;
 pub mod passkeys;
 pub mod password;
+pub mod policy;
 pub mod rate_limit;
 pub mod saml;
 pub mod scim;
@@ -241,6 +242,9 @@ pub enum AuthError {
     Conflict(String),
     /// 429 : trop de tentatives infructueuses.
     TooManyAttempts { message: String, retry_after: u64 },
+    /// 403 avec le code [`policy::TOTP_SETUP_REQUIRED`] : la politique de
+    /// l'instance exige d'abord l'enrôlement du second facteur.
+    TotpSetupRequired,
     /// 500 : le détail est journalisé, jamais renvoyé.
     Internal(anyhow::Error),
 }
@@ -260,6 +264,15 @@ impl IntoResponse for AuthError {
                 }
                 response
             }
+            Self::TotpSetupRequired => (
+                StatusCode::FORBIDDEN,
+                Json(json!({
+                    "error": "This instance requires two-factor authentication for admins and \
+                              operators: set it up in Settings → Account & security first.",
+                    "code": policy::TOTP_SETUP_REQUIRED,
+                })),
+            )
+                .into_response(),
             Self::Internal(error) => {
                 tracing::error!(?error, "erreur interne d'authentification");
                 body(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error.".to_string())
@@ -282,6 +295,12 @@ impl AuthError {
     /// Le refus opposé à un lecteur qui tente une écriture.
     pub fn admin_required() -> Self {
         Self::Forbidden("Admin role required.".into())
+    }
+
+    /// Le refus opposé à un compte que la politique « second facteur
+    /// obligatoire » retient à l'enrôlement.
+    pub fn totp_setup_required() -> Self {
+        Self::TotpSetupRequired
     }
 
     /// Le refus opposé à un lecteur qui tente de traiter une alerte.
