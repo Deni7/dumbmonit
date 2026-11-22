@@ -57,7 +57,7 @@ pub async fn insert(pool: &SqlitePool, draft: &Draft, author: &str) -> Result<i6
 }
 
 pub async fn get(pool: &SqlitePool, id: i64) -> Result<Option<Annotation>> {
-    let row = sqlx::query(&format!("SELECT {COLUMNS} FROM annotations WHERE id = ?"))
+    let row = sqlx::query(sqlx::AssertSqlSafe(format!("SELECT {COLUMNS} FROM annotations WHERE id = ?")))
         .bind(id)
         .fetch_optional(pool)
         .await
@@ -74,11 +74,11 @@ pub async fn list(
     to: Option<DateTime<Utc>>,
     limit: i64,
 ) -> Result<Vec<Annotation>> {
-    let rows = sqlx::query(&format!(
+    let rows = sqlx::query(sqlx::AssertSqlSafe(format!(
         "SELECT {COLUMNS} FROM annotations
          WHERE (?1 IS NULL OR COALESCE(until, at) >= ?1) AND (?2 IS NULL OR at <= ?2)
          ORDER BY at DESC, id DESC LIMIT ?3"
-    ))
+    )))
     .bind(from.map(db::timestamp))
     .bind(to.map(db::timestamp))
     .bind(limit)

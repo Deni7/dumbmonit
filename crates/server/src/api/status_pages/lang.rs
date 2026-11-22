@@ -311,11 +311,10 @@ mod tests {
         let unknown = Languages { default_lang: String::new(), translations: vec![t("ja")] };
         assert!(validate(unknown).is_err());
         let ok = Languages { default_lang: "fr".into(), translations: vec![t("de"), t("pt-BR")] };
-        assert_eq!(validate(ok).unwrap().translations.len(), 2);
+        assert_eq!(validate(ok).ok().map(|l| l.translations.len()), Some(2));
         // Une langue sans aucun texte est écartée.
-        let blank = Languages { default_lang: String::new(), translations: vec![t("it")] };
-        let mut blank = blank;
+        let mut blank = Languages { default_lang: String::new(), translations: vec![t("it")] };
         blank.translations[0].title.clear();
-        assert!(validate(blank).unwrap().translations.is_empty());
+        assert!(validate(blank).ok().is_some_and(|l| l.translations.is_empty()));
     }
 }

@@ -225,6 +225,6 @@ mod tests {
     fn un_nom_vide_ou_trop_long_est_refuse() {
         assert!(clean_name("  ").is_err());
         assert!(clean_name(&"x".repeat(MAX_NAME_CHARS + 1)).is_err());
-        assert_eq!(clean_name("  Web server ").unwrap(), "Web server");
+        assert_eq!(clean_name("  Web server ").ok().as_deref(), Some("Web server"));
     }
 }
