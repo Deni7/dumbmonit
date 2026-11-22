@@ -62,6 +62,11 @@ param(
     [string]$Sha256,
     # Install a downloaded binary without verifying it (air-gapped or manual setups only).
     [switch]$InsecureSkipChecksum,
+    # Install only if the agent binary is exactly this version (x.y.z): the server ships its own,
+    # and this refuses anything else, for example after a server upgrade.
+    [string]$Version,
+    # Say what would be done, then stop: nothing is downloaded, written or started.
+    [switch]$DryRun,
     [switch]$Uninstall
 )
 
@@ -283,13 +288,23 @@ function Migrate-Legacy {
 
 $identite = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principal = New-Object Security.Principal.WindowsPrincipal($identite)
-if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+if ($Version -and $Version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$') {
+    Stop-Sur "Invalid -Version value (expected x.y.z): $Version"
+}
+if (-not $DryRun -and -not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     Stop-Sur "This installer needs a PowerShell console running as administrator."
 }
 
 # ------------------------------------------------------------ désinstallation
 
 if ($Uninstall) {
+    if ($DryRun) {
+        Write-Etape "Dry run: nothing is changed. The uninstall would:"
+        Write-Etape "  - stop and delete the service $ServiceName"
+        Write-Etape "  - delete $InstallDir and the configuration $ConfigDir (it holds the token)"
+        Write-Etape "  - remove the firewall rule of the relay gateway, if any"
+        exit 0
+    }
     Write-Etape "Stopping the service"
     if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
         Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
@@ -334,6 +349,27 @@ $architecture = switch ($env:PROCESSOR_ARCHITECTURE) {
         'x86_64'
     }
     default { Stop-Sur "Unsupported architecture: $env:PROCESSOR_ARCHITECTURE" }
+}
+
+if ($DryRun) {
+    Write-Etape "Dry run: nothing is downloaded, written or started. The install would:"
+    Write-Etape "  - system: windows-$architecture, service: $ServiceName"
+    if ($BinPath) {
+        Write-Etape "  - install the binary $BinPath to $ExePath"
+    } else {
+        Write-Etape "  - download $Url/download/dumbmonit-agent-windows-$architecture.exe and install it to $ExePath"
+        if ($InsecureSkipChecksum) {
+            Write-Etape "  - NOT verify its checksum (-InsecureSkipChecksum)"
+        } elseif ($Sha256) {
+            Write-Etape "  - verify its SHA-256 against -Sha256"
+        } else {
+            Write-Etape "  - REFUSE it: no expected SHA-256 (-Sha256 missing)"
+        }
+    }
+    if ($Version) { Write-Etape "  - refuse any binary that is not version $Version" }
+    Write-Etape "  - write the configuration in $ConfigDir (server $Url, token hidden)"
+    Write-Etape "  - register and start the service $ServiceName"
+    exit 0
 }
 
 New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
@@ -392,6 +428,17 @@ if ($BinPath) {
         }
         Write-Etape "Checksum verified ($obtenu)"
     }
+}
+
+# Version imposée : un autre binaire n'est pas installé, l'agent en place reste tel quel.
+if ($Version) {
+    $obtenue = ''
+    try { $obtenue = ((& $exeTemporaire --version) -join ' ').Trim() -replace '^dumbmonit-agent\s+', '' } catch { }
+    if ($obtenue -ne $Version) {
+        Remove-Item -Path $exeTemporaire -Force -ErrorAction SilentlyContinue
+        Stop-Sur "The agent binary is version '$obtenue', not the requested $Version: nothing was installed."
+    }
+    Write-Etape "Version $obtenue confirmed"
 }
 
 if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
