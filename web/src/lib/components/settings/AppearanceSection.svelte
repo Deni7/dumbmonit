@@ -6,6 +6,8 @@
 	 *	 */
 	import { Moon, Sun, SunMoon } from 'lucide-svelte';
 	import { Panel } from '#lib/ui/index.js';
+	import Segmented from '#lib/ui/Segmented.svelte';
+	import { displayPrefs } from '#lib/stores/prefs.svelte.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { theme, type ConsoleTheme } from '#lib/stores/theme.svelte.js';
 	import LanguageSelect from '#lib/components/LanguageSelect.svelte';
@@ -15,6 +17,25 @@
 		{ value: 'light', label: () => m.settings_appearance_theme_light(), icon: Sun },
 		{ value: 'auto', label: () => m.settings_appearance_theme_system(), icon: SunMoon }
 	];
+
+	const TIME_OPTIONS = $derived([
+		{ value: 'auto', label: m.w2global_prefs_auto() },
+		{ value: '12', label: m.w2global_prefs_time_12() },
+		{ value: '24', label: m.w2global_prefs_time_24() }
+	]);
+	const WEEK_OPTIONS = $derived([
+		{ value: 'auto', label: m.w2global_prefs_auto() },
+		{ value: 'monday', label: m.w2global_prefs_week_monday() },
+		{ value: 'sunday', label: m.w2global_prefs_week_sunday() }
+	]);
+	const DENSITY_OPTIONS = $derived([
+		{ value: 'comfortable', label: m.w2global_prefs_density_comfortable() },
+		{ value: 'compact', label: m.w2global_prefs_density_compact() }
+	]);
+	const MOTION_OPTIONS = $derived([
+		{ value: 'auto', label: m.w2global_prefs_motion_system() },
+		{ value: 'reduce', label: m.w2global_prefs_motion_reduce() }
+	]);
 </script>
 
 <Panel id="appearance" title={m['settings.section.appearance']()} description={m.settings_language_theme_description()}>
@@ -44,6 +65,37 @@
 		<div class="flex flex-wrap items-center justify-between gap-3 max-sm:flex-nowrap">
 			<label for="settings-language" class="text-sm font-semibold text-ink">{m['settings.appearance.language_label']()}</label>
 			<LanguageSelect id="settings-language" class="w-full max-sm:w-auto max-sm:min-w-0 max-sm:flex-1 sm:w-auto sm:min-w-56" />
+		</div>
+		<div class="grid gap-4 border-t border-line pt-4 sm:grid-cols-2">
+			<Segmented
+				legend={m.w2global_prefs_time_label()}
+				name="pref-time-format"
+				options={TIME_OPTIONS}
+				value={displayPrefs.timeFormat}
+				onchange={(v) => displayPrefs.set({ timeFormat: v as 'auto' | '12' | '24' })}
+			/>
+			<Segmented
+				legend={m.w2global_prefs_week_label()}
+				name="pref-week-start"
+				options={WEEK_OPTIONS}
+				value={displayPrefs.weekStart}
+				onchange={(v) => displayPrefs.set({ weekStart: v as 'auto' | 'monday' | 'sunday' })}
+			/>
+			<Segmented
+				legend={m.w2global_prefs_density_label()}
+				name="pref-density"
+				options={DENSITY_OPTIONS}
+				value={displayPrefs.density}
+				onchange={(v) => displayPrefs.set({ density: v as 'comfortable' | 'compact' })}
+			/>
+			<Segmented
+				legend={m.w2global_prefs_motion_label()}
+				name="pref-motion"
+				options={MOTION_OPTIONS}
+				value={displayPrefs.motion}
+				help={m.w2global_prefs_motion_help()}
+				onchange={(v) => displayPrefs.set({ motion: v as 'auto' | 'reduce' })}
+			/>
 		</div>
 	</div>
 </Panel>

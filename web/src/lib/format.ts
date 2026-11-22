@@ -3,6 +3,7 @@ import type { Target } from '#lib/api/index.js';
 import { m } from '#lib/paraglide/messages.js';
 import { getLocale } from '#lib/paraglide/runtime.js';
 import { ageParts } from '#lib/components/devices/age.js';
+import { displayPrefs } from '#lib/stores/prefs.svelte.js';
 
 /**
  * Converts a server timestamp into a `Date`.
@@ -25,10 +26,13 @@ const dateTimeFormats = new Map<string, Intl.DateTimeFormat>();
 /** Formatter of the active UI locale, built once per locale. */
 function dateTimeFormat(): Intl.DateTimeFormat {
 	const locale = getLocale();
-	let format = dateTimeFormats.get(locale);
+	// The 12/24 h choice of Settings › Appearance; `undefined` follows the locale.
+	const hour12 = displayPrefs.hour12;
+	const key = `${locale}|${hour12}`;
+	let format = dateTimeFormats.get(key);
 	if (!format) {
-		format = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' });
-		dateTimeFormats.set(locale, format);
+		format = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', hour12 });
+		dateTimeFormats.set(key, format);
 	}
 	return format;
 }
