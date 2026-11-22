@@ -262,10 +262,7 @@ fn slack_headers(secret: &str, timestamp: i64, body: &str) -> Vec<(&'static str,
     let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).unwrap();
     mac.update(format!("v0:{timestamp}:{body}").as_bytes());
     let signature = format!("v0={}", hex::encode(mac.finalize().into_bytes()));
-    vec![
-        ("x-slack-request-timestamp", timestamp.to_string()),
-        ("x-slack-signature", signature),
-    ]
+    vec![("x-slack-request-timestamp", timestamp.to_string()), ("x-slack-signature", signature)]
 }
 
 async fn slack_channel(app: &TestApp) -> i64 {
@@ -357,11 +354,8 @@ async fn a_slack_press_with_a_forged_or_mismatched_token_does_nothing() {
 
     // Signé par Slack, mais le jeton du bouton est forgé.
     let other = ActionKey::from_cipher(&Cipher::from_key([1; 32]));
-    let forged = other.sign(&Claims::new(
-        Action::Ack,
-        vec![app.alert_ref("cpu_high@1").await],
-        Utc::now(),
-    ));
+    let forged =
+        other.sign(&Claims::new(Action::Ack, vec![app.alert_ref("cpu_high@1").await], Utc::now()));
     for body in [
         slack_body("dumbmonit_ack", &forged),
         slack_body("dumbmonit_ack", "garbage"),

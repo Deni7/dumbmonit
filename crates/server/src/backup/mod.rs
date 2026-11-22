@@ -21,8 +21,8 @@
 //! qui déchiffre les identifiants des équipements. Une sauvegarde de la base
 //! sans lui restaure une instance qui ne peut plus parler à rien.
 
-pub mod annotations;
 pub mod accounts;
+pub mod annotations;
 pub mod bundle;
 pub mod export;
 pub mod import;

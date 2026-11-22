@@ -442,7 +442,6 @@ impl Telegram {
     }
 }
 
-
 #[async_trait]
 impl Notifier for Telegram {
     fn kind(&self) -> &'static str {

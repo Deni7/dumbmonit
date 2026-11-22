@@ -282,9 +282,9 @@ pub async fn execute(
     let claims = verified(&state, ip, &payload.token).await?;
     match apply(&state, &claims, ACTOR, ip).await? {
         Applied::Done(result) => Ok(no_store(result)),
-        Applied::Inactive => Err(ApiError::NotFound(
-            "These alerts are no longer active: nothing left to do.".into(),
-        )),
+        Applied::Inactive => {
+            Err(ApiError::NotFound("These alerts are no longer active: nothing left to do.".into()))
+        }
         Applied::Used => Err(ApiError::Conflict("This link has already been used.".into())),
     }
 }

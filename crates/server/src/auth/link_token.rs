@@ -44,10 +44,8 @@ impl LinkToken {
         let hex = |part: &str, bytes: usize| {
             part.len() == bytes * 2 && part.bytes().all(|b| b.is_ascii_hexdigit())
         };
-        (hex(id, ID_BYTES) && hex(secret, SECRET_BYTES)).then(|| Self {
-            id: id.to_ascii_lowercase(),
-            secret: secret.to_ascii_lowercase(),
-        })
+        (hex(id, ID_BYTES) && hex(secret, SECRET_BYTES))
+            .then(|| Self { id: id.to_ascii_lowercase(), secret: secret.to_ascii_lowercase() })
     }
 
     /// Partie publique, qui retrouve la ligne en base.
