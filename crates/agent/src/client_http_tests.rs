@@ -354,3 +354,32 @@ async fn an_unreachable_websocket_says_why_instead_of_a_broken_handshake() {
     assert!(message.contains("cannot connect"), "{message}");
     assert!(!message.contains("dmon_jeton"), "{message}");
 }
+
+#[tokio::test]
+async fn on_the_websocket_a_backup_server_is_reached_through_its_own_websocket() {
+    // Deux serveurs (primaire et secours de `server_urls`) dont seul l'adresse
+    // de l'interface répond, chacun sous la même autorité épinglée.
+    let (primary, pin, primary_calls) = fake_channel(ingest_only).await;
+    let client = client_behind(primary, &pin, TransportMode::WebSocket);
+    client.send(&batch()).await.expect("lot accepté par la primaire");
+    assert_eq!(primary_calls.count("POST", "/api/ingest"), 1);
+    assert!(client.via_websocket());
+    assert_eq!(client.endpoint(), format!("ws://{primary}/api/agent/ws"), "jamais le pont local");
+
+    // Bascule : le canal suit l'interface du secours, aucune connexion ne
+    // reste ouverte vers la primaire.
+    let (backup, backup_pin, backup_calls) = fake_channel(ingest_only).await;
+    client.set_pins(vec![pin.clone(), backup_pin]);
+    let closed = format!("https://127.0.0.1:{}", closed_port());
+    client.retarget_server(&closed, &format!("http://{backup}"));
+    client.send(&batch()).await.expect("lot accepté par le secours");
+    assert_eq!(backup_calls.count("POST", "/api/ingest"), 1);
+    assert_eq!(primary_calls.count("POST", "/api/ingest"), 1, "rien de plus vers la primaire");
+    assert_eq!(client.endpoint(), format!("ws://{backup}/api/agent/ws"));
+
+    // L'essai de la primaire passe par sa WebSocket : elle répond ; une
+    // adresse où rien n'écoute, non.
+    assert_eq!(client.websocket_answers(&format!("http://{primary}")).await, Ok(()));
+    let nowhere = format!("http://127.0.0.1:{}", closed_port());
+    assert!(client.websocket_answers(&nowhere).await.is_err());
+}

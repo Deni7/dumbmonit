@@ -193,6 +193,21 @@ impl Connector {
         &self.url
     }
 
+    /// Le même client (TLS de l'interface, mandataire) vers une autre adresse :
+    /// celle d'un serveur de secours (`server_urls`).
+    pub fn with_url(&self, url: String) -> Self {
+        Self { url, http: self.http.clone(), last_error: Mutex::new(None) }
+    }
+
+    /// Ouvre une WebSocket à cette adresse puis la referme, sans rien noter :
+    /// vrai si DumbMonit y répond (mise à niveau acceptée sous le bon
+    /// sous-protocole). L'essai de la primaire, depuis un secours.
+    pub async fn answers(&self) -> Result<(), String> {
+        let mut ws = self.try_open().await?;
+        let _ = ws.close(None).await;
+        Ok(())
+    }
+
     /// Dernière erreur d'ouverture, s'il y en a eu une depuis le dernier succès.
     pub fn last_error(&self) -> Option<String> {
         self.last_error.lock().unwrap_or_else(PoisonError::into_inner).clone()
@@ -462,6 +477,36 @@ impl Transport {
         state.bridge = None;
     }
 
+    /// Autre serveur (`server_urls`) : la WebSocket vise désormais son
+    /// adresse. Le pont est refermé, ses connexions avec lui — aucune ne reste
+    /// ouverte vers l'ancien serveur — et rouvert au premier besoin.
+    /// `None` : pas d'adresse utilisable, le port des agents.
+    pub fn retarget(&self, ws_url: Option<String>) {
+        let mut state = self.lock();
+        let connector = match (&state.connector, ws_url) {
+            (Some(current), Some(url)) => Some(Arc::new(current.with_url(url))),
+            _ => None,
+        };
+        if connector.is_none() {
+            state.route = Route::Direct;
+        }
+        state.connector = connector;
+        state.bridge = None;
+    }
+
+    /// Ouvreur de la WebSocket vers cette adresse, avec les réglages en cours
+    /// (`None` sans WebSocket configurée).
+    pub fn connector_for(&self, ws_url: String) -> Option<Connector> {
+        self.lock().connector.as_ref().map(|current| current.with_url(ws_url))
+    }
+
+    /// Adresse affichée de la WebSocket quand c'est elle qui sert.
+    pub fn websocket_address(&self) -> Option<String> {
+        let state = self.lock();
+        let connector = state.connector.as_ref().filter(|_| state.route == Route::WebSocket)?;
+        Some(display(connector.url()))
+    }
+
     /// Reprend le chemin retenu la dernière fois, en mode `auto` seulement.
     pub fn remember(&self, route: Route) {
         let mut state = self.lock();
@@ -623,6 +668,28 @@ mod tests {
         assert_eq!(transport.unreachable(), 2);
         transport.note_reachable();
         assert_eq!(transport.unreachable(), 0);
+    }
+
+    #[test]
+    fn another_server_moves_the_websocket_and_drops_it_without_an_address() {
+        let proxy = ProxyConfig::default();
+        let connector = Connector::new("https://a/api/agent/ws".into(), None, &proxy).unwrap();
+        let transport = Transport::default();
+        transport.configure(TransportMode::WebSocket, Some(connector));
+        assert_eq!(transport.websocket_address().as_deref(), Some("wss://a/api/agent/ws"));
+
+        // Un secours de `server_urls` : la WebSocket suit son adresse.
+        transport.retarget(Some("https://b/api/agent/ws".into()));
+        assert_eq!(transport.route(), Route::WebSocket);
+        assert_eq!(transport.websocket_address().as_deref(), Some("wss://b/api/agent/ws"));
+        let probe = transport.connector_for("https://c/api/agent/ws".into()).expect("ouvreur");
+        assert_eq!(probe.url(), "https://c/api/agent/ws");
+
+        // Sans adresse utilisable : le port des agents, plus de WebSocket.
+        transport.retarget(None);
+        assert_eq!(transport.route(), Route::Direct);
+        assert_eq!(transport.websocket_address(), None);
+        assert!(transport.connector_for("https://c/api/agent/ws".into()).is_none());
     }
 
     /// Serveur WebSocket factice : renvoie en écho chaque message binaire.

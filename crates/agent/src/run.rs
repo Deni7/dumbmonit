@@ -543,7 +543,7 @@ impl Agent {
 
     pub async fn run(mut self, mut shutdown: Shutdown) -> Result<()> {
         info!(
-            server = self.client.url(),
+            server = self.client.endpoint(),
             transport = self.client.describe_transport(),
             host = self.identity.hostname,
             period_s = self.interval.as_secs(),
@@ -962,7 +962,8 @@ impl Agent {
             self.identity.relay_gateway_check =
                 self.gateway_check.lock().ok().and_then(|held| held.clone());
         }
-        self.identity.server_link = self.failover.link(&self.client.base_url());
+        // Par la WebSocket, l'adresse de l'interface (`wss://…`), pas le pont.
+        self.identity.server_link = self.failover.link(&self.client.endpoint());
         let mut batch =
             PushBatch::new(self.identity.clone(), samples, chrono::Utc::now().timestamp_millis());
         if self.wants_inventory() {
@@ -1296,8 +1297,10 @@ impl Agent {
     /// canal reste le même : certificat, épinglage et mandataire suivent.
     fn switch_server(&mut self, index: usize) {
         let Some(url) = self.server_root(index) else { return };
-        let from = self.client.base_url();
-        self.client.retarget(&url);
+        let Some(web_url) = self.failover.web_url(index).map(str::to_string) else { return };
+        let from = self.client.endpoint();
+        // Sur la WebSocket, c'est l'interface de ce serveur qui la porte.
+        self.client.retarget_server(&url, &web_url);
         self.failover.switched_to(index, Instant::now());
         if index == 0 {
             info!(from, to = url, "the primary server answers again, switching back to it");
@@ -1325,15 +1328,26 @@ impl Agent {
             return;
         }
         let Some(url) = self.server_root(0) else { return };
-        let outcome = self
-            .client
-            .probe_http()
-            .get(format!("{url}{}", failover::PROBE_PATH))
-            .timeout(failover::PROBE_TIMEOUT)
-            .send()
-            .await
-            .map(|response| response.status().as_u16())
-            .map_err(|error| crate::client::describe(&error));
+        let outcome = if self.client.via_websocket() {
+            // Par la WebSocket, le port des agents de la primaire n'est pas
+            // joignable : c'est sa WebSocket qui est essayée. Un serveur en
+            // attente (ou un tunnel sans serveur derrière lui) ne l'ouvre pas.
+            let Some(web_url) = self.failover.web_url(0).map(str::to_string) else { return };
+            let probe = self.client.websocket_answers(&web_url);
+            match tokio::time::timeout(failover::PROBE_TIMEOUT, probe).await {
+                Ok(answered) => answered.map(|()| 200),
+                Err(_) => Err("the primary's agent WebSocket did not answer in time".to_string()),
+            }
+        } else {
+            self.client
+                .probe_http()
+                .get(format!("{url}{}", failover::PROBE_PATH))
+                .timeout(failover::PROBE_TIMEOUT)
+                .send()
+                .await
+                .map(|response| response.status().as_u16())
+                .map_err(|error| crate::client::describe(&error))
+        };
         match failover::probe_verdict(outcome) {
             Ok(()) => self.switch_server(0),
             Err(reason) => {

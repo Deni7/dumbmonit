@@ -553,6 +553,61 @@ impl PushClient {
         }
     }
 
+    /// Change de serveur (`server_urls`) : `root`, son canal chiffré (ou son
+    /// interface sur l'ancien canal), `web_url` la racine de son interface,
+    /// où vit sa WebSocket. Sur le canal chiffré, le canal est remonté sur le
+    /// chemin en cours : par la WebSocket, le pont vise désormais ce serveur
+    /// et aucune connexion ne reste ouverte vers l'ancien.
+    pub fn retarget_server(&self, root: &str, web_url: &str) {
+        self.transport.retarget(crate::ws::websocket_url(web_url));
+        let identity = match self.target.lock() {
+            Ok(mut target) => target.as_mut().map(|(url, identity)| {
+                *url = root.to_string();
+                identity.clone()
+            }),
+            Err(_) => None,
+        };
+        if let Some(identity) = identity.filter(|_| self.is_encrypted()) {
+            match self.install_tls(self.transport.route(), root, identity) {
+                Ok(()) => return,
+                Err(error) => {
+                    tracing::warn!(error = %format!("{error:#}"), "agent channel not moved");
+                }
+            }
+        }
+        self.retarget(root);
+    }
+
+    /// Le serveur de cette interface répond-il par sa WebSocket ? Vrai si
+    /// DumbMonit y accepte la mise à niveau des agents (un serveur en attente
+    /// ne l'accepte pas). L'essai de la primaire quand l'agent passe par la
+    /// WebSocket : le port des agents, lui, n'est pas joignable.
+    pub async fn websocket_answers(&self, web_url: &str) -> Result<(), String> {
+        let url = crate::ws::websocket_url(web_url)
+            .ok_or_else(|| format!("no agent WebSocket address for {web_url}"))?;
+        let connector = self
+            .transport
+            .connector_for(url)
+            .ok_or_else(|| "the WebSocket transport is not configured".to_string())?;
+        connector.answers().await
+    }
+
+    /// Vrai si le canal chiffré passe en ce moment par la WebSocket.
+    pub fn via_websocket(&self) -> bool {
+        self.is_encrypted() && self.transport.route() == Route::WebSocket
+    }
+
+    /// Adresse du serveur telle qu'elle se dit (journaux, lot) : la WebSocket
+    /// (`wss://…`) quand c'est elle qui sert, jamais le pont local.
+    pub fn endpoint(&self) -> String {
+        if self.is_encrypted()
+            && let Some(address) = self.transport.websocket_address()
+        {
+            return address;
+        }
+        self.base_url()
+    }
+
     /// Racine du serveur visé en ce moment, sans chemin.
     pub fn base_url(&self) -> String {
         self.channel().base_url.clone()
