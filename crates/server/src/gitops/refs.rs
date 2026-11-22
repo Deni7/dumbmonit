@@ -325,6 +325,7 @@ mod tests {
             credential: Some(json!({"type": "snmp_v3", "username": "bob",
                 "auth": {"protocol": "sha", "passphrase": "hunter2"}})),
             group_name: String::new(),
+            note: String::new(),
             position: 0,
             location: None,
             multisite: None,

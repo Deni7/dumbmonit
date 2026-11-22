@@ -558,7 +558,7 @@ async fn targets(
 ) -> Result<Vec<BundleTarget>> {
     let rows = sqlx::query(
         "SELECT id, name, address, kind, profile_id, parent_id, via_agent, interval_secs,
-                enabled, cve_scan, tags, credential_enc, group_name, position,
+                enabled, cve_scan, tags, credential_enc, group_name, note, position,
                 (SELECT l.name FROM locations l WHERE l.id = targets.location_id) AS location
          FROM targets ORDER BY id",
     )
@@ -618,6 +618,7 @@ async fn targets(
             tags: serde_json::from_str(&tags).unwrap_or_default(),
             credential,
             group_name: row.try_get("group_name")?,
+            note: row.try_get("note")?,
             position: row.try_get("position")?,
             location: row.try_get("location")?,
             multisite: multisite.remove(&id).map(|config| BundleMultisite {

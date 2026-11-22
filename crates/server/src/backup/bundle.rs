@@ -327,6 +327,9 @@ pub struct BundleTarget {
     /// encore : c'est aussi ce que vaut « sans dossier ».
     #[serde(default)]
     pub group_name: String,
+    /// Note libre de l'équipement (migration 0263). Vide dans un lot plus ancien.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub note: String,
     /// Rang manuel dans `/targets` (migration 0038). Zéro par défaut pour un
     /// lot plus ancien : les cibles restaurées arrivent alors toutes à la même
     /// hauteur plutôt que dans un ordre inventé.
@@ -1151,6 +1154,7 @@ mod tests {
                 tags: BTreeMap::new(),
                 credential: Some(serde_json::json!({"type": "snmp_v2c", "community": "s3cret"})),
                 group_name: "Rack A".to_string(),
+                note: "Racked by Sam, ask before a reboot".to_string(),
                 position: 3,
                 location: None,
                 multisite: None,
@@ -1170,6 +1174,7 @@ mod tests {
         assert_eq!(reopened.targets[0].address, "192.168.1.1");
         assert_eq!(reopened.targets[0].credential.as_ref().unwrap()["community"], "s3cret");
         assert_eq!(reopened.targets[0].group_name, "Rack A");
+        assert_eq!(reopened.targets[0].note, "Racked by Sam, ask before a reboot");
         assert_eq!(reopened.targets[0].position, 3);
     }
 
@@ -1185,6 +1190,7 @@ mod tests {
         });
         let bundle: Bundle = serde_json::from_value(json).unwrap();
         assert_eq!(bundle.targets[0].group_name, "");
+        assert_eq!(bundle.targets[0].note, "");
         assert_eq!(bundle.targets[0].position, 0);
     }
 
