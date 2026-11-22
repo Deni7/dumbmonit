@@ -391,6 +391,9 @@ pub async fn evaluate_once(
     for group in &mut outcome.groups {
         group.client_id = group.target_id.and_then(|id| target_clients.get(&id).copied());
     }
+    // Canaux propres à un moniteur : ce que sa règle envoie partout ne part
+    // que vers eux (voir `db::target_channels`).
+    db::target_channels::narrow_groups(pool, &mut outcome.groups).await?;
 
     report.alerts_tracked = outcome.alerts.len();
     for alert in &outcome.alerts {

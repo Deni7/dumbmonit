@@ -3280,6 +3280,158 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /api/targets/bulk:
+    patch:
+      operationId: bulkUpdateTargets
+      tags: [Devices]
+      summary: Edit several devices at once
+      description: >-
+        Applies one change to every listed device: check interval, notification
+        channels (`set`, `add` or `remove`), free tags (`add`, `remove`; a key
+        that is an option of the device's type is refused when added and left
+        alone when removed) and folder (`""`: no folder). Fields left out stay
+        as they are. Each device is checked as a single edit would be (it must
+        exist and be visible, a team-restricted account needs `manage` on it
+        and on the destination folder, a monitor managed by Docker labels or a
+        configuration file is refused, a channel of another MSP client is
+        refused) and gets its own verdict in `results`. The devices that pass
+        are written together in one transaction. A request that changes
+        nothing, or an interval, folder name, tag or channel that is invalid
+        for every device, is refused as a whole (400).
+      x-token-scope: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids, patch]
+              properties:
+                ids:
+                  type: array
+                  maxItems: 20000
+                  items: { type: integer, format: int64 }
+                patch: { $ref: "#/components/schemas/TargetBulkPatch" }
+      responses:
+        "200":
+          description: One verdict per device, in the order of `ids` (a repeated id counts once).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TargetBulkReport" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/monitor-templates:
+    get:
+      operationId: listMonitorTemplates
+      tags: [Devices]
+      summary: Monitor templates
+      description: >-
+        Saved starting points for the add form: a type, its options and free
+        tags without any secret, a check interval and notification channels.
+        Never an address or a credential.
+      x-token-scope: read
+      responses:
+        "200":
+          description: Every template, by name.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MonitorTemplate" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      operationId: createMonitorTemplate
+      tags: [Devices]
+      summary: Save a device as a template
+      description: >-
+        Builds the template from what is stored for `target_id`: its type,
+        interval, notification channels and options and tags, leaving out
+        every key that names a secret, the HTTP headers, any value carrying a
+        password (`https://user:pass@host`) and, of a scenario, everything but
+        each step's name, method and URL. An agent cannot be a template.
+      x-token-scope: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, target_id]
+              properties:
+                name: { type: string, maxLength: 80 }
+                target_id: { type: integer, format: int64 }
+      responses:
+        "201":
+          description: The template.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MonitorTemplate" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/monitor-templates/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    get:
+      operationId: getMonitorTemplate
+      tags: [Devices]
+      summary: One monitor template
+      x-token-scope: read
+      responses:
+        "200":
+          description: The template.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MonitorTemplate" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      operationId: renameMonitorTemplate
+      tags: [Devices]
+      summary: Rename a monitor template
+      x-token-scope: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 80 }
+      responses:
+        "200":
+          description: The template.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MonitorTemplate" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      operationId: deleteMonitorTemplate
+      tags: [Devices]
+      summary: Delete a monitor template
+      description: Devices created from it are not affected.
+      x-token-scope: write
+      responses:
+        "204": { description: Template deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /api/targets/{id}:
     parameters:
       - $ref: "#/components/parameters/TargetId"
@@ -13521,6 +13673,10 @@ components:
           additionalProperties: { type: string }
         group_name: { type: string, description: "Flat folder shown on `/targets`; empty: no folder." }
         note: { type: string, description: "Free-text note for humans (owner, location, what to do when it is down). Empty: none." }
+        channels:
+          type: array
+          description: "Notification channels of this device: an alert its rule sends to every channel goes to these only (a rule that names its own channels keeps them). Empty: every channel, as before."
+          items: { type: integer, format: int64 }
         created_at: { type: [string, "null"], description: "Creation date, UTC without suffix." }
         position: { type: integer, format: int64, description: "Manual rank, tiebreaking only within the same state and folder." }
         location_id: { type: [integer, "null"], format: int64, description: "Location assigned on the world map; null: none (the device may still sit at one through its site, see `GET /api/locations`)." }
@@ -13540,6 +13696,67 @@ components:
           type: [string, "null"]
           enum: [down, config, null]
           description: "`down`: the device did not answer; `config`: our side (credentials, address, option)."
+    TargetBulkPatch:
+      type: object
+      description: What a bulk edit changes; a field left out stays as it is.
+      properties:
+        interval_secs: { type: integer, minimum: 10, maximum: 604800 }
+        channels:
+          description: "Notification channels of each device: replace the list, add to it or remove from it. An empty `set` goes back to the channels of the alert rules."
+          oneOf:
+            - type: object
+              required: [set]
+              properties: { set: { type: array, items: { type: integer, format: int64 } } }
+            - type: object
+              required: [add]
+              properties: { add: { type: array, items: { type: integer, format: int64 } } }
+            - type: object
+              required: [remove]
+              properties: { remove: { type: array, items: { type: integer, format: int64 } } }
+        tags:
+          type: object
+          properties:
+            add:
+              type: object
+              description: "Free tags to set (key: 1 to 64 characters without `=`; value: one line, at most 200 characters)."
+              additionalProperties: { type: string }
+            remove:
+              type: array
+              items: { type: string }
+        group_name: { type: string, maxLength: 60, description: "Destination folder; empty: no folder." }
+    TargetBulkReport:
+      type: object
+      required: [updated, failed, results]
+      properties:
+        updated: { type: integer }
+        failed: { type: integer }
+        results:
+          type: array
+          items:
+            type: object
+            required: [id, ok]
+            properties:
+              id: { type: integer, format: int64 }
+              ok: { type: boolean }
+              error: { type: string, description: Why this device was left as it was. }
+    MonitorTemplate:
+      type: object
+      required: [id, name, kind, interval_secs, tags, channels, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        kind: { type: string }
+        interval_secs: { type: integer }
+        tags:
+          type: object
+          description: Options of the type and free tags; never a secret.
+          additionalProperties: { type: string }
+        channels:
+          type: array
+          description: Notification channels of a device created from it; empty means the channels of its alert rules.
+          items: { type: integer, format: int64 }
+        created_at: { type: string, description: "UTC, without suffix." }
+        updated_at: { type: string, description: "UTC, without suffix." }
     TargetManaged:
       type: object
       description: >-
@@ -13673,6 +13890,10 @@ components:
           additionalProperties: { type: string }
         group_name: { type: [string, "null"], description: "Flat folder shown on `/targets`. Empty or `null`: no folder. Absent on `PUT` keeps the folder." }
         location_id: { type: [integer, "null"], format: int64, description: "Location on the world map; `null`: none. Absent on `PUT` keeps the assignment." }
+        channels:
+          type: array
+          description: "Notification channels of this device (see `Target.channels`). Absent on `PUT` keeps them; `[]` goes back to the channels of the alert rules. A channel of another MSP client is refused."
+          items: { type: integer, format: int64 }
         multisite:
           description: "Probe from several locations (uptime monitors only, at least two locations, not combined with `via_agent`); `null`: one place. Absent on `PUT` keeps the setting."
           oneOf:

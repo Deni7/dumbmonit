@@ -22,6 +22,7 @@ pub mod bundle;
 pub mod export;
 pub mod import;
 pub mod local;
+pub mod monitor_templates;
 pub mod oncall;
 
 pub use bundle::{Bundle, Envelope, FORMAT, MIN_PASSPHRASE_LEN, VERSION};

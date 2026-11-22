@@ -30,6 +30,7 @@ use sqlx::{Row, Sqlite, SqlitePool, Transaction};
 
 use crate::api::topology_edits::{self, CorrectionKind, RuleKind, RuleSpec, RuleStatus};
 use crate::backup::bundle::*;
+use crate::backup::monitor_templates as templates;
 use crate::collectors::agent;
 use crate::crypto::Cipher;
 
@@ -147,6 +148,11 @@ pub async fn restore(
     report.push(restore_report_schedules(&mut tx, bundle, &channels, &refs).await?);
     report.push(restore_report_logo(&mut tx, bundle).await?);
     report.push(restore_slos(&mut tx, bundle, &refs).await?);
+    report.push(templates::restore_templates(&mut tx, &bundle.monitor_templates, &channels).await?);
+    report.push(
+        templates::restore_target_channels(&mut tx, &bundle.target_channels, &refs, &channels)
+            .await?,
+    );
     report.push(restore_incidents(&mut tx, bundle).await?);
     report.push(restore_agent_tokens(&mut tx, bundle).await?);
     report.push(restore_api_tokens(&mut tx, bundle).await?);
