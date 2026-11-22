@@ -13,6 +13,7 @@ token to copy, and what to type into the form.
 - [Settings or secrets: the difference](#settings-or-secrets-the-difference)
 - [Self-signed certificates](#self-signed-certificates)
 - [Acknowledge or snooze from the notification](#acknowledge-or-snooze-from-the-notification)
+- [Personal notifications](#personal-notifications)
 - [The custom channel](#the-custom-channel)
   - [Available variables](#available-variables)
   - [Example 1 — an internal JSON API](#example-1--an-internal-json-api)
@@ -153,6 +154,43 @@ other invalid link, and repeated attempts from one address are slowed down.
 Turn **Acknowledge and snooze from notifications** off in the notification policy
 to stop adding them; this also invalidates the links already sent. Clearing the
 public URL has the same effect.
+
+---
+
+## Personal notifications
+
+Channels belong to the instance; each person can also receive alerts
+personally, in Settings → **My account → My notifications** (see
+[Settings](using/settings.md#my-notifications)): by email, to the address of
+the account, through the [email server](#email-server) of the instance, and/or
+by [Web Push](#web-push) on the devices that account has subscribed — no
+channel to create.
+
+They go through the same steps as a channel, after it in each evaluation
+cycle:
+
+1. **What the account sees.** An alert on a monitor its teams do not show
+   never reaches it; alerts without a monitor reach it only with the scope
+   *Everything I see*.
+2. **Its scope.** Everything it sees, the folders opened by its teams, or the
+   folders (sub-folders included) and tags (`key=value`, or `key` alone) it
+   picked.
+3. **Its minimum severity**, and whether it wants recoveries. A recovery is
+   only sent for an alert that was announced to that account.
+4. **Its minimum delay** between two messages for the same alert, on top of
+   the rule's own reminders.
+5. **Quiet hours**, in its time zone: only critical alerts (*Warning*) get
+   through; the rest is not sent to it, and stays in the alert list.
+6. **Flapping and the hourly cap** of the global policy: an alert held back
+   for flapping is not sent, and an account receives at most the policy's
+   messages per hour.
+
+One message per monitor, without the grouping window: a person wants to know
+at once. Maintenance windows, suppression by dependency and silences apply
+before, as for every channel. A failed delivery is logged by the server and
+not retried. Action links (acknowledge, snooze) are not added to personal
+messages. **Send me a test** sends a test message through each means saved
+as on.
 
 ---
 
@@ -730,8 +768,10 @@ message DumbMonit prepared.
 **Settings → Notifications → Email server** sets one SMTP server for the
 instance: host, port, encryption (STARTTLS, TLS or none), username, password
 and the sender's address and name. It sends what has no channel of its own:
-[status page subscribers](using/status-pages.md#email-subscribers), and
-[scheduled reports](using/reports.md) when no email channel is enabled.
+[status page subscribers](using/status-pages.md#email-subscribers),
+[scheduled reports](using/reports.md) when no email channel is enabled,
+[personal notifications](#personal-notifications), and the password reset
+links and invitations of [accounts](using/settings.md#invitations).
 **Send a test email** tries the form as it is, before saving, and shows the
 SMTP server's answer when it fails.
 
