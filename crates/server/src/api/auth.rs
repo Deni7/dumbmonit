@@ -208,7 +208,9 @@ pub async fn status(
         None
     };
     let totp_setup_required = match &session {
-        Some((_, user, verified)) => policy::setup_required(&state.pool, user, verified.via).await?,
+        Some((_, user, verified)) => {
+            policy::setup_required(&state.pool, user, verified.via).await?
+        }
         None => false,
     };
     let user = session.map(|(_, user, _)| UserView::from(user));

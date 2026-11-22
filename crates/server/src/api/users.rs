@@ -80,8 +80,8 @@ pub async fn create(
 ) -> AuthResult<(StatusCode, Json<UserView>)> {
     let username = payload.username.trim();
     users::validate_username(username).map_err(AuthError::Invalid)?;
-    let email =
-        users::normalize_email(payload.email.as_deref().unwrap_or("")).map_err(AuthError::Invalid)?;
+    let email = users::normalize_email(payload.email.as_deref().unwrap_or(""))
+        .map_err(AuthError::Invalid)?;
 
     let password = payload.password.filter(|password| !password.is_empty());
     let hash = match password {

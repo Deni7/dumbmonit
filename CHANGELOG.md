@@ -78,6 +78,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **Refreshes back off on errors.** Every panel that refreshes on its own now goes through one
+  poller, which slows down while the server does not answer and pauses in a hidden tab.
+- **Translations reviewed.** The texts added since 0.19.0 were reread in the eight other languages
+  (terminology, typography, register).
+
 - **Monitors list in the style of Alerts.** A smaller toolbar (search, Filter, Compact/Tiles, a
   folder button and Select), "Add a monitor" in the page header, one column header above the list,
   folder headers like the Alerts groups (a quiet problem count only while folded), rows with the
