@@ -16,6 +16,7 @@
 	import { parseServerDate } from '#lib/format.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { Skeleton } from '#lib/ui/index.js';
+	import { startPolling } from '#lib/poll.js';
 	import { HORIZON_DAYS, ROW_LIMIT, upcomingRows, type UpcomingRow, type UpcomingTone } from './upcoming.js';
 
 	const REFRESH_MS = 5 * 60_000;
@@ -28,31 +29,30 @@
 	// The deadlines are the block's own data: when they cannot be read, say so rather than
 	// "nothing due". The vulnerabilities (an opt-in feature, possibly off or not for this
 	// role) and the update check are extras: silent when absent.
-	$effect(() => {
-		const controller = new AbortController();
-		const load = () => {
-			listDeadlines({ upcoming: true, maxDays: HORIZON_DAYS, signal: controller.signal })
-				.then((list) => {
-					deadlines = list;
-					failed = false;
-				})
-				.catch(() => {
-					if (!controller.signal.aborted) failed = deadlines === null;
-				});
-			listCves({ severity: 'critical', state: 'vulnerable', ignored: false }, controller.signal)
-				.then((list) => (findings = list.findings))
-				.catch(() => {});
-			getUpdate(controller.signal, true)
-				.then((info) => (update = info))
-				.catch(() => {});
-		};
-		load();
-		const timer = setInterval(load, REFRESH_MS);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
-	});
+	// Only the deadlines decide whether the block backs off.
+	$effect(() =>
+		startPolling(async (signal) => {
+			const [ok] = await Promise.all([
+				listDeadlines({ upcoming: true, maxDays: HORIZON_DAYS, signal })
+					.then((list) => {
+						deadlines = list;
+						failed = false;
+						return true;
+					})
+					.catch(() => {
+						if (!signal.aborted) failed = deadlines === null;
+						return false;
+					}),
+				listCves({ severity: 'critical', state: 'vulnerable', ignored: false }, signal)
+					.then((list) => (findings = list.findings))
+					.catch(() => {}),
+				getUpdate(signal, true)
+					.then((info) => (update = info))
+					.catch(() => {})
+			]);
+			return ok;
+		}, REFRESH_MS)
+	);
 
 	const rows = $derived(upcomingRows({ deadlines: deadlines ?? [], findings, update }));
 	const shown = $derived(rows.slice(0, ROW_LIMIT));

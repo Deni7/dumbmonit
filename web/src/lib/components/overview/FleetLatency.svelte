@@ -16,6 +16,7 @@
 	import { TopN, type TopItem } from '#lib/viz/index.js';
 	import { fleetStore } from '#lib/components/enterprise/fleet.svelte.js';
 	import { loadFleetLatency, type FleetLatencyTrend } from '#lib/components/enterprise/fleet.js';
+	import { startPolling } from '#lib/poll.js';
 
 	const REFRESH_MS = 60_000;
 
@@ -29,24 +30,22 @@
 
 	$effect(() => {
 		const seconds = consoleState.rangeSeconds;
-		const controller = new AbortController();
-		const load = () =>
-			loadFleetLatency(seconds, controller.signal)
+		// The first load always runs; the next ones only while LIVE is on.
+		let first = true;
+		return startPolling((signal) => {
+			if (!first && !consoleState.live) return true;
+			first = false;
+			return loadFleetLatency(seconds, signal)
 				.then((next) => {
 					trend = next;
 					failed = false;
+					return true;
 				})
 				.catch(() => {
-					if (!controller.signal.aborted) failed = true;
+					if (!signal.aborted) failed = true;
+					return false;
 				});
-		void load();
-		const timer = setInterval(() => {
-			if (consoleState.live && document.visibilityState !== 'hidden') void load();
 		}, REFRESH_MS);
-		return () => {
-			clearInterval(timer);
-			controller.abort();
-		};
 	});
 
 	const series = $derived(
