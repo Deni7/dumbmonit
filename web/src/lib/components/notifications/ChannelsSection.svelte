@@ -5,11 +5,11 @@
 	 * the catalogue we could neither name a kind nor build the form.
 	 */
 	import ClientAssign from '#lib/components/ClientAssign.svelte';
-	import { BellRing, EllipsisVertical, Plus } from 'lucide-svelte';
-	import { deleteChannel, listChannelKinds, listChannels, testChannel, toApiError, type Channel } from '#lib/api/index.js';
+	import { BellRing, EllipsisVertical, Plus, Search } from 'lucide-svelte';
+	import { deleteChannel, listChannelKinds, listChannels, testChannel, toApiError, updateChannel, type Channel } from '#lib/api/index.js';
 	import { formatDateTime, formatRelative, pad2 } from '#lib/format.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
-	import { Button, ClickSpark, Confirm, EmptyState, ErrorNotice, Menu, Panel, Plate, Skeleton } from '#lib/ui/index.js';
+	import { Button, ClickSpark, Confirm, EmptyState, ErrorNotice, Menu, Panel, Plate, Skeleton, Toggle } from '#lib/ui/index.js';
 	import { kindIcon, normalizeKind, type KindInfo } from './kinds';
 	import { withoutOnCall } from '#lib/components/oncall/gate.js';
 	import { instanceStore } from '#lib/stores/instance.svelte.js';
@@ -22,7 +22,13 @@
 	let channels = $state<Channel[]>([]);
 	// The on-call channel kind (and the channels made with it) only shows while on-call schedules are on.
 	const pickKinds = $derived(withoutOnCall(kinds, instanceStore.oncallEnabled));
-	const shownChannels = $derived(withoutOnCall(channels, instanceStore.oncallEnabled));
+	const allChannels = $derived(withoutOnCall(channels, instanceStore.oncallEnabled));
+	let search = $state('');
+	const shownChannels = $derived.by(() => {
+		const term = search.trim().toLowerCase();
+		if (!term) return allChannels;
+		return allChannels.filter((c) => `${c.name} ${kindLabel(c.kind)} ${c.kind}`.toLowerCase().includes(term));
+	});
 	let loading = $state(true);
 	let error = $state<unknown>(null);
 
@@ -83,6 +89,15 @@
 
 	/** `null`: closed; `'new'`: adding; a channel: editing it. */
 	let form = $state<null | 'new' | Channel>(null);
+	/** Adding from a copy of this channel (the form is then `'new'`). */
+	let copySource = $state<Channel | null>(null);
+	let formKey = $state(0);
+
+	function openForm(next: 'new' | Channel, copyOf: Channel | null = null) {
+		form = next;
+		copySource = copyOf;
+		formKey += 1;
+	}
 	let highlighted = $state<number | null>(null);
 
 	function afterSave(saved: Channel) {
@@ -90,6 +105,7 @@
 		if (index === -1) channels = [...channels, saved];
 		else channels[index] = saved;
 		form = null;
+		copySource = null;
 		// A brief glow on the row that just changed, so the eye lands on it.
 		highlighted = saved.id;
 		setTimeout(() => (highlighted = null), 1800);
@@ -97,9 +113,59 @@
 
 	// --- Per-channel actions --------------------------------------------------
 
-	let busy = $state<{ id: number; action: 'test' | 'delete' } | null>(null);
+	let busy = $state<{ id: number; action: 'test' | 'delete' | 'toggle' } | null>(null);
 	let actionError = $state<{ id: number; cause: unknown } | null>(null);
-	let testResult = $state<{ id: number; ok: boolean; message: string } | null>(null);
+	let testResult = $state<{ id: number; ok: boolean; message: string; filters: string[] } | null>(null);
+	/** Bumped when a Toggle change is refused, so the switch is drawn again from the real state. */
+	let toggleNonce = $state(0);
+
+	/** Whether this is the only enabled channel: no alert would reach anyone without it. */
+	function isLastEnabled(channel: Channel): boolean {
+		return channel.enabled && !allChannels.some((c) => c.id !== channel.id && c.enabled);
+	}
+
+	async function toggle(channel: Channel, enabled: boolean) {
+		if (!enabled && isLastEnabled(channel) && !confirm(m.w1alerts_channels_last_disable_confirm({ name: channel.name }))) {
+			toggleNonce += 1;
+			return;
+		}
+		busy = { id: channel.id, action: 'toggle' };
+		actionError = null;
+		try {
+			// Settings are re-sent: an update without them would empty them. Secrets and
+			// the delivery policy are omitted, which keeps what is stored.
+			const saved = await updateChannel(channel.id, {
+				name: channel.name,
+				kind: channel.kind,
+				enabled,
+				settings: channel.settings
+			});
+			channels = channels.map((c) => (c.id === saved.id ? saved : c));
+		} catch (cause) {
+			actionError = { id: channel.id, cause };
+			toggleNonce += 1;
+		} finally {
+			busy = null;
+		}
+	}
+
+	/** The words for a setting that would hold back a real alert, from the test report. */
+	function filterNote(code: string): string {
+		switch (code) {
+			case 'disabled':
+				return m.w1alerts_channels_test_filter_disabled();
+			case 'min_severity_warning':
+				return m.w1alerts_channels_test_filter_advisory();
+			case 'min_severity_critical':
+				return m.w1alerts_channels_test_filter_warning();
+			case 'quiet_hours':
+				return m.w1alerts_channels_test_filter_quiet();
+			case 'matcher':
+				return m.w1alerts_channels_test_filter_matcher();
+			default:
+				return code;
+		}
+	}
 
 	async function sendTest(channel: Channel): Promise<boolean> {
 		busy = { id: channel.id, action: 'test' };
@@ -107,7 +173,7 @@
 		testResult = null;
 		try {
 			const report = await testChannel(channel.id);
-			testResult = { id: channel.id, ok: report.ok, message: report.message };
+			testResult = { id: channel.id, ok: report.ok, message: report.message, filters: report.filters ?? [] };
 			// The test updates "last sent" and "last error" on the server.
 			channels = await listChannels();
 			return report.ok;
@@ -120,6 +186,7 @@
 	}
 
 	async function remove(channel: Channel) {
+		if (isLastEnabled(channel) && !confirm(m.w1alerts_channels_last_delete_confirm({ name: channel.name }))) return;
 		busy = { id: channel.id, action: 'delete' };
 		actionError = null;
 		try {
@@ -138,9 +205,9 @@
 	{#snippet aside()}
 		{#if !auth.isAdmin}
 			<Plate tone="ghost" label={auth.readOnlyLabel} />
-		{:else if !loading && !error && form === null && shownChannels.length > 0}
+		{:else if !loading && !error && form === null && allChannels.length > 0}
 			<ClickSpark>
-				<Button variant="primary" size="sm" onclick={() => (form = 'new')}>
+				<Button variant="primary" size="sm" onclick={() => openForm('new')}>
 					<Plus class="size-4" aria-hidden="true" />
 					{m.notifications_channels_add()}
 				</Button>
@@ -159,13 +226,19 @@
 			{#if form !== null}
 				<div class="mb-4">
 					<!-- The key forces a fresh form on every opening: no leftover input. -->
-					{#key form}
-						<ChannelForm kinds={pickKinds} channel={form === 'new' ? undefined : form} onsaved={afterSave} oncancel={() => (form = null)} />
+					{#key formKey}
+						<ChannelForm
+							kinds={pickKinds}
+							channel={form === 'new' ? undefined : form}
+							copyOf={copySource ?? undefined}
+							onsaved={afterSave}
+							oncancel={() => ((form = null), (copySource = null))}
+						/>
 					{/key}
 				</div>
 			{/if}
 
-			{#if shownChannels.length === 0}
+			{#if allChannels.length === 0}
 				{#if !auth.isAdmin}
 					<EmptyState icon={BellRing} title={m.notifications_channels_empty_title()} description={m.notifications_channels_empty_viewer()} />
 				{:else if form === null}
@@ -176,7 +249,7 @@
 					>
 						{#snippet action()}
 							<ClickSpark>
-								<Button variant="primary" onclick={() => (form = 'new')}>
+								<Button variant="primary" onclick={() => openForm('new')}>
 									<Plus class="size-4" aria-hidden="true" />
 									{m.notifications_channels_add()}
 								</Button>
@@ -185,6 +258,16 @@
 					</EmptyState>
 				{/if}
 			{:else}
+				{#if allChannels.length > 3}
+					<label class="relative mb-3 block max-w-sm">
+						<span class="sr-only">{m.w1alerts_channels_search_label()}</span>
+						<Search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3" aria-hidden="true" />
+						<input type="search" class="input !pl-9" placeholder={m.w1alerts_channels_search_placeholder()} bind:value={search} autocomplete="off" />
+					</label>
+				{/if}
+				{#if shownChannels.length === 0}
+					<p class="py-3 text-[0.8125rem] text-ink-2" aria-live="polite">{m.w1alerts_channels_nomatch()}</p>
+				{/if}
 				<ul class="grid gap-2" role="list">
 					{#each shownChannels as channel, i (channel.id)}
 						{@const Icon = kindIcon(channel.kind)}
@@ -222,10 +305,21 @@
 								{#if auth.isAdmin}
 									<div class="flex flex-wrap items-center gap-1.5">
 										<ClientAssign kind="channel" id={channel.id} />
+										{#key `${channel.id}-${toggleNonce}`}
+											<Toggle
+												id={`channel-toggle-${channel.id}`}
+												checked={channel.enabled}
+												disabled={current !== null}
+												label={channel.enabled
+													? m.w1alerts_channels_disable_aria({ name: channel.name })
+													: m.w1alerts_channels_enable_aria({ name: channel.name })}
+												onchange={(value) => void toggle(channel, value)}
+											/>
+										{/key}
 										<Button variant="ghost" size="sm" loading={current === 'test'} disabled={current !== null} onclick={() => sendTest(channel)}>
 											{m.notifications_channels_send_test()}
 										</Button>
-										<Button variant="ghost" size="sm" disabled={current !== null} onclick={() => (form = channel)}>{m.notifications_channels_edit()}</Button>
+										<Button variant="ghost" size="sm" disabled={current !== null} onclick={() => openForm(channel)}>{m.notifications_channels_edit()}</Button>
 										<Menu label={m.notifications_channels_more()}>
 											{#snippet trigger({ toggle, open })}
 												<Button
@@ -242,10 +336,23 @@
 													<EllipsisVertical class="size-3.5" aria-hidden="true" />
 												</Button>
 											{/snippet}
-											{#snippet children()}
+											{#snippet children({ close })}
+												<div class="grid gap-1">
+												<Button
+													variant="ghost"
+													size="sm"
+													class="!justify-start"
+													onclick={() => {
+														close();
+														openForm('new', channel);
+													}}
+												>
+													{m.w1alerts_channels_duplicate()}
+												</Button>
 												<Confirm confirmLabel={m.notifications_channels_remove_confirm()} loading={current === 'delete'} disabled={current !== null} onconfirm={() => remove(channel)}>
 													{m.notifications_channels_remove()}
 												</Confirm>
+												</div>
 											{/snippet}
 										</Menu>
 									</div>
@@ -258,6 +365,20 @@
 										<Plate tone={testResult.ok ? 'signal' : 'warning'} label={testResult.ok ? m.notifications_channels_test_ok() : m.notifications_channels_test_failed()} />
 										<span class="min-w-0 break-words text-ink-2">{testResult.message}</span>
 									</div>
+									{#if testResult.ok}
+										<div class="mt-2 text-[0.8125rem] text-ink-2">
+											{#if testResult.filters.length === 0}
+												<p>{m.w1alerts_channels_test_filter_none()}</p>
+											{:else}
+												<p class="font-medium text-ink">{m.w1alerts_channels_test_filter_title()}</p>
+												<ul class="mt-0.5 list-disc pl-5">
+													{#each testResult.filters as code (code)}
+														<li>{filterNote(code)}</li>
+													{/each}
+												</ul>
+											{/if}
+										</div>
+									{/if}
 								{/if}
 								{#if actionError?.id === channel.id}
 									{@const failure = toApiError(actionError.cause)}
