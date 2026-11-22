@@ -10,6 +10,7 @@
 	import { auth, PASSWORD_MIN_LENGTH, validatePassword } from '#lib/stores/auth.svelte.js';
 	import { Button, ErrorNotice, Field, Panel, Plate } from '#lib/ui/index.js';
 	import PasswordInput from './PasswordInput.svelte';
+	import PasswordStrength from './PasswordStrength.svelte';
 	import TwoFactorSection from './TwoFactorSection.svelte';
 	import PasskeysSection from './PasskeysSection.svelte';
 
@@ -118,6 +119,7 @@
 					invalid={!!errors.next}
 					oninput={() => (errors = { ...errors, next: undefined })}
 				/>
+				<PasswordStrength value={next} />
 			</Field>
 			<Field label={m.settings_security_confirm_label()} for="confirm-next-password" error={errors.confirmation}>
 				<PasswordInput
