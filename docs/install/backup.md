@@ -75,6 +75,7 @@ recovery**: a bundle whose passphrase is lost is lost.
 | `api_tokens` | API tokens, as hashes. Existing tokens keep working. |
 | `push_monitors` | Heartbeat tokens, so the URLs your cron jobs already call stay the same. |
 | `locations` | World map locations (name, address, spot, site); each monitor keeps its location. |
+| `backup_destinations` | Off-site destinations of the local backups, their settings (confirmed SFTP host key included) and their credentials. Upload results are not in it. |
 
 Monitors are matched on **kind + address**, which is also the unique key of the
 table: importing the same bundle twice never creates a second copy of anything.
@@ -178,7 +179,8 @@ The `.key` beside it is the copy of `secret.key` — together, the pair is enoug
 to rebuild the instance.
 
 They live in the same volume as the database, so they undo a mistake, not a lost
-disk. Copy them off the machine if you want more than that.
+disk. [Off-site copies](#off-site-copies) send each one to an S3 bucket, a
+WebDAV folder or an SFTP server as soon as it is written.
 
 ### Settings
 
@@ -259,6 +261,102 @@ sqlite3 dumbmonit-20260922-030000.db 'SELECT name, kind, address FROM targets;'
 ```
 
 Credentials in that file stay unreadable without the matching `secret.key`.
+
+## Off-site copies
+
+**Settings → Backup → Off-site copies.** After each local backup — scheduled or
+**Back up now** — the same `.db` file is uploaded to every enabled destination.
+Each destination keeps its own number of copies: beyond it, the oldest
+`dumbmonit-<timestamp>.db` files there are deleted, with their `.key`. Nothing
+else at the destination is ever touched, so the folder or prefix can be shared
+with other files; it should not be shared with **another DumbMonit instance**,
+whose copies would count against yours.
+
+A failed upload never affects the local backup. It is retried twice for a
+network error or a busy server (not for a refused password), then shown on the
+destination with its cause, and the local copy stays exactly as it was.
+
+| Kind | Fields | Notes |
+|---|---|---|
+| S3-compatible | Endpoint, region, bucket, folder in the bucket, access key ID, secret access key, path-style | Leave the endpoint empty for AWS. MinIO and most self-hosted servers need **path-style**, as does an endpoint given as an IP address. Cloudflare R2 uses the region `auto`. One upload per file, up to 5 GiB. |
+| WebDAV | Folder address, user name, password | The folder must exist. On Nextcloud, use `https://<server>/remote.php/dav/files/<user>/<folder>` and an app password. |
+| SFTP | Host, port, user name, remote folder, host key fingerprint, password and/or private key | The private key must be Ed25519 or ECDSA in OpenSSH format; RSA keys are refused. The remote folder must exist. |
+
+The S3 access key needs permission to put, list and delete objects in the
+bucket (`s3:PutObject`, `s3:ListBucket`, `s3:DeleteObject` on AWS).
+
+**Test** writes a small `dumbmonit-connection-test-….txt` file, checks that it
+appears in the listing (pruning depends on it), and deletes it.
+
+### The SFTP host key
+
+DumbMonit never trusts an SFTP server on first use. Until a fingerprint is
+confirmed, the connection is closed **before** any password or key is sent:
+**Test** then shows the fingerprint the server presented. Compare it with the
+server's own, then press **Confirm this key**:
+
+```bash
+# On the SFTP server
+ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
+```
+
+You can also paste the `SHA256:…` fingerprint in the form directly. If the
+server later presents another key, uploads stop and the test says so: confirm
+the new key only if you know the server was reinstalled. Changing the host or
+the port drops the confirmed key.
+
+### The encryption key
+
+By default only the database goes off-site, **not** `secret.key`. That is
+deliberate: whoever can read the destination could otherwise decrypt every
+stored credential. Keep the key somewhere safe yourself (a password manager is
+fine: it is one line), or a copy taken back from the destination restores an
+instance that cannot talk to anything.
+
+Turn on **Also upload the encryption key** for a destination only if you trust
+it as much as this server. The `.key` is then uploaded next to each `.db`.
+
+### Credentials
+
+Secret access keys, passwords and private keys are stored encrypted with the
+instance key, like monitor credentials, and are never sent back to the browser.
+Leave a secret field empty when editing to keep what is saved. When the server
+or the account of a destination changes, the secrets must be typed again: they
+are never sent to a server they were not entered for. Creating, changing,
+deleting and testing a destination are written to the audit log.
+
+### Knowing that it was copied
+
+Each destination shows its last upload: when, the size, and the cause of a
+failure. `GET /metrics` exposes, per destination that has succeeded at least
+once:
+
+| Metric | Meaning |
+|---|---|
+| `dumbmonit_backup_offsite_last_success_timestamp_seconds{destination}` | Unix time of the last successful upload; `destination` is its name. |
+
+Alert on `time() - dumbmonit_backup_offsite_last_success_timestamp_seconds > 2 * 86400`
+to know when off-site copies stopped.
+
+### From the command line
+
+The routes are under `/api/backup/destinations`, administrator session only,
+like the rest of `/api/backup` (see the [API reference](../reference/api.md)):
+
+```bash
+curl -s -b jar -X POST https://localhost:8080/api/backup/destinations \
+  -H 'content-type: application/json' -H 'X-Requested-With: DumbMonit' \
+  -d '{"name": "B2", "kind": "s3", "keep": 14,
+       "settings": {"endpoint": "https://s3.eu-central-003.backblazeb2.com",
+                    "region": "eu-central-003", "bucket": "my-backups",
+                    "prefix": "dumbmonit", "access_key_id": "…"},
+       "secrets": {"secret_access_key": "…"}}'
+```
+
+### Restoring from an off-site copy
+
+Download the `.db` (and the `.key`, or take `secret.key` from where you keep
+it), copy both into the volume, then follow [Restoring one](#restoring-one).
 
 ## Archiving the whole volume
 
