@@ -1414,6 +1414,17 @@ export interface AgentChannelCheck {
 		reachable?: boolean | null;
 		/** What failed, as the relay reports it (English). */
 		check_error?: string | null;
+		/** When the relay ran that test (Unix milliseconds). */
+		checked_at_ms?: number | null;
+		/** What keeps the gateway from accepting the site, when the server knows it. */
+		problem?: GatewayProblem | null;
+		/** Address the relay really bound. */
+		listen?: string | null;
+		/** Why the relay could not open the port. */
+		bind_error?: string | null;
+		agent_version?: string;
+		/** First agent version whose relay opens a gateway. */
+		min_agent_version?: string;
 	} | null;
 }
 
@@ -1954,6 +1965,10 @@ export interface AgentHost {
 	gateway_tunnels?: number;
 	/** The relay's last test of its own gateway. Mirrors `GatewayCheck` in `crates/proto/src/push.rs`. */
 	gateway_check?: GatewayCheck | null;
+	/** The gateway as the relay really opened it (bound address, or why it could not listen). */
+	gateway_state?: GatewayState | null;
+	/** What keeps the gateway from accepting the site's machines, when known (offline aside). */
+	gateway_problem?: GatewayProblem | null;
 	/**
 	 * Server the agent reports to when its configuration lists several
 	 * (`server_urls`): the primary or a backup. `null` with a single address;
@@ -1973,6 +1988,26 @@ export interface GatewayCheck {
 	error?: string | null;
 	checked_at_ms: number;
 }
+
+/** A relay's gateway as it really opened it. Mirrors `GatewayState` in `crates/proto/src/push.rs`. */
+export interface GatewayState {
+	/** `host:port` asked: `gateway_listen` of its agent.yaml, else every interface on the port set here. */
+	wanted: string;
+	/** `host:port` really bound; absent when opening failed. */
+	listen?: string | null;
+	/** Why the port could not be opened (English, from the relay). */
+	error?: string | null;
+	/** The address comes from `gateway_listen` on the relay, which wins over this interface. */
+	local?: boolean;
+	/** The relay talks to the server on the encrypted channel: without it, no tunnel. */
+	encrypted?: boolean;
+}
+
+/**
+ * What keeps a relay's gateway from accepting the machines of its site.
+ * Mirrors `GatewayProblem` in `crates/server/src/collectors/agent/gateway.rs`.
+ */
+export type GatewayProblem = 'closed' | 'too_old' | 'offline' | 'bind_failed' | 'loopback' | 'no_tunnel';
 
 /**
  * Address of the server an agent uses among those of its configuration

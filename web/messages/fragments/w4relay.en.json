@@ -1,0 +1,22 @@
+{
+	"deviceform_channelcheck_gateway_bind_body": "The relay reports: {error}. Free port {port} on the relay, or choose another gateway port in the Relay panel of {relay}'s page. To see which program holds the port on the relay:",
+	"deviceform_channelcheck_gateway_bind_title": "{relay} cannot open port {port}",
+	"deviceform_channelcheck_gateway_closed_body": "The site's machines go through the relay's gateway, which is off for this relay. On {relay}'s page, in the Relay panel, turn on “{setting}” and save: the relay opens it within seconds.",
+	"deviceform_channelcheck_gateway_closed_title": "{relay}'s gateway is switched off",
+	"deviceform_channelcheck_gateway_copy_listen": "Copy the line",
+	"deviceform_channelcheck_gateway_copy_owner": "Copy the commands",
+	"deviceform_channelcheck_gateway_loopback_body": "The agent.yaml of {relay} binds the gateway to the loopback, so no other machine of the site can reach it. On the relay, replace the gateway_listen line with this one (or remove it), then restart the agent:",
+	"deviceform_channelcheck_gateway_loopback_title": "{relay} listens on {address} only",
+	"deviceform_channelcheck_gateway_no_tunnel_body": "Its gateway listens, but {relay} reaches this server over the web port only, so it cannot carry the site's agents. Check that {relay} reaches the server's encrypted agent port (published in Docker and open in the firewall): the relay switches to it on its own.",
+	"deviceform_channelcheck_gateway_no_tunnel_title": "{relay} is not on the encrypted agent channel",
+	"deviceform_channelcheck_gateway_offline_body": "{relay} has not reported for a while, so it can neither open nor carry its gateway. Check that its agent is running and reaches this server; this check carries on by itself.",
+	"deviceform_channelcheck_gateway_offline_title": "{relay} is not connected",
+	"deviceform_channelcheck_gateway_open_relay": "Open {relay}'s page",
+	"deviceform_channelcheck_gateway_tested_by": "Tested by {relay} itself at {address}, {when}. This test does not cross a firewall between the site's machines and the relay.",
+	"deviceform_channelcheck_gateway_too_old_body": "A relay opens a gateway from agent {min} on. Update the agent on {relay} (from its page, or by running its install command again); this check then carries on by itself.",
+	"deviceform_channelcheck_gateway_too_old_title": "{relay} runs agent {version}, which has no gateway",
+	"devicesb_relay_panel_gateway_bind_failed": "Cannot listen on {address}: {error}",
+	"devicesb_relay_panel_gateway_loopback": "Listens on {address} only: the site's machines cannot reach it. In the relay's agent.yaml, use {line}.",
+	"devicesb_relay_panel_gateway_no_tunnel": "The relay is not on the encrypted agent channel yet: the gateway cannot carry the site's agents.",
+	"devicesb_relay_panel_gateway_too_old": "Agent {version} is too old to open a gateway: update it."
+}

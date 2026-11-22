@@ -286,13 +286,9 @@
 		</div>
 
 		{@render step(1, m.deviceform_agentflow_step_install())}
-		{#if throughRelay && chosenRelay}
-			{#if chosenRelay.gateway_port == null}
-				<p class="-mt-2 text-sm leading-relaxed text-ink">{m.deviceform_agentflow_gateway_pending({ relay: chosenRelay.name })}</p>
-			{/if}
-		{/if}
 
-		<!-- The channel must answer where the command sends machines before the command shows. -->
+		<!-- The channel must answer where the command sends machines before the command shows:
+		     through a relay, its gateway must listen and pass its own test, or the check says why not. -->
 		<AgentChannelCheck baseUrl={origin} relayId={throughRelay && chosenRelay ? chosenRelay.id : null} relayHost={relayHost.trim() || null}>
 {#if spk}
 			<div class="grid gap-1.5">

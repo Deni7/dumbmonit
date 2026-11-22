@@ -1,0 +1,22 @@
+{
+	"deviceform_channelcheck_gateway_bind_body": "Релей сообщает: {error}. Освободите порт {port} на релее или выберите другой порт шлюза в панели «Ретранслятор» на странице {relay}. Чтобы узнать, какая программа занимает порт на релее:",
+	"deviceform_channelcheck_gateway_bind_title": "{relay} не может открыть порт {port}",
+	"deviceform_channelcheck_gateway_closed_body": "Машины площадки подключаются через шлюз релея, а для этого релея он выключен. На странице {relay}, в панели «Ретранслятор», включите «{setting}» и сохраните: релей откроет его за несколько секунд.",
+	"deviceform_channelcheck_gateway_closed_title": "Шлюз {relay} выключен",
+	"deviceform_channelcheck_gateway_copy_listen": "Скопировать строку",
+	"deviceform_channelcheck_gateway_copy_owner": "Скопировать команды",
+	"deviceform_channelcheck_gateway_loopback_body": "agent.yaml на {relay} привязывает шлюз к петлевому интерфейсу, поэтому ни одна другая машина площадки не может до него достучаться. На релее замените строку gateway_listen на эту (или удалите её) и перезапустите агент:",
+	"deviceform_channelcheck_gateway_loopback_title": "{relay} слушает только {address}",
+	"deviceform_channelcheck_gateway_no_tunnel_body": "Его шлюз слушает, но {relay} достигает этого сервера только через веб-порт, поэтому не может передавать агентов площадки. Убедитесь, что {relay} достигает зашифрованного порта агентов сервера (опубликован в Docker и открыт в межсетевом экране): релей перейдёт на него сам.",
+	"deviceform_channelcheck_gateway_no_tunnel_title": "{relay} не использует зашифрованный канал агентов",
+	"deviceform_channelcheck_gateway_offline_body": "{relay} давно не выходил на связь, поэтому не может ни открыть шлюз, ни передавать через него трафик. Убедитесь, что его агент запущен и достигает этого сервера; проверка продолжится сама.",
+	"deviceform_channelcheck_gateway_offline_title": "{relay} не подключён",
+	"deviceform_channelcheck_gateway_open_relay": "Открыть страницу {relay}",
+	"deviceform_channelcheck_gateway_tested_by": "Проверено самим {relay} по адресу {address}, {when}. Эта проверка не проходит через межсетевой экран между машинами площадки и релеем.",
+	"deviceform_channelcheck_gateway_too_old_body": "Релей открывает шлюз начиная с агента {min}. Обновите агент на {relay} (на его странице или повторно выполнив команду установки); после этого проверка продолжится сама.",
+	"deviceform_channelcheck_gateway_too_old_title": "На {relay} работает агент {version}, в котором нет шлюза",
+	"devicesb_relay_panel_gateway_bind_failed": "Не удаётся слушать {address}: {error}",
+	"devicesb_relay_panel_gateway_loopback": "Слушает только {address}: машины площадки не могут до него достучаться. В agent.yaml релея используйте {line}.",
+	"devicesb_relay_panel_gateway_no_tunnel": "Релей ещё не использует зашифрованный канал агентов: шлюз не может передавать агентов площадки.",
+	"devicesb_relay_panel_gateway_too_old": "Агент {version} слишком старый, чтобы открыть шлюз: обновите его."
+}

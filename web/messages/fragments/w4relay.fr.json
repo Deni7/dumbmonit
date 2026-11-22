@@ -1,0 +1,22 @@
+{
+	"deviceform_channelcheck_gateway_bind_body": "Le relais signale : {error}. Libérez le port {port} sur le relais, ou choisissez un autre port de passerelle dans le panneau Relais de la page de {relay}. Pour voir quel programme tient le port sur le relais :",
+	"deviceform_channelcheck_gateway_bind_title": "{relay} ne peut pas ouvrir le port {port}",
+	"deviceform_channelcheck_gateway_closed_body": "Les machines du site passent par la passerelle du relais, désactivée pour ce relais. Sur la page de {relay}, dans le panneau Relais, activez « {setting} » et enregistrez : le relais l'ouvre en quelques secondes.",
+	"deviceform_channelcheck_gateway_closed_title": "La passerelle de {relay} est désactivée",
+	"deviceform_channelcheck_gateway_copy_listen": "Copier la ligne",
+	"deviceform_channelcheck_gateway_copy_owner": "Copier les commandes",
+	"deviceform_channelcheck_gateway_loopback_body": "L'agent.yaml de {relay} limite la passerelle à la boucle locale : aucune autre machine du site ne peut la joindre. Sur le relais, remplacez la ligne gateway_listen par celle-ci (ou supprimez-la), puis redémarrez l'agent :",
+	"deviceform_channelcheck_gateway_loopback_title": "{relay} n'écoute que sur {address}",
+	"deviceform_channelcheck_gateway_no_tunnel_body": "Sa passerelle écoute, mais {relay} ne joint ce serveur que par le port web : il ne peut donc pas porter les agents du site. Vérifiez que {relay} joint le port chiffré des agents du serveur (publié dans Docker et ouvert dans le pare-feu) : le relais y passe de lui-même.",
+	"deviceform_channelcheck_gateway_no_tunnel_title": "{relay} n'est pas sur le canal chiffré des agents",
+	"deviceform_channelcheck_gateway_offline_body": "{relay} ne donne plus de nouvelles depuis un moment : il ne peut ni ouvrir ni porter sa passerelle. Vérifiez que son agent tourne et joint ce serveur ; cette vérification reprend d'elle-même.",
+	"deviceform_channelcheck_gateway_offline_title": "{relay} n'est pas connecté",
+	"deviceform_channelcheck_gateway_open_relay": "Ouvrir la page de {relay}",
+	"deviceform_channelcheck_gateway_tested_by": "Essayé par {relay} lui-même à {address}, {when}. Cet essai ne traverse pas un pare-feu placé entre les machines du site et le relais.",
+	"deviceform_channelcheck_gateway_too_old_body": "Un relais ouvre une passerelle à partir de l'agent {min}. Mettez à jour l'agent de {relay} (depuis sa page, ou en relançant sa commande d'installation) ; cette vérification reprend ensuite d'elle-même.",
+	"deviceform_channelcheck_gateway_too_old_title": "{relay} fait tourner l'agent {version}, qui n'a pas de passerelle",
+	"devicesb_relay_panel_gateway_bind_failed": "Impossible d'écouter sur {address} : {error}",
+	"devicesb_relay_panel_gateway_loopback": "N'écoute que sur {address} : les machines du site ne peuvent pas la joindre. Dans l'agent.yaml du relais, utilisez {line}.",
+	"devicesb_relay_panel_gateway_no_tunnel": "Le relais n'est pas encore sur le canal chiffré des agents : la passerelle ne peut pas porter les agents du site.",
+	"devicesb_relay_panel_gateway_too_old": "L'agent {version} est trop ancien pour ouvrir une passerelle : mettez-le à jour."
+}

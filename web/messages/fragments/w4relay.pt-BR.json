@@ -1,0 +1,22 @@
+{
+	"deviceform_channelcheck_gateway_bind_body": "O relay informa: {error}. Libere a porta {port} no relay ou escolha outra porta de gateway no painel Relay da página de {relay}. Para ver qual programa ocupa a porta no relay:",
+	"deviceform_channelcheck_gateway_bind_title": "{relay} não consegue abrir a porta {port}",
+	"deviceform_channelcheck_gateway_closed_body": "As máquinas do local passam pelo gateway do relay, que está desligado para este relay. Na página de {relay}, no painel Relay, ative “{setting}” e salve: o relay o abre em poucos segundos.",
+	"deviceform_channelcheck_gateway_closed_title": "O gateway de {relay} está desligado",
+	"deviceform_channelcheck_gateway_copy_listen": "Copiar a linha",
+	"deviceform_channelcheck_gateway_copy_owner": "Copiar os comandos",
+	"deviceform_channelcheck_gateway_loopback_body": "O agent.yaml de {relay} limita o gateway à interface de loopback, então nenhuma outra máquina do local consegue alcançá-lo. No relay, substitua a linha gateway_listen por esta (ou remova-a) e reinicie o agente:",
+	"deviceform_channelcheck_gateway_loopback_title": "{relay} só escuta em {address}",
+	"deviceform_channelcheck_gateway_no_tunnel_body": "O gateway dele escuta, mas {relay} só alcança este servidor pela porta web, então não consegue transportar os agentes do local. Verifique se {relay} alcança a porta criptografada de agentes do servidor (publicada no Docker e aberta no firewall): o relay passa a usá-la sozinho.",
+	"deviceform_channelcheck_gateway_no_tunnel_title": "{relay} não está no canal criptografado dos agentes",
+	"deviceform_channelcheck_gateway_offline_body": "{relay} não se comunica há algum tempo, então não consegue abrir nem transportar o gateway. Verifique se o agente dele está rodando e alcança este servidor; esta verificação continua sozinha.",
+	"deviceform_channelcheck_gateway_offline_title": "{relay} não está conectado",
+	"deviceform_channelcheck_gateway_open_relay": "Abrir a página de {relay}",
+	"deviceform_channelcheck_gateway_tested_by": "Testado pelo próprio {relay} em {address}, {when}. Este teste não atravessa um firewall entre as máquinas do local e o relay.",
+	"deviceform_channelcheck_gateway_too_old_body": "Um relay abre um gateway a partir do agente {min}. Atualize o agente de {relay} (pela página dele ou executando de novo o comando de instalação); esta verificação depois continua sozinha.",
+	"deviceform_channelcheck_gateway_too_old_title": "{relay} roda o agente {version}, que não tem gateway",
+	"devicesb_relay_panel_gateway_bind_failed": "Não consegue escutar em {address}: {error}",
+	"devicesb_relay_panel_gateway_loopback": "Só escuta em {address}: as máquinas do local não conseguem alcançá-lo. No agent.yaml do relay, use {line}.",
+	"devicesb_relay_panel_gateway_no_tunnel": "O relay ainda não está no canal criptografado dos agentes: o gateway não consegue transportar os agentes do local.",
+	"devicesb_relay_panel_gateway_too_old": "O agente {version} é antigo demais para abrir um gateway: atualize-o."
+}
