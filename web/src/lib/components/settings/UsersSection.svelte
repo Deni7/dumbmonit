@@ -30,6 +30,9 @@
 	import { getAuthPolicy, saveAuthPolicy, signOutUser } from '#lib/api/sessions.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { USER_SORTS, filterUsers, sortUsers, type UserSort } from '#lib/components/settings/usersList.js';
+	import ResetLinkButton from '#lib/components/account/ResetLinkButton.svelte';
+	import ResetLinkNotice from '#lib/components/account/ResetLinkNotice.svelte';
+	import type { AccountLink } from '#lib/api/accounts.js';
 
 	let users = $state<User[]>([]);
 	let loading = $state(true);
@@ -209,6 +212,8 @@
 	let saving = $state(false);
 	/** Password reset shown once, like on creation. */
 	let resetShown = $state<{ user: User; password: string } | null>(null);
+	/** Reset link just created from a row: sent, or shown once to copy. */
+	let linkShown = $state<{ user: User; link: AccountLink } | null>(null);
 
 	function openEdit(user: User) {
 		editingId = user.id;
@@ -416,6 +421,9 @@
 					</div>
 				</div>
 			{/if}
+			{#if linkShown}
+				<ResetLinkNotice user={linkShown.user} link={linkShown.link} ondone={() => (linkShown = null)} />
+			{/if}
 			{#if resetShown}
 				<div class="rise-in mb-4 rounded-[var(--radius-card)] border border-advisory/40 bg-surface p-4">
 					<div class="flex flex-wrap items-center justify-between gap-2">
@@ -530,6 +538,14 @@
 										<span title={me ? m.settings_users_sign_out_self_title() : m.settings_users_sign_out_title()}>
 											<Confirm confirmLabel={m.settings_users_sign_out_confirm()} variant="secondary" loading={busy} onconfirm={() => signOutEverywhere(user)}>{m.settings_users_sign_out()}</Confirm>
 										</span>
+									{/if}
+									{#if user.auth === 'password' && user.role !== 'wall' && !user.disabled && !me}
+										<ResetLinkButton
+											{user}
+											disabled={busy}
+											onlink={(owner, link) => (linkShown = { user: owner, link })}
+											onerror={(cause) => (rowError = { id: user.id, cause })}
+										/>
 									{/if}
 									{#if user.totp_enabled && !me}
 										<span title={m.settings_users_reset2fa_title()}>

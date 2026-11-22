@@ -63,6 +63,8 @@
 	import ChannelsSection from '#lib/components/notifications/ChannelsSection.svelte';
 	import NotificationPolicySection from '#lib/components/notifications/NotificationPolicySection.svelte';
 	import MailServerSection from '#lib/components/settings/MailServerSection.svelte';
+	import MyNotificationsSection from '#lib/components/account/MyNotificationsSection.svelte';
+	import InvitationsSection from '#lib/components/account/InvitationsSection.svelte';
 
 	// Accounts only exist once the instance is protected; viewers never see that tab.
 	const showAccounts = $derived(auth.available && auth.configured && auth.isAdmin);
@@ -91,8 +93,8 @@
 
 	/** The sections of each tab, top to bottom. */
 	const SECTIONS = $derived<Record<SettingsTab, Component[]>>({
-		account: [AppearanceSection, SecuritySection, PushSection],
-		team: [UsersSection, TeamsSection, ...(auth.isAdmin ? [ClientsSection] : []), SsoSection, SamlSection, ScimSection, LdapSection, ...(auth.isAdmin ? [AuditLogSection] : [])],
+		account: [AppearanceSection, SecuritySection, PushSection, ...(auth.configured ? [MyNotificationsSection] : [])],
+		team: [UsersSection, ...(auth.isAdmin ? [InvitationsSection] : []), TeamsSection, ...(auth.isAdmin ? [ClientsSection] : []), SsoSection, SamlSection, ScimSection, LdapSection, ...(auth.isAdmin ? [AuditLogSection] : [])],
 		monitoring: [AgentsSection, PacksSection, SecurityScoreSection, ...(auth.isAdmin ? [LocationsSection] : [])],
 		notifications: [ChannelsSection, ...(auth.isAdmin ? [MailServerSection] : []), NotificationPolicySection],
 		wall: [WallModeSection, WallWeatherSection, MusicSection],

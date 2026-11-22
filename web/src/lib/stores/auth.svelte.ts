@@ -82,10 +82,11 @@ export const PUBLIC_ROUTES = ['/login', '/setup'];
 
 /**
  * Prefixes of pages served to anyone, outside the app shell: the public status
- * pages (`/s/<slug>`). They never redirect to sign-in, and never bounce a
+ * pages (`/s/<slug>`), and the pages a reset link or an invitation opens
+ * (`/reset`, `/invite`). They never redirect to sign-in, and never bounce a
  * signed-in user away either.
  */
-export const STANDALONE_PREFIXES = ['/s/', '/alert-action'];
+export const STANDALONE_PREFIXES = ['/s/', '/alert-action', '/reset', '/invite'];
 
 export function isStandaloneRoute(pathname: string): boolean {
 	return STANDALONE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
@@ -147,6 +148,8 @@ class AuthStore {
 	 * and the layout shows only that.
 	 */
 	totpSetupRequired = $state(false);
+	/** "Forgot password?" emails a reset link; otherwise it points to the docs. */
+	passwordReset = $state(false);
 	/** Error preventing us from knowing the session state (server unreachable). */
 	error = $state<unknown>(null);
 
@@ -260,6 +263,7 @@ class AuthStore {
 			this.demo = state.demo;
 			this.https = state.https;
 			this.totpSetupRequired = state.totpSetupRequired;
+			this.passwordReset = state.passwordReset === true;
 			this.error = null;
 			const rights = state.user ? await getMyRights(signal) : { access: null, msp: null };
 			this.access = rights.access;

@@ -105,6 +105,9 @@ pub struct StatusView {
     /// La politique de l'instance retient ce compte à l'enrôlement du second
     /// facteur : l'interface n'affiche rien d'autre (voir `auth::policy`).
     totp_setup_required: bool,
+    /// « Mot de passe oublié ? » envoie un lien par courriel ; faux, l'écran
+    /// de connexion renvoie à la documentation (voir `api::recovery`).
+    password_reset: bool,
 }
 
 /// Ce que l'interface doit savoir du HTTPS avant même la connexion : rien de
@@ -231,6 +234,9 @@ pub async fn status(
         passkeys: configured && crate::auth::passkeys::count(&state.pool, None).await? > 0,
         demo: state.config.demo,
         totp_setup_required,
+        password_reset: configured
+            && !state.config.demo
+            && super::recovery::self_service_available(&state).await,
         https: {
             let summary = state.web_tls().summary();
             HttpsStatus {

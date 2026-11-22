@@ -110,6 +110,34 @@ HTTPS (or localhost), Home Screen installation on iPhone and iPad, and the
 push service domains the server must reach. Full guide:
 [Push notifications (PWA)](push-notifications.md).
 
+## My notifications {#my-notifications}
+
+Alerts sent to you personally, on top of the team channels — every account
+sets its own, viewers and operators included (wall displays have no
+settings). Turn on **By email** (to your account's address, through the
+[email server](../notifications.md#email-server) of the instance; an admin
+adds the address in **Users**) and/or **On my push devices** (the devices
+subscribed under *Push notifications* just above), then choose:
+
+- **Send** — the minimum severity: everything, *Advisory and up*, or
+  *Warning only*.
+- **Same alert again no sooner than** — a minimum delay between two
+  messages for the same alert.
+- **Tell me when it clears** — off, you only hear about problems.
+- **About** — everything you can see, your teams' folders, or the folders
+  (sub-folders included) and tags you pick. Whatever the choice, an alert on
+  a monitor your teams do not show never reaches you.
+- **Quiet hours** — days and a time span in this browser's time zone, which
+  follows daylight saving. During quiet hours only *Warning* alerts reach
+  you; the rest is not sent to you and stays in the alert list.
+
+**Send me a test** tries each means saved as on. The rules of the channels
+apply here too: one message per monitor, flapping alerts held back, the
+hourly cap of the notification policy, and a recovery only for what was
+announced to you. Details in
+[Personal notifications](../notifications.md#personal-notifications). The
+choices are part of the backup.
+
 ## Users
 
 Admins only. The accounts that can sign in, and their role:
@@ -148,6 +176,61 @@ account has a second factor; **Delete** removes it for good. The server keeps
 at least one active admin, and the controls reflect that rule rather than
 reporting it as an error: the last admin cannot be demoted, disabled or
 deleted, and you cannot disable or delete your own account.
+
+**Reset link** (on the row of an account that signs in with a local
+password) creates a single-use link to `/reset`, where the person chooses a
+new password with the same rules as everywhere. It is emailed to the
+account's address when it has one and an email server is configured, and
+shown once in every case, to copy and hand over. A new link replaces the
+previous one. Using it signs the account out everywhere; two-factor
+authentication stays on. Single sign-on and LDAP accounts change their
+password with their provider, and wall displays get a new password through
+**Edit**: neither has a reset link.
+
+### Invitations {#invitations}
+
+**Invite** asks for an email address, a role (viewer, operator or admin —
+a wall display is created with **Add user**) and the teams to join, and
+sends a link to `/invite`. There the person picks a username (the part of
+the address before `@` is suggested), a display name and a password, and is
+signed in at once. When single sign-on (OIDC or SAML) is enabled, the page
+also offers the provider's button: the account is then created without a
+password, with the invited address as username, and is linked at the first
+sign-in when the provider presents that address as verified. Without an
+email server, the link is shown once to copy and send yourself.
+
+Open invitations are listed under the form, expired ones included: **Send
+again** creates a new link with a new expiry (the previous link stops
+working), **Revoke** withdraws it. Inviting the same address again replaces
+the open invitation; an address already used by an account is refused.
+Only admins invite: team rights do not cover accounts.
+
+### Forgot password by email {#forgot-password}
+
+On the sign-in screen, **Forgot password?** asks for a username or an email
+address and emails a reset link when:
+
+- the switch **"Forgot password?" by email** in **Invitations** is on (it is
+  by default),
+- an [email server](../notifications.md#email-server) is configured,
+- and DumbMonit knows a safe address for the link: the public URL of the
+  [notification policy](../notifications.md) (or `DUMBMONIT_PUBLIC_URL`),
+  otherwise the address an admin last used to open these settings. The
+  address a stranger's browser sends is never used, so nobody can make
+  DumbMonit email a link that leads elsewhere.
+
+Otherwise the link points to the [FAQ](../faq.md#i-lost-the-password), as
+before. Only an active account with a local password and an email address
+gets a link — never a single sign-on, LDAP or wall-display account. The
+screen answers the same way, after the same delay, whether an account
+matches or not, and each request counts against a limit per address and per
+account. Links work once; a reset link lasts 30 minutes and an invitation 7
+days by default (**Reset links last** and **Invitations last**). The links
+hold a 256-bit secret, of which the server only keeps a hash. Every step —
+request, link created, reset, invitation created, resent, revoked, accepted,
+and attempts with an unusable link — is recorded in the
+[audit log](#audit-log). The settings and open invitations are part of the
+backup; reset links are not (they last half an hour).
 
 ### Wall display accounts {#wall-display-accounts}
 

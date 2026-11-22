@@ -590,7 +590,8 @@ export async function getAuthStatus(signal?: AbortSignal): Promise<AuthState> {
 			passkeys: Boolean(status?.passkeys),
 			demo: Boolean(status?.demo),
 			https: status?.https ?? null,
-			totpSetupRequired: status?.totp_setup_required === true
+			totpSetupRequired: status?.totp_setup_required === true,
+			passwordReset: status?.password_reset === true
 		};
 	} catch (cause) {
 		if (cause instanceof DOMException && cause.name === 'AbortError') throw cause;

@@ -463,6 +463,17 @@ pub async fn evaluate_once(
     )
     .await;
 
+    // Notifications personnelles : ce que chaque compte a choisi de recevoir
+    // lui-même, par courriel ou Web Push (`notify::personal`).
+    let personal = notify::personal::dispatch::Ctx {
+        pool,
+        cipher,
+        http,
+        public_url: public_url.as_deref(),
+        max_per_hour: global.max_per_hour,
+    };
+    notify::personal::dispatch::dispatch(&personal, &outcome.groups, now).await;
+
     // Astreintes : les escalades en cours avancent (étape suivante, arrêt à
     // l'acquittement), les relèves sont annoncées. Une erreur ici ne doit pas
     // empêcher le cycle d'enregistrer ce qui précède.

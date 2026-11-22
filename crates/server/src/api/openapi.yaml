@@ -1028,6 +1028,279 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /api/auth/password-reset:
+    post:
+      operationId: requestPasswordReset
+      tags: [Accounts]
+      summary: Ask for a password reset link by email
+      description: >-
+        Public, like the sign-in. `login` is a username or an email address.
+        The answer is always `202`, after the same delay, whether an account
+        matches or not: nothing tells whether it exists. A link (`/reset?token=…`)
+        is emailed only to an active account with a local password and an email
+        address — never to an SSO, LDAP or wall-display account — when an
+        administrator left self-service on, an email server is configured and a
+        link base is known (the public URL, or the origin an administrator last
+        used). Each request counts against a per-address and a per-account
+        limit (`429`). Requires `X-Requested-With: DumbMonit`.
+      security: []
+      x-token-scope: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [login]
+              properties:
+                login: { type: string, description: Username or email address. }
+      responses:
+        "202":
+          description: Request taken; the same answer for every account.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/auth/password-reset/check:
+    post:
+      operationId: checkPasswordReset
+      tags: [Accounts]
+      summary: Read a password reset link
+      description: >-
+        Public. `404` for any link that cannot be used (unknown, expired,
+        already used, account no longer eligible), always with the same
+        message; failures count against the address (`429`).
+      security: []
+      x-token-scope: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LinkTokenRequest" }
+      responses:
+        "200":
+          description: The link is valid.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [username, expires_at]
+                properties:
+                  username: { type: string }
+                  expires_at: { type: string, description: UTC, without suffix. }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/auth/password-reset/complete:
+    post:
+      operationId: completePasswordReset
+      tags: [Accounts]
+      summary: Choose a new password with a reset link
+      description: >-
+        Public. Sets the password (12 characters at least), signs the account
+        out everywhere and uses the link up, along with any other link of the
+        account. Two-factor authentication stays on. Then sign in as usual.
+      security: []
+      x-token-scope: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string, format: password, minLength: 12 }
+      responses:
+        "204": { description: Password changed; every session of the account is closed. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/auth/invitations/check:
+    post:
+      operationId: checkInvitation
+      tags: [Accounts]
+      summary: Read an invitation link
+      description: >-
+        Public. `404` for any link that cannot be used (unknown, expired,
+        revoked, already accepted), always with the same message.
+      security: []
+      x-token-scope: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LinkTokenRequest" }
+      responses:
+        "200":
+          description: The invitation.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitationCheck" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/auth/invitations/accept:
+    post:
+      operationId: acceptInvitation
+      tags: [Accounts]
+      summary: Create an account from an invitation
+      description: >-
+        Public. Creates the account with the role, email address and teams of
+        the invitation, and closes the invitation. With a `password`, the
+        account signs in with its `username`; with `sso: true` (single sign-on
+        enabled), it has no password and its username is the invited address,
+        which the identity provider must present as verified at the first
+        sign-in. `409` when the username is taken (the invitation stays valid).
+      security: []
+      x-token-scope: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+                username: { type: string }
+                display_name: { type: string, maxLength: 120 }
+                password: { type: string, format: password, minLength: 12 }
+                sso: { type: boolean, default: false }
+      responses:
+        "201":
+          description: Account created; sign in next.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [username]
+                properties:
+                  username: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/auth/recovery:
+    get:
+      operationId: getAccountLinkSettings
+      tags: [Accounts]
+      summary: Settings of reset links and invitations
+      description: >-
+        Administrator session only. Also remembers the origin the
+        administrator uses: it is the base of the links when no public URL is
+        set.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "200":
+          description: The settings and what they make possible.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccountLinkSettingsView" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    put:
+      operationId: putAccountLinkSettings
+      tags: [Accounts]
+      summary: Change the settings of reset links and invitations
+      description: Administrator session only. An omitted field takes its default.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountLinkSettings" }
+      responses:
+        "200":
+          description: The settings now in force.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccountLinkSettingsView" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/auth/notifications:
+    get:
+      operationId: getMyNotifications
+      tags: [Accounts]
+      summary: My personal notifications
+      description: >-
+        Session only, any role but wall displays. What the signed-in account
+        receives itself, by email (to its address, through the instance email
+        server) or Web Push (its subscribed devices), on top of the channels.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "200":
+          description: The choices, and the folders, tags and teams to pick from.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MyNotificationsView" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    put:
+      operationId: putMyNotifications
+      tags: [Accounts]
+      summary: Change my personal notifications
+      description: >-
+        Session only. Replaces the choices; an omitted field takes its default.
+        `email: true` needs an email address on the account.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PersonalNotificationPrefs" }
+      responses:
+        "200":
+          description: The choices now in force.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MyNotificationsView" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/auth/notifications/test:
+    post:
+      operationId: testMyNotifications
+      tags: [Accounts]
+      summary: Send myself a test notification
+      description: Session only. Through each means saved as on; `409` when none is.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "200":
+          description: What each means gave; `null` when not tried.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  email: { $ref: "#/components/schemas/PersonalDelivery" }
+                  push: { $ref: "#/components/schemas/PersonalDelivery" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
   /api/auth/audit:
     get:
       operationId: listAuditLog
@@ -2113,6 +2386,145 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/SessionsClosed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/users/{id}/reset-link:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    post:
+      operationId: createPasswordResetLink
+      tags: [Accounts]
+      summary: Create a password reset link for an account
+      description: >-
+        Administrator session only. For an active account with a local
+        password (not a wall display: set its password instead). The link is
+        emailed to the account's address when `send` is true and an email
+        server is configured, and returned in every case, to hand over
+        otherwise. A new link replaces the previous one.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                send: { type: boolean, default: true }
+      responses:
+        "200":
+          description: The link, shown once.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url, expires_at, emailed]
+                properties:
+                  url: { type: string }
+                  expires_at: { type: string, description: UTC, without suffix. }
+                  emailed: { type: boolean }
+                  email_error: { type: [string, "null"] }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/users/invitations:
+    get:
+      operationId: listInvitations
+      tags: [Accounts]
+      summary: Open invitations
+      description: Administrator session only. Expired ones included (`expired`), to resend or revoke.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "200":
+          description: The invitations, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Invitation" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      operationId: createInvitation
+      tags: [Accounts]
+      summary: Invite someone by email
+      description: >-
+        Administrator session only. Any role but `wall`, and teams to join on
+        acceptance. Replaces an open invitation of the same address; `409` when
+        an account already uses it. The link is emailed when `send` is true and
+        an email server is configured, and returned in every case.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email: { type: string, format: email }
+                role: { $ref: "#/components/schemas/Role" }
+                teams: { type: array, items: { type: integer, format: int64 } }
+                send: { type: boolean, default: true }
+      responses:
+        "201":
+          description: The invitation and its link, shown once.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitationSent" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/users/invitations/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    delete:
+      operationId: revokeInvitation
+      tags: [Accounts]
+      summary: Revoke an open invitation
+      description: Administrator session only. Its link stops working at once.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "204": { description: Revoked. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/users/invitations/{id}/resend:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    post:
+      operationId: resendInvitation
+      tags: [Accounts]
+      summary: Send an invitation again
+      description: >-
+        Administrator session only. A new link and a new expiry; the previous
+        link stops working.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                send: { type: boolean, default: true }
+      responses:
+        "200":
+          description: The invitation and its new link, shown once.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitationSent" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -12884,6 +13296,7 @@ components:
         passkeys: { type: boolean, description: "At least one passkey is registered: the sign-in screen offers to use one." }
         demo: { type: boolean }
         totp_setup_required: { type: boolean, description: "The instance policy holds this session at two-factor enrolment until it is done." }
+        password_reset: { type: boolean, description: '"Forgot password?" emails a reset link; otherwise the sign-in screen points to the documentation.' }
         https:
           type: object
           description: HTTPS of the web port, for the "session in clear" banner. Nothing secret.
@@ -13026,6 +13439,101 @@ components:
       type: object
       properties:
         require_totp: { type: boolean, default: false, description: Require two-factor authentication from admins and operators who sign in with a local password. }
+    LinkTokenRequest:
+      type: object
+      required: [token]
+      properties:
+        token: { type: string, description: "The `token` parameter of the link." }
+    AccountLinkSettings:
+      type: object
+      properties:
+        self_service: { type: boolean, default: true, description: '"Forgot password?" emails a reset link.' }
+        reset_minutes: { type: integer, minimum: 5, maximum: 1440, default: 30, description: Lifetime of a reset link. }
+        invite_hours: { type: integer, minimum: 1, maximum: 720, default: 168, description: Lifetime of an invitation. }
+    AccountLinkSettingsView:
+      allOf:
+        - $ref: "#/components/schemas/AccountLinkSettings"
+        - type: object
+          required: [mail_server, self_service_available]
+          properties:
+            mail_server: { type: boolean, description: The instance email server is configured. }
+            link_base: { type: [string, "null"], description: Base of the links sent. }
+            self_service_available: { type: boolean, description: '"Forgot password?" really sends a link.' }
+    InvitationCheck:
+      type: object
+      required: [email, role, suggested_username, invited_by, expires_at, sso]
+      properties:
+        email: { type: string }
+        role: { $ref: "#/components/schemas/Role" }
+        suggested_username: { type: string }
+        invited_by: { type: string }
+        expires_at: { type: string, description: UTC, without suffix. }
+        sso: { type: boolean, description: Single sign-on is enabled and can be used instead of a password. }
+    Invitation:
+      type: object
+      required: [id, email, role, teams, invited_by, created_at, expires_at, expired]
+      properties:
+        id: { type: integer, format: int64 }
+        email: { type: string }
+        role: { $ref: "#/components/schemas/Role" }
+        teams:
+          type: array
+          items:
+            type: object
+            required: [id, name]
+            properties:
+              id: { type: integer, format: int64 }
+              name: { type: string }
+        invited_by: { type: string }
+        created_at: { type: string }
+        expires_at: { type: string }
+        last_sent_at: { type: [string, "null"] }
+        expired: { type: boolean }
+    InvitationSent:
+      type: object
+      required: [invitation, url, emailed]
+      properties:
+        invitation: { $ref: "#/components/schemas/Invitation" }
+        url: { type: string, description: "`/invite?token=…`, shown once." }
+        emailed: { type: boolean }
+        email_error: { type: [string, "null"] }
+    PersonalNotificationPrefs:
+      type: object
+      properties:
+        email: { type: boolean, default: false }
+        webpush: { type: boolean, default: false }
+        min_severity: { $ref: "#/components/schemas/Severity" }
+        notify_resolved: { type: boolean, default: true }
+        scope:
+          type: string
+          enum: [all, teams, pick]
+          default: all
+          description: Everything the account sees, the folders of its teams, or the folders and tags picked.
+        folders: { type: array, items: { type: string }, maxItems: 50 }
+        tags: { type: array, items: { type: string, description: "`key=value`, or `key` alone." }, maxItems: 50 }
+        min_interval_secs: { type: integer, minimum: 0, maximum: 86400, default: 0 }
+        quiet_hours:
+          description: A weekly window in the account's time zone; only critical alerts get through.
+          oneOf:
+            - { $ref: "#/components/schemas/Schedule" }
+            - { type: "null" }
+    MyNotificationsView:
+      type: object
+      required: [prefs, mail_server, push_devices, teams, folders, tags]
+      properties:
+        prefs: { $ref: "#/components/schemas/PersonalNotificationPrefs" }
+        email: { type: [string, "null"], description: The account's address, set by an administrator. }
+        mail_server: { type: boolean }
+        push_devices: { type: integer }
+        teams: { type: array, items: { type: string } }
+        folders: { type: array, items: { type: string } }
+        tags: { type: array, items: { type: string } }
+    PersonalDelivery:
+      type: [object, "null"]
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+        error: { type: [string, "null"] }
     RecoveryCodes:
       type: object
       required: [recovery_codes]

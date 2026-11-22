@@ -263,6 +263,10 @@ pub struct Bundle {
     /// secrets en clair dans le lot, lui-même chiffré par la phrase de passe.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub backup_destinations: Vec<crate::backup::offsite::bundle::BundleBackupDestination>,
+    /// Réglages des liens de compte, invitations ouvertes et notifications
+    /// personnelles (migrations 0294 et 0295).
+    #[serde(default, skip_serializing_if = "crate::backup::accounts::BundleAccounts::is_empty")]
+    pub accounts: crate::backup::accounts::BundleAccounts,
 }
 
 /// Serveur de courriel enregistré et son mot de passe.
@@ -311,6 +315,8 @@ impl Bundle {
             ("target_channels".to_string(), self.target_channels.len()),
             ("annotations".to_string(), self.annotations.len()),
             ("backup_destinations".to_string(), self.backup_destinations.len()),
+            ("invitations".to_string(), self.accounts.invitations.len()),
+            ("notification_prefs".to_string(), self.accounts.notification_prefs.len()),
         ])
     }
 }

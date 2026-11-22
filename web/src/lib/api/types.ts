@@ -1339,6 +1339,8 @@ export interface AuthStatus {
 	https?: HttpsStatus;
 	/** The instance policy holds this session at two-factor enrolment. */
 	totp_setup_required?: boolean;
+	/** "Forgot password?" emails a reset link; otherwise it points to the docs. */
+	password_reset?: boolean;
 }
 
 /** `AuthStatus.https`: nothing secret, the fingerprint is what every client receives. */
@@ -1654,6 +1656,8 @@ export interface AuthState {
 	https: HttpsStatus | null;
 	/** The instance policy asks this session to set up two-factor first. */
 	totpSetupRequired: boolean;
+	/** "Forgot password?" emails a reset link (mail server and self-service on). */
+	passwordReset?: boolean;
 }
 
 /** A passkey (WebAuthn credential) of the current account. Mirrors `auth::passkeys::PasskeyView`. */

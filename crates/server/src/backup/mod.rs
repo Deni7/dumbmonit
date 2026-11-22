@@ -22,6 +22,7 @@
 //! sans lui restaure une instance qui ne peut plus parler à rien.
 
 pub mod annotations;
+pub mod accounts;
 pub mod bundle;
 pub mod export;
 pub mod import;
