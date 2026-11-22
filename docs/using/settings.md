@@ -68,9 +68,25 @@ password alone. The secret is stored encrypted with the instance secret;
 codes are hashed. Single sign-on accounts get their second factor from the
 identity provider, not here.
 
-Admins also find the **security log** in this section: sign-ins and failures,
-password and two-factor changes, token and account changes, with the client
-address. It keeps the last 5 000 entries.
+Admins find the **audit log** in its own section of the *Team* tab; see
+[Audit log](#audit-log).
+
+## Audit log {#audit-log}
+
+Admin-only, in the *Team* tab. It records who did what and from where: sign-ins,
+failures and sign-outs, password and two-factor changes, token and account
+changes, backups exported, restored or downloaded, single sign-on and LDAP
+settings, notification channels created, changed or deleted, and more. Each
+entry has a readable label; an event this version does not know is shown as its
+raw name. Secrets never appear in the details.
+
+Filter by **account**, **event**, **address** and **period** (UTC), and press
+*Load more* to read further back. **Export CSV** and **Export JSON** download
+what the filters select (the export itself is logged). In the CSV, a cell that
+a spreadsheet could read as a formula starts with an apostrophe.
+
+It keeps the last 5 000 entries by default; `DUMBMONIT_AUDIT_KEEP` changes that
+(100 to 1 000 000, see [Configuration](../reference/configuration.md)).
 
 ## Push notifications
 
@@ -258,7 +274,10 @@ press *Restore for real*.
 
 **Scheduled local backups** shows whether they are on, where they go, the last
 run and whether it succeeded, and the files kept with their size. **Back up
-now** writes one immediately — the thing to do before an upgrade.
+now** writes one immediately — the thing to do before an upgrade. The schedule
+(on or off, hours between backups, copies kept) is editable here; a setting
+fixed by a `DUMBMONIT_BACKUP_*` variable is shown as managed by the environment
+and cannot be changed from the screen. Each copy on disk can be downloaded.
 
 Everything here is admin-only. See [Backup and restore](../install/backup.md).
 
@@ -303,6 +322,11 @@ setup and alert history) and VictoriaMetrics (every measurement in the
 charts), as reported by `GET /api/health` and refreshed every 15 seconds. A
 store that stops answering shows a warning with the error and what to check.
 The section also links to this documentation and names the licence, MIT.
+
+For administrators, **Effective configuration** lists what the server runs with,
+without any secret: data directory, ports, VictoriaMetrics (embedded or
+external, host only), backup schedule, log filter. The same list is printed by
+`dumbmonit --check-config` (see [Configuration](../reference/configuration.md#checking-your-configuration)).
 
 **First run**, folded at the bottom, times the road to the first alert on this
 instance: started without an account, administrator created, first monitor,

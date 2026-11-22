@@ -27,6 +27,17 @@ export interface Health {
 	victoria: ComponentHealth;
 	/** Public demo mode (`DUMBMONIT_DEMO=1`): read-only, fictional data. */
 	demo: boolean;
+	/** Data volume, for signed-in callers; absent when the system cannot measure it. */
+	data_disk?: { free_bytes: number; total_bytes: number; database_bytes: number };
+}
+
+/** One entry of `GET /api/instance/effective-config`: a non-secret setting the server runs with. */
+export interface EffectiveSetting {
+	/** Stable English identifier, turned into a label by the About section. */
+	key: string;
+	value: string;
+	/** The environment variable that sets it, when there is one. */
+	env: string | null;
 }
 
 // --- Credentials ------------------------------------------------------------
@@ -4331,6 +4342,8 @@ export interface BackupSchedule {
 	files: BackupFile[];
 	total_bytes: number;
 	directory_error: string | null;
+	/** Settings a `DUMBMONIT_BACKUP_*` variable fixes: the interface cannot change them. */
+	env_managed: { enabled: boolean; interval_hours: boolean; keep: boolean };
 }
 
 /** Response of `GET /api/backup`. */

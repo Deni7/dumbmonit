@@ -34,6 +34,7 @@ pub fn routes() -> Router<AppState> {
         .route("/auth/totp/verify", post(verify))
         .route("/users/{id}/totp", delete(admin_reset))
         .route("/auth/audit", get(audit_log))
+        .route("/auth/audit/export", get(audit_export))
 }
 
 /// Où en est le second facteur du compte courant.
@@ -300,19 +301,100 @@ pub async fn login_step(
     open_session(&state, &user, ip).await
 }
 
-/// `GET /api/auth/audit?limit=200` — les derniers gestes de sécurité.
+/// `GET /api/auth/audit` — les derniers gestes de sécurité, filtrables et
+/// paginés par curseur (`before` = identifiant de la dernière entrée reçue).
 #[derive(Debug, Deserialize)]
 pub struct AuditQuery {
     #[serde(default)]
     limit: Option<i64>,
+    #[serde(default)]
+    actor: Option<String>,
+    #[serde(default)]
+    action: Option<String>,
+    #[serde(default)]
+    ip: Option<String>,
+    #[serde(default)]
+    since: Option<String>,
+    #[serde(default)]
+    until: Option<String>,
+    #[serde(default)]
+    before: Option<i64>,
+    /// `csv` ou `json`, pour l'export seulement.
+    #[serde(default)]
+    format: Option<String>,
 }
+
+impl AuditQuery {
+    fn filter(&self) -> AuthResult<audit::Filter> {
+        let bound = |raw: &Option<String>, end: bool| -> AuthResult<Option<String>> {
+            match raw.as_deref().map(str::trim).filter(|raw| !raw.is_empty()) {
+                None => Ok(None),
+                Some(raw) => {
+                    audit::normalise_bound(raw, end).map(Some).map_err(AuthError::Invalid)
+                }
+            }
+        };
+        Ok(audit::Filter {
+            actor: self.actor.clone(),
+            action: self.action.clone(),
+            ip: self.ip.clone(),
+            since: bound(&self.since, false)?,
+            until: bound(&self.until, true)?,
+            before: self.before,
+        })
+    }
+}
+
+/// Plafond d'une page lue à l'écran, et d'un export.
+const AUDIT_PAGE_MAX: i64 = 1_000;
+const AUDIT_EXPORT_MAX: i64 = 100_000;
 
 pub async fn audit_log(
     State(state): State<AppState>,
     _: AdminUser,
     axum::extract::Query(query): axum::extract::Query<AuditQuery>,
 ) -> AuthResult<Json<Vec<audit::Entry>>> {
-    Ok(Json(audit::recent(&state.pool, query.limit.unwrap_or(200)).await?))
+    let filter = query.filter()?;
+    let limit = query.limit.unwrap_or(200);
+    Ok(Json(audit::search(&state.pool, &filter, limit, AUDIT_PAGE_MAX).await?))
+}
+
+/// `GET /api/auth/audit/export?format=csv|json` — le journal filtré, en fichier.
+pub async fn audit_export(
+    State(state): State<AppState>,
+    AdminUser(me): AdminUser,
+    ClientIp(ip): ClientIp,
+    axum::extract::Query(query): axum::extract::Query<AuditQuery>,
+) -> AuthResult<Response> {
+    let filter = query.filter()?;
+    let format = query.format.as_deref().unwrap_or("csv");
+    let entries = audit::search(&state.pool, &filter, AUDIT_EXPORT_MAX, AUDIT_EXPORT_MAX).await?;
+    let (content_type, extension, body) = match format {
+        "csv" => ("text/csv; charset=utf-8", "csv", audit::to_csv(&entries)),
+        "json" => (
+            "application/json",
+            "json",
+            serde_json::to_string_pretty(&entries).map_err(|e| AuthError::Internal(e.into()))?,
+        ),
+        other => {
+            return Err(AuthError::Invalid(format!(
+                "unknown format `{other}`: use `csv` or `json`"
+            )));
+        }
+    };
+    audit::record(&state.pool, Some(&me.username), "audit.exported", Some(extension), ip).await;
+    let stamp = chrono::Utc::now().format("%Y%m%d-%H%M%S");
+    let name = format!("dumbmonit-audit-{stamp}.{extension}");
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(axum::http::header::CONTENT_TYPE, content_type)
+        .header(
+            axum::http::header::CONTENT_DISPOSITION,
+            format!("attachment; filename=\"{name}\""),
+        )
+        .header(axum::http::header::CACHE_CONTROL, "no-store")
+        .body(axum::body::Body::from(body))
+        .map_err(|e| AuthError::Internal(e.into()))
 }
 
 #[cfg(test)]

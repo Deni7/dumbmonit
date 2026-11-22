@@ -146,6 +146,11 @@ show the container as *healthy* without any extra setting. It runs
 shell or `curl`, so do not replace it with a `curl`-based check in your Compose
 file.
 
+`/api/health` is a liveness check: it always answers `200`, and a failing
+dependency is in the body. For a check that fails when the database or
+VictoriaMetrics is down (a reverse proxy, an orchestrator), call `/api/ready`
+instead: `200` when both answer, `503` otherwise. Neither needs a sign-in.
+
 ## Environment variables
 
 Everything goes through environment variables; none is required. Add the ones

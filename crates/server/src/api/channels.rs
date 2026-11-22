@@ -8,7 +8,7 @@
 use std::collections::HashSet;
 
 use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::{Extension, Path, State};
 use axum::http::StatusCode;
 use chrono::Utc;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -19,8 +19,10 @@ use crate::alerting::matcher::{ChannelMatcher, Condition};
 use crate::alerting::notify_policy::ChannelPolicy;
 use crate::alerting::silence::Schedule;
 use crate::api::{ApiError, ApiResult};
-use crate::auth::clients;
+use crate::auth::client_ip::ClientIp;
+use crate::auth::middleware::CurrentPrincipal;
 use crate::auth::teams::TeamAccess;
+use crate::auth::{audit, clients};
 use crate::db;
 use crate::notify::policy_store;
 use crate::notify::{self, CHANNEL_KINDS, ChannelConfig, ChannelSummary, DeliveryReport};
@@ -234,6 +236,8 @@ async fn summary(pool: &SqlitePool, id: i64) -> ApiResult<ChannelSummary> {
 pub async fn create(
     TeamAccess(access): TeamAccess,
     State(state): State<AppState>,
+    Extension(CurrentPrincipal(principal)): Extension<CurrentPrincipal>,
+    ClientIp(ip): ClientIp,
     Json(mut payload): Json<ChannelPayload>,
 ) -> ApiResult<(StatusCode, Json<ChannelSummary>)> {
     let policy = parse_policy(payload.policy.take(), &ChannelPolicy::default())?;
@@ -247,11 +251,17 @@ pub async fn create(
     policy_store::save_channel_policy(&state.pool, id, &policy).await?;
     clients::adopt(&state.pool, &access, clients::Kind::Channel, id).await?;
     crate::first_run::record(&state.pool, crate::first_run::Milestone::FirstChannel).await;
+    // Le nom et le type seulement : jamais les réglages, qui portent des secrets.
+    let subject = format!("{} ({})", draft.name, draft.kind);
+    audit::record(&state.pool, Some(&principal.label()), "channel.created", Some(&subject), ip)
+        .await;
     Ok((StatusCode::CREATED, Json(summary(&state.pool, id).await?)))
 }
 
 pub async fn update(
     State(state): State<AppState>,
+    Extension(CurrentPrincipal(principal)): Extension<CurrentPrincipal>,
+    ClientIp(ip): ClientIp,
     Path(id): Path<i64>,
     Json(mut payload): Json<ChannelPayload>,
 ) -> ApiResult<Json<ChannelSummary>> {
@@ -273,6 +283,9 @@ pub async fn update(
         .await
         .map_err(duplicate_name_to_conflict)?;
     policy_store::save_channel_policy(&state.pool, id, &policy).await?;
+    let subject = format!("{} ({})", draft.name, draft.kind);
+    audit::record(&state.pool, Some(&principal.label()), "channel.updated", Some(&subject), ip)
+        .await;
     Ok(Json(summary(&state.pool, id).await?))
 }
 
@@ -280,7 +293,13 @@ pub async fn update(
 ///
 /// Une règle qui pointe vers un canal disparu ne notifie plus rien du tout, et rien
 /// ne le signale : mieux vaut refuser ici, en nommant les règles à corriger.
-pub async fn delete(State(state): State<AppState>, Path(id): Path<i64>) -> ApiResult<StatusCode> {
+pub async fn delete(
+    State(state): State<AppState>,
+    Extension(CurrentPrincipal(principal)): Extension<CurrentPrincipal>,
+    ClientIp(ip): ClientIp,
+    Path(id): Path<i64>,
+) -> ApiResult<StatusCode> {
+    let name = summary(&state.pool, id).await.map(|channel| channel.name).ok();
     let rules = db::alerts::list_rules(&state.pool).await?;
     let users: Vec<&str> = rules
         .iter()
@@ -296,6 +315,15 @@ pub async fn delete(State(state): State<AppState>, Path(id): Path<i64>) -> ApiRe
     }
 
     if db::alerts::delete_channel(&state.pool, id).await? {
+        let subject = name.unwrap_or_else(|| id.to_string());
+        audit::record(
+            &state.pool,
+            Some(&principal.label()),
+            "channel.deleted",
+            Some(&subject),
+            ip,
+        )
+        .await;
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(not_found(id))

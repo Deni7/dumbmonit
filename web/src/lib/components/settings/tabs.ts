@@ -29,6 +29,7 @@ export const SECTION_TAB: Record<string, SettingsTab> = {
 	clients: 'team',
 	saml: 'team',
 	scim: 'team',
+	audit: 'team',
 	agents: 'monitoring',
 	packs: 'monitoring',
 	'security-score': 'monitoring',

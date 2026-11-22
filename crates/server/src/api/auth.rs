@@ -538,10 +538,14 @@ const DUMMY_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$c2VsLWRlLXJlbXBsaXNzYWd
 /// `POST /api/auth/logout` — ferme la session courante et efface le cookie.
 pub async fn logout(
     State(state): State<AppState>,
+    ClientIp(ip): ClientIp,
+    user: Option<Extension<crate::auth::middleware::CurrentUser>>,
     current: Option<Extension<CurrentSession>>,
 ) -> AuthResult<Response> {
     if let Some(Extension(CurrentSession(token))) = current {
         session::delete(&state.pool, token.id()).await?;
+        let actor = user.as_ref().map(|Extension(user)| user.0.username.as_str());
+        audit::record(&state.pool, actor, "logout", None, ip).await;
     }
     // Le cookie est effacé même sans session en base : c'est la seule façon de se
     // débarrasser d'un cookie devenu inutilisable.

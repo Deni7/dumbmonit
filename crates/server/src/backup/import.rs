@@ -136,6 +136,7 @@ pub async fn restore(
     report.push(restore_overrides(&mut tx, bundle, &refs).await?);
     report.push(restore_notify_policy(&mut tx, bundle).await?);
     report.push(restore_agent_enrolment(&mut tx, bundle).await?);
+    report.push(restore_backup_schedule(&mut tx, bundle).await?);
     report.push(restore_wall_weather(&mut tx, bundle).await?);
     report.push(restore_agent_update_rollout(&mut tx, bundle).await?);
     report.push(restore_mail_server(&mut tx, cipher, bundle).await?);
@@ -917,6 +918,50 @@ async fn restore_notify_policy(
     .execute(&mut **tx)
     .await
     .context("écriture de la politique de notification")?;
+    report.count(if existing.is_some() {
+        RestoreOutcome::Updated
+    } else {
+        RestoreOutcome::Created
+    });
+    Ok(report)
+}
+
+/// Planification des sauvegardes locales : remplacée par celle du lot, après
+/// contrôle et mise dans les bornes. Un lot sans section ne touche à rien.
+async fn restore_backup_schedule(
+    tx: &mut Transaction<'_, Sqlite>,
+    bundle: &Bundle,
+) -> Result<SectionReport> {
+    use crate::backup::local::{SETTINGS_KEY, ScheduleOverride};
+    let mut report = SectionReport::new("backup_schedule");
+    let Some(raw) = &bundle.backup_schedule else { return Ok(report) };
+    let Ok(stored) = serde_json::from_value::<ScheduleOverride>(raw.clone()) else {
+        report.skipped += 1;
+        report.notes.push("The backup schedule of the backup is unreadable".into());
+        return Ok(report);
+    };
+    let value = serde_json::to_vec(&stored.clamped())?;
+    let existing = sqlx::query("SELECT value FROM settings WHERE key = ?")
+        .bind(SETTINGS_KEY)
+        .fetch_optional(&mut **tx)
+        .await
+        .context("lecture de la planification des sauvegardes")?;
+    if let Some(row) = &existing
+        && row.try_get::<Vec<u8>, _>("value")? == value
+    {
+        report.skipped += 1;
+        return Ok(report);
+    }
+    sqlx::query(
+        "INSERT INTO settings (key, value) VALUES (?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value,
+             updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')",
+    )
+    .bind(SETTINGS_KEY)
+    .bind(&value)
+    .execute(&mut **tx)
+    .await
+    .context("écriture de la planification des sauvegardes")?;
     report.count(if existing.is_some() {
         RestoreOutcome::Updated
     } else {

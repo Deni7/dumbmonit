@@ -1,6 +1,6 @@
 use axum::Json;
 use axum::extract::State;
-use axum::http::HeaderMap;
+use axum::http::{HeaderMap, StatusCode};
 use serde::Serialize;
 
 use crate::state::AppState;
@@ -16,6 +16,18 @@ pub struct Health {
     victoria: ComponentHealth,
     /// Mode démonstration publique (`DUMBMONIT_DEMO`) : lecture seule, parc fictif.
     demo: bool,
+    /// Volume des données (`/data`) : place libre et taille. Session ouverte
+    /// seulement, et absent quand le système ne sait pas le mesurer.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    data_disk: Option<DataDisk>,
+}
+
+#[derive(Serialize)]
+struct DataDisk {
+    free_bytes: u64,
+    total_bytes: u64,
+    /// Taille de la base SQLite et de son journal.
+    database_bytes: u64,
 }
 
 #[derive(Serialize)]
@@ -86,5 +98,33 @@ pub async fn health(State(state): State<AppState>, headers: HeaderMap) -> Json<H
         database: shown(ComponentHealth::from(database)),
         victoria: shown(ComponentHealth::from(victoria).embedded(state.config.vm_embedded())),
         demo: state.config.demo,
+        data_disk: if signed_in { data_disk(&state).await } else { None },
     })
+}
+
+/// Place libre du volume des données : un seul `statvfs`, rien de plus.
+async fn data_disk(state: &AppState) -> Option<DataDisk> {
+    let (free_bytes, total_bytes) = crate::selfmon::volume(&state.config.data_dir)?;
+    let database_bytes = crate::selfmon::database_bytes(&state.config.database_path()).await;
+    Some(DataDisk { free_bytes, total_bytes, database_bytes })
+}
+
+/// Réponse de `GET /api/ready`.
+#[derive(Serialize)]
+pub struct Ready {
+    ready: bool,
+    database: bool,
+    victoria: bool,
+}
+
+/// Sonde de disponibilité : 200 quand la base et VictoriaMetrics répondent,
+/// 503 sinon. Publique comme `/api/health`, et sans le détail des pannes : un
+/// orchestrateur n'a besoin que du code de retour. `/api/health` reste la sonde
+/// de vivacité (elle répond toujours 200).
+pub async fn ready(State(state): State<AppState>) -> (StatusCode, Json<Ready>) {
+    let database = sqlx::query("SELECT 1").execute(&state.pool).await.is_ok();
+    let victoria = state.victoria.health().await.is_ok();
+    let ready = database && victoria;
+    let status = if ready { StatusCode::OK } else { StatusCode::SERVICE_UNAVAILABLE };
+    (status, Json(Ready { ready, database, victoria }))
 }

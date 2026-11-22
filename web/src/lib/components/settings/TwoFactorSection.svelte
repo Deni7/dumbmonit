@@ -4,15 +4,14 @@
 	 *
 	 * Self-contained: loads its own status, walks through the enrolment
 	 * (password → QR code → first code → recovery codes shown once) and offers
-	 * the way out (password again). Admins also get the security audit log
-	 * underneath. Mounted inside `SecuritySection` with one line.
+	 * the way out (password again). The audit log has its own section
+	 * (`AuditLogSection`). Mounted inside `SecuritySection` with one line.
 	 */
 	import qrcode from 'qrcode-generator';
 	import { ShieldCheck, ShieldOff } from 'lucide-svelte';
-	import { ApiError, type AuditEntry, type TotpEnrolment, type TotpStatus } from '#lib/api/index.js';
-	import { disableTotp, enrolTotp, getTotpStatus, listAuditLog, verifyTotp } from '#lib/api/totp.js';
+	import { ApiError, type TotpEnrolment, type TotpStatus } from '#lib/api/index.js';
+	import { disableTotp, enrolTotp, getTotpStatus, verifyTotp } from '#lib/api/totp.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
-	import { formatDateTime } from '#lib/format.js';
 	import { Button, CopyBlock, DocLink, ErrorNotice, Field, Plate, Skeleton } from '#lib/ui/index.js';
 	import PasswordInput from './PasswordInput.svelte';
 	import { m } from '#lib/paraglide/messages.js';
@@ -30,11 +29,6 @@
 	let recoveryCodes = $state<string[]>([]);
 	let busy = $state(false);
 	let apiError = $state<unknown>(null);
-
-	// Audit log (admins only).
-	let audit = $state<AuditEntry[] | null>(null);
-	let auditError = $state<unknown>(null);
-	let auditShown = $state(false);
 
 	const canEnrol = $derived(auth.available && auth.user?.auth === 'password');
 
@@ -128,40 +122,6 @@
 			busy = false;
 		}
 	}
-
-	async function toggleAudit() {
-		auditShown = !auditShown;
-		if (!auditShown || audit !== null) return;
-		auditError = null;
-		try {
-			audit = await listAuditLog(100);
-		} catch (cause) {
-			auditError = cause;
-		}
-	}
-
-	const ACTION_LABEL: Record<string, () => string> = {
-		login: () => m.settings_2fa_action_login(),
-		'login.failed': () => m.settings_2fa_action_login_failed(),
-		'password.changed': () => m.settings_2fa_action_password_changed(),
-		'totp.enabled': () => m.settings_2fa_action_totp_enabled(),
-		'totp.disabled': () => m.settings_2fa_action_totp_disabled(),
-		'totp.reset': () => m.settings_2fa_action_totp_reset(),
-		'totp.failed': () => m.settings_2fa_action_totp_failed(),
-		'totp.recovery_used': () => m.settings_2fa_action_totp_recovery_used(),
-		'login.passkey': () => m.settings_2fa_action_login_passkey(),
-		'passkey.added': () => m.settings_2fa_action_passkey_added(),
-		'passkey.removed': () => m.settings_2fa_action_passkey_removed(),
-		'passkey.failed': () => m.settings_2fa_action_passkey_failed(),
-		'token.created': () => m.settings_2fa_action_token_created(),
-		'token.revoked': () => m.settings_2fa_action_token_revoked(),
-		'agent_token.created': () => m.settings_2fa_action_agent_token_created(),
-		'agent_token.revoked': () => m.settings_2fa_action_agent_token_revoked(),
-		'user.created': () => m.settings_2fa_action_user_created(),
-		'user.updated': () => m.settings_2fa_action_user_updated(),
-		'user.deleted': () => m.settings_2fa_action_user_deleted()
-	};
-	const failing = (action: string) => action.endsWith('.failed');
 </script>
 
 {#if canEnrol}
@@ -256,49 +216,6 @@
 			</div>
 		{/if}
 
-		{#if auth.user?.role === 'admin'}
-			<div class="mt-5">
-				<Button size="sm" variant="ghost" onclick={() => void toggleAudit()} aria-expanded={auditShown}>
-					{auditShown ? m.settings_2fa_hide_log() : m.settings_2fa_show_log()}
-				</Button>
-				{#if auditShown}
-					{#if auditError}
-						<div class="mt-2"><ErrorNotice error={auditError} title={m.settings_2fa_log_error()} /></div>
-					{:else if audit === null}
-						<Skeleton class="mt-2 h-24 w-full" />
-					{:else if audit.length === 0}
-						<p class="mt-2 text-[0.8125rem] text-ink-2">{m.settings_2fa_log_empty()}</p>
-					{:else}
-						<div class="mt-2 overflow-x-auto rounded-lg border border-line">
-							<table class="table-stack w-full text-[0.8125rem]">
-								<thead class="bg-surface-2 text-left text-ink-2">
-									<tr>
-										<th class="px-3 py-2 font-semibold">{m.settings_2fa_col_when()}</th>
-										<th class="px-3 py-2 font-semibold">{m.settings_2fa_col_event()}</th>
-										<th class="px-3 py-2 font-semibold">{m.settings_2fa_col_who()}</th>
-										<th class="px-3 py-2 font-semibold">{m.settings_2fa_col_subject()}</th>
-										<th class="px-3 py-2 font-semibold">{m.settings_2fa_col_from()}</th>
-									</tr>
-								</thead>
-								<tbody>
-									{#each audit as entry (entry.id)}
-										<tr class="border-t border-line">
-											<td class="tnum px-3 py-1.5 whitespace-nowrap text-ink-2">{formatDateTime(entry.at)}</td>
-											<td class="px-3 py-1.5" data-label={m.settings_2fa_col_event()}>
-												<Plate size="sm" tone={failing(entry.action) ? 'warning' : 'ghost'} label={ACTION_LABEL[entry.action]?.() ?? entry.action} />
-											</td>
-											<td class="px-3 py-1.5 font-mono" data-label={m.settings_2fa_col_who()}>{entry.actor ?? '—'}</td>
-											<td class="px-3 py-1.5 font-mono" data-label={m.settings_2fa_col_subject()}>{entry.subject ?? '—'}</td>
-											<td class="tnum px-3 py-1.5 font-mono text-ink-2" data-label={m.settings_2fa_col_from()}>{entry.ip ?? '—'}</td>
-										</tr>
-									{/each}
-								</tbody>
-							</table>
-						</div>
-					{/if}
-				{/if}
-			</div>
-		{/if}
 	</div>
 {/if}
 

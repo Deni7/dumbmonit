@@ -54,6 +54,10 @@ EXPECTED_SHA256=""
 SKIP_CHECKSUM=0
 UNINSTALL=0
 NO_START=0
+# Version imposée (`--version=`) : le binaire installé doit être celle-là.
+PIN_VERSION=""
+# Simulation (`--dry-run`) : dit ce qui serait fait, ne change rien.
+DRY_RUN=0
 MODULES=""
 MODULES_SET=0
 PLAKAR_KLOSETS=""
@@ -140,6 +144,11 @@ OPTIONS:
                         Install a downloaded binary without verifying it.
                         Only for air-gapped or manual setups: anyone able to
                         tamper with the download then runs code as root here.
+    --version=X.Y.Z     Install only if the agent binary is exactly this version
+                        (the server ships its own: this refuses to install
+                        anything else, for example after a server upgrade)
+    --dry-run           Print what would be done, then stop: nothing is
+                        downloaded, written or started. No root needed.
     --no-start          Install everything, but do not contact the server or
                         start the service (machine image, testing)
     --uninstall         Uninstall the agent and delete its configuration
@@ -188,12 +197,19 @@ for argument in "$@"; do
         --bin=*)      LOCAL_BIN="${argument#*=}" ;;
         --sha256=*)   EXPECTED_SHA256="${argument#*=}" ;;
         --insecure-skip-checksum) SKIP_CHECKSUM=1 ;;
+        --version=*)  PIN_VERSION="${argument#*=}" ;;
+        --dry-run)    DRY_RUN=1 ;;
         --no-start)   NO_START=1 ;;
         --uninstall)  UNINSTALL=1 ;;
         --help|-h)    usage; exit 0 ;;
         *)            echec "unknown option '$argument' (see --help)" ;;
     esac
 done
+
+if [ -n "$PIN_VERSION" ]; then
+    printf '%s' "$PIN_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$' \
+        || echec "invalid --version value (expected x.y.z): $PIN_VERSION"
+fi
 
 # Les noms de modules sont vérifiés avant toute chose : une faute de frappe
 # ferait refuser le démarrage de l'agent, une fois tout installé.
@@ -206,7 +222,8 @@ if [ "$MODULES_SET" -eq 1 ]; then
     done
 fi
 
-[ "$(id -u)" -eq 0 ] || echec "this installer must run as root (try with sudo)"
+[ "$DRY_RUN" -eq 1 ] || [ "$(id -u)" -eq 0 ] \
+    || echec "this installer must run as root (try with sudo)"
 
 # ------------------------------------------------- système et architecture
 
@@ -443,6 +460,15 @@ ouvrir_pare_feu() {
 }
 
 if [ "$UNINSTALL" -eq 1 ]; then
+    if [ "$DRY_RUN" -eq 1 ]; then
+        info "dry run: nothing is changed. The uninstall would:"
+        info "  - stop and disable the service ($INIT)"
+        info "  - remove the firewall rules this script added, if any"
+        info "  - delete $BIN_DIR, $LINK_PATH and the service file"
+        info "  - delete the configuration $CONFIG_DIR (it holds the token)"
+        info "  - clean up what an agent from before the rename left behind"
+        exit 0
+    fi
     info "stopping the service"
     arreter_service
     annuler_pare_feu
@@ -655,6 +681,38 @@ verifier_empreinte() {
     info "checksum verified ($obtenu)"
 }
 
+# Simulation : tout ce qui précède n'a fait que lire. On dit ce qui serait fait,
+# sans jamais afficher le jeton.
+if [ "$DRY_RUN" -eq 1 ]; then
+    info "dry run: nothing is downloaded, written or started. The install would:"
+    info "  - system: $PLATFORM-$ARCH, service manager: $INIT"
+    if [ -n "$LOCAL_BIN" ]; then
+        info "  - install the binary $LOCAL_BIN to $BIN_PATH (link $LINK_PATH)"
+    else
+        info "  - download $URL/download/dumbmonit-agent-$PLATFORM-$ARCH and install it to $BIN_PATH (link $LINK_PATH)"
+        if [ "$SKIP_CHECKSUM" -eq 1 ]; then
+            info "  - NOT verify its checksum (--insecure-skip-checksum)"
+        elif [ -n "$(empreinte_attendue)" ]; then
+            info "  - verify its SHA-256 against --sha256"
+        else
+            info "  - REFUSE it: no expected SHA-256 for $PLATFORM-$ARCH (--sha256 missing)"
+        fi
+    fi
+    if [ -n "$PIN_VERSION" ]; then
+        info "  - refuse any binary that is not version $PIN_VERSION"
+    fi
+    info "  - write the configuration $CONFIG_FILE (server $URL, token hidden)"
+    if [ "$OPEN_GATEWAY" -eq 1 ] && [ "$NO_FIREWALL" -eq 0 ]; then
+        info "  - open TCP $GATEWAY_PORT on the local firewall, to the local subnet only"
+    fi
+    if [ "$NO_START" -eq 1 ]; then
+        info "  - not start the service (--no-start)"
+    else
+        info "  - check the connection to $URL, then enable and start the service ($SERVICE_NAME)"
+    fi
+    exit 0
+fi
+
 # Écriture à côté puis renommage : un `cp` sur un binaire en cours d'exécution
 # échoue avec « Text file busy », alors qu'un renommage est atomique et sans effet
 # sur le processus déjà lancé.
@@ -662,6 +720,16 @@ mkdir -p "$(dirname "$BIN_PATH")"
 TMP_BIN="$BIN_PATH.nouveau"
 install_binaire "$TMP_BIN"
 chmod 0755 "$TMP_BIN"
+# Version imposée : un autre binaire (le serveur a été mis à jour depuis) n'est
+# pas installé, et l'agent déjà en place reste tel quel.
+if [ -n "$PIN_VERSION" ]; then
+    obtenue="$("$TMP_BIN" --version 2>/dev/null | awk '{print $2}')" || obtenue=""
+    if [ "$obtenue" != "$PIN_VERSION" ]; then
+        rm -f "$TMP_BIN"
+        echec "the agent binary is version ${obtenue:-unknown}, not the requested $PIN_VERSION: nothing was installed."
+    fi
+    info "version $obtenue confirmed"
+fi
 mv -f "$TMP_BIN" "$BIN_PATH"
 # Le lien remplace aussi le binaire qu'une installation antérieure avait posé
 # à cet endroit.

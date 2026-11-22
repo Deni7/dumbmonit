@@ -19,7 +19,8 @@ use subtle::ConstantTimeEq;
 use crate::auth::middleware::AdminUser;
 use crate::auth::oidc::flow::{self, CallbackParams, FlowError};
 use crate::auth::oidc::{self, OidcConfig, Source, discovery};
-use crate::auth::{AuthResult, AuthState, cookie, session};
+use crate::auth::client_ip::ClientIp;
+use crate::auth::{AuthResult, AuthState, audit, cookie, session};
 use crate::state::AppState;
 
 #[derive(Debug, Deserialize)]
@@ -325,7 +326,8 @@ impl std::fmt::Debug for ConfigPayload {
 pub async fn put_config(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthState>,
-    _: AdminUser,
+    AdminUser(me): AdminUser,
+    ClientIp(ip): ClientIp,
     origin: Origin,
     Json(payload): Json<ConfigPayload>,
 ) -> AuthResult<Json<ConfigView>> {
@@ -366,6 +368,7 @@ pub async fn put_config(
     // Le fournisseur a pu changer : le document mis en cache ne vaut plus rien.
     *auth.discovery_cache().lock().await = None;
     tracing::info!("OIDC settings saved");
+    audit::record(&state.pool, Some(&me.username), "settings.oidc", None, ip).await;
 
     let resolved = oidc::resolve(&state.pool, &state.cipher, &state.config.oidc).await?;
     Ok(Json(view(&state, resolved, &origin.0)))
@@ -376,12 +379,14 @@ pub async fn put_config(
 pub async fn delete_config(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthState>,
-    _: AdminUser,
+    AdminUser(me): AdminUser,
+    ClientIp(ip): ClientIp,
     origin: Origin,
 ) -> AuthResult<Json<ConfigView>> {
     oidc::clear(&state.pool).await?;
     *auth.discovery_cache().lock().await = None;
     tracing::info!("OIDC settings cleared");
+    audit::record(&state.pool, Some(&me.username), "settings.oidc.cleared", None, ip).await;
     let resolved = oidc::resolve(&state.pool, &state.cipher, &state.config.oidc).await?;
     Ok(Json(view(&state, resolved, &origin.0)))
 }

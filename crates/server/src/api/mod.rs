@@ -409,6 +409,7 @@ pub fn router_with_hubs(
     // inutilisable.
     let public = Router::new()
         .route("/health", get(health::health))
+        .route("/ready", get(health::ready))
         // La spécification OpenAPI de tout ce qui suit : publique, sans secret.
         .route("/openapi.json", get(openapi::spec))
         // Mode produit et fin de l'assistant : l'interface choisit son habillage
