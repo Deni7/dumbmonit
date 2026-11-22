@@ -1134,6 +1134,14 @@ without a VPN and with nothing to open on the remote side.
 
 How to set it up, step by step, is in [Monitor a remote site](../install/remote-site.md).
 
+A relay can also be a **gateway** for the agents of its site that cannot reach
+the server (TCP 8443 by default, every interface, `gateway_listen` to change
+it). The relay reports what it really opened — the bound address, or why it
+cannot listen — and its page shows it under *Relay*. The add screen shows the
+*Through &lt;relay&gt;* install command only once the gateway listens and has
+passed the relay's own test; otherwise it says why and how to fix it. See
+[Install agents behind the relay](../install/remote-site.md#5-install-agents-behind-the-relay).
+
 ## Binding: one machine, one agent
 
 An enrollment token says *this machine is allowed to talk*. It does not say
@@ -1297,6 +1305,8 @@ tail -f /var/log/dumbmonit-agent.log   # service log (OpenRC)
 | Symptom | Likely cause |
 |---|---|
 | Installer says "could not reach the server" | Wrong URL or token. The configuration is written: fix `agent.yaml`, then restart the service. |
+| Installer says "the encrypted agent channel … refuses the connection" | The agent port (8443) is not published or not open on the server: add `"8443:8443"` under `ports:` in `docker-compose.yml`, then `docker compose up -d`, and open the port in the firewall. See [Network ports](../install/ports.md#troubleshooting-the-agent-channel). |
+| `irm https://<relay>:8443/install.ps1` or `curl` fails with *Unable to connect* / *Failed to connect* | Installing through a relay whose gateway does not accept the machine. The relay's page says whether its gateway listens and why not; see [Install agents behind the relay](../install/remote-site.md#5-install-agents-behind-the-relay). |
 | Download fails with 404 | The server has no agent binaries (`DUMBMONIT_AGENT_DIR` empty). Use `--bin=PATH` with a binary you built. |
 | Installer stops with "checksum mismatch" | The command was copied before a server upgrade (copy a fresh one when adding a server with the agent), or the binary received is not the one the server serves: a proxy or a cache in the way, or a tampered download. |
 | Installer stops with "no expected checksum" | The command has no `--sha256` for this platform: an old command, or a macOS binary (not shipped by the server). Copy a fresh command, or pass `--sha256=<platform>-<arch>:<hex>` from the release's `.sha256`. |

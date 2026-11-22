@@ -106,6 +106,15 @@ All notable changes to this project are documented here. The format follows
 ### Fixed
 
 - **Last 24 h was empty in the monitors table.** The history was only loaded for the tiles view.
+- **Installing through a relay could wait or fail silently.** The relay now reports the gateway it
+  really opened (bound address) or why it could not (port already used, permission, address), and
+  whether it is on the encrypted channel it needs for tunnels. The add screen shows the *Through
+  &lt;relay&gt;* command only once the gateway listens and has passed the relay's own test (labelled
+  as such); otherwise it names the cause — gateway switched off, relay agent older than 0.14.2,
+  relay offline, port that cannot be opened, loopback only, no encrypted channel — with the fix
+  (setting, `gateway_listen` line, commands to find what holds the port, firewall commands for
+  firewalld, ufw and Windows). The relay's *Relay* panel shows the same causes. A `gateway_listen`
+  in the relay's `agent.yaml` now sets the port written into the site's install command.
 
 ## 0.19.0 — 2026-11-19
 
