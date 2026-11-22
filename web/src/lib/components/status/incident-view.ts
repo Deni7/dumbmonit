@@ -9,15 +9,15 @@ import type { PublicIncident } from '#lib/api/types.js';
 /** Services above which the public page offers a search and a "problems only" switch. */
 export const FILTER_THRESHOLD = 8;
 
-/** Anchor id of an incident card; the permalink is `#incident-<id>`. */
-export function incidentAnchor(id: number): string {
-	return `incident-${id}`;
+/** Anchor id of an incident card; the permalink is `#incident-<anchor>` (start and title, never the internal id). */
+export function incidentAnchor(anchor: string): string {
+	return `incident-${anchor}`;
 }
 
-/** The incident id a `location.hash` points at, or `null`. */
-export function incidentFromHash(hash: string): number | null {
-	const match = /^#incident-(\d+)$/.exec(hash);
-	return match ? Number(match[1]) : null;
+/** The incident anchor a `location.hash` points at, or `null`. */
+export function incidentFromHash(hash: string): string | null {
+	const match = /^#incident-([a-z0-9-]+)$/.exec(hash);
+	return match ? match[1] : null;
 }
 
 function parse(value: string): number {
@@ -85,7 +85,7 @@ export function draftIncident(input: DraftInput): PublicIncident {
 	const updates = message ? [...input.updates, { status: input.status, body: message, created_at: input.now }] : input.updates;
 	const closing = input.status === 'resolved' || input.status === 'completed';
 	return {
-		id: input.id ?? 0,
+		anchor: 'draft',
 		title: input.title.trim() || '…',
 		kind: input.kind,
 		status: input.status,

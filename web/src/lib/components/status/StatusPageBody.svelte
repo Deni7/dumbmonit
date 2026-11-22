@@ -74,8 +74,8 @@
 		olderError = null;
 		try {
 			const slice = await loadOlder(olderStarted ? olderNext : undefined);
-			const known = new Set([...past, ...older].map((i) => i.id));
-			older = [...older, ...slice.incidents.filter((i) => !known.has(i.id))];
+			const known = new Set([...past, ...older].map((i) => i.anchor));
+			older = [...older, ...slice.incidents.filter((i) => !known.has(i.anchor))];
 			olderNext = slice.next;
 			olderStarted = true;
 			olderDone = !slice.next;
@@ -111,7 +111,7 @@
 	const filtering = $derived(serviceCount > FILTER_THRESHOLD);
 	const shownGroups = $derived(filtering ? filterGroups(status.groups, query, onlyProblems) : status.groups);
 
-	// A permalink (`#incident-<id>`) opened before the page was drawn: scroll to the card once it exists.
+	// A permalink (`#incident-<anchor>`) opened before the page was drawn: scroll to the card once it exists.
 	let scrolledToHash = false;
 	$effect(() => {
 		void past;
@@ -192,7 +192,7 @@
 			{active.length === 1 ? m.status_public_announcement_one() : m.status_public_announcement_many()}
 		</h2>
 		<div class="mt-2 grid gap-2">
-			{#each active as incident (incident.id)}
+			{#each active as incident (incident.anchor)}
 				<IncidentCard {incident} />
 			{/each}
 		</div>
@@ -255,7 +255,7 @@
 				<div>
 					<h3 class="border-b border-line pb-1 text-xs font-semibold text-ink-2">{group.label}</h3>
 					<div class="mt-1.5 grid gap-1.5">
-						{#each group.incidents as incident (incident.id)}
+						{#each group.incidents as incident (incident.anchor)}
 							<IncidentCard {incident} compact />
 						{/each}
 					</div>

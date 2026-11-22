@@ -1470,9 +1470,9 @@ struct DayBucket {
 
 #[derive(Debug, Serialize)]
 struct PublicIncident {
-    /// Identifiant de l'annonce : sert d'ancre (`#incident-<id>`) et de lien
-    /// permanent, y compris dans le flux RSS.
-    id: i64,
+    /// Ancre de l'annonce (`#incident-<anchor>`), lien permanent y compris dans
+    /// le flux RSS : début et titre en slug, jamais l'identifiant interne.
+    anchor: String,
     title: String,
     kind: String,
     status: String,
@@ -2010,7 +2010,7 @@ fn to_public_incident(
 ) -> PublicIncident {
     let postmortem = postmortem::public(postmortem, &incident.status);
     PublicIncident {
-        id: incident.id,
+        anchor: incident_anchor(&incident.starts_at, &incident.title),
         title: incident.title,
         kind: incident.kind,
         status: incident.status,
@@ -2028,6 +2028,20 @@ fn to_public_incident(
         components,
         postmortem,
     }
+}
+
+/// Ancre publique d'une annonce : `AAAAMMJJ-HHMM-<titre en slug>` (titre coupé à
+/// 40 caractères). Stable tant que le titre ne change pas.
+fn incident_anchor(starts_at: &str, title: &str) -> String {
+    let stamp: String = starts_at.chars().filter(char::is_ascii_digit).take(12).collect();
+    let stamp = if stamp.len() > 8 {
+        format!("{}-{}", &stamp[..8], &stamp[8..])
+    } else {
+        stamp
+    };
+    let slug: String = slugify(title).chars().take(40).collect();
+    let slug = slug.trim_end_matches('-');
+    if slug.is_empty() { stamp } else { format!("{stamp}-{slug}") }
 }
 
 /// Clé publique d'un service : son libellé en slug, suffixée en cas de doublon.
@@ -2528,8 +2542,8 @@ pub async fn public_rss(
             }
         }
         let field = |name: &str| entry.get(name).and_then(Value::as_str).unwrap_or("");
-        let permalink = match entry.get("id").and_then(Value::as_i64) {
-            Some(id) => format!("{link}#incident-{id}"),
+        let permalink = match entry.get("anchor").and_then(Value::as_str) {
+            Some(anchor) => format!("{link}#incident-{anchor}"),
             None => link.clone(),
         };
         let latest = entry

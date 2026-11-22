@@ -40,7 +40,7 @@
 
 	let copied = $state(false);
 	async function copyLink() {
-		const url = `${location.origin}${location.pathname}${location.search}#${incidentAnchor(incident.id)}`;
+		const url = `${location.origin}${location.pathname}${location.search}#${incidentAnchor(incident.anchor)}`;
 		if (!(await copyText(url))) return;
 		copied = true;
 		setTimeout(() => (copied = false), 2000);
@@ -65,7 +65,7 @@
 	);
 </script>
 
-<Tilt tag="article" id={preview ? undefined : incidentAnchor(incident.id)} maxTilt={2.5} class={`scroll-mt-4 target:ring-2 target:ring-accent/50 rounded-[var(--radius-card)] border bg-surface ${closed || compact ? 'border-line' : isMaintenance ? 'border-info/40' : incident.severity === 'major' ? 'border-warning/40' : 'border-advisory/40'} ${compact ? 'px-4 py-3' : 'px-4 py-4 shadow-lift sm:px-5'}`}>
+<Tilt tag="article" id={preview ? undefined : incidentAnchor(incident.anchor)} maxTilt={2.5} class={`scroll-mt-4 target:ring-2 target:ring-accent/50 rounded-[var(--radius-card)] border bg-surface ${closed || compact ? 'border-line' : isMaintenance ? 'border-info/40' : incident.severity === 'major' ? 'border-warning/40' : 'border-advisory/40'} ${compact ? 'px-4 py-3' : 'px-4 py-4 shadow-lift sm:px-5'}`}>
 	<div class="flex flex-wrap items-center gap-2">
 		<Plate tone={isMaintenance ? 'info' : closed ? 'ghost' : incident.severity === 'major' ? 'warning' : 'advisory'} label={KIND_LABEL[incident.kind]} bare />
 		<Plate tone={status.tone} label={status.label} />

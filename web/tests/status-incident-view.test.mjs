@@ -6,10 +6,10 @@ import { badgeUrl } from '../src/lib/components/status/share.ts';
 import { utcOffset } from '../src/lib/components/status/timezone.ts';
 
 test('an incident has a stable anchor, read back from the hash', () => {
-	assert.equal(incidentAnchor(42), 'incident-42');
-	assert.equal(incidentFromHash('#incident-42'), 42);
+	assert.equal(incidentAnchor('20261122-1405-database-down'), 'incident-20261122-1405-database-down');
+	assert.equal(incidentFromHash('#incident-20261122-1405-database-down'), '20261122-1405-database-down');
 	assert.equal(incidentFromHash('#services'), null);
-	assert.equal(incidentFromHash('#incident-x'), null);
+	assert.equal(incidentFromHash('#incident-<x>'), null);
 });
 
 test('the resolution time is the gap between start and end', () => {

@@ -2658,8 +2658,8 @@ export interface PublicIncidentUpdate {
 }
 
 export interface PublicIncident {
-	/** Anchor and permalink: `#incident-<id>`. */
-	id: number;
+	/** Anchor and permalink: `#incident-<anchor>` (start and title in a slug, never the internal id). */
+	anchor: string;
 	/** Public keys of the services touched; absent: the whole page. */
 	components?: string[];
 	title: string;
