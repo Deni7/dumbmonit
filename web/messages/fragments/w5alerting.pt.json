@@ -1,0 +1,309 @@
+{
+	"w5alerting_backtest_absorbed": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "A espera absorveu {count} ultrapassagem breve.",
+				"countPlural=other": "A espera absorveu {count} ultrapassagens breves."
+			}
+		}
+	],
+	"w5alerting_backtest_coarsened": "Avaliado a cada {step} em vez de a cada {interval} para que o teste seja rápido: as durações de espera curtas são aproximadas.",
+	"w5alerting_backtest_error": "Não foi possível executar o teste.",
+	"w5alerting_backtest_fired": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Teria disparado uma vez.",
+				"countPlural=other": "Teria disparado {count} vezes."
+			}
+		}
+	],
+	"w5alerting_backtest_help": "Repete estas definições, guardadas ou não, sobre as medições já armazenadas, tal como o motor de alertas as avalia.",
+	"w5alerting_backtest_never_fired": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Não teria disparado no último dia.",
+				"countPlural=other": "Não teria disparado nos últimos {count} dias."
+			}
+		}
+	],
+	"w5alerting_backtest_not_anomaly": "As regras de anomalia não podem ser testadas no histórico: comparam cada valor com uma referência aprendida semana após semana.",
+	"w5alerting_backtest_not_drift": "As regras de desvio não podem ser testadas no histórico: cada avaliação compara o valor com semanas anteriores.",
+	"w5alerting_backtest_not_forecast": "As regras de previsão não podem ser testadas no histórico: cada avaliação extrapola dias de medições.",
+	"w5alerting_backtest_not_log_pattern": "As regras de padrão de registo não podem ser testadas no histórico: contam linhas de registo, não medições armazenadas.",
+	"w5alerting_backtest_not_slo_burn": "As regras de orçamento de erros não podem ser testadas no histórico: são calculadas a partir dos SLO, não de uma consulta armazenada.",
+	"w5alerting_backtest_notifications": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Ou seja, {count} notificação.",
+				"countPlural=other": "Ou seja, {count} notificações."
+			}
+		}
+	],
+	"w5alerting_backtest_period": "De {start} a {end}, pico {peak}",
+	"w5alerting_backtest_period_more": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "e mais {count} período",
+				"countPlural=other": "e mais {count} períodos"
+			}
+		}
+	],
+	"w5alerting_backtest_period_open": "Desde {start}, ainda ativo no fim, pico {peak}",
+	"w5alerting_backtest_quiet": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} outra série nunca ultrapassou o limiar.",
+				"countPlural=other": "{count} outras séries nunca ultrapassaram o limiar."
+			}
+		}
+	],
+	"w5alerting_backtest_run": "Testar no histórico",
+	"w5alerting_backtest_scope_note": "Conta apenas a regra: janelas de manutenção, dependências, confirmações e definições dos canais não são aplicadas.",
+	"w5alerting_backtest_series_notifications": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} notificação",
+				"countPlural=other": "{count} notificações"
+			}
+		}
+	],
+	"w5alerting_backtest_series_periods": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Disparou uma vez, {duration} no total",
+				"countPlural=other": "Disparou {count} vezes, {duration} no total"
+			}
+		}
+	],
+	"w5alerting_backtest_show_all": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Mostrar as {count} séries",
+				"countPlural=other": "Mostrar as {count} séries"
+			}
+		}
+	],
+	"w5alerting_backtest_show_less": "Mostrar menos",
+	"w5alerting_backtest_spark_label": "Valores medidos em {name}",
+	"w5alerting_backtest_title": "Testar no histórico",
+	"w5alerting_backtest_truncated": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Só foram repetidas as 100 séries mais vezes acima do limiar, de {count}.",
+				"countPlural=other": "Só foram repetidas as 100 séries mais vezes acima do limiar, de {count}."
+			}
+		}
+	],
+	"w5alerting_backtest_window": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Último dia",
+				"countPlural=other": "Últimos {count} dias"
+			}
+		}
+	],
+	"w5alerting_backtest_window_label": "Período do histórico",
+	"w5alerting_noise_acknowledged": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "em {count} alerta confirmado",
+				"countPlural=other": "em {count} alertas confirmados"
+			}
+		}
+	],
+	"w5alerting_noise_edit_rule": "Editar regra",
+	"w5alerting_noise_empty": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Nenhum alerta disparou no último dia.",
+				"countPlural=other": "Nenhum alerta disparou nos últimos {count} dias."
+			}
+		}
+	],
+	"w5alerting_noise_empty_help": "Por agora não há nada a ajustar.",
+	"w5alerting_noise_error": "Não foi possível carregar o relatório de ruído.",
+	"w5alerting_noise_fired_label": "Alertas disparados",
+	"w5alerting_noise_flap_changes": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} mudança de estado",
+				"countPlural=other": "{count} mudanças de estado"
+			}
+		}
+	],
+	"w5alerting_noise_flap_on": "{rule} em {device}",
+	"w5alerting_noise_flapping_help": "Alertas que dispararam pelo menos 3 vezes no período: um limiar de recuperação ou uma espera mais longa costuma acalmá-los.",
+	"w5alerting_noise_flapping_title": "Alertas intermitentes",
+	"w5alerting_noise_intro": "Que regras alertam demasiado e com que rapidez se responde aos alertas, a partir do histórico de alertas.",
+	"w5alerting_noise_mtta": "Até à confirmação: {delay}",
+	"w5alerting_noise_mtta_label": "Tempo médio até confirmação",
+	"w5alerting_noise_mttr": "Até à resolução: {delay}",
+	"w5alerting_noise_mttr_label": "Tempo médio até resolução",
+	"w5alerting_noise_no_delay": "ainda sem dados",
+	"w5alerting_noise_notifications_label": "Notificações enviadas",
+	"w5alerting_noise_resolved": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "em {count} alerta resolvido",
+				"countPlural=other": "em {count} alertas resolvidos"
+			}
+		}
+	],
+	"w5alerting_noise_row_fired": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "disparou uma vez",
+				"countPlural=other": "disparou {count} vezes"
+			}
+		}
+	],
+	"w5alerting_noise_row_notifications": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} notificação",
+				"countPlural=other": "{count} notificações"
+			}
+		}
+	],
+	"w5alerting_noise_rules_help": "Ordenadas por notificações enviadas, incluindo lembretes e resoluções.",
+	"w5alerting_noise_rules_title": "Regras mais ruidosas",
+	"w5alerting_noise_tab": "Ruído",
+	"w5alerting_noise_teams_title": "Por equipa",
+	"w5alerting_noise_test_rule": "Testar no histórico",
+	"w5alerting_noise_truncated": "Período muito movimentado: o relatório abrange os 100 000 alertas mais recentes.",
+	"w5alerting_noise_window": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} dia",
+				"countPlural=other": "{count} dias"
+			}
+		}
+	],
+	"w5alerting_noise_window_label": "Período"
+}

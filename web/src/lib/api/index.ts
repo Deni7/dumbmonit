@@ -103,6 +103,7 @@ export * from './clients';
 export * from './mail_server';
 export * from './slos';
 export * from './annotations';
+export * from './alert_insights';
 export {
 	ApiError,
 	toApiError,

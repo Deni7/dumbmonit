@@ -9,6 +9,8 @@ mod agent_sentinel;
 mod agent_tls;
 mod agent_updates;
 mod alert_actions;
+mod alert_backtest;
+mod alert_noise;
 pub(crate) mod alerts;
 mod annotations;
 mod auth;
@@ -254,12 +256,14 @@ pub fn router_with_hubs(
         .route("/alerts/history", get(alerts::history))
         .route("/alerts/history/dismiss-resolved", post(alerts::dismiss_resolved_history))
         .route("/alerts/history/{id}/dismiss", post(alerts::dismiss_history_entry))
+        .route("/alerts/noise", get(alert_noise::noise))
         .route("/alerts/{fingerprint}/ack", post(alerts::ack_alert).delete(alerts::unack_alert))
         .route(
             "/alerts/{fingerprint}/dismiss",
             post(alerts::dismiss_alert).delete(alerts::undismiss_alert),
         )
         .route("/alerts/rules", get(alerts::list_rules).post(alerts::create_rule))
+        .route("/alerts/rules/backtest", post(alert_backtest::backtest))
         .route("/alerts/rules/{id}", put(alerts::update_rule).delete(alerts::delete_rule))
         .route("/alerts/rules/{id}/enable", post(alerts::set_rule_enabled))
         .route("/alerts/rules/{id}/reset", post(alerts::reset_rule))

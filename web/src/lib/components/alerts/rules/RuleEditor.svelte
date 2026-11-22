@@ -10,7 +10,7 @@
 	 * overridden, so the server never zeroes a field the editor does not show.
 	 */
 	import { untrack } from 'svelte';
-	import type { AlertRule, Channel, RuleOperator } from '#lib/api/index.js';
+	import type { AlertRule, AlertRulePayload, Channel, RuleOperator } from '#lib/api/index.js';
 	import { ApiError, updateAlertRule } from '#lib/api/index.js';
 	import { Button, Field } from '#lib/ui/index.js';
 	import { m } from '#lib/paraglide/messages.js';
@@ -29,6 +29,7 @@
 		type SeverityWord
 	} from './options';
 	import OverridesEditor from './OverridesEditor.svelte';
+	import BacktestPanel from './BacktestPanel.svelte';
 	import UnsavedBadge from '#lib/components/settings/UnsavedBadge.svelte';
 	import { useDirtyTracker } from '#lib/settings/unsaved.svelte.js';
 
@@ -39,9 +40,11 @@
 		channelsError?: string | null;
 		onsaved: (rule: AlertRule) => void;
 		oncancel: () => void;
+		/** Opened from "Test on history" (noise report): run the test straight away. */
+		autoBacktest?: boolean;
 	}
 
-	let { rule, channels, channelsError = null, onsaved, oncancel }: Props = $props();
+	let { rule, channels, channelsError = null, onsaved, oncancel, autoBacktest = false }: Props = $props();
 
 	const OPERATORS: { id: RuleOperator; label: string }[] = $derived([
 		{ id: '>', label: m.alerts_rules_edit_op_gt() },
@@ -130,38 +133,42 @@
 		selected = on ? [...selected, id] : selected.filter((c) => c !== id);
 	}
 
-	async function submit(event: SubmitEvent) {
-		event.preventDefault();
+	/**
+	 * The rule as the form now stands, ready for the API; null (and the reason
+	 * in `error`) when a field is not valid. Shared by Save and by the
+	 * history test, which replays these unsaved values.
+	 */
+	function buildPayload(): AlertRulePayload | null {
 		error = null;
 		hint = null;
 		const trimmedName = name.trim();
 		if (!trimmedName) {
 			error = m.alerts_rules_error_name();
-			return;
+			return null;
 		}
 		const trimmedQuery = query.trim();
 		if (!trimmedQuery) {
 			error = m.alerts_rules_edit_error_query();
-			return;
+			return null;
 		}
 		const thresholdValue = anomaly ? rule.threshold : Number(threshold);
 		if (!Number.isFinite(thresholdValue)) {
 			error = m.alerts_rules_error_threshold();
-			return;
+			return null;
 		}
 		let clearValue: number | null = null;
 		if (!anomaly && clearThreshold.trim() !== '') {
 			clearValue = Number(clearThreshold);
 			if (!Number.isFinite(clearValue)) {
 				error = m.alerts_rules_edit_error_clear_number();
-				return;
+				return null;
 			}
 			const firesAbove = operator === '>' || operator === '>=';
 			if (firesAbove ? clearValue >= thresholdValue : clearValue <= thresholdValue) {
 				error = firesAbove
 					? m.alerts_rules_edit_error_clear_below()
 					: m.alerts_rules_edit_error_clear_above();
-				return;
+				return null;
 			}
 		}
 		let params = rule.params;
@@ -172,7 +179,7 @@
 			const critical = Number(criticalDays);
 			if (!Number.isFinite(warning) || !Number.isFinite(critical) || critical <= 0 || warning < critical) {
 				error = m.alerts_rules_forecast_error_tiers();
-				return;
+				return null;
 			}
 			params = { ...rule.params, forecast_warning_days: warning, forecast_critical_days: critical };
 		} else if (drift) {
@@ -180,31 +187,38 @@
 			const minValue = Number(driftMinValue);
 			if (!Number.isFinite(k) || k <= 0) {
 				error = m.alerts_rules_drift_error_k();
-				return;
+				return null;
 			}
 			if (!Number.isFinite(minValue) || minValue < 0) {
 				error = m.alerts_rules_drift_error_min_value();
-				return;
+				return null;
 			}
 			params = { ...rule.params, k, drift_min_value: minValue };
 		}
+		return {
+			...payloadFrom(rule),
+			name: rule.builtin ? rule.name : trimmedName,
+			description: rule.builtin ? rule.description : description.trim(),
+			query: rule.builtin ? rule.query : trimmedQuery,
+			operator,
+			threshold: thresholdValue,
+			clear_threshold: clearValue,
+			for_secs: forSecs,
+			severity: fromSeverityWord(severity),
+			channels: selected,
+			params,
+			repeat_secs: repeatSecs > 0 ? repeatSecs : null,
+			escalate_after_secs: escalateSecs > 0 ? escalateSecs : null
+		};
+	}
+
+	async function submit(event: SubmitEvent) {
+		event.preventDefault();
+		const payload = buildPayload();
+		if (!payload) return;
 		saving = true;
 		try {
-			const saved = await updateAlertRule(rule.id, {
-				...payloadFrom(rule),
-				name: rule.builtin ? rule.name : trimmedName,
-				description: rule.builtin ? rule.description : description.trim(),
-				query: rule.builtin ? rule.query : trimmedQuery,
-				operator,
-				threshold: thresholdValue,
-				clear_threshold: clearValue,
-				for_secs: forSecs,
-				severity: fromSeverityWord(severity),
-				channels: selected,
-				params,
-				repeat_secs: repeatSecs > 0 ? repeatSecs : null,
-				escalate_after_secs: escalateSecs > 0 ? escalateSecs : null
-			});
+			const saved = await updateAlertRule(rule.id, payload);
 			tracker.markClean();
 			onsaved(saved);
 		} catch (cause) {
@@ -423,6 +437,8 @@
 	{#if !anomaly}
 		<OverridesEditor {rule} />
 	{/if}
+
+	<BacktestPanel {rule} getPayload={buildPayload} autoRun={autoBacktest} />
 
 	{#if error}
 		<p class="text-[0.8125rem] font-medium text-warning-ink" role="alert">
