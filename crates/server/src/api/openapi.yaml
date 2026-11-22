@@ -4394,6 +4394,56 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
 
+  /api/reports/schedules/{id}/retry:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    post:
+      operationId: retryReportSend
+      tags: [Reports]
+      summary: Send again a report whose last send failed
+      description: >-
+        A real send (not a preview) to the saved recipients. On success the
+        recorded error is cleared. Only while the last send is marked failed;
+        one retry per schedule every 30 seconds.
+      x-token-scope: write
+      responses:
+        "200":
+          description: How many recipients were reached.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReportPreviewResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/reports/schedules/{id}/pdf:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      operationId: downloadScheduledReportPdf
+      tags: [Reports]
+      summary: The PDF of the last SLA report sent, made again
+      description: >-
+        Sent reports do not keep their attachments: the PDF is rebuilt for the
+        same period (the calendar month before the last send) from the
+        recorded history. `404` before the first send, `400` for a digest.
+      x-token-scope: read
+      parameters:
+        - name: disposition
+          in: query
+          schema: { type: string, enum: [attachment, inline], default: attachment }
+      responses:
+        "200":
+          description: The PDF.
+          content:
+            application/pdf: { schema: { type: string, format: binary } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /api/reports/sla:
     get:
       operationId: downloadSlaReport
@@ -4432,9 +4482,17 @@ paths:
           in: query
           schema: { type: string, example: '{"targets":[1,2],"groups":["Edge"]}' }
           description: "JSON `ReportScope`: the monitors listed and those of the groups listed (union). Omitted: every monitor the report can see."
+        - name: objectives
+          in: query
+          schema: { type: string, example: '{"groups":{"Edge":99.5},"monitors":{"Gateway":99.99}}' }
+          description: "JSON `ReportObjectives`: objectives of single groups or monitors, which replace `objective` for those rows."
+        - name: disposition
+          in: query
+          schema: { type: string, enum: [attachment, inline], default: attachment }
+          description: "`inline` lets the browser show the file (a PDF opens in the tab) instead of saving it."
       responses:
         "200":
-          description: The file, as an attachment, or with `format=json` the report as data (the printable page of the web interface).
+          description: The file, as an attachment (or inline), or with `format=json` the report as data (the printable page of the web interface).
           content:
             application/pdf: { schema: { type: string, format: binary } }
             text/csv: { schema: { type: string } }
@@ -4829,6 +4887,7 @@ paths:
   /api/public/status/{slug}/badge.svg:
     parameters:
       - $ref: "#/components/parameters/Slug"
+      - $ref: "#/components/parameters/BadgeStyle"
     get:
       operationId: getPublicStatusBadge
       tags: [Public status]
@@ -4862,6 +4921,15 @@ paths:
       operationId: getPublicStatusRss
       tags: [Public status]
       summary: Incidents as an RSS feed
+      description: >-
+        Each item links to the incident's permalink on the page
+        (`#incident-<id>`). `component` keeps only the announcements that touch
+        one service, plus those that apply to the whole page.
+      parameters:
+        - name: component
+          in: query
+          description: The service's `key` in the public document.
+          schema: { type: string }
       security: []
       x-token-scope: public
       responses:
@@ -4870,6 +4938,43 @@ paths:
           content:
             application/rss+xml:
               schema: { type: string }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/public/status/{slug}/incidents:
+    parameters:
+      - $ref: "#/components/parameters/Slug"
+    get:
+      operationId: getPublicStatusOlderIncidents
+      tags: [Public status]
+      summary: Past incidents older than the page's 30 days
+      description: >-
+        A slice of resolved announcements, newest first, starting before the
+        30-day window of the page document. Follows the page's access mode.
+      parameters:
+        - name: before
+          in: query
+          description: The `next` cursor of the previous slice.
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      security: []
+      x-token-scope: public
+      responses:
+        "200":
+          description: A slice of incidents.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [incidents]
+                properties:
+                  incidents:
+                    type: array
+                    items: { $ref: "#/components/schemas/PublicIncident" }
+                  next: { type: string, description: Cursor of the next slice; absent at the end. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/PageAccessRequired" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /api/public/status/{slug}/maintenance.ics:
@@ -4991,6 +5096,7 @@ paths:
   /api/public/status/{slug}/uptime.svg:
     parameters:
       - $ref: "#/components/parameters/Slug"
+      - $ref: "#/components/parameters/BadgeStyle"
       - $ref: "#/components/parameters/BadgeDays"
     get:
       operationId: getPublicUptimeBadge
@@ -5006,6 +5112,7 @@ paths:
   /api/public/status/{slug}/response.svg:
     parameters:
       - $ref: "#/components/parameters/Slug"
+      - $ref: "#/components/parameters/BadgeStyle"
     get:
       operationId: getPublicResponseBadge
       tags: [Public status]
@@ -5019,6 +5126,7 @@ paths:
   /api/public/status/{slug}/components/{key}/badge.svg:
     parameters:
       - $ref: "#/components/parameters/Slug"
+      - $ref: "#/components/parameters/BadgeStyle"
       - $ref: "#/components/parameters/ComponentKey"
     get:
       operationId: getPublicComponentBadge
@@ -5033,6 +5141,7 @@ paths:
   /api/public/status/{slug}/components/{key}/uptime.svg:
     parameters:
       - $ref: "#/components/parameters/Slug"
+      - $ref: "#/components/parameters/BadgeStyle"
       - $ref: "#/components/parameters/ComponentKey"
       - $ref: "#/components/parameters/BadgeDays"
     get:
@@ -5049,6 +5158,7 @@ paths:
   /api/public/status/{slug}/components/{key}/response.svg:
     parameters:
       - $ref: "#/components/parameters/Slug"
+      - $ref: "#/components/parameters/BadgeStyle"
       - $ref: "#/components/parameters/ComponentKey"
     get:
       operationId: getPublicComponentResponseBadge
@@ -11028,6 +11138,11 @@ components:
       required: true
       description: The service's `key` in the public document (its label in URL form).
       schema: { type: string }
+    BadgeStyle:
+      name: style
+      in: query
+      description: Shape of the badge.
+      schema: { type: string, enum: [flat, flat-square, for-the-badge], default: flat }
     BadgeDays:
       name: days
       in: query
@@ -13758,6 +13873,13 @@ components:
         notes: { type: string, maxLength: 2000, default: "" }
         show_logo: { type: boolean, default: true, description: "Kept for layouts saved before `logo`; always `logo != none` once saved. `false` wins over `logo`." }
         logo: { type: string, enum: [auto, client, page, custom, none], default: auto, description: "Where the logo comes from: `auto` (the client's, else the status page's), `client`, `page`, `custom` (`/api/reports/logo`) or `none`." }
+        objectives: { $ref: "#/components/schemas/ReportObjectives" }
+    ReportObjectives:
+      type: object
+      description: Availability objectives of single groups or monitors, in percent, which replace the report's objective for those rows. A monitor's own objective wins over its group's. Keys are names.
+      properties:
+        groups: { type: object, additionalProperties: { type: number, exclusiveMinimum: 0, maximum: 100 }, description: By group name; "Ungrouped" for the monitors without a group. }
+        monitors: { type: object, additionalProperties: { type: number, exclusiveMinimum: 0, maximum: 100 }, description: By monitor name. }
     ReportScope:
       type: object
       description: The monitors listed and those of the groups listed (union). Empty is every monitor the report can see.
@@ -13796,6 +13918,8 @@ components:
               monitors: { type: integer }
               uptime: { type: [number, "null"] }
               previous_uptime: { type: [number, "null"] }
+              objective: { type: [number, "null"], description: The objective that applies to the group; its own or the report's. }
+              own_objective: { type: boolean, description: True when the objective is the group's own. }
               status: { type: string }
         monitors:
           type: array
@@ -13807,6 +13931,8 @@ components:
               group: { type: string }
               uptime: { type: [number, "null"] }
               previous_uptime: { type: [number, "null"] }
+              objective: { type: [number, "null"], description: The objective that applies to the monitor; its own (or its group's) or the report's. }
+              own_objective: { type: boolean, description: True when the objective is the monitor's or its group's own. }
               status: { type: string }
               incidents: { type: integer }
               downtime_secs: { type: integer }
@@ -14188,6 +14314,11 @@ components:
       properties:
         status: { type: string, description: Defaults to the incident's current status. }
         body: { type: string, maxLength: 4000 }
+        at: { type: string, description: Date of the message to complete a history; such a message notifies nobody. }
+        notify:
+          type: boolean
+          default: true
+          description: "`false` publishes the message without notifying subscribers."
     PublicStatus:
       type: object
       required: [page, overall, generated_at, groups, incidents, maintenance]
@@ -14289,6 +14420,11 @@ components:
     PublicIncident:
       type: object
       properties:
+        id: { type: integer, description: Anchor and permalink (`#incident-<id>`). }
+        components:
+          type: array
+          items: { type: string }
+          description: Keys of the services touched; absent for the whole page.
         title: { type: string }
         kind: { type: string }
         status: { type: string }
