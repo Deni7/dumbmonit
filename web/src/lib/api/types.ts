@@ -158,6 +158,11 @@ export interface Target {
 	group_name: string;
 	/** Free-text note for humans; empty or absent: none. Older servers omit it. */
 	note?: string;
+	/**
+	 * Notification channels of this monitor: an alert its rule sends to every
+	 * channel goes to these only. Empty or absent: every channel, as before.
+	 */
+	channels?: number[];
 	/** Creation date (UTC); older servers omit it. */
 	created_at?: string | null;
 	/** Manual rank, tiebreaking only within the same state and folder. */
@@ -252,6 +257,8 @@ export interface TargetPayload {
 	note?: string;
 	/** Location on the world map; `null`: none. Absent on edit keeps it. */
 	location_id?: LocationId | null;
+	/** Notification channels (see `Target.channels`). Absent on edit keeps them; `[]`: the rules' channels. */
+	channels?: number[];
 	credential?: Credential;
 }
 

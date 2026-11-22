@@ -22,6 +22,7 @@
 	import { page } from '$app/state';
 	import { goto } from '#lib/navigation.js';
 	import {
+		ApiError,
 		createSilence,
 		deleteTarget,
 		listCollectors,
@@ -96,6 +97,8 @@
 	import ListBulkBar from './ListBulkBar.svelte';
 	import ListEmpty from './ListEmpty.svelte';
 	import { ListReorder } from './reorder.svelte.js';
+	import { bulkEditFailures, freeTagKeys } from './bulk-edit.js';
+	import type { TargetBulkReport } from '#lib/api/targetsBulk.js';
 	import {
 		countActiveFilters,
 		countSegments,
@@ -643,6 +646,19 @@
 			(t) => updateTarget(t.id, targetToPayload(t, { group_name: group }))
 		);
 	const bulkDelete = () => bulk(selectedTargets, (t) => deleteTarget(t.id));
+	/** "Edit" went out as one request: what it left as it was stays selected, said by name. */
+	async function bulkEdited(report: TargetBulkReport) {
+		const { ids, failed } = bulkEditFailures(report, selectedTargets);
+		await alertsStore.refresh();
+		selected = new Set(ids);
+		// The server's own reason per monitor, read as the refusal it is (not a network failure).
+		const named = failed.map((f) => ({ name: f.name, error: new ApiError(f.error, 400) }));
+		bulkReport = named.length > 0 ? { failed: named, total: report.results.length } : null;
+		if (failed.length > 0) return;
+		rowToast = { key: ++rowToastKey, message: m.w5monitors_bulkedit_done({ count: report.updated }) };
+		// Leaves the selection mode so the toast is not hidden behind the bar.
+		stopSelecting();
+	}
 
 	/** Durations offered by "Silence": a one-off window from now, per monitor of the selection. */
 	const silenceChoices = $derived([
@@ -955,6 +971,9 @@
 			{folderChoices}
 			locations={bulkLocations}
 			relays={bulkRelays}
+			targets={selectedTargets}
+			tagKeys={freeTagKeys(selectedTargets, optionKeysOf)}
+			onedited={(report) => void bulkEdited(report)}
 			onselectall={(on) => {
 				if (on !== allShownSelected) toggleAllShown();
 			}}
