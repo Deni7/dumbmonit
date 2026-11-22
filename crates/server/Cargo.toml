@@ -150,6 +150,18 @@ roxmltree = "0.20"
 web-push-native = { version = "0.5", default-features = false }
 p256 = { version = "0.13", features = ["ecdsa"] }
 
+# Copies hors site des sauvegardes (`backup::offsite`). SFTP : la même crate
+# et les mêmes fonctions que la sauvegarde des configurations réseau
+# (`dumbmonit-collectors`), donc rien de neuf dans le verrou ; le protocole
+# SFTP lui-même (v3, cinq requêtes) est écrit ici plutôt que de tirer
+# `russh-sftp` et ses dépendances. Les clés privées RSA sont refusées (voir
+# `deny.toml`). `http-body` et `http-body-util` (déjà compilés pour reqwest) :
+# corps de requête lu depuis le fichier au fil de l'envoi, sans la fonction
+# `stream` de reqwest.
+russh = { version = "0.65", default-features = false, features = ["flate2", "ring", "rsa"] }
+http-body = "1"
+http-body-util = "0.1"
+
 [target.'cfg(unix)'.dependencies]
 # SIGTERM vers le VictoriaMetrics embarqué : tokio ne sait envoyer que SIGKILL.
 libc = "0.2"

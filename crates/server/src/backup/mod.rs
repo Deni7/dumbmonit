@@ -14,6 +14,9 @@
 //!   `/data/backups/` à intervalle régulier et tournée. C'est la reprise après
 //!   incident sur la même machine, sans rien saisir.
 //!
+//! Les sauvegardes locales partent ensuite, si l'opérateur l'a réglé, vers des
+//! destinations hors site ([`offsite`] : S3, WebDAV, SFTP).
+//!
 //! Dans les deux cas, la règle à dire et à redire : `/data/secret.key` est ce
 //! qui déchiffre les identifiants des équipements. Une sauvegarde de la base
 //! sans lui restaure une instance qui ne peut plus parler à rien.
@@ -22,6 +25,7 @@ pub mod bundle;
 pub mod export;
 pub mod import;
 pub mod local;
+pub mod offsite;
 pub mod oncall;
 
 pub use bundle::{Bundle, Envelope, FORMAT, MIN_PASSPHRASE_LEN, VERSION};
