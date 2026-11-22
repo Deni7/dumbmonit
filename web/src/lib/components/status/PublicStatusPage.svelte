@@ -15,7 +15,7 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { startPolling } from '#lib/poll.js';
 	import { FileQuestion } from 'lucide-svelte';
-	import { getPublicStatus, getPublicStatusDay, toApiError, type PublicDayDetail, type PublicStatus } from '#lib/api/index.js';
+	import { getPublicOlderIncidents, getPublicStatus, getPublicStatusDay, toApiError, type PublicDayDetail, type PublicStatus } from '#lib/api/index.js';
 	import { theme } from '#lib/stores/theme.svelte.js';
 	import { EmptyState, ErrorNotice, Skeleton } from '#lib/ui/index.js';
 	import AccessGate from '#lib/components/status/AccessGate.svelte';
@@ -41,8 +41,10 @@
 	let loading = $state(true);
 	let error = $state<unknown>(null);
 	let lastChecked = $state<Date | null>(null);
+	let refreshing = $state(false);
 
 	async function load(signal?: AbortSignal) {
+		refreshing = true;
 		try {
 			status = await getPublicStatus(slug, signal);
 			error = null;
@@ -53,6 +55,7 @@
 			if (!status) error = cause;
 		} finally {
 			loading = false;
+			refreshing = false;
 		}
 	}
 
@@ -178,7 +181,15 @@
 				<Skeleton class="h-24 w-full" />
 			</div>
 		{:else}
-			<StatusPageBody {status} {lastChecked} onselectday={showDay} day={dayPanel} />
+			<StatusPageBody
+				{status}
+				{lastChecked}
+				{refreshing}
+				onrefresh={() => void load()}
+				loadOlder={(cursor) => getPublicOlderIncidents(slug, cursor)}
+				onselectday={showDay}
+				day={dayPanel}
+			/>
 		{/if}
 	</main>
 </div>

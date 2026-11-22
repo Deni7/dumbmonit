@@ -36,6 +36,16 @@ const WINDOWS: [(u32, &str); 4] =
 pub struct UptimeQuery {
     #[serde(default)]
     days: Option<u32>,
+    /// `flat` (défaut), `flat-square` ou `for-the-badge`.
+    #[serde(default)]
+    style: Option<String>,
+}
+
+/// Paramètre `?style=` seul, pour les badges qui n'ont pas d'autre réglage.
+#[derive(Debug, Deserialize)]
+pub struct StyleQuery {
+    #[serde(default)]
+    pub style: Option<String>,
 }
 
 fn svg_response(svg: String) -> Response {
@@ -63,29 +73,81 @@ fn text_width(text: &str) -> u32 {
     width.ceil() as u32
 }
 
+/// Style d'un badge, au vocabulaire de shields.io.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(super) enum Style {
+    /// Coins légèrement arrondis (défaut).
+    #[default]
+    Flat,
+    /// Coins droits.
+    FlatSquare,
+    /// Grand format, majuscules espacées.
+    ForTheBadge,
+}
+
+impl Style {
+    /// Lit le paramètre `?style=` ; absent ou vide : le style par défaut.
+    pub(super) fn parse(raw: Option<&str>) -> ApiResult<Self> {
+        match raw.map(str::trim).filter(|s| !s.is_empty()) {
+            None | Some("flat") => Ok(Self::Flat),
+            Some("flat-square") => Ok(Self::FlatSquare),
+            Some("for-the-badge") => Ok(Self::ForTheBadge),
+            Some(_) => Err(ApiError::BadRequest(
+                "style must be flat, flat-square or for-the-badge.".into(),
+            )),
+        }
+    }
+}
+
 /// Badge à la manière de shields.io : « étiquette | valeur ».
 pub(super) fn render(label: &str, value: &str, colour: &str) -> String {
+    render_styled(label, value, colour, Style::Flat)
+}
+
+/// Comme [`render`], dans le style demandé.
+pub(super) fn render_styled(label: &str, value: &str, colour: &str, style: Style) -> String {
     let label: String = label.chars().take(40).collect();
-    let label_w = text_width(&label) + 12;
-    let value_w = text_width(value) + 12;
+    let (label, value, height, radius, pad, font_size, y, extra) = match style {
+        Style::Flat => (label, value.to_string(), 20, 3, 12, 11, 14, ""),
+        Style::FlatSquare => (label, value.to_string(), 20, 0, 12, 11, 14, ""),
+        Style::ForTheBadge => (
+            label.to_uppercase(),
+            value.to_uppercase(),
+            28,
+            0,
+            24,
+            10,
+            18,
+            " font-weight=\"700\" letter-spacing=\"1\"",
+        ),
+    };
+    // Les majuscules espacées de « for-the-badge » prennent une unité par lettre.
+    let spacing = |text: &str| if extra.is_empty() { 0 } else { text.chars().count() as u32 };
+    let label_w = text_width(&label) + spacing(&label) + pad;
+    let value_w = text_width(&value) + spacing(&value) + pad;
     let total = label_w + value_w;
     let label = xml_escape(&label);
-    let value = xml_escape(value);
+    let value = xml_escape(&value);
     format!(
         concat!(
-            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{total}\" height=\"20\" ",
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{total}\" height=\"{height}\" ",
             "role=\"img\" aria-label=\"{label}: {value}\">",
             "<title>{label}: {value}</title>",
-            "<clipPath id=\"r\"><rect width=\"{total}\" height=\"20\" rx=\"3\" fill=\"#fff\"/></clipPath>",
+            "<clipPath id=\"r\"><rect width=\"{total}\" height=\"{height}\" rx=\"{radius}\" fill=\"#fff\"/></clipPath>",
             "<g clip-path=\"url(#r)\">",
-            "<rect width=\"{label_w}\" height=\"20\" fill=\"{label_bg}\"/>",
-            "<rect x=\"{label_w}\" width=\"{value_w}\" height=\"20\" fill=\"{colour}\"/></g>",
+            "<rect width=\"{label_w}\" height=\"{height}\" fill=\"{label_bg}\"/>",
+            "<rect x=\"{label_w}\" width=\"{value_w}\" height=\"{height}\" fill=\"{colour}\"/></g>",
             "<g fill=\"#fff\" text-anchor=\"middle\" ",
-            "font-family=\"Inter,system-ui,-apple-system,Segoe UI,sans-serif\" font-size=\"11\">",
-            "<text x=\"{label_x}\" y=\"14\">{label}</text>",
-            "<text x=\"{value_x}\" y=\"14\">{value}</text></g></svg>"
+            "font-family=\"Inter,system-ui,-apple-system,Segoe UI,sans-serif\" font-size=\"{font_size}\"{extra}>",
+            "<text x=\"{label_x}\" y=\"{y}\">{label}</text>",
+            "<text x=\"{value_x}\" y=\"{y}\">{value}</text></g></svg>"
         ),
         total = total,
+        height = height,
+        radius = radius,
+        font_size = font_size,
+        extra = extra,
+        y = y,
         label = label,
         value = value,
         label_w = label_w,
@@ -191,31 +253,37 @@ pub async fn page_uptime(
     Query(query): Query<UptimeQuery>,
 ) -> ApiResult<Response> {
     let (doc, private) = load_public_checked(&state, &slug, &headers).await?;
+    let style = Style::parse(query.style.as_deref())?;
     let (days, field) = window_field(&doc, query.days)?;
     let (value, colour) = uptime_value(mean(&doc, field));
-    Ok(access::seal(svg_response(render(&window_label(days), &value, colour)), private))
+    let svg = render_styled(&window_label(days), &value, colour, style);
+    Ok(access::seal(svg_response(svg), private))
 }
 
 pub async fn page_response(
     State(state): State<AppState>,
     Path(slug): Path<String>,
     headers: HeaderMap,
+    Query(query): Query<StyleQuery>,
 ) -> ApiResult<Response> {
     let (doc, private) = load_public_checked(&state, &slug, &headers).await?;
+    let style = Style::parse(query.style.as_deref())?;
     let (value, colour) = latency_value(mean(&doc, "latency_ms"));
-    Ok(access::seal(svg_response(render("response", &value, colour)), private))
+    Ok(access::seal(svg_response(render_styled("response", &value, colour, style)), private))
 }
 
 pub async fn item_status(
     State(state): State<AppState>,
     Path((slug, key)): Path<(String, String)>,
     headers: HeaderMap,
+    Query(query): Query<StyleQuery>,
 ) -> ApiResult<Response> {
     let (doc, private) = load_public_checked(&state, &slug, &headers).await?;
+    let style = Style::parse(query.style.as_deref())?;
     let item = find_item(&doc, &key)?;
     let label = item.get("label").and_then(Value::as_str).unwrap_or("service");
     let (word, colour) = item_word(item.get("state").and_then(Value::as_str).unwrap_or(""));
-    Ok(access::seal(svg_response(render(label, word, colour)), private))
+    Ok(access::seal(svg_response(render_styled(label, word, colour, style)), private))
 }
 
 pub async fn item_uptime(
@@ -225,11 +293,17 @@ pub async fn item_uptime(
     Query(query): Query<UptimeQuery>,
 ) -> ApiResult<Response> {
     let (doc, private) = load_public_checked(&state, &slug, &headers).await?;
+    let style = Style::parse(query.style.as_deref())?;
     let (days, field) = window_field(&doc, query.days)?;
     let item = find_item(&doc, &key)?;
     let label = item.get("label").and_then(Value::as_str).unwrap_or("service");
     let (value, colour) = uptime_value(item.get(field).and_then(Value::as_f64));
-    let svg = svg_response(render(&format!("{label} · {}", window_label(days)), &value, colour));
+    let svg = svg_response(render_styled(
+        &format!("{label} · {}", window_label(days)),
+        &value,
+        colour,
+        style,
+    ));
     Ok(access::seal(svg, private))
 }
 
@@ -237,12 +311,15 @@ pub async fn item_response(
     State(state): State<AppState>,
     Path((slug, key)): Path<(String, String)>,
     headers: HeaderMap,
+    Query(query): Query<StyleQuery>,
 ) -> ApiResult<Response> {
     let (doc, private) = load_public_checked(&state, &slug, &headers).await?;
+    let style = Style::parse(query.style.as_deref())?;
     let item = find_item(&doc, &key)?;
     let label = item.get("label").and_then(Value::as_str).unwrap_or("service");
     let (value, colour) = latency_value(item.get("latency_ms").and_then(Value::as_f64));
-    let svg = svg_response(render(&format!("{label} · response"), &value, colour));
+    let svg =
+        svg_response(render_styled(&format!("{label} · response"), &value, colour, style));
     Ok(access::seal(svg, private))
 }
 
@@ -273,6 +350,24 @@ mod tests {
         assert!(window_field(&doc, Some(90)).is_err());
         assert!(window_field(&doc, Some(12)).is_err());
         assert!(matches!(window_field(&doc, None), Ok((30, "uptime_30d"))));
+    }
+
+    #[test]
+    fn the_style_changes_the_shape() {
+        let flat = render_styled("status", "up", GREEN, Style::Flat);
+        let square = render_styled("status", "up", GREEN, Style::FlatSquare);
+        let big = render_styled("status", "up", GREEN, Style::ForTheBadge);
+        assert!(flat.contains("rx=\"3\""));
+        assert!(square.contains("rx=\"0\""));
+        assert!(big.contains("height=\"28\"") && big.contains("STATUS"));
+        assert_eq!(flat, render("status", "up", GREEN));
+    }
+
+    #[test]
+    fn the_style_parameter_is_checked() {
+        assert_eq!(Style::parse(None).unwrap(), Style::Flat);
+        assert_eq!(Style::parse(Some("for-the-badge")).unwrap(), Style::ForTheBadge);
+        assert!(Style::parse(Some("plastic")).is_err());
     }
 
     #[test]

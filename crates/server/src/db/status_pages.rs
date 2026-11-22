@@ -717,6 +717,32 @@ pub async fn incidents_for_page(
     .context("incidents d'une page de statut")
 }
 
+/// Annonces terminées avant un curseur `(fin, id)`, les plus récentes d'abord :
+/// la suite de la liste des incidents passés d'une page. `limit` lignes au plus.
+pub async fn older_incidents_for_page(
+    pool: &SqlitePool,
+    page_id: i64,
+    before_end: &str,
+    before_id: i64,
+    limit: i64,
+) -> Result<Vec<Incident>> {
+    sqlx::query_as(
+        "SELECT id, page_id, title, kind, status, severity, starts_at, ends_at, created_at, updated_at FROM incidents
+         WHERE (page_id IS NULL OR page_id = ?1)
+           AND ends_at IS NOT NULL
+           AND (ends_at < ?2 OR (ends_at = ?2 AND id < ?3))
+         ORDER BY ends_at DESC, id DESC
+         LIMIT ?4"
+    )
+    .bind(page_id)
+    .bind(before_end)
+    .bind(before_id)
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+    .context("incidents plus anciens d'une page de statut")
+}
+
 pub async fn get_incident(pool: &SqlitePool, id: i64) -> Result<Option<Incident>> {
     sqlx::query_as("SELECT id, page_id, title, kind, status, severity, starts_at, ends_at, created_at, updated_at FROM incidents WHERE id = ?")
         .bind(id)
