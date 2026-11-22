@@ -587,6 +587,7 @@
 			<Search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3" aria-hidden="true" />
 			<input
 				type="search"
+				data-page-search
 				class="input !pl-9"
 				placeholder={m.alerts_rules_search_placeholder()}
 				bind:value={search}

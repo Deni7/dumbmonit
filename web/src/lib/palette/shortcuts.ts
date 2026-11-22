@@ -5,7 +5,7 @@
  */
 import type { Binding } from './logic.js';
 
-export type ShortcutId = 'overview' | 'devices' | 'alerts' | 'status' | 'map' | 'security' | 'logs' | 'add' | 'help';
+export type ShortcutId = 'overview' | 'devices' | 'alerts' | 'status' | 'map' | 'security' | 'logs' | 'add' | 'settings' | 'help';
 
 export interface Shortcut extends Binding {
 	id: ShortcutId;
@@ -24,6 +24,7 @@ export const SHORTCUTS: Shortcut[] = [
 	{ id: 'security', keys: 'g x', href: '/targets?tab=security' },
 	{ id: 'logs', keys: 'g l', href: '/targets?tab=logs', admin: true },
 	{ id: 'add', keys: 'g n', href: '/targets/new', admin: true },
+	{ id: 'settings', keys: 'g ,', href: '/settings' },
 	{ id: 'help', keys: '?' }
 ];
 
@@ -36,6 +37,7 @@ export const ENTRY_SHORTCUT: Record<string, string> = {
 	'page:/targets?tab=map': 'g m',
 	'page:/targets?tab=security': 'g x',
 	'page:/targets?tab=logs': 'g l',
+	'page:/settings': 'g ,',
 	'action:add': 'g n',
 	'action:shortcuts': '?'
 };

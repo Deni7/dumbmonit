@@ -16,6 +16,7 @@
 		security: () => m.misc_shortcuts_go({ page: m.misc_nav_security() }),
 		logs: () => m.misc_shortcuts_go({ page: m.logsearch_title() }),
 		add: () => m.misc_palette_add_device(),
+		settings: () => m.misc_shortcuts_go({ page: m.misc_nav_settings() }),
 		help: () => m.misc_shortcuts_title()
 	};
 
@@ -27,6 +28,14 @@
 			keys: shortcutKeys(s.keys),
 			sequence: s.keys.includes(' ')
 		}))
+	]);
+
+	/** Keys that act on the current page (lists, search), shown in their own section. */
+	const pageRows = $derived([
+		{ label: m.w2global_shortcuts_search(), keys: ['/'] },
+		{ label: m.w2global_shortcuts_next_row(), keys: ['J'] },
+		{ label: m.w2global_shortcuts_prev_row(), keys: ['K'] },
+		{ label: m.w2global_shortcuts_ack_row(), keys: ['A'] }
 	]);
 
 	let closeButton = $state<HTMLButtonElement | null>(null);
@@ -81,6 +90,19 @@
 						<span class="min-w-0 truncate">{row.label}</span>
 						<span class="flex shrink-0 items-center gap-1">
 							{#each row.keys as key, i (i)}
+								<kbd class="shortcut-key">{key}</kbd>
+							{/each}
+						</span>
+					</li>
+				{/each}
+			</ul>
+			<h3 class="px-4 pt-1 text-[0.6875rem] font-semibold tracking-wide text-ink-2 uppercase">{m.w2global_shortcuts_page_section()}</h3>
+			<ul class="px-4 pt-1 pb-3">
+				{#each pageRows as row (row.label)}
+					<li class="flex items-center justify-between gap-4 py-1.5 text-sm text-ink">
+						<span class="min-w-0 truncate">{row.label}</span>
+						<span class="flex shrink-0 items-center gap-1">
+							{#each row.keys as key (key)}
 								<kbd class="shortcut-key">{key}</kbd>
 							{/each}
 						</span>
