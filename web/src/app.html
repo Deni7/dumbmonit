@@ -159,6 +159,17 @@
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover" class="h-full">
+		<noscript>
+			<div
+				style="margin: 0; padding: 48px 24px; min-height: 100vh; box-sizing: border-box; background: #0a1020; color: #e8eef8; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; text-align: center"
+			>
+				<h1 style="margin: 0 0 12px; font-size: 24px">DumbMonit needs JavaScript</h1>
+				<p style="margin: 0 auto; max-width: 480px; font-size: 16px; line-height: 1.5; color: #9fb0c8">
+					The console is a web application and cannot run with scripts turned off. Enable JavaScript for this
+					site, or allow it in your browser or content blocker, then reload the page.
+				</p>
+			</div>
+		</noscript>
 		<div style="display: contents" class="h-full">%sveltekit.body%</div>
 	</body>
 </html>
