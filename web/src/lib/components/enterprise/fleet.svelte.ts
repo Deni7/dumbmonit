@@ -29,7 +29,7 @@ class FleetStore {
 		this.#controller = controller;
 		this.#loadingRange = consoleState.range;
 		const seconds = consoleState.rangeSeconds;
-		const since = new Date(Date.now() - Math.max(seconds, 30 * 86400) * 1000).toISOString();
+		const since = new Date(Date.now() - Math.max(seconds, 60 * 86400) * 1000).toISOString();
 		try {
 			const [latency, figures, history] = await Promise.all([
 				loadLatency(seconds, controller.signal),

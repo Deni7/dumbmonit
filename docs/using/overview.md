@@ -46,6 +46,12 @@ inspector: what needs attention (with the alert actions, see
 forecasts and who is on call. ++i++ shows or hides it; on a narrower screen it
 opens as a drawer. For a full list of monitors, see [Monitors page](devices.md).
 
+## Incidents of the period and freshness {#incident-trend}
+
+The incidents block counts the last 7, 14 or 30 days (the buttons at its top;
+the choice is remembered in the browser), against the period before. Above the
+figures, "Updated 12 s ago" says how fresh the data is, with a refresh button.
+
 ## Wall mode {#wall-mode}
 
 `/wall` shows a board for a monitor in the room: the verdict, the clock, the five
