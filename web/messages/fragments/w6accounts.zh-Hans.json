@@ -1,0 +1,182 @@
+{
+	"w6accounts_audit_invitation_accepted": "邀请已接受",
+	"w6accounts_audit_invitation_created": "邀请已创建",
+	"w6accounts_audit_invitation_invalid_link": "尝试使用无效的邀请链接",
+	"w6accounts_audit_invitation_resent": "邀请已重新发送",
+	"w6accounts_audit_invitation_revoked": "邀请已撤销",
+	"w6accounts_audit_notifications_personal": "个人通知已更改",
+	"w6accounts_audit_recovery_settings": "重置链接与邀请设置已更改",
+	"w6accounts_audit_reset_completed": "已通过链接重置密码",
+	"w6accounts_audit_reset_ignored": "为未知或不符合条件的账户请求重置",
+	"w6accounts_audit_reset_invalid_link": "尝试使用无效的重置链接",
+	"w6accounts_audit_reset_link_created": "已创建密码重置链接",
+	"w6accounts_audit_reset_requested": "已通过邮件发送重置链接",
+	"w6accounts_audit_reset_unavailable": "在邮件重置不可用时请求重置",
+	"w6accounts_backup_section_accounts": "重置链接与邀请设置、待处理的邀请，以及每个账户的个人通知。",
+	"w6accounts_forgot_back": "返回登录",
+	"w6accounts_forgot_docs": "其他找回访问的方式",
+	"w6accounts_forgot_failed": "请求未能完成",
+	"w6accounts_forgot_intro": "输入用户名或电子邮件地址。如果你的账户可以通过邮件重置，你会收到一个用于设置新密码的链接。",
+	"w6accounts_forgot_login_help": "通过单点登录或 LDAP 登录的账户需在其身份提供方处修改密码。",
+	"w6accounts_forgot_login_label": "用户名或邮箱",
+	"w6accounts_forgot_login_required": "请输入用户名或电子邮件地址。",
+	"w6accounts_forgot_sent_detail": "如果有匹配且可通过邮件重置的账户，链接已在路上。链接仅可使用一次，且很快过期。",
+	"w6accounts_forgot_sent_none": "几分钟后仍未收到？请查看垃圾邮件文件夹，或请管理员为你重置密码。",
+	"w6accounts_forgot_sent_title": "请查看收件箱",
+	"w6accounts_forgot_submit": "给我发送链接",
+	"w6accounts_forgot_title": "重置密码",
+	"w6accounts_forgot_too_many": "来自此处的请求过多。请等待几分钟后重试。",
+	"w6accounts_invite_check_failed": "无法验证此邀请",
+	"w6accounts_invite_failed": "账户未创建",
+	"w6accounts_invite_for": "发给 {email}，有效期至 {until}。",
+	"w6accounts_invite_intro": "{inviter} 邀请你以 {role} 身份加入。",
+	"w6accounts_invite_invalid_detail": "它已过期、已被使用或已被撤销。请让邀请你的人重新发送。",
+	"w6accounts_invite_invalid_title": "此邀请已失效",
+	"w6accounts_invite_page_title": "邀请 · DumbMonit",
+	"w6accounts_invite_sso_help": "你的身份提供方必须确认地址 {email}：你的账户将用它作为用户名。",
+	"w6accounts_invite_sso_leaving": "账户已创建。正在前往你的身份提供方…",
+	"w6accounts_invite_submit": "创建我的账户",
+	"w6accounts_invite_title": "创建你的账户",
+	"w6accounts_invite_username_help": "登录时输入的名称，不能包含空格。",
+	"w6accounts_invites_add": "邀请",
+	"w6accounts_invites_copy": "{email} 的邀请：请复制链接并自行发送",
+	"w6accounts_invites_copy_link": "复制链接",
+	"w6accounts_invites_create": "创建邀请",
+	"w6accounts_invites_create_error": "邀请未创建",
+	"w6accounts_invites_days": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 天"
+			}
+		}
+	],
+	"w6accounts_invites_description": "通过邮件邀请成员并指定角色和团队，并设置重置链接与邀请的有效期。",
+	"w6accounts_invites_email_failed": "邮件未发出：{error}",
+	"w6accounts_invites_empty": "没有等待回复的邀请。",
+	"w6accounts_invites_expired": "已过期",
+	"w6accounts_invites_form_aria": "新邀请",
+	"w6accounts_invites_hours": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 小时"
+			}
+		}
+	],
+	"w6accounts_invites_invite_lifetime": "邀请有效期",
+	"w6accounts_invites_load_error": "无法加载邀请",
+	"w6accounts_invites_minutes": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 分钟"
+			}
+		}
+	],
+	"w6accounts_invites_resend": "重新发送",
+	"w6accounts_invites_reset_lifetime": "重置链接有效期",
+	"w6accounts_invites_revoke": "撤销",
+	"w6accounts_invites_revoke_confirm": "确定永久撤销？",
+	"w6accounts_invites_row_error": "邀请未更改",
+	"w6accounts_invites_row_expired": "由 {by} 邀请，已于 {when} 过期",
+	"w6accounts_invites_row_pending": "由 {by} 邀请，{when} 过期",
+	"w6accounts_invites_row_teams": "将加入：{teams}",
+	"w6accounts_invites_search_kw": "邀请 邮件 重置 链接 忘记密码",
+	"w6accounts_invites_self_service": "通过邮件\"忘记密码？\"",
+	"w6accounts_invites_self_service_no_base": "等待用于生成链接的公开 URL：请在通知策略中设置。",
+	"w6accounts_invites_self_service_no_mail": "等待邮件服务器：请在\"通知\"中配置。",
+	"w6accounts_invites_self_service_off": "已关闭：登录页面改为指向文档。",
+	"w6accounts_invites_self_service_on": "已开启：链接指向 {base}。",
+	"w6accounts_invites_send": "通过邮件发送邀请",
+	"w6accounts_invites_send_no_mail": "尚未配置邮件服务器：你会得到一个链接，需要自行复制发送。",
+	"w6accounts_invites_sent": "邀请已发送至 {email}",
+	"w6accounts_invites_settings_error": "设置未保存",
+	"w6accounts_invites_teams": "加入的团队",
+	"w6accounts_invites_title": "邀请",
+	"w6accounts_link_shown": "链接仅显示一次——请立即复制",
+	"w6accounts_mine_description": "除团队频道外，单独发送给你的告警。",
+	"w6accounts_mine_email": "通过邮件",
+	"w6accounts_mine_email_no_address": "你的账户没有电子邮件地址：请让管理员添加。",
+	"w6accounts_mine_email_no_server": "此实例尚未配置邮件服务器。",
+	"w6accounts_mine_email_to": "发送到 {email}。",
+	"w6accounts_mine_folders": "文件夹",
+	"w6accounts_mine_folders_none": "暂无文件夹。",
+	"w6accounts_mine_load_error": "无法加载你的通知设置",
+	"w6accounts_mine_push": "推送到我的设备",
+	"w6accounts_mine_push_devices": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "已订阅 {count} 台设备。"
+			}
+		}
+	],
+	"w6accounts_mine_push_none": "尚无设备：请在上方为此浏览器开启推送通知。",
+	"w6accounts_mine_quiet_help": "静音时段内只有\"警告\"级别的告警会发给你，其余留在告警列表中。时间按此浏览器的时区计算。",
+	"w6accounts_mine_resolved_help": "关闭后，你只会收到问题通知，不会收到恢复通知。",
+	"w6accounts_mine_save": "保存",
+	"w6accounts_mine_save_error": "你的通知设置未保存",
+	"w6accounts_mine_scope": "范围",
+	"w6accounts_mine_scope_all": "我能看到的全部",
+	"w6accounts_mine_scope_all_help": "你的账户能看到的所有监控项。",
+	"w6accounts_mine_scope_no_team": "你尚未加入任何团队：不会收到任何通知。",
+	"w6accounts_mine_scope_pick": "我选择的文件夹和标签",
+	"w6accounts_mine_scope_pick_help": "监控项位于这些文件夹之一（含子文件夹）或带有这些标签之一时即符合。",
+	"w6accounts_mine_scope_teams": "我所在团队的文件夹",
+	"w6accounts_mine_scope_teams_help": "{teams} 开放的文件夹。",
+	"w6accounts_mine_search_kw": "我的通知 个人 邮件 推送 静音时段",
+	"w6accounts_mine_tags": "标签",
+	"w6accounts_mine_tags_filter": "筛选标签",
+	"w6accounts_mine_tags_none": "你能看到的监控项没有标签。",
+	"w6accounts_mine_test": "给我发送测试",
+	"w6accounts_mine_test_email_failed": "邮件失败：{error}",
+	"w6accounts_mine_test_email_ok": "测试邮件已发送",
+	"w6accounts_mine_test_error": "测试未发送",
+	"w6accounts_mine_test_push_failed": "推送失败：{error}",
+	"w6accounts_mine_test_push_ok": "测试推送已送达",
+	"w6accounts_mine_title": "我的通知",
+	"w6accounts_reset_check_failed": "无法验证此链接",
+	"w6accounts_reset_done_detail": "请使用新密码登录。此账户的其他会话均已结束。",
+	"w6accounts_reset_done_title": "密码已更改",
+	"w6accounts_reset_failed": "密码未更改",
+	"w6accounts_reset_intro": "账户 {username}。此链接有效期至 {until}。",
+	"w6accounts_reset_invalid_detail": "它已过期、已被使用，或已被更新的链接取代。请在登录页面重新申请。",
+	"w6accounts_reset_invalid_title": "此链接已失效",
+	"w6accounts_reset_note": "保存后，此账户的所有会话都会退出。双因素认证保持开启。",
+	"w6accounts_reset_page_title": "重置密码 · DumbMonit",
+	"w6accounts_reset_password": "新密码",
+	"w6accounts_reset_submit": "保存新密码",
+	"w6accounts_reset_title": "设置新密码",
+	"w6accounts_reset_to_login": "前往登录",
+	"w6accounts_resetlink_button": "重置链接",
+	"w6accounts_resetlink_copy": "{username} 的重置链接：请复制后转交",
+	"w6accounts_resetlink_expires": "仅可使用一次，有效期至 {until}。",
+	"w6accounts_resetlink_sent": "{username} 的重置链接已发送至 {email}",
+	"w6accounts_resetlink_title_copy": "创建一个可复制转交的密码重置链接",
+	"w6accounts_resetlink_title_email": "向 {email} 发送密码重置链接"
+}

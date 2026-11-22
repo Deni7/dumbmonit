@@ -124,7 +124,8 @@
 		netconfig_host_keys: m.settings_backup_section_netconfig_host_keys,
 		netconfig_versions: m.settings_backup_section_netconfig_versions,
 		netscan_schedules: m.settings_backup_section_netscan_schedules,
-		slos: m.settings_backup_section_slos
+		slos: m.settings_backup_section_slos,
+		accounts: m.w6accounts_backup_section_accounts
 	};
 	function sectionText(key: string, fallback: string): string {
 		return SECTION_TEXT[key]?.() ?? fallback;

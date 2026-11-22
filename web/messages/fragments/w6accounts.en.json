@@ -1,0 +1,186 @@
+{
+	"w6accounts_audit_invitation_accepted": "Invitation accepted",
+	"w6accounts_audit_invitation_created": "Invitation created",
+	"w6accounts_audit_invitation_invalid_link": "Unusable invitation link tried",
+	"w6accounts_audit_invitation_resent": "Invitation sent again",
+	"w6accounts_audit_invitation_revoked": "Invitation revoked",
+	"w6accounts_audit_notifications_personal": "Personal notifications changed",
+	"w6accounts_audit_recovery_settings": "Reset link and invitation settings changed",
+	"w6accounts_audit_reset_completed": "Password reset with a link",
+	"w6accounts_audit_reset_ignored": "Password reset asked for an unknown or ineligible account",
+	"w6accounts_audit_reset_invalid_link": "Unusable password reset link tried",
+	"w6accounts_audit_reset_link_created": "Password reset link created",
+	"w6accounts_audit_reset_requested": "Password reset link emailed",
+	"w6accounts_audit_reset_unavailable": "Password reset asked while email reset is unavailable",
+	"w6accounts_backup_section_accounts": "Reset link and invitation settings, open invitations, and each account's personal notifications.",
+	"w6accounts_forgot_back": "Back to sign-in",
+	"w6accounts_forgot_docs": "Other ways to get back in",
+	"w6accounts_forgot_failed": "The request did not go through",
+	"w6accounts_forgot_intro": "Enter your username or email address. If your account can be reset by email, you get a link to choose a new password.",
+	"w6accounts_forgot_login_help": "Accounts that sign in through single sign-on or LDAP change their password with their provider.",
+	"w6accounts_forgot_login_label": "Username or email",
+	"w6accounts_forgot_login_required": "Enter your username or email address.",
+	"w6accounts_forgot_sent_detail": "If an account matches and can be reset by email, a link is on its way. It works once and expires soon.",
+	"w6accounts_forgot_sent_none": "Nothing after a few minutes? Look in your spam folder, or ask an administrator to reset your password.",
+	"w6accounts_forgot_sent_title": "Check your inbox",
+	"w6accounts_forgot_submit": "Email me a link",
+	"w6accounts_forgot_title": "Reset your password",
+	"w6accounts_forgot_too_many": "Too many requests from here. Wait a few minutes, then try again.",
+	"w6accounts_invite_check_failed": "The invitation could not be checked",
+	"w6accounts_invite_failed": "The account was not created",
+	"w6accounts_invite_for": "For {email}, until {until}.",
+	"w6accounts_invite_intro": "{inviter} invites you to join as {role}.",
+	"w6accounts_invite_invalid_detail": "It has expired, was already used or was withdrawn. Ask the person who invited you to send it again.",
+	"w6accounts_invite_invalid_title": "This invitation no longer works",
+	"w6accounts_invite_page_title": "Invitation · DumbMonit",
+	"w6accounts_invite_sso_help": "Your provider must confirm the address {email}: your account uses it as its username.",
+	"w6accounts_invite_sso_leaving": "Account created. Taking you to your identity provider…",
+	"w6accounts_invite_submit": "Create my account",
+	"w6accounts_invite_title": "Create your account",
+	"w6accounts_invite_username_help": "What you type to sign in. No spaces.",
+	"w6accounts_invites_add": "Invite",
+	"w6accounts_invites_copy": "Invitation for {email}: copy the link and send it yourself",
+	"w6accounts_invites_copy_link": "Copy the link",
+	"w6accounts_invites_create": "Create the invitation",
+	"w6accounts_invites_create_error": "The invitation was not created",
+	"w6accounts_invites_days": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} day",
+				"countPlural=other": "{count} days"
+			}
+		}
+	],
+	"w6accounts_invites_description": "Invite people by email with a role and teams, and set how long reset links and invitations last.",
+	"w6accounts_invites_email_failed": "The email did not go out: {error}",
+	"w6accounts_invites_empty": "No invitation is waiting for an answer.",
+	"w6accounts_invites_expired": "Expired",
+	"w6accounts_invites_form_aria": "New invitation",
+	"w6accounts_invites_hours": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} hour",
+				"countPlural=other": "{count} hours"
+			}
+		}
+	],
+	"w6accounts_invites_invite_lifetime": "Invitations last",
+	"w6accounts_invites_load_error": "Invitations could not be loaded",
+	"w6accounts_invites_minutes": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} minute",
+				"countPlural=other": "{count} minutes"
+			}
+		}
+	],
+	"w6accounts_invites_resend": "Send again",
+	"w6accounts_invites_reset_lifetime": "Reset links last",
+	"w6accounts_invites_revoke": "Revoke",
+	"w6accounts_invites_revoke_confirm": "Revoke for good?",
+	"w6accounts_invites_row_error": "The invitation was not changed",
+	"w6accounts_invites_row_expired": "Invited by {by}, expired {when}",
+	"w6accounts_invites_row_pending": "Invited by {by}, expires {when}",
+	"w6accounts_invites_row_teams": "Joins: {teams}",
+	"w6accounts_invites_search_kw": "invite invitation email reset link forgot password",
+	"w6accounts_invites_self_service": "“Forgot password?” by email",
+	"w6accounts_invites_self_service_no_base": "Waiting for a public URL to build the links: set it in the notification policy.",
+	"w6accounts_invites_self_service_no_mail": "Waiting for an email server: set one up in Notifications.",
+	"w6accounts_invites_self_service_off": "Off: the sign-in screen points to the documentation instead.",
+	"w6accounts_invites_self_service_on": "On: links point to {base}.",
+	"w6accounts_invites_send": "Send the invitation by email",
+	"w6accounts_invites_send_no_mail": "No email server is set up: you get a link to copy and send yourself.",
+	"w6accounts_invites_sent": "Invitation sent to {email}",
+	"w6accounts_invites_settings_error": "The settings were not saved",
+	"w6accounts_invites_teams": "Teams to join",
+	"w6accounts_invites_title": "Invitations",
+	"w6accounts_link_shown": "Link shown once — copy it now",
+	"w6accounts_mine_description": "Alerts sent to you personally, on top of the team channels.",
+	"w6accounts_mine_email": "By email",
+	"w6accounts_mine_email_no_address": "Your account has no email address: ask an administrator to add one.",
+	"w6accounts_mine_email_no_server": "No email server is set up on this instance yet.",
+	"w6accounts_mine_email_to": "To {email}.",
+	"w6accounts_mine_folders": "Folders",
+	"w6accounts_mine_folders_none": "No folder yet.",
+	"w6accounts_mine_load_error": "Your notifications could not be loaded",
+	"w6accounts_mine_push": "On my push devices",
+	"w6accounts_mine_push_devices": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} device subscribed.",
+				"countPlural=other": "{count} devices subscribed."
+			}
+		}
+	],
+	"w6accounts_mine_push_none": "No device yet: turn on push notifications for this browser above.",
+	"w6accounts_mine_quiet_help": "During quiet hours only Warning-level alerts reach you; the rest stays in the alert list. Times follow this browser's time zone.",
+	"w6accounts_mine_resolved_help": "Off: you only hear about problems, never recoveries.",
+	"w6accounts_mine_save": "Save",
+	"w6accounts_mine_save_error": "Your notifications were not saved",
+	"w6accounts_mine_scope": "About",
+	"w6accounts_mine_scope_all": "Everything I see",
+	"w6accounts_mine_scope_all_help": "Every monitor your account can see.",
+	"w6accounts_mine_scope_no_team": "You are in no team yet: nothing would reach you.",
+	"w6accounts_mine_scope_pick": "Folders and tags I pick",
+	"w6accounts_mine_scope_pick_help": "A monitor counts when it is in one of these folders (sub-folders included) or has one of these tags.",
+	"w6accounts_mine_scope_teams": "My teams' folders",
+	"w6accounts_mine_scope_teams_help": "The folders opened by {teams}.",
+	"w6accounts_mine_search_kw": "my notifications personal email push quiet hours",
+	"w6accounts_mine_tags": "Tags",
+	"w6accounts_mine_tags_filter": "Filter tags",
+	"w6accounts_mine_tags_none": "No tag on the monitors you see.",
+	"w6accounts_mine_test": "Send me a test",
+	"w6accounts_mine_test_email_failed": "Email failed: {error}",
+	"w6accounts_mine_test_email_ok": "Test email sent",
+	"w6accounts_mine_test_error": "The test was not sent",
+	"w6accounts_mine_test_push_failed": "Push failed: {error}",
+	"w6accounts_mine_test_push_ok": "Test push delivered",
+	"w6accounts_mine_title": "My notifications",
+	"w6accounts_reset_check_failed": "The link could not be checked",
+	"w6accounts_reset_done_detail": "Sign in with your new password. Every other session of this account is now closed.",
+	"w6accounts_reset_done_title": "Password changed",
+	"w6accounts_reset_failed": "The password was not changed",
+	"w6accounts_reset_intro": "For the account {username}. This link works until {until}.",
+	"w6accounts_reset_invalid_detail": "It has expired, was already used, or a newer link replaced it. Ask for a new one from the sign-in screen.",
+	"w6accounts_reset_invalid_title": "This link no longer works",
+	"w6accounts_reset_note": "Saving signs this account out everywhere. Two-factor authentication stays on.",
+	"w6accounts_reset_page_title": "Reset password · DumbMonit",
+	"w6accounts_reset_password": "New password",
+	"w6accounts_reset_submit": "Save the new password",
+	"w6accounts_reset_title": "Choose a new password",
+	"w6accounts_reset_to_login": "Go to sign-in",
+	"w6accounts_resetlink_button": "Reset link",
+	"w6accounts_resetlink_copy": "Reset link for {username}: copy it and hand it over",
+	"w6accounts_resetlink_expires": "Works once, until {until}.",
+	"w6accounts_resetlink_sent": "Reset link for {username} sent to {email}",
+	"w6accounts_resetlink_title_copy": "Creates a password reset link to copy and hand over",
+	"w6accounts_resetlink_title_email": "Emails a password reset link to {email}"
+}
