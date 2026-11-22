@@ -3178,7 +3178,8 @@ async fn post_incident(state: &AppState, args: &Args) -> ToolResult {
     let status = args.str("status").map(str::to_string);
 
     let (created, Json(view)) = if let Some(id) = args.i64("incident_id") {
-        let payload = status_pages::UpdatePayload { status, body: body.to_string(), at: None };
+        let payload =
+            status_pages::UpdatePayload { status, body: body.to_string(), at: None, notify: None };
         let (_, view) =
             status_pages::add_update(State(state.clone()), Path(id), Json(payload)).await?;
         (false, view)

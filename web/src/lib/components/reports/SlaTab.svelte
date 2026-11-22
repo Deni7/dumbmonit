@@ -10,7 +10,7 @@
 	 */
 
 	import { untrack } from 'svelte';
-	import { ChevronDown, Download, FileSpreadsheet, Printer, Repeat } from 'lucide-svelte';
+	import { ChevronDown, Download, ExternalLink, FileSpreadsheet, Printer, Repeat } from 'lucide-svelte';
 	import { page } from '$app/state';
 	import { replaceState } from '$app/navigation';
 	import { m } from '#lib/paraglide/messages.js';
@@ -163,6 +163,28 @@
 		}
 	}
 
+	let opening = $state(false);
+
+	/** The PDF in a new tab (the browser's viewer) instead of a file in Downloads. */
+	async function openPdf() {
+		opening = true;
+		downloadError = null;
+		// The tab opens at once, while the click still counts; the PDF lands in it when built.
+		const tab = window.open('about:blank', '_blank');
+		try {
+			const { blob } = await downloadSlaReport({ ...request, format: 'pdf', disposition: 'inline' });
+			const url = URL.createObjectURL(blob);
+			if (tab) tab.location.href = url;
+			else window.open(url, '_blank');
+			setTimeout(() => URL.revokeObjectURL(url), 60_000);
+		} catch (cause) {
+			tab?.close();
+			downloadError = toApiError(cause);
+		} finally {
+			opening = false;
+		}
+	}
+
 	const scheduleHref = $derived(`/status?tab=reports&schedule=sla&${query}`);
 
 	/** The printable sheet opens in its own tab: it builds the report and opens the print dialog. */
@@ -256,6 +278,10 @@
 				<Button variant="primary" onclick={() => void download('pdf')} loading={downloading === 'pdf'} success={downloaded} disabled={!ready}>
 					<Download class="size-4" aria-hidden="true" />
 					{m.reports_print_download()}
+				</Button>
+				<Button variant="secondary" onclick={() => void openPdf()} loading={opening} disabled={!ready}>
+					<ExternalLink class="size-4" aria-hidden="true" />
+					{m.reports_sla_open_pdf()}
 				</Button>
 				<Button variant="secondary" onclick={printSheet} disabled={!ready}>
 					<Printer class="size-4" aria-hidden="true" />

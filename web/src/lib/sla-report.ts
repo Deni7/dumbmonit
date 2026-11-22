@@ -44,6 +44,58 @@ export const REPORT_SECTION_KEYS: (keyof ReportSections)[] = [
 	'notes'
 ];
 
+/**
+ * Availability objectives (percent) of single groups or monitors, by name: they
+ * replace the report's objective for those rows, a monitor's own beating its
+ * group's. Mirrors `reports::layout::Objectives`.
+ */
+export interface ReportObjectives {
+	/** `Ungrouped` stands for the monitors without a group. */
+	groups: Record<string, number>;
+	monitors: Record<string, number>;
+}
+
+export type ObjectiveKind = 'group' | 'monitor';
+
+export function emptyObjectives(): ReportObjectives {
+	return { groups: {}, monitors: {} };
+}
+
+export function hasObjectives(objectives: ReportObjectives | null | undefined): boolean {
+	return !!objectives && (Object.keys(objectives.groups).length > 0 || Object.keys(objectives.monitors).length > 0);
+}
+
+/** A typed percentage (`99,9` or `99.9`) when it is above 0 and at most 100; else `null`. */
+export function parseObjective(raw: string): number | null {
+	const text = raw.trim().replace(',', '.');
+	if (text === '') return null;
+	const value = Number(text);
+	return Number.isFinite(value) && value > 0 && value <= 100 ? value : null;
+}
+
+/** The same objectives with `name` set (a new value replaces the old one). */
+export function withObjective(objectives: ReportObjectives, kind: ObjectiveKind, name: string, value: number): ReportObjectives {
+	const key = kind === 'group' ? 'groups' : 'monitors';
+	return { ...objectives, [key]: { ...objectives[key], [name]: value } };
+}
+
+/** The same objectives without `name`. */
+export function withoutObjective(objectives: ReportObjectives, kind: ObjectiveKind, name: string): ReportObjectives {
+	const key = kind === 'group' ? 'groups' : 'monitors';
+	const rest = { ...objectives[key] };
+	delete rest[name];
+	return { ...objectives, [key]: rest };
+}
+
+/** Every override as a row, groups first, each part in name order. */
+export function objectiveRows(objectives: ReportObjectives): { kind: ObjectiveKind; name: string; value: number }[] {
+	const rows = (record: Record<string, number>, kind: ObjectiveKind) =>
+		Object.keys(record)
+			.sort((a, b) => a.localeCompare(b))
+			.map((name) => ({ kind, name, value: record[name] }));
+	return [...rows(objectives.groups, 'group'), ...rows(objectives.monitors, 'monitor')];
+}
+
 /** How the SLA PDF is laid out. Mirrors `reports::layout::Layout`. */
 export interface ReportLayout {
 	template: ReportTemplate;
@@ -56,6 +108,8 @@ export interface ReportLayout {
 	/** Kept for layouts saved before `logo`: always `logo !== 'none'`. */
 	show_logo: boolean;
 	logo: ReportLogo;
+	/** Objectives of single groups or monitors; overrides the report's. */
+	objectives: ReportObjectives;
 }
 
 /** The monitors listed and those of the groups listed (union); empty: everything. Mirrors `reports::layout::Scope`. */
@@ -78,7 +132,7 @@ export function sectionsFor(template: ReportTemplate): ReportSections {
 }
 
 export function defaultReportLayout(): ReportLayout {
-	return { template: 'detailed', paper: 'a4', sections: sectionsFor('detailed'), title: null, notes: '', show_logo: true, logo: 'auto' };
+	return { template: 'detailed', paper: 'a4', sections: sectionsFor('detailed'), title: null, notes: '', show_logo: true, logo: 'auto', objectives: emptyObjectives() };
 }
 
 /** A stored layout with every field present (an old schedule may lack some). */
@@ -93,7 +147,8 @@ export function normaliseLayout(layout: Partial<ReportLayout> | null | undefined
 		title: layout?.title ?? null,
 		notes: layout?.notes ?? '',
 		show_logo: logo !== 'none',
-		logo
+		logo,
+		objectives: { groups: { ...(layout?.objectives?.groups ?? {}) }, monitors: { ...(layout?.objectives?.monitors ?? {}) } }
 	};
 }
 
@@ -115,6 +170,8 @@ export interface SlaRequest {
 	page?: number;
 	/** MSP mode: the client reported on (its targets, name and logo). */
 	client?: number;
+	/** `inline`: the server marks the file to be shown by the browser, not saved. */
+	disposition?: 'inline' | 'attachment';
 	/** PDF layout and scope; omitted: the detailed report of everything. */
 	layout?: ReportLayout;
 	scope?: ReportScope;
@@ -146,6 +203,7 @@ export function slaParams(request_: SlaRequest): URLSearchParams {
 		if (layout.notes.trim() !== '') params.set('notes', layout.notes.trim());
 		const logo = layout.show_logo ? layout.logo : 'none';
 		if (logo !== 'auto') params.set('logo', logo);
+		if (hasObjectives(layout.objectives)) params.set('objectives', JSON.stringify(layout.objectives));
 	}
 	if (scope && (scope.targets.length > 0 || scope.groups.length > 0)) {
 		params.set('scope', JSON.stringify(scope));
@@ -172,6 +230,21 @@ export function slaRequestFrom(params: URLSearchParams): SlaRequest {
 	layout.notes = params.get('notes') ?? '';
 	layout.logo = readLogo(params.get('logo')) ?? 'auto';
 	layout.show_logo = layout.logo !== 'none';
+	try {
+		const parsed: unknown = JSON.parse(params.get('objectives') ?? 'null');
+		if (parsed && typeof parsed === 'object') {
+			const raw = parsed as Partial<ReportObjectives>;
+			const keep = (record: unknown): Record<string, number> =>
+				Object.fromEntries(
+					Object.entries(record && typeof record === 'object' ? record : {}).filter(
+						(entry): entry is [string, number] => typeof entry[1] === 'number' && entry[1] > 0 && entry[1] <= 100
+					)
+				);
+			layout.objectives = { groups: keep(raw.groups), monitors: keep(raw.monitors) };
+		}
+	} catch {
+		// Not JSON: no overrides.
+	}
 	let scope = emptyScope();
 	try {
 		const parsed: unknown = JSON.parse(params.get('scope') ?? 'null');
@@ -231,6 +304,10 @@ export interface SlaGroup {
 	monitors: number;
 	uptime: number | null;
 	previous_uptime: number | null;
+	/** The objective that applies to the group: its own, else the report's. */
+	objective: number | null;
+	/** True when `objective` is the group's own, not the report's. */
+	own_objective: boolean;
 	status: string;
 }
 
@@ -239,6 +316,9 @@ export interface SlaMonitor {
 	group: string;
 	uptime: number | null;
 	previous_uptime: number | null;
+	/** The objective that applies to the monitor: its own (or its group's), else the report's. */
+	objective: number | null;
+	own_objective: boolean;
 	status: string;
 	incidents: number;
 	downtime_secs: number;

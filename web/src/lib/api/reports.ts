@@ -103,15 +103,11 @@ export function getSlaReport(request_: SlaRequest, signal?: AbortSignal): Promis
 	return request<SlaReport>(`/reports/sla?${params}`, { signal });
 }
 
-/**
- * Builds the availability report of a chosen period and returns the file.
- * Administrators only. A refusal comes back as an `ApiError` like any other call.
- */
-export async function downloadSlaReport(request_: SlaRequest): Promise<{ blob: Blob; filename: string }> {
-	const params = slaParams(request_);
+/** Reads a file from the report API: the blob and the name the server gave it. */
+async function fetchReportFile(path: string, fallbackName: string): Promise<{ blob: Blob; filename: string }> {
 	let response: Response;
 	try {
-		response = await fetch(`/api/reports/sla?${params}`, {
+		response = await fetch(`/api${path}`, {
 			headers: { 'x-requested-with': 'DumbMonit', ...clientViewHeaders() }
 		});
 	} catch {
@@ -128,8 +124,30 @@ export async function downloadSlaReport(request_: SlaRequest): Promise<{ blob: B
 		throw new ApiError(message, response.status);
 	}
 	const disposition = response.headers.get('content-disposition') ?? '';
-	const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? `availability.${request_.format === 'pdf' ? 'pdf' : 'csv'}`;
+	const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? fallbackName;
 	return { blob: await response.blob(), filename };
+}
+
+/**
+ * Builds the availability report of a chosen period and returns the file.
+ * Administrators only. A refusal comes back as an `ApiError` like any other call.
+ */
+export function downloadSlaReport(request_: SlaRequest): Promise<{ blob: Blob; filename: string }> {
+	const params = slaParams(request_);
+	return fetchReportFile(`/reports/sla?${params}`, `availability.${request_.format === 'pdf' ? 'pdf' : 'csv'}`);
+}
+
+/** Retries a report whose last send failed: a real send to the saved recipients. */
+export function retryReportSend(id: number): Promise<ReportPreviewResult> {
+	return request<ReportPreviewResult>(`/reports/schedules/${id}/retry`, { method: 'POST' });
+}
+
+/**
+ * The PDF of the last SLA report sent, made again for the same period (the
+ * server keeps no attachments). `inline` marks it to be shown, not saved.
+ */
+export function downloadScheduledReportPdf(id: number, inline = true): Promise<{ blob: Blob; filename: string }> {
+	return fetchReportFile(`/reports/schedules/${id}/pdf${inline ? '?disposition=inline' : ''}`, 'availability.pdf');
 }
 
 /** Logo uploaded for SLA reports (layouts set to `custom`): PNG or JPEG, as a base64 or `data:` URL. */

@@ -280,7 +280,7 @@ pub async fn deliver(
         .flatten();
 
     let sla = stored.kind == "sla";
-    let (data, mut rendered) = if sla {
+    let (mut data, mut rendered) = if sla {
         // Le mois civil entier qui précède l'envoi, dans le fuseau du calendrier.
         let period = schedule::Period::previous_calendar_month(now, calendar.tz)
             .ok_or("Cannot work out the month to report.".to_string())?;
@@ -305,6 +305,8 @@ pub async fn deliver(
         (data, rendered)
     };
     rendered.subject = rendered.subject.replace(['\r', '\n'], " ");
+    // Les objectifs propres à des groupes ou à des moniteurs, pour les pièces jointes.
+    data.apply_objectives(&stored.layout.objectives);
 
     let attachments = if sla {
         let options = sla_options(
@@ -321,6 +323,37 @@ pub async fn deliver(
         Vec::new()
     };
     send_all(&smtp, &stored.recipients, &rendered, &attachments).await
+}
+
+/// Refait le PDF d'un rapport SLA déjà envoyé, pour la même période : le mois
+/// civil qui précédait `sent_at`. Les envois ne gardent pas leurs pièces
+/// jointes ; les chiffres viennent de l'historique, donc le document est le
+/// même, à la date de génération près. Rend le nom du fichier et les octets.
+pub async fn regenerate_sla_pdf(
+    state: &AppState,
+    stored: &StoredSchedule,
+    sent_at: DateTime<Utc>,
+    now: DateTime<Utc>,
+) -> Result<(String, Vec<u8>), String> {
+    if stored.kind != "sla" {
+        return Err("Only an SLA report has a PDF.".to_string());
+    }
+    let calendar = schedule_of(stored).ok_or("The schedule is unreadable.".to_string())?;
+    let client = clients::owner_of(&state.pool, clients::Kind::Report, stored.id)
+        .await
+        .map_err(|_| "Cannot read the client of this schedule.".to_string())?
+        .flatten();
+    let period = schedule::Period::previous_calendar_month(sent_at, calendar.tz)
+        .ok_or("Cannot work out the month to report.".to_string())?;
+    let (mut data, _) =
+        sla_email(state, &stored.name, period, calendar.tz, client, &stored.scope, false, sent_at)
+            .await?;
+    data.apply_objectives(&stored.layout.objectives);
+    let options =
+        sla_options(state, stored.page_id, client, stored.objective, stored.layout.clone(), now)
+            .await;
+    let stem = sla::file_stem(&data, calendar.tz);
+    Ok((format!("{stem}.pdf"), sla::pdf(&data, calendar.tz, &options)))
 }
 
 /// Données et courriel d'un rapport SLA mensuel (un client, ou toute

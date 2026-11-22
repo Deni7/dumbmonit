@@ -84,6 +84,7 @@ import type {
 	IncidentUpdatePayload,
 	PostmortemPayload,
 	PublicDayDetail,
+	PublicOlderIncidents,
 	PublicStatus,
 	StatusSubscriber,
 	StatusSubscribePayload,
@@ -1057,6 +1058,12 @@ export function setStatusPageAccess(
 	body: { mode: StatusPageAccess; password?: string }
 ): Promise<StatusPage> {
 	return request<StatusPage>(`/status-pages/${id}/access`, { method: 'PUT', body });
+}
+
+/** The next slice of resolved incidents older than the page's 30 days. */
+export function getPublicOlderIncidents(slug: string, before?: string, signal?: AbortSignal): Promise<PublicOlderIncidents> {
+	const query = before ? `?before=${encodeURIComponent(before)}` : '';
+	return request<PublicOlderIncidents>(`/public/status/${encodeURIComponent(slug)}/incidents${query}`, { signal });
 }
 
 export function getPublicStatusDay(slug: string, date: string, signal?: AbortSignal): Promise<PublicDayDetail> {

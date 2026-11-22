@@ -7,12 +7,17 @@ import {
 	chartFloor,
 	chartShare,
 	defaultReportLayout,
+	emptyObjectives,
 	normaliseLayout,
+	objectiveRows,
+	parseObjective,
 	scopeIds,
 	scopeOf,
 	sectionsFor,
 	slaParams,
-	slaRequestFrom
+	slaRequestFrom,
+	withObjective,
+	withoutObjective
 } from '../src/lib/sla-report.ts';
 
 test('the summary template starts without the long tables', () => {
@@ -126,4 +131,34 @@ test('ticked monitors become the shortest scope', () => {
 	assert.deepEqual([...scopeIds({ targets: [2], groups: ['Core'] }, monitors)].sort(), [2, 3]);
 	assert.equal(scopeIds({ targets: [], groups: [] }, monitors).size, 4);
 	assert.equal(scopeIds({ targets: [99], groups: [] }, monitors).size, 0, 'a deleted monitor is not counted');
+});
+
+test('objectives of single groups or monitors travel with the layout', () => {
+	let objectives = emptyObjectives();
+	objectives = withObjective(objectives, 'group', 'Edge', 99.5);
+	objectives = withObjective(objectives, 'monitor', 'Gateway', 99.99);
+	objectives = withObjective(objectives, 'monitor', 'Gateway', 99.95);
+	assert.deepEqual(objectiveRows(objectives), [
+		{ kind: 'group', name: 'Edge', value: 99.5 },
+		{ kind: 'monitor', name: 'Gateway', value: 99.95 }
+	]);
+	const layout = { ...defaultReportLayout(), objectives };
+	const params = slaParams({ format: 'json', layout });
+	assert.deepEqual(JSON.parse(params.get('objectives')), objectives);
+	assert.deepEqual(slaRequestFrom(params).layout.objectives, objectives);
+	assert.equal(slaParams({ format: 'json', layout: defaultReportLayout() }).has('objectives'), false, 'none: left out');
+	assert.deepEqual(withoutObjective(objectives, 'group', 'Edge').groups, {});
+	// An address with nonsense in it keeps only valid percentages.
+	const odd = new URLSearchParams({ objectives: '{"groups":{"A":150,"B":99},"monitors":"x"}' });
+	assert.deepEqual(slaRequestFrom(odd).layout.objectives, { groups: { B: 99 }, monitors: {} });
+	assert.deepEqual(normaliseLayout({}).objectives, emptyObjectives(), 'a layout from before has none');
+});
+
+test('a typed objective is a percentage above 0 and at most 100', () => {
+	assert.equal(parseObjective('99,9'), 99.9);
+	assert.equal(parseObjective(' 100 '), 100);
+	assert.equal(parseObjective('0'), null);
+	assert.equal(parseObjective('101'), null);
+	assert.equal(parseObjective('abc'), null);
+	assert.equal(parseObjective(''), null);
 });
