@@ -80,8 +80,8 @@ impl Client {
             raw.push('?');
             raw.push_str(&query);
         }
-        let url =
-            Url::parse(&raw).map_err(|error| Failure::fatal(format!("S3 address {raw}: {error}")))?;
+        let url = Url::parse(&raw)
+            .map_err(|error| Failure::fatal(format!("S3 address {raw}: {error}")))?;
         Ok(Location { url, authority, path })
     }
 
@@ -153,7 +153,8 @@ impl Client {
         let what = format!("uploading {name}");
         let body = Some((transfer::file_body(file), size));
         let key = self.object_key(name);
-        self.send(Method::PUT, Some(&key), Vec::new(), &hash, body, TRANSFER_TIMEOUT, &what).await?;
+        self.send(Method::PUT, Some(&key), Vec::new(), &hash, body, TRANSFER_TIMEOUT, &what)
+            .await?;
         Ok(size)
     }
 
@@ -189,8 +190,9 @@ impl Client {
                 query.push(("continuation-token".to_string(), token.clone()));
             }
             let what = "listing the bucket";
-            let response =
-                self.send(Method::GET, None, query, EMPTY_SHA256, None, SHORT_TIMEOUT, what).await?;
+            let response = self
+                .send(Method::GET, None, query, EMPTY_SHA256, None, SHORT_TIMEOUT, what)
+                .await?;
             let body = response.text().await.map_err(|error| Failure::request(what, &error))?;
             let page = parse_list(&body, &prefix)?;
             names.extend(page.names);

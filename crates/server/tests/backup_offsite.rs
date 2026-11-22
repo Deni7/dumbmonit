@@ -139,10 +139,8 @@ async fn fake_s3(
 }
 
 async fn s3_server(objects: Objects) -> String {
-    let router = Router::new()
-        .fallback(fake_s3)
-        .layer(DefaultBodyLimit::disable())
-        .with_state(objects);
+    let router =
+        Router::new().fallback(fake_s3).layer(DefaultBodyLimit::disable()).with_state(objects);
     serve(router).await
 }
 
@@ -196,10 +194,8 @@ async fn fake_dav(
 }
 
 async fn dav_server(files: Objects) -> String {
-    let router = Router::new()
-        .fallback(fake_dav)
-        .layer(DefaultBodyLimit::disable())
-        .with_state(files);
+    let router =
+        Router::new().fallback(fake_dav).layer(DefaultBodyLimit::disable()).with_state(files);
     serve(router).await
 }
 

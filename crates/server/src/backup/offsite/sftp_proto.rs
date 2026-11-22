@@ -53,7 +53,10 @@ const MAX_PACKET: usize = 1024 * 1024;
 pub enum Error {
     Io(std::io::Error),
     /// Le serveur a répondu par un statut d'erreur.
-    Status { code: u32, message: String },
+    Status {
+        code: u32,
+        message: String,
+    },
     Protocol(String),
 }
 

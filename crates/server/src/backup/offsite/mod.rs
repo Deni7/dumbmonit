@@ -206,10 +206,8 @@ impl Settings {
                 } else {
                     directory.trim_end_matches('/').to_string()
                 };
-                s.host_key = s
-                    .host_key
-                    .map(|key| key.trim().to_string())
-                    .filter(|key| !key.is_empty());
+                s.host_key =
+                    s.host_key.map(|key| key.trim().to_string()).filter(|key| !key.is_empty());
                 Self::Sftp(s)
             }
         }
@@ -281,10 +279,9 @@ impl Settings {
                 Err("Enter a password or a private key.".into())
             }
             Self::Sftp(_) => match secrets.get("private_key").filter(|key| !key.is_empty()) {
-                Some(key) => sftp::check_private_key(
-                    key,
-                    secrets.get("key_passphrase").map(String::as_str),
-                ),
+                Some(key) => {
+                    sftp::check_private_key(key, secrets.get("key_passphrase").map(String::as_str))
+                }
                 None => Ok(()),
             },
             _ => Ok(()),

@@ -57,11 +57,12 @@ pub async fn insert(pool: &SqlitePool, draft: &Draft, author: &str) -> Result<i6
 }
 
 pub async fn get(pool: &SqlitePool, id: i64) -> Result<Option<Annotation>> {
-    let row = sqlx::query(sqlx::AssertSqlSafe(format!("SELECT {COLUMNS} FROM annotations WHERE id = ?")))
-        .bind(id)
-        .fetch_optional(pool)
-        .await
-        .context("lecture d'un repère")?;
+    let row =
+        sqlx::query(sqlx::AssertSqlSafe(format!("SELECT {COLUMNS} FROM annotations WHERE id = ?")))
+            .bind(id)
+            .fetch_optional(pool)
+            .await
+            .context("lecture d'un repère")?;
     row.as_ref().map(read).transpose()
 }
 

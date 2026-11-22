@@ -105,9 +105,9 @@ async fn one(state: &AppState, id: i64) -> ApiResult<store::Destination> {
 
 async fn name_taken(state: &AppState, name: &str, except: Option<i64>) -> ApiResult<()> {
     match store::id_by_name(&state.pool, name).await? {
-        Some(other) if Some(other) != except => {
-            Err(ApiError::Conflict(format!("A backup destination named \"{name}\" already exists.")))
-        }
+        Some(other) if Some(other) != except => Err(ApiError::Conflict(format!(
+            "A backup destination named \"{name}\" already exists."
+        ))),
         _ => Ok(()),
     }
 }
