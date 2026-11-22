@@ -8956,6 +8956,126 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/backup/destinations:
+    get:
+      operationId: listBackupDestinations
+      tags: [Backup]
+      summary: The off-site destinations of the local backups
+      description: >-
+        Administrator session only. Secrets are never returned: `has_secret` and `saved_secrets`
+        (field names only) say what is stored. `uploading` is true while an upload runs.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      x-roles: [admin]
+      responses:
+        "200":
+          description: The destinations.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BackupDestinationList" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      operationId: createBackupDestination
+      tags: [Backup]
+      summary: Add an off-site destination (S3-compatible, WebDAV or SFTP)
+      description: >-
+        Administrator session only, recorded in the audit log. After each successful local backup
+        the file is uploaded to every enabled destination, which then keeps its `keep` newest
+        copies. `secret.key` goes too only with `include_key`. An SFTP destination authenticates
+        only once its `host_key` fingerprint is confirmed.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      x-roles: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BackupDestinationRequest" }
+      responses:
+        "201":
+          description: The destination.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BackupDestination" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/backup/destinations/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    put:
+      operationId: updateBackupDestination
+      tags: [Backup]
+      summary: Change an off-site destination
+      description: >-
+        Administrator session only, recorded in the audit log. `secrets` omitted or `null` keeps
+        the stored ones, `{}` clears them; when the server or the account changes they must be
+        sent again. Changing the SFTP host or port drops the confirmed host key.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      x-roles: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BackupDestinationRequest" }
+      responses:
+        "200":
+          description: The destination.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BackupDestination" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      operationId: deleteBackupDestination
+      tags: [Backup]
+      summary: Remove an off-site destination (the copies already there stay)
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      x-roles: [admin]
+      responses:
+        "204": { description: Removed. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/backup/destinations/{id}/test:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      operationId: testBackupDestination
+      tags: [Backup]
+      summary: Write, list and delete a small test file on a destination
+      description: >-
+        Administrator session only, recorded in the audit log. For SFTP, a host key that is not
+        confirmed (or changed) is refused before authenticating, and `host_key` gives the
+        fingerprint the server presented, for the administrator to check and confirm.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      x-roles: [admin]
+      responses:
+        "200":
+          description: The outcome (a failure is reported here, not as an HTTP error).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BackupDestinationTest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /api/config/plan:
     post:
       operationId: planConfig
@@ -17028,6 +17148,81 @@ components:
             enabled: { type: boolean }
             interval_hours: { type: boolean }
             keep: { type: boolean }
+    BackupDestinationRequest:
+      type: object
+      required: [name, kind, settings]
+      properties:
+        name: { type: string, maxLength: 64 }
+        kind: { type: string, enum: [s3, webdav, sftp] }
+        enabled: { type: boolean, default: true }
+        keep: { type: integer, minimum: 1, maximum: 365, default: 7 }
+        include_key:
+          type: boolean
+          default: false
+          description: Upload `secret.key` with the database. Whoever reads the destination can then decrypt every stored credential.
+        settings:
+          type: object
+          description: >-
+            s3: `endpoint` (empty = AWS), `region`, `bucket`, `prefix`, `access_key_id`,
+            `path_style`. webdav: `url` (an existing folder), `username`. sftp: `host`, `port`,
+            `username`, `directory`, `host_key` (`SHA256:…`). Unknown fields are refused.
+          additionalProperties: true
+        secrets:
+          type: [object, "null"]
+          description: >-
+            s3: `secret_access_key`. webdav: `password`. sftp: `password` and/or `private_key`
+            (Ed25519 or ECDSA, OpenSSH format) with `key_passphrase`.
+          additionalProperties: { type: string }
+    BackupDestinationResult:
+      type: object
+      properties:
+        at: { type: string, description: UTC, no suffix. }
+        ok: { type: boolean }
+        file: { type: string }
+        bytes: { type: integer }
+        duration_ms: { type: integer }
+        error:
+          type: [string, "null"]
+          description: The failure, or on a success a remark (old copies not pruned).
+    BackupDestination:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        kind: { type: string, enum: [s3, webdav, sftp] }
+        enabled: { type: boolean }
+        keep: { type: integer }
+        include_key: { type: boolean }
+        settings: { type: object, additionalProperties: true }
+        has_secret: { type: boolean }
+        saved_secrets:
+          type: array
+          items: { type: string }
+          description: Names of the stored secret fields, never their values.
+        last:
+          oneOf:
+            - { $ref: "#/components/schemas/BackupDestinationResult" }
+            - { type: "null" }
+        last_success_at: { type: [string, "null"] }
+    BackupDestinationList:
+      type: object
+      properties:
+        destinations:
+          type: array
+          items: { $ref: "#/components/schemas/BackupDestination" }
+        uploading: { type: boolean }
+    BackupDestinationTest:
+      type: object
+      properties:
+        ok: { type: boolean }
+        message: { type: string }
+        duration_ms: { type: integer }
+        host_key:
+          type: [string, "null"]
+          description: SFTP fingerprint presented by the server when it is not the confirmed one.
+        host_key_changed:
+          type: boolean
+          description: True when another fingerprint was confirmed (reinstalled server, or impostor).
     ConfigRequest:
       type: object
       description: Either `yaml` or `config`.

@@ -34,10 +34,11 @@ pub fn routes() -> Router<AppState> {
         .route("/backup/local/files", get(local_files))
         .route("/backup/local/files/{name}", get(download_local))
         .route("/backup/schedule", put(set_schedule))
+        .merge(super::backup_destinations::routes())
 }
 
 /// Un lot n'est délivré qu'à un administrateur connecté dans l'interface.
-fn admin(principal: &Principal) -> ApiResult<&User> {
+pub(super) fn admin(principal: &Principal) -> ApiResult<&User> {
     match principal {
         Principal::User(user) if user.role.is_admin() => Ok(user),
         Principal::User(_) => {
@@ -253,6 +254,9 @@ pub async fn run_local(
     let settings = local::Settings::load(&state.pool, &state.config).await;
     let record = local::run_once(&state.pool, &settings).await;
     local::publish(&state).await;
+    // Les copies hors site partent en tâche de fond ; `GET /backup/destinations`
+    // dit quand elles sont faites.
+    crate::backup::offsite::after_local_backup(&state, &settings, &record).await;
     audit::record(&state.pool, Some(&me), "backup.local_run", Some(&record.file), ip).await;
     Ok(Json(local::status(&state.pool, &settings).await?))
 }

@@ -259,6 +259,10 @@ pub struct Bundle {
     /// Canaux propres aux moniteurs (migration 0282), par référence.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub target_channels: Vec<crate::backup::monitor_templates::BundleTargetChannels>,
+    /// Destinations hors site des sauvegardes locales (migration 0286), leurs
+    /// secrets en clair dans le lot, lui-même chiffré par la phrase de passe.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub backup_destinations: Vec<crate::backup::offsite::bundle::BundleBackupDestination>,
 }
 
 /// Serveur de courriel enregistré et son mot de passe.
@@ -306,6 +310,7 @@ impl Bundle {
             ("monitor_templates".to_string(), self.monitor_templates.len()),
             ("target_channels".to_string(), self.target_channels.len()),
             ("annotations".to_string(), self.annotations.len()),
+            ("backup_destinations".to_string(), self.backup_destinations.len()),
         ])
     }
 }

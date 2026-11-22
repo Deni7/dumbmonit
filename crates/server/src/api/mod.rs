@@ -16,6 +16,7 @@ mod annotations;
 mod auth;
 mod backends;
 mod backup;
+mod backup_destinations;
 mod blacklist;
 mod channels;
 pub(crate) mod clients;
