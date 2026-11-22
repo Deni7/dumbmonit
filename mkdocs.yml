@@ -251,5 +251,5 @@ nav:
       - Assurance case: development/assurance-case.md
       - Reproducible builds: development/reproducible-builds.md
       - Signing the agent binaries: development/agent-signing.md
-      - PostgreSQL plan: development/postgres-plan.md
+      - PostgreSQL plan: development/postgresql-plan.md
   - FAQ: faq.md

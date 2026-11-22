@@ -539,7 +539,7 @@ All notable changes to this project are documented here. The format follows
   minutes and goes back as soon as it answers as an active server. The machine page shows which
   server it reports to and since when (migration 0242).
 - **Plan for PostgreSQL as an option** (not implemented): what it would take and cost, in
-  [docs/development/postgres-plan.md](docs/development/postgres-plan.md).
+  [docs/development/postgresql-plan.md](docs/development/postgresql-plan.md).
 - **One port for a remote site.** The agent port (8443) now also serves `install.sh`, `install.ps1`
   and the agent binaries, without a client certificate (like enrolment). The install command shown
   for a relay uses that port only: script, binary and encrypted channel come from
