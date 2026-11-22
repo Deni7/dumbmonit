@@ -33,6 +33,7 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { Download, KeyRound, RefreshCw, ShieldAlert } from 'lucide-svelte';
 	import DiffView from '../webchange/DiffView.svelte';
+	import { startPolling } from '#lib/poll.js';
 
 	interface Props {
 		target: Target;
@@ -87,6 +88,7 @@
 		} catch (cause) {
 			if (mine !== generation || signal.aborted) return;
 			loadError = cause;
+			return false;
 		} finally {
 			if (mine === generation) loading = false;
 		}
@@ -178,13 +180,13 @@
 			mode = 'diff';
 			queued = false;
 		});
-		void refresh();
-		const timer = setInterval(() => void refresh(), 60_000);
+		// `refresh` carries its own controller: it is also called after a backup or a key change.
+		const stop = startPolling(() => refresh(), 60_000);
 		return () => {
 			generation++;
 			detailGeneration++;
 			controller?.abort();
-			clearInterval(timer);
+			stop();
 			if (refreshTimer) clearTimeout(refreshTimer);
 		};
 	});

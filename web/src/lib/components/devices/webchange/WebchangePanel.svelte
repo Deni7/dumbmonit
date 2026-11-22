@@ -27,6 +27,7 @@
 	import WatchedPages from './WatchedPages.svelte';
 	import ChangePane from './ChangePane.svelte';
 	import { groupSameEdits } from './format';
+	import { startPolling } from '#lib/poll.js';
 
 	interface Props {
 		target: Target;
@@ -89,6 +90,7 @@
 			changesError = null;
 		} else changesError = changesResult.reason;
 		loading = false;
+		return pagesResult.status === 'fulfilled' && changesResult.status === 'fulfilled';
 	}
 
 	async function checkNow(): Promise<boolean> {
@@ -127,12 +129,12 @@
 			pickedId = null;
 			justChecked = false;
 		});
-		void refresh();
-		const timer = setInterval(() => void refresh(), 60_000);
+		// `refresh` carries its own controller: it is also called after "Check now".
+		const stop = startPolling(() => refresh(), 60_000);
 		return () => {
 			generation++;
 			controller?.abort();
-			clearInterval(timer);
+			stop();
 			if (refreshTimer) clearTimeout(refreshTimer);
 		};
 	});

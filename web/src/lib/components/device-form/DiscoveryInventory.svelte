@@ -29,6 +29,7 @@
 	import NetscanGrid from './NetscanGrid.svelte';
 	import ReviewQueue from './ReviewQueue.svelte';
 	import { defaultSubnet, usableSubnets } from './test-connection';
+	import { startPolling } from '#lib/poll.js';
 
 	/** Refresh while the screen is open: a scan finishes in the background. */
 	const REFRESH_MS = 15000;
@@ -78,12 +79,11 @@
 		listRelays(controller.signal)
 			.then((list) => (relays = list.filter((r) => r.relay)))
 			.catch(() => {});
-		void refresh(controller.signal);
+		const stop = startPolling(refresh, REFRESH_MS);
 		// Opening the screen is seeing the latest batch of new devices: it is announced once.
 		markNetscanReviewSeen().catch(() => {});
-		const timer = setInterval(() => void refresh(controller.signal), REFRESH_MS);
 		return () => {
-			clearInterval(timer);
+			stop();
 			controller.abort();
 		};
 	});
@@ -98,6 +98,7 @@
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			if (cause instanceof ApiError && cause.missing) unavailable = true;
 			else loadError = cause;
+			return false;
 		} finally {
 			loaded = true;
 		}
@@ -186,7 +187,7 @@
 			<ErrorNotice error={actionError} title={m.discovery_inventory_action_error()} />
 		{/if}
 
-		<ReviewQueue {devices} onchanged={() => refresh()} />
+		<ReviewQueue {devices} onchanged={() => refresh().then(() => {})} />
 
 		<section aria-labelledby="inv-schedules" class="grid gap-3">
 			<h3 id="inv-schedules" class="flex items-center gap-2 text-sm font-semibold text-ink">
