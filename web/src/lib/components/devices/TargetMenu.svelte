@@ -8,12 +8,14 @@
 	 * The gear is tinted while a snooze window covers the monitor, so the state
 	 * is still visible with the menu closed.
 	 */
-	import { CopyPlus, Power, PowerOff, ScrollText, Settings, Trash2 } from 'lucide-svelte';
+	import { BookmarkPlus, CopyPlus, Power, PowerOff, ScrollText, Settings, Trash2 } from 'lucide-svelte';
 	import type { Silence, Target } from '#lib/api/index.js';
 	import { listSilences } from '#lib/api/index.js';
 	import SilenceControl from '#lib/components/devices/SilenceControl.svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { Button, Confirm, Menu } from '#lib/ui/index.js';
+	import { auth } from '#lib/stores/auth.svelte.js';
+	import SaveTemplateDialog from '#lib/components/monitors/SaveTemplateDialog.svelte';
 
 	interface Props {
 		target: Target;
@@ -41,6 +43,7 @@
 	});
 	/** An agent and what a Docker label manages are not made from the add form: no copy of them. */
 	const duplicable = $derived(target.kind !== 'agent' && target.kind !== 'agent_service' && !target.managed);
+	let templateDialog = $state<SaveTemplateDialog | null>(null);
 	const silenced = $derived(silences.some((s) => s.active_now && (s.target_id === target.id || s.target_id === null)));
 
 	const item =
@@ -91,6 +94,11 @@
 				<a href={withBase(`/targets/new?kind=${encodeURIComponent(target.kind)}&duplicate=${target.id}`)} role="menuitem" class={item}>
 					<CopyPlus class="size-4 shrink-0 text-ink-2" aria-hidden="true" />{m.w1monitors_detail_duplicate()}
 				</a>
+				{#if auth.isAdmin}
+					<button type="button" role="menuitem" class={item} aria-haspopup="dialog" onclick={() => { close(); templateDialog?.show(); }}>
+						<BookmarkPlus class="size-4 shrink-0 text-ink-2" aria-hidden="true" />{m.w5monitors_template_save_open()}
+					</button>
+				{/if}
 			{/if}
 
 			<div class="my-1 border-t border-line" role="separator"></div>
@@ -103,3 +111,5 @@
 		</div>
 	{/snippet}
 </Menu>
+
+<SaveTemplateDialog bind:this={templateDialog} {target} />
