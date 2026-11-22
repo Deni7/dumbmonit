@@ -45,6 +45,7 @@
 	import DomainField from './DomainField.svelte';
 	import GroupPicker from './GroupPicker.svelte';
 	import SeoSection from './SeoSection.svelte';
+	import TranslationsSection from './TranslationsSection.svelte';
 	import { ACCENTS, accentClass } from './words';
 	import { slugify } from './share';
 	import { formFingerprint } from './form-state';
@@ -393,6 +394,8 @@
 	const tabIcon = $derived(hideBranding ? previewLogo : withBase('/favicon.svg'));
 	const previewTheme = $derived(theme === 'dark' ? 'sp-preview-dark' : theme === 'light' ? 'sp-preview-light' : '');
 	const serviceNames = $derived(previewDoc.groups.flatMap((g) => g.items.map((i) => i.label)));
+	/** Group names and service names, as written, for the translations. */
+	const translatableNames = $derived([...new Set(previewDoc.groups.flatMap((g) => [g.name, ...g.items.map((i) => i.label)]).filter((n) => n.trim() !== ''))]);
 
 	// ------------------------------------------------------------ save / leave
 
@@ -452,6 +455,7 @@
 	let openStructure = $state(true);
 	let openLook = $state(true);
 	let openSeo = $state(false);
+	let openTranslations = $state(false);
 	let openConnect = $state(false);
 	// Phones and tablets: one pane at a time.
 	let pane = $state<'settings' | 'preview'>('settings');
@@ -937,6 +941,12 @@
 			{#if published}
 				<Disclosure title={m.status_seo_section()} bind:open={openSeo}>
 					<SeoSection bare {idPrefix} bind:seo name={title} {description} url={seoUrl} logo={seoLogo} services={serviceNames} disabled={saving} />
+				</Disclosure>
+			{/if}
+
+			{#if page}
+				<Disclosure title={m.w5calendar_langs_section()} bind:open={openTranslations}>
+					<TranslationsSection pageId={page.id} {idPrefix} names={translatableNames} disabled={saving} />
 				</Disclosure>
 			{/if}
 

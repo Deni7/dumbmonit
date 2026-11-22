@@ -26,6 +26,7 @@ import type {
 	AlertRulePayload,
 	Silence,
 	SilenceOccurrence,
+	StatusPageLanguages,
 	SilencePayload,
 	AccessInfo,
 	MspAccess,
@@ -953,6 +954,15 @@ export function setStatusPageItems(
 	return request<StatusPageItem[]>(`/status-pages/${id}/items`, { method: 'PUT', body: items });
 }
 
+/** Default language and per-language texts of a status page. */
+export function getStatusPageLanguages(id: number, signal?: AbortSignal): Promise<StatusPageLanguages> {
+	return request<StatusPageLanguages>(`/status-pages/${id}/languages`, { signal });
+}
+
+export function putStatusPageLanguages(id: number, languages: StatusPageLanguages): Promise<StatusPageLanguages> {
+	return request<StatusPageLanguages>(`/status-pages/${id}/languages`, { method: 'PUT', body: languages });
+}
+
 export function listIncidents(signal?: AbortSignal): Promise<Incident[]> {
 	return request<Incident[]>('/incidents', { signal });
 }
@@ -1051,8 +1061,9 @@ export function unsubscribeFromStatus(slug: string, token: string): Promise<{ st
  * page. A private page answers 401 (`ApiError.access` says what it wants),
  * which must not sign the visitor out of DumbMonit.
  */
-export function getPublicStatus(slug: string, signal?: AbortSignal): Promise<PublicStatus> {
+export function getPublicStatus(slug: string, signal?: AbortSignal, lang?: string): Promise<PublicStatus> {
 	return request<PublicStatus>(`/public/status/${encodeURIComponent(slug)}`, {
+		query: lang ? { lang } : undefined,
 		signal,
 		allowUnauthorized: true
 	});

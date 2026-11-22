@@ -2732,6 +2732,23 @@ export interface PublicStatusItem {
 	external?: boolean;
 }
 
+/** The admin-written texts of a status page in one language; empty keeps the written text. */
+export interface StatusPageTranslation {
+	lang: string;
+	title: string;
+	description: string;
+	footer_text: string;
+	/** Written service or group name to its translation. */
+	labels: Record<string, string>;
+}
+
+/** `GET`/`PUT /api/status-pages/{id}/languages`. */
+export interface StatusPageLanguages {
+	/** Default interface language of the page; `""` is English. */
+	default_lang: string;
+	translations: StatusPageTranslation[];
+}
+
 /** One day of a status page, hour by hour (`GET /api/public/status/{slug}/day/{date}`). */
 export interface PublicDayDetail {
 	date: string;
@@ -2808,6 +2825,12 @@ export interface PublicStatus {
 		subscribe_kinds: StatusSubscriptionKind[];
 		/** White label: no DumbMonit icon or name around the page. Older servers omit it. */
 		hide_branding?: boolean;
+		/** Default interface language of the page, used when the visitor's browser speaks none of ours. */
+		default_lang?: string;
+		/** Language the page's own texts were served in. */
+		lang?: string;
+		/** Languages the admin translated the page's texts into. */
+		languages?: string[];
 		/** Effective search-engine values (settings, or defaults built from the page name). */
 		seo?: {
 			indexable: boolean;
