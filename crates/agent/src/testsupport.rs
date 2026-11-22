@@ -158,6 +158,7 @@ pub async fn fake_http(handler: impl Fn(&Req) -> Resp + Send + Sync + 'static) -
 }
 
 /// Réponse de mise à niveau WebSocket qui annonce ce sous-protocole.
+#[allow(clippy::result_large_err)] // la signature est celle qu'impose tungstenite
 pub fn answering(
     protocol: &'static str,
 ) -> impl FnOnce(&WsRequest, WsResponse) -> Result<WsResponse, ErrorResponse> {

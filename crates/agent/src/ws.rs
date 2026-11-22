@@ -758,7 +758,7 @@ mod tests {
         let foreign = echo_server("chat").await;
         let url = format!("http://{foreign}{AGENT_WS_PATH}");
         let connector = Connector::new(url, None, &ProxyConfig::default()).unwrap();
-        let error = connector.open().await.err().expect("refusée");
+        let Err(error) = connector.open().await else { panic!("refusée") };
         assert!(error.contains("not the DumbMonit agent channel"), "{error}");
     }
 }

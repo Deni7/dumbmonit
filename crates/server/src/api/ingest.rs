@@ -531,7 +531,7 @@ pub async fn create_token(
 /// Source unique des commandes affichées par l'interface (création d'un jeton)
 /// et de tout générateur de déploiement (script GPO, Ansible…) : ceux-ci lisent
 /// `GET /api/agent/install` et remplacent `{TOKEN}` dans les gabarits, ou
-/// appellent [`install_parameters_via`] côté serveur.
+/// appellent [`install_parameters_for`] côté serveur.
 #[derive(Debug, Clone, Serialize)]
 pub struct InstallParams {
     /// URL `https://` d'où viennent scripts d'installation et binaires : le
@@ -733,37 +733,6 @@ impl InstallParams {
     }
 }
 
-/// Paramètres d'installation pour une URL de base donnée (celle par laquelle
-/// les machines joignent l'interface ; à défaut, l'adresse d'écoute), en direct
-/// ou à travers un agent relais : scripts, binaires et canal chiffré passent
-/// alors par sa passerelle, qui mène en TLS jusqu'au port des agents du
-/// serveur — l'épingle est alors celle de ce port.
-pub async fn install_parameters_via(
-    state: &AppState,
-    base_url: Option<&str>,
-    route: Option<RelayRoute>,
-) -> InstallParams {
-    install_parameters_probed(state, base_url, route, None, false).await
-}
-
-/// Comme [`install_parameters_via`], avec les en-têtes de la requête HTTP
-/// entrante : sans relais, le serveur sonde alors l'adresse que le navigateur a
-/// ouverte pour y relever le certificat réellement présenté (mandataire inverse,
-/// redirection de port) au lieu de supposer le sien.
-///
-/// `agent_port_only` : sans relais, tout passe par le port des agents (un seul
-/// port à ouvrir pour un site distant), quand ce port est ouvert.
-pub async fn install_parameters_probed(
-    state: &AppState,
-    base_url: Option<&str>,
-    route: Option<RelayRoute>,
-    headers: Option<&HeaderMap>,
-    agent_port_only: bool,
-) -> InstallParams {
-    install_parameters_for(state, base_url, route, headers, agent_port_only, TransportWish::Auto)
-        .await
-}
-
 /// Transport du canal chiffré que la commande d'installation doit donner.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -784,7 +753,12 @@ pub enum TransportWish {
 /// l'interface.
 pub const TRANSPORT_WEBSOCKET: &str = "websocket";
 
-/// Comme [`install_parameters_probed`], avec le transport demandé.
+/// Paramètres d'installation pour une URL de base donnée (celle par laquelle
+/// les machines joignent l'interface ; à défaut, l'adresse d'écoute), en direct
+/// ou à travers un agent relais, avec le transport demandé. Avec les en-têtes
+/// de la requête entrante, sans relais, le serveur sonde l'adresse que le
+/// navigateur a ouverte pour y relever le certificat réellement présenté.
+/// `agent_port_only` : sans relais, tout passe par le port des agents.
 ///
 /// Derrière Cloudflare Tunnel ou un mandataire inverse qui termine TLS, le
 /// port des agents n'est pas joignable à l'adresse du navigateur : la

@@ -129,6 +129,7 @@ mod tests {
 
     fn relay() -> HostInfo {
         HostInfo {
+            via_websocket: false,
             hostname: "relais".into(),
             os: "linux".into(),
             os_version: None,
