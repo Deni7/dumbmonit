@@ -49,9 +49,9 @@ fn plain(raw: &str) -> Option<String> {
 
 /// « 30 minutes », « 7 days », « 1 hour ».
 pub fn duration_text(minutes: u32) -> String {
-    let (count, unit) = if minutes % (24 * 60) == 0 {
+    let (count, unit) = if minutes.is_multiple_of(24 * 60) {
         (minutes / (24 * 60), "day")
-    } else if minutes % 60 == 0 {
+    } else if minutes.is_multiple_of(60) {
         (minutes / 60, "hour")
     } else {
         (minutes, "minute")

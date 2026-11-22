@@ -246,7 +246,7 @@ pub fn select_items(
             if item.reason == NotifyReason::Resolved {
                 // Seulement ce qui lui a été annoncé, et pas deux fois.
                 return prefs.notify_resolved
-                    && mine().last().is_some_and(|last| last.reason.is_firing_like());
+                    && mine().next_back().is_some_and(|last| last.reason.is_firing_like());
             }
             if item.severity < prefs.min_severity {
                 return false;
