@@ -260,6 +260,11 @@ Everything `GET /metrics` exposes. Values are read when you scrape; the
 | `dumbmonit_notifications_failed_total{kind}` | counter | Notifications the channel refused, by kind. They are requeued and retried; a steadily rising value is a broken webhook or SMTP account. |
 | `dumbmonit_agents` | gauge | Machines that have registered an agent. |
 | `dumbmonit_agents_stale` | gauge | Agents that have pushed nothing for five minutes. |
+| `dumbmonit_targets{state}` | gauge | Monitors by state: `ok`, `error` (last probe failed), `pending` (never probed yet), `disabled`. |
+| `dumbmonit_sessions_active` | gauge | Web sessions that have not expired. |
+| `dumbmonit_api_tokens_expiring` | gauge | API tokens, not revoked, that expire within seven days. |
+| `dumbmonit_backup_last_success_timestamp_seconds` | gauge | Unix time of the last successful scheduled local backup. Absent until one has been tried. Alert on `time() - …`. |
+| `dumbmonit_backup_last_run_ok` | gauge | 1 when the last scheduled local backup succeeded, 0 when it failed. Absent until one has been tried. |
 | `dumbmonit_database_up` | gauge | 1 when SQLite answers — the same check as `/api/health`. |
 | `dumbmonit_database_bytes` | gauge | Size of `dumbmonit.db` and its write-ahead log. Does not include `/data/vm`. |
 | `dumbmonit_victoriametrics_up` | gauge | 1 when VictoriaMetrics answers — the same check as `/api/health`. 0 while the embedded child is restarting. |

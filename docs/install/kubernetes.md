@@ -79,7 +79,9 @@ ingress:
 - The pod runs as uid 65532, with a read-only root filesystem (`/tmp` is an
   emptyDir), no capabilities and the `RuntimeDefault` seccomp profile.
   `pingSysctl` lets ping monitors work without privileges.
-- Probes call `/api/health` over HTTPS.
+- The liveness probe calls `/api/health` over HTTPS (it always answers `200`). For a
+  readiness probe of your own, use `/api/ready`: `200` when the database and
+  VictoriaMetrics answer, `503` otherwise.
 - Optional: `networkPolicy.enabled`, `podDisruptionBudget.enabled`.
 - Any other `DUMBMONIT_*` variable goes in `extraEnv`
   (see [Docker](docker.md) for the list).
