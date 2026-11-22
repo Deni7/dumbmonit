@@ -53,6 +53,19 @@ pub struct RelayCheck {
     pub reachable: Option<bool>,
     /// Ce qui a échoué, tel que le relais le rapporte.
     pub check_error: Option<String>,
+    /// Instant de cet essai, en millisecondes depuis l'époque Unix : l'écran
+    /// dit qui a essayé, et quand.
+    pub checked_at_ms: Option<i64>,
+    /// Ce qui empêche la passerelle d'accepter le site, quand le serveur le
+    /// sait ; l'écran l'explique, avec le correctif, au lieu d'attendre.
+    pub problem: Option<crate::collectors::agent::gateway::GatewayProblem>,
+    /// Adresse que le relais a vraiment liée, s'il la rapporte.
+    pub listen: Option<String>,
+    /// Pourquoi il n'a pas pu ouvrir le port, s'il le rapporte.
+    pub bind_error: Option<String>,
+    pub agent_version: String,
+    /// Version de l'agent à partir de laquelle un relais ouvre une passerelle.
+    pub min_agent_version: &'static str,
 }
 
 /// Ce que l'écran d'ajout montre avant la commande d'installation.
@@ -115,6 +128,12 @@ async fn check(
             self_check: route.self_check,
             reachable: route.reachable,
             check_error: route.check_error,
+            checked_at_ms: route.checked_at_ms,
+            problem: route.problem,
+            listen: route.listen,
+            bind_error: route.bind_error,
+            agent_version: route.agent_version,
+            min_agent_version: crate::collectors::agent::gateway::MIN_GATEWAY_AGENT,
         }),
     }))
 }

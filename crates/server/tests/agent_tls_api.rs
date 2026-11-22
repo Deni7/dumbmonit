@@ -994,8 +994,29 @@ async fn a_relay_learns_of_an_install_at_once_and_its_own_gateway_test_gates_the
     send(report(true, "192.168.10.5:8443")).await.expect("lot");
     let passed = check().await;
     assert_eq!(passed.body["relay"]["reachable"], true, "{}", passed.body);
+    assert_eq!(passed.body["relay"]["problem"], Value::Null, "rien ne bloque");
     let view = lab.app.get(&format!("/api/targets/{relay_id}/agent"), Some(&admin)).await;
     assert_eq!(view.body["gateway_check"]["ok"], true, "{}", view.body);
+
+    // Le port est pris sur le relais : la cause remonte au lieu d'une attente
+    // muette, et l'écran le dit.
+    let mut body = batch("id-relais");
+    let identity = body["identity"].as_object_mut().unwrap();
+    identity.insert("relay".into(), json!(true));
+    identity.insert(
+        "relay_gateway_state".into(),
+        json!({ "wanted": "0.0.0.0:8443", "error": "the port is already used", "encrypted": true }),
+    );
+    let sent = send(body).await.expect("lot");
+    assert_eq!(sent.status(), StatusCode::OK);
+    let blocked = check().await;
+    assert_eq!(blocked.body["relay"]["problem"], "bind_failed", "{}", blocked.body);
+    assert_eq!(blocked.body["relay"]["listening"], false);
+    assert_eq!(blocked.body["relay"]["bind_error"], "the port is already used");
+    assert_eq!(blocked.body["relay"]["min_agent_version"], "0.14.2");
+    let view = lab.app.get(&format!("/api/targets/{relay_id}/agent"), Some(&admin)).await;
+    assert_eq!(view.body["gateway_problem"], "bind_failed", "{}", view.body);
+    assert_eq!(view.body["gateway_state"]["error"], "the port is already used");
 }
 
 // ------------------------------------------------------------- port unique

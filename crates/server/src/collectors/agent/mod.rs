@@ -22,6 +22,7 @@ pub mod catalog;
 pub mod commands;
 pub mod enrolment;
 pub mod eventlog;
+pub mod gateway;
 pub mod logs;
 pub mod modules;
 pub mod policy;

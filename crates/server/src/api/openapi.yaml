@@ -6159,7 +6159,9 @@ paths:
         command will carry (from `base_url`), completes the TLS 1.3 handshake
         and checks that the certificate chain is its own. Through a relay
         (`relay_id`), nothing is dialled: the answer says whether the relay
-        reports that its gateway listens. Nothing secret is sent.
+        reports that its gateway listens, the outcome of the relay's own test
+        of it at the site's address, and what blocks it (`problem`). Nothing
+        secret is sent.
       security: [{ cookieAuth: [] }]
       x-token-scope: none
       requestBody:
@@ -6199,6 +6201,19 @@ paths:
                       self_check: { type: boolean, description: The relay tests its own gateway (up-to-date agent). }
                       reachable: { type: [boolean, "null"], description: "Outcome of the relay's last test of its gateway at this address; null: not tested there yet." }
                       check_error: { type: [string, "null"] }
+                      checked_at_ms: { type: [integer, "null"], description: "When the relay ran that test (Unix milliseconds)." }
+                      problem:
+                        type: [string, "null"]
+                        description: >-
+                          What keeps the gateway from accepting the site's machines, when known:
+                          closed from the interface, relay agent older than `min_agent_version`,
+                          relay offline, port that cannot be opened (`bind_error`), listening on
+                          the loopback only, or relay not on the encrypted channel (no tunnel).
+                        enum: [closed, too_old, offline, bind_failed, loopback, no_tunnel, null]
+                      listen: { type: [string, "null"], description: "Address the relay really bound (host:port)." }
+                      bind_error: { type: [string, "null"], description: "Why the relay could not open the port, as it reports it." }
+                      agent_version: { type: string }
+                      min_agent_version: { type: string, description: "First agent version whose relay opens a gateway." }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
@@ -15388,6 +15403,19 @@ components:
           oneOf:
             - type: "null"
             - $ref: "#/components/schemas/GatewayCheck"
+        gateway_state:
+          description: "The gateway as the relay really opened it: requested and bound address, or why it could not listen. Null: no gateway asked, or an older relay."
+          type: [object, "null"]
+          properties:
+            wanted: { type: string, description: "Address asked (host:port)." }
+            listen: { type: [string, "null"], description: "Address really bound; null when opening failed." }
+            error: { type: [string, "null"], description: Why the port could not be opened. }
+            local: { type: boolean, description: "The address comes from `gateway_listen` in the relay's agent.yaml, which wins." }
+            encrypted: { type: boolean, description: The relay talks to the server on the encrypted channel (needed for tunnels). }
+        gateway_problem:
+          type: [string, "null"]
+          description: What keeps the gateway from accepting the site's machines, when known (an offline relay is shown elsewhere).
+          enum: [closed, too_old, offline, bind_failed, loopback, no_tunnel, null]
         server_link:
           description: "Server the agent uses when its configuration lists several (`server_urls`); null with a single address."
           oneOf:
