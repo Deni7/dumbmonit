@@ -21,6 +21,32 @@ export interface Release {
 
 export const RELEASES: Release[] = [
 	{
+		version: '0.20.0-dev.1',
+		date: '2026-11-22',
+		highlights: [
+			{
+				title: 'SLOs, post-mortems and multi-step HTTP checks',
+				text: 'Error budgets with burn-rate alerts, post-mortems on status page incidents, and HTTP scenarios that log in and follow several steps.'
+			},
+			{
+				title: 'Faster monitor lists',
+				text: 'Duplicate a monitor, quick actions on each row, tags on rows, notes, custom intervals, more sorts, and bulk silence.'
+			},
+			{
+				title: 'Maintenance and alerts, less clicking',
+				text: 'End, extend, edit or copy a maintenance window; switch channels on and off from the list; see when each rule last fired.'
+			},
+			{
+				title: 'Status pages and reports',
+				text: 'Links to each incident, older incidents, per-service feeds, badge styles, update templates and preview, SLA objectives per group.'
+			},
+			{
+				title: 'Accounts and operations',
+				text: 'Your open sessions, required 2FA, editable API tokens, a full audit log with export, backup schedule and downloads, and /api/ready.'
+			}
+		]
+	},
+	{
 		version: '0.17.1',
 		date: '2026-11-04',
 		highlights: [
