@@ -2034,11 +2034,7 @@ fn to_public_incident(
 /// 40 caractères). Stable tant que le titre ne change pas.
 fn incident_anchor(starts_at: &str, title: &str) -> String {
     let stamp: String = starts_at.chars().filter(char::is_ascii_digit).take(12).collect();
-    let stamp = if stamp.len() > 8 {
-        format!("{}-{}", &stamp[..8], &stamp[8..])
-    } else {
-        stamp
-    };
+    let stamp = if stamp.len() > 8 { format!("{}-{}", &stamp[..8], &stamp[8..]) } else { stamp };
     let slug: String = slugify(title).chars().take(40).collect();
     let slug = slug.trim_end_matches('-');
     if slug.is_empty() { stamp } else { format!("{stamp}-{slug}") }
