@@ -32,7 +32,7 @@
 pub mod measure;
 pub mod store;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -156,6 +156,39 @@ impl MonitorRef {
 /// Les moniteurs actifs couverts par un périmètre.
 pub fn members<'a>(scope: &Scope, monitors: &'a [MonitorRef]) -> Vec<&'a MonitorRef> {
     monitors.iter().filter(|m| m.enabled && scope.keeps(m.id, &m.group)).collect()
+}
+
+/// Vrai si le périmètre couvre au moins un moniteur (actif ou non) et que tous
+/// ceux qu'il couvre sont dans `allowed`. Un périmètre vide couvre tous les
+/// moniteurs : un compte restreint ne le voit donc jamais.
+pub fn within(scope: &Scope, monitors: &[MonitorRef], allowed: &HashSet<i64>) -> bool {
+    let mut any = false;
+    for monitor in monitors.iter().filter(|m| scope.keeps(m.id, &m.group)) {
+        if !allowed.contains(&monitor.id) {
+            return false;
+        }
+        any = true;
+    }
+    any
+}
+
+/// Étiquettes de la série d'un SLO. Elle est rattachée au premier moniteur
+/// couvert (identifiant le plus bas, donc stable d'un cycle à l'autre : un
+/// « pire moniteur » ferait changer l'empreinte de l'alerte) par l'étiquette
+/// `target`, avec le nom et l'identifiant du SLO pour que l'écran renvoie vers
+/// lui. Sans moniteur couvert, la série n'a pas de `target`.
+pub fn burn_labels(slo: &Slo, covered: &[&MonitorRef]) -> BTreeMap<String, String> {
+    let mut labels: BTreeMap<String, String> = [
+        ("__name__".to_string(), BURN_METRIC.to_string()),
+        (SLO_ID_LABEL.to_string(), slo.id.to_string()),
+        (model::SLO_LABEL.to_string(), slo.name.clone()),
+    ]
+    .into_iter()
+    .collect();
+    if let Some(first) = covered.iter().map(|m| m.id).min() {
+        labels.insert("target".to_string(), first.to_string());
+    }
+    labels
 }
 
 // --------------------------------------------------------------------------
@@ -427,19 +460,14 @@ pub async fn burn_rule(
         if status.burn.is_empty() {
             continue;
         }
-        let labels: BTreeMap<String, String> = [
-            ("__name__".to_string(), BURN_METRIC.to_string()),
-            (SLO_ID_LABEL.to_string(), slo.id.to_string()),
-            (model::SLO_LABEL.to_string(), slo.name.clone()),
-        ]
-        .into_iter()
-        .collect();
+        let labels = burn_labels(slo, &covered);
         let fingerprint = model::fingerprint(&rule.uid, &model::identity_key(&labels));
         derived.annotations.insert(
             fingerprint,
             Annotation {
                 score: None,
-                detail: burn_detail(status.verdict, &status.burn),
+                detail: burn_detail(status.verdict, &status.burn)
+                    .map(|detail| format!("SLO \"{}\": {detail}", slo.name)),
                 armed: true,
             },
         );
@@ -549,6 +577,45 @@ mod tests {
         assert_eq!(aggregate(Vec::<f64>::new()), None);
         assert_eq!(aggregate([100.0, 98.0]), Some(99.0));
         assert_eq!(aggregate([f64::NAN, 50.0]), Some(50.0));
+    }
+
+    #[test]
+    fn un_slo_n_est_visible_que_si_tous_ses_moniteurs_le_sont() {
+        let mut off = monitor(2, "http", "A");
+        off.enabled = false;
+        let monitors = [monitor(1, "http", "A"), off, monitor(3, "http", "B")];
+        let allowed: HashSet<i64> = [1, 2].into_iter().collect();
+        let in_a = Scope { targets: Vec::new(), groups: vec!["A".to_string()] };
+        assert!(within(&in_a, &monitors, &allowed), "disabled monitors count too");
+        let mixed = Scope { targets: vec![3], groups: vec!["A".to_string()] };
+        assert!(!within(&mixed, &monitors, &allowed));
+        // Un périmètre vide couvre tout, donc aussi ce qui est hors équipes.
+        assert!(!within(&Scope::default(), &monitors, &allowed));
+        let all: HashSet<i64> = [1, 2, 3].into_iter().collect();
+        assert!(within(&Scope::default(), &monitors, &all));
+        // Aucun moniteur couvert : rien à qui l'attribuer.
+        let none = Scope { targets: vec![99], groups: Vec::new() };
+        assert!(!within(&none, &monitors, &all));
+    }
+
+    #[test]
+    fn l_alerte_de_consommation_vise_le_premier_moniteur_et_nomme_le_slo() {
+        let monitors = [monitor(7, "http", ""), monitor(4, "http", "")];
+        let covered: Vec<&MonitorRef> = monitors.iter().collect();
+        let mut item = slo(99.9, 30);
+        item.id = 12;
+        let labels = burn_labels(&item, &covered);
+        assert_eq!(labels.get("target").map(String::as_str), Some("4"));
+        assert_eq!(labels.get(SLO_ID_LABEL).map(String::as_str), Some("12"));
+        assert_eq!(labels.get(model::SLO_LABEL).map(String::as_str), Some("API"));
+        assert!(model::carries_target_id(&labels), "the engine resolves it to the monitor");
+        // Même identité d'alerte quel que soit l'ordre des moniteurs.
+        let reversed: Vec<&MonitorRef> = monitors.iter().rev().collect();
+        assert_eq!(
+            model::identity_key(&labels),
+            model::identity_key(&burn_labels(&item, &reversed))
+        );
+        assert!(!burn_labels(&item, &[]).contains_key("target"));
     }
 
     fn slo(objective: f64, window_days: u32) -> Slo {

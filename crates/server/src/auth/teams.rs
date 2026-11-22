@@ -455,6 +455,13 @@ pub const SCOPED_ROUTES: &[(&str, &str, RouteRule)] = &[
     ("POST", "/alerts/silences", RouteRule::Open),
     ("GET", "/topology", RouteRule::Open),
     ("GET", "/status-pages", RouteRule::Open),
+    // SLO : le gestionnaire ne montre et n'accepte que ceux dont tous les
+    // moniteurs sont dans les équipes du compte.
+    ("GET", "/slos", RouteRule::Open),
+    ("POST", "/slos", RouteRule::Open),
+    ("GET", "/slos/*", RouteRule::Open),
+    ("PUT", "/slos/*", RouteRule::Open),
+    ("DELETE", "/slos/*", RouteRule::Open),
     ("GET", "/security/cves", RouteRule::Open),
     ("GET", "/security/cves/summary", RouteRule::Open),
     ("GET", "/security/cves/inventory", RouteRule::Open),
@@ -482,6 +489,10 @@ pub const MANAGE_TARGET_ROUTES: &[(&str, &str)] = &[
     ("DELETE", "/targets/*"),
     ("POST", "/targets/*/probe"),
     ("POST", "/targets"),
+    // SLO : le gestionnaire exige `manage` sur chacun des moniteurs couverts.
+    ("POST", "/slos"),
+    ("PUT", "/slos/*"),
+    ("DELETE", "/slos/*"),
 ];
 
 const NOT_FOR_TEAMS: &str = "This page is not available to team-restricted accounts: ask an \
@@ -1078,6 +1089,24 @@ mod tests {
         assert!(!is_manage_route(&Method::POST, "/targets/3/commands"));
         assert!(!is_manage_route(&Method::POST, "/targets/import"));
         assert!(!is_manage_route(&Method::PUT, "/targets/3/agent/modules/x"));
+        // SLO : ouvertes, le gestionnaire vérifie chaque moniteur couvert.
+        assert!(is_manage_route(&Method::POST, "/api/slos"));
+        assert!(is_manage_route(&Method::PUT, "/slos/4"));
+        assert!(is_manage_route(&Method::DELETE, "/slos/4"));
+        assert!(!is_manage_route(&Method::POST, "/slos/4"));
+    }
+
+    #[test]
+    fn slo_routes_are_open_to_team_accounts() {
+        for (method, path) in
+            [("GET", "/slos"), ("POST", "/slos"), ("GET", "/slos/4"), ("PUT", "/slos/4")]
+        {
+            assert!(
+                SCOPED_ROUTES.iter().any(|(m, pattern, _)| *m == method
+                    && path_matches(pattern, path)),
+                "{method} {path}"
+            );
+        }
     }
 
     #[test]

@@ -2,10 +2,12 @@
 //! atteinte, budget d'erreur, vitesses de consommation).
 //!
 //! Lecture ouverte à tous les rôles, écriture aux administrateurs (le garde de
-//! session s'en charge). Les mesures viennent de VictoriaMetrics : s'il ne
+//! session s'en charge). Un compte restreint par ses équipes ne voit que les SLO
+//! dont tous les moniteurs sont visibles, et n'écrit que sur ceux dont tous les
+//! moniteurs sont au niveau `manage` (404 si invisible, 403 sinon). Les mesures viennent de VictoriaMetrics : s'il ne
 //! répond pas, la liste s'affiche quand même, avec `status.measured = false`.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -15,6 +17,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use crate::api::{ApiError, ApiResult};
+use crate::auth::teams::{Access, Level, TeamAccess};
 use crate::reports::layout::Scope;
 use crate::slo::{self, MAX_SLOS, MonitorRef, Slo, SloInput, SloStatus, measure, store};
 use crate::state::AppState;
@@ -113,16 +116,70 @@ async fn views(state: &AppState, slos: Vec<Slo>, monitors: &[MonitorRef]) -> Vec
         .collect()
 }
 
-pub async fn list(State(state): State<AppState>) -> ApiResult<Json<Vec<SloView>>> {
-    let slos = store::list(&state.pool).await?;
+/// Moniteurs sur lesquels le compte a au moins `level` ; `None` : sans restriction.
+async fn allowed(
+    state: &AppState,
+    access: &Access,
+    level: Level,
+) -> ApiResult<Option<HashSet<i64>>> {
+    Ok(access.targets_at(&state.pool, level).await?)
+}
+
+/// Un compte restreint ne touche qu'à un périmètre fait de moniteurs qu'il
+/// gère : 403 sinon. Sans restriction, tout passe.
+async fn require_scope(
+    state: &AppState,
+    access: &Access,
+    scope: &Scope,
+    monitors: &[MonitorRef],
+) -> ApiResult<()> {
+    let Some(managed) = allowed(state, access, Level::Manage).await? else { return Ok(()) };
+    if slo::within(scope, monitors, &managed) {
+        Ok(())
+    } else {
+        Err(ApiError::Forbidden(
+            "An SLO can only cover monitors that your teams let you manage.".into(),
+        ))
+    }
+}
+
+/// Un SLO existant, visible du compte : 404 sinon.
+async fn visible_slo(
+    state: &AppState,
+    access: &Access,
+    id: i64,
+    monitors: &[MonitorRef],
+) -> ApiResult<Slo> {
+    let item = store::get(&state.pool, id).await?.ok_or_else(|| not_found(id))?;
+    if let Some(visible) = allowed(state, access, Level::Read).await?
+        && !slo::within(&item.scope, monitors, &visible)
+    {
+        return Err(not_found(id));
+    }
+    Ok(item)
+}
+
+pub async fn list(
+    State(state): State<AppState>,
+    TeamAccess(access): TeamAccess,
+) -> ApiResult<Json<Vec<SloView>>> {
+    let mut slos = store::list(&state.pool).await?;
     let monitors = store::monitors(&state.pool).await?;
+    if let Some(visible) = allowed(&state, &access, Level::Read).await? {
+        slos.retain(|item| slo::within(&item.scope, &monitors, &visible));
+    }
     Ok(Json(views(&state, slos, &monitors).await))
 }
 
 async fn detail(state: &AppState, id: i64) -> ApiResult<SloDetail> {
     let item = store::get(&state.pool, id).await?.ok_or_else(|| not_found(id))?;
     let monitors = store::monitors(&state.pool).await?;
-    let covered = slo::members(&item.scope, &monitors);
+    detail_of(state, item, &monitors).await
+}
+
+async fn detail_of(state: &AppState, item: Slo, monitors: &[MonitorRef]) -> ApiResult<SloDetail> {
+    let id = item.id;
+    let covered = slo::members(&item.scope, monitors);
     let members: Vec<i64> = covered.iter().map(|m| m.id).collect();
     let burndown = match measure::burndown_curve(
         &state.victoria,
@@ -139,22 +196,28 @@ async fn detail(state: &AppState, id: i64) -> ApiResult<SloDetail> {
             Vec::new()
         }
     };
-    let mut views = views(state, vec![item], &monitors).await;
+    let mut views = views(state, vec![item], monitors).await;
     Ok(SloDetail { view: views.remove(0), members, burndown })
 }
 
 pub async fn get_one(
     State(state): State<AppState>,
+    TeamAccess(access): TeamAccess,
     Path(id): Path<i64>,
 ) -> ApiResult<Json<SloDetail>> {
-    Ok(Json(detail(&state, id).await?))
+    let monitors = store::monitors(&state.pool).await?;
+    let item = visible_slo(&state, &access, id, &monitors).await?;
+    Ok(Json(detail_of(&state, item, &monitors).await?))
 }
 
 pub async fn create(
     State(state): State<AppState>,
+    TeamAccess(access): TeamAccess,
     Json(payload): Json<SloPayload>,
 ) -> ApiResult<(StatusCode, Json<SloDetail>)> {
     let input = validate(&state, payload, None).await?;
+    let monitors = store::monitors(&state.pool).await?;
+    require_scope(&state, &access, &input.scope, &monitors).await?;
     if store::count(&state.pool).await? >= MAX_SLOS {
         return Err(ApiError::Conflict(format!("At most {MAX_SLOS} SLOs are allowed.")));
     }
@@ -165,18 +228,29 @@ pub async fn create(
 
 pub async fn update(
     State(state): State<AppState>,
+    TeamAccess(access): TeamAccess,
     Path(id): Path<i64>,
     Json(payload): Json<SloPayload>,
 ) -> ApiResult<Json<SloDetail>> {
-    store::get(&state.pool, id).await?.ok_or_else(|| not_found(id))?;
+    let monitors = store::monitors(&state.pool).await?;
+    let existing = visible_slo(&state, &access, id, &monitors).await?;
+    require_scope(&state, &access, &existing.scope, &monitors).await?;
     let input = validate(&state, payload, Some(id)).await?;
+    require_scope(&state, &access, &input.scope, &monitors).await?;
     if !store::update(&state.pool, id, &input).await? {
         return Err(not_found(id));
     }
     Ok(Json(detail(&state, id).await?))
 }
 
-pub async fn remove(State(state): State<AppState>, Path(id): Path<i64>) -> ApiResult<StatusCode> {
+pub async fn remove(
+    State(state): State<AppState>,
+    TeamAccess(access): TeamAccess,
+    Path(id): Path<i64>,
+) -> ApiResult<StatusCode> {
+    let monitors = store::monitors(&state.pool).await?;
+    let existing = visible_slo(&state, &access, id, &monitors).await?;
+    require_scope(&state, &access, &existing.scope, &monitors).await?;
     if store::delete(&state.pool, id).await? {
         Ok(StatusCode::NO_CONTENT)
     } else {

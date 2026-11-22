@@ -713,3 +713,101 @@ async fn teams_travel_in_the_backup() {
         .collect();
     assert_eq!(names, ["Lyon", "Paris"]);
 }
+
+fn slo_body(name: &str, targets: &[i64]) -> Value {
+    json!({
+        "name": name,
+        "objective": 99.9,
+        "window_days": 30,
+        "scope": { "targets": targets, "groups": [] }
+    })
+}
+
+#[tokio::test]
+async fn team_accounts_only_reach_slos_made_of_their_own_monitors() {
+    let lab = lab().await;
+    let admin = lab.admin.as_str();
+    let reply = lab.app.get("/api/teams", Some(admin)).await;
+    let lyon_team = reply.body["teams"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["name"] == "Lyon")
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    let (operator, op) = create_user(&lab.app, admin, "olga", "operator").await;
+    join(&lab, lyon_team, operator).await;
+    let (viewer, reader) = create_user(&lab.app, admin, "anna", "viewer").await;
+    join(&lab, lab.paris_team, viewer).await;
+
+    let mut made = Vec::new();
+    for (name, targets) in [
+        ("lyon-slo", vec![lab.lyon]),
+        ("paris-slo", vec![lab.paris]),
+        ("mixed-slo", vec![lab.lyon, lab.paris]),
+        ("everything", vec![]),
+    ] {
+        let reply = lab.app.post("/api/slos", slo_body(name, &targets), Some(admin)).await;
+        assert_eq!(reply.status, StatusCode::CREATED, "{name}: {}", reply.body);
+        made.push(reply.body["id"].as_i64().unwrap());
+    }
+    let (lyon_slo, paris_slo, mixed_slo, global_slo) = (made[0], made[1], made[2], made[3]);
+
+    // La liste ne montre que les SLO entièrement dans les équipes du compte.
+    let reply = lab.app.get("/api/slos", Some(&op)).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(ids(&reply.body), vec![lyon_slo]);
+    let reply = lab.app.get("/api/slos", Some(&reader)).await;
+    assert_eq!(ids(&reply.body), vec![paris_slo]);
+    let reply = lab.app.get("/api/slos", Some(admin)).await;
+    assert_eq!(reply.body.as_array().unwrap().len(), 4);
+
+    // Le détail d'un SLO hors équipes : introuvable.
+    let reply = lab.app.get(&format!("/api/slos/{lyon_slo}"), Some(&op)).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    for id in [paris_slo, mixed_slo, global_slo] {
+        let reply = lab.app.get(&format!("/api/slos/{id}"), Some(&op)).await;
+        assert_eq!(reply.status, StatusCode::NOT_FOUND, "{}", reply.body);
+    }
+
+    // Création : seulement sur des moniteurs que l'équipe gère.
+    let reply = lab.app.post("/api/slos", slo_body("mine", &[lab.lyon]), Some(&op)).await;
+    assert_eq!(reply.status, StatusCode::CREATED, "{}", reply.body);
+    let mine = reply.body["id"].as_i64().unwrap();
+    for (name, targets) in [
+        ("outside", vec![lab.paris]),
+        ("mixed", vec![lab.lyon, lab.paris]),
+        ("whole-estate", vec![]),
+    ] {
+        let reply = lab.app.post("/api/slos", slo_body(name, &targets), Some(&op)).await;
+        assert_eq!(reply.status, StatusCode::FORBIDDEN, "{name}: {}", reply.body);
+    }
+
+    // Modification : ni vers l'extérieur, ni sur celui d'une autre équipe.
+    let reply = lab
+        .app
+        .put(&format!("/api/slos/{mine}"), slo_body("mine", &[lab.paris]), Some(&op))
+        .await;
+    assert_eq!(reply.status, StatusCode::FORBIDDEN, "{}", reply.body);
+    let reply = lab
+        .app
+        .put(&format!("/api/slos/{mine}"), slo_body("renamed", &[lab.lyon]), Some(&op))
+        .await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    let reply = lab
+        .app
+        .put(&format!("/api/slos/{paris_slo}"), slo_body("hijack", &[lab.lyon]), Some(&op))
+        .await;
+    assert_eq!(reply.status, StatusCode::NOT_FOUND, "{}", reply.body);
+
+    // Suppression.
+    let reply = lab.app.delete(&format!("/api/slos/{paris_slo}"), Some(&op)).await;
+    assert_eq!(reply.status, StatusCode::NOT_FOUND, "{}", reply.body);
+    let reply = lab.app.delete(&format!("/api/slos/{mine}"), Some(&op)).await;
+    assert_eq!(reply.status, StatusCode::NO_CONTENT, "{}", reply.body);
+
+    // Un lecteur lit mais n'écrit pas, même dans son dossier.
+    let reply = lab.app.post("/api/slos", slo_body("nope", &[lab.paris]), Some(&reader)).await;
+    assert_eq!(reply.status, StatusCode::FORBIDDEN, "{}", reply.body);
+}
