@@ -102,6 +102,10 @@ pub async fn collect(pool: &SqlitePool, cipher: &Cipher, options: ExportOptions)
         agent_enrolment: Some(serde_json::to_value(
             crate::collectors::agent::enrolment::load_settings(pool).await?,
         )?),
+        backup_schedule: crate::backup::local::stored_override(pool)
+            .await?
+            .map(serde_json::to_value)
+            .transpose()?,
         // Seulement quand un lieu est choisi : sans lieu, rien à restaurer.
         wall_weather: match crate::weather::load_settings(pool).await? {
             settings if settings.place.is_some() => Some(serde_json::to_value(settings)?),
@@ -1193,6 +1197,7 @@ pub fn sections() -> BTreeMap<&'static str, &'static str> {
             "Network configuration versions, only when you include them: they hold device secrets.",
         ),
         ("instance", "Instance name, language, time zone and setup state."),
+        ("backup_schedule", "The schedule of the local backups, when you changed it."),
         ("clients", "MSP clients, their members, branding, and what belongs to each."),
         (
             "netscan_schedules",

@@ -218,6 +218,11 @@ pub struct Bundle {
     /// `agent.enrolment` de `settings`, migration 0233).
     #[serde(default)]
     pub agent_enrolment: Option<Value>,
+    /// Planification des sauvegardes locales modifiée depuis l'interface (clé
+    /// `backup.schedule` de `settings`). Absente tant qu'elle n'a pas été changée ;
+    /// l'environnement (`DUMBMONIT_BACKUP_*`) l'emporte toujours à l'exécution.
+    #[serde(default)]
+    pub backup_schedule: Option<Value>,
     /// Météo du mur : lieu et unité (clé `wall.weather` de `settings`).
     /// Absente tant qu'aucun lieu n'a été choisi.
     #[serde(default)]
