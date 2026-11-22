@@ -12,7 +12,7 @@
 	import { Confirm, EmptyState, Plate, Button, Menu } from '#lib/ui/index.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import { CalendarClock, Search } from 'lucide-svelte';
-	import { formatDateTime } from '#lib/format.js';
+	import { formatDateTime, parseServerDate } from '#lib/format.js';
 	import { scheduleLabel, silenceScope } from './helpers';
 	import { m } from '#lib/paraglide/messages.js';
 	import FileManagedBadge from '#lib/components/settings/FileManagedBadge.svelte';
@@ -53,10 +53,18 @@
 		return silence.schedule.kind === 'weekly' || silence.schedule.kind === 'monthly';
 	}
 
+	/** A one-off window already over (ended with "End now") waits for the server purge: hide it. */
+	function isOver(silence: Silence): boolean {
+		if (silence.active_now || silence.schedule.kind !== 'once') return false;
+		const end = parseServerDate(silence.schedule.ends_at);
+		return end !== null && end.getTime() <= Date.now();
+	}
+
 	const searched = $derived.by(() => {
 		const term = search.trim().toLowerCase();
-		if (!term) return silences;
-		return silences.filter(
+		const live = silences.filter((s) => !isOver(s));
+		if (!term) return live;
+		return live.filter(
 			(s) => s.name.toLowerCase().includes(term) || s.comment.toLowerCase().includes(term)
 		);
 	});
