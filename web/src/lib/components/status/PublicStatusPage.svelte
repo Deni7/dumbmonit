@@ -53,6 +53,7 @@
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			// A failed refresh keeps the last good document on screen.
 			if (!status) error = cause;
+			return false;
 		} finally {
 			loading = false;
 			refreshing = false;

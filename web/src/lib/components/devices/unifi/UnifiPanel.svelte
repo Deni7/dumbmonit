@@ -63,6 +63,7 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
+			return false;
 		} finally {
 			loading = false;
 		}

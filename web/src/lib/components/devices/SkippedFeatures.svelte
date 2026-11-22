@@ -47,6 +47,7 @@
 			features = (await getSkippedFeatures(target.id, signal)).features;
 		} catch {
 			// A note is a courtesy: a failed read leaves the page as it was.
+			return false;
 		}
 	}
 

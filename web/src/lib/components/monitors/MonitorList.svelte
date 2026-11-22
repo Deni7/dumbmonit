@@ -1186,6 +1186,7 @@
 		// failure here must not take the rack down with it.
 		const next = await loadSparklines(24 * 3600, signal).catch(() => null);
 		if (next) sparklines = next;
+		return next !== null;
 	}
 
 	/** The table's 24 hourly segments: one aggregated query for the whole fleet. */
