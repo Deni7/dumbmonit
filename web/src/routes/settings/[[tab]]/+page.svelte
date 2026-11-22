@@ -48,6 +48,7 @@
 	import AssistantSection from '#lib/components/settings/AssistantSection.svelte';
 	import AppearanceSection from '#lib/components/settings/AppearanceSection.svelte';
 	import BackupSection from '#lib/components/settings/BackupSection.svelte';
+	import AuditLogSection from '#lib/components/settings/AuditLogSection.svelte';
 	import ConfigFilesSection from '#lib/components/settings/ConfigFilesSection.svelte';
 	import SelfMonitoringSection from '#lib/components/settings/SelfMonitoringSection.svelte';
 	import StorageSection from '#lib/components/settings/StorageSection.svelte';
@@ -90,7 +91,7 @@
 	/** The sections of each tab, top to bottom. */
 	const SECTIONS = $derived<Record<SettingsTab, Component[]>>({
 		account: [AppearanceSection, SecuritySection, PushSection],
-		team: [UsersSection, TeamsSection, ...(auth.isAdmin ? [ClientsSection] : []), SsoSection, SamlSection, ScimSection, LdapSection],
+		team: [UsersSection, TeamsSection, ...(auth.isAdmin ? [ClientsSection] : []), SsoSection, SamlSection, ScimSection, LdapSection, ...(auth.isAdmin ? [AuditLogSection] : [])],
 		monitoring: [AgentsSection, PacksSection, SecurityScoreSection, ...(auth.isAdmin ? [LocationsSection] : [])],
 		notifications: [ChannelsSection, ...(auth.isAdmin ? [MailServerSection] : []), NotificationPolicySection],
 		wall: [WallModeSection, WallWeatherSection, MusicSection],

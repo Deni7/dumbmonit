@@ -13,7 +13,8 @@ use crate::auth::ldap::client::{self, TestReport};
 use crate::auth::ldap::{self, GroupMode, LdapConfig};
 use crate::auth::middleware::AdminUser;
 use crate::auth::oidc::Source;
-use crate::auth::{AuthError, AuthResult};
+use crate::auth::client_ip::ClientIp;
+use crate::auth::{AuthError, AuthResult, audit};
 use crate::state::AppState;
 
 /// La configuration telle que l'écran des réglages la montre : sans le mot de
@@ -153,7 +154,8 @@ impl ConfigPayload {
 /// `PUT /api/auth/ldap/config`
 pub async fn put_config(
     State(state): State<AppState>,
-    _: AdminUser,
+    AdminUser(me): AdminUser,
+    ClientIp(ip): ClientIp,
     Json(payload): Json<ConfigPayload>,
 ) -> AuthResult<Json<ConfigView>> {
     let config = payload.into_config();
@@ -175,6 +177,7 @@ pub async fn put_config(
     }
     ldap::save(&state.pool, &state.cipher, config).await?;
     tracing::info!("LDAP settings saved");
+    audit::record(&state.pool, Some(&me.username), "settings.ldap", None, ip).await;
     let resolved = effective(&state).await?;
     Ok(Json(view(&state, resolved)))
 }
@@ -188,10 +191,12 @@ fn same_account(saved: &LdapConfig, next: &LdapConfig) -> bool {
 /// l'environnement reprend la main, ou l'annuaire s'éteint.
 pub async fn delete_config(
     State(state): State<AppState>,
-    _: AdminUser,
+    AdminUser(me): AdminUser,
+    ClientIp(ip): ClientIp,
 ) -> AuthResult<Json<ConfigView>> {
     ldap::clear(&state.pool).await?;
     tracing::info!("LDAP settings cleared");
+    audit::record(&state.pool, Some(&me.username), "settings.ldap.cleared", None, ip).await;
     let resolved = effective(&state).await?;
     Ok(Json(view(&state, resolved)))
 }
