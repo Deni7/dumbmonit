@@ -6,6 +6,7 @@
 import { browser } from '$app/env';
 import { listAlertHistory, type AlertHistoryEntry, type TargetId } from '#lib/api/index.js';
 import { consoleState } from '#lib/stores/console.svelte.js';
+import { startPolling } from '#lib/poll.js';
 import { loadFigures, loadLatency, type FleetFigures } from './fleet.js';
 
 const INTERVAL_MS = 60_000;
@@ -21,9 +22,10 @@ class FleetStore {
 	#loadedRange = '';
 	/** Range of the refresh in flight, so a second view starting at once does not repeat it. */
 	#loadingRange = '';
-	#timer: ReturnType<typeof setInterval> | undefined;
+	#stopPolling: (() => void) | undefined;
 
-	async refresh(): Promise<void> {
+	/** Resolves to `false` when the figures could not be read. */
+	async refresh(): Promise<boolean> {
 		this.#controller?.abort();
 		const controller = new AbortController();
 		this.#controller = controller;
@@ -41,9 +43,11 @@ class FleetStore {
 			this.history = history;
 			this.error = null;
 			this.#loadedRange = consoleState.range;
+			return true;
 		} catch (cause) {
-			if (cause instanceof DOMException && cause.name === 'AbortError') return;
+			if (cause instanceof DOMException && cause.name === 'AbortError') return true;
 			this.error = cause;
+			return false;
 		} finally {
 			if (this.#controller === controller) {
 				this.loading = false;
@@ -62,18 +66,21 @@ class FleetStore {
 		if (!browser) return () => {};
 		this.#subscribers += 1;
 		if (this.#subscribers === 1) {
-			this.#timer = setInterval(() => {
-				if (!consoleState.live || document.visibilityState === 'hidden') return;
-				void this.refresh();
+			// The first load always runs; the next ones only while LIVE is on.
+			let first = true;
+			this.#stopPolling = startPolling(() => {
+				if (!first && !consoleState.live) return true;
+				first = false;
+				return this.refresh();
 			}, INTERVAL_MS);
-			void this.refresh();
 		} else if (this.#stale()) {
 			void this.refresh();
 		}
 		return () => {
 			this.#subscribers -= 1;
 			if (this.#subscribers > 0) return;
-			clearInterval(this.#timer);
+			this.#stopPolling?.();
+			this.#stopPolling = undefined;
 			this.#controller?.abort();
 		};
 	}

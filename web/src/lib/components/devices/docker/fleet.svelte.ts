@@ -18,6 +18,7 @@ import {
 	type ContainerPolicy,
 	type ContainerView
 } from './api';
+import { startPolling } from '#lib/poll.js';
 
 export class ContainerFleet {
 	containers = $state<ContainerView[]>([]);
@@ -42,7 +43,7 @@ export class ContainerFleet {
 	#agentId: TargetId;
 	#subscribers = 0;
 	#controller: AbortController | null = null;
-	#timer: ReturnType<typeof setInterval> | null = null;
+	#stopPolling: (() => void) | null = null;
 	#period = 0;
 
 	constructor(id: TargetId, agentId: TargetId = id) {
@@ -68,6 +69,7 @@ export class ContainerFleet {
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			this.error = cause;
+			return false;
 		} finally {
 			this.loading = false;
 		}
@@ -126,15 +128,18 @@ export class ContainerFleet {
 	poll(period: number) {
 		if (this.#subscribers === 0 || this.#period === period) return;
 		this.#period = period;
-		if (this.#timer) clearInterval(this.#timer);
-		this.#timer = setInterval(() => void this.load(this.#controller?.signal), period);
+		this.#stopPolling?.();
+		// `retain` has just loaded: the first poll waits one period. The fleet's
+		// own controller carries the requests, so a change of period does not
+		// cut the one in flight.
+		this.#stopPolling = startPolling(() => this.load(this.#controller?.signal), period, { immediate: false });
 	}
 
 	#stop() {
 		this.#controller?.abort();
 		this.#controller = null;
-		if (this.#timer) clearInterval(this.#timer);
-		this.#timer = null;
+		this.#stopPolling?.();
+		this.#stopPolling = null;
 		this.#period = 0;
 		this.loading = true;
 		this.containers = [];
