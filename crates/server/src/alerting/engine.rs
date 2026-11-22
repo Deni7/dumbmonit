@@ -197,6 +197,7 @@ async fn maintenance(pool: &SqlitePool, config: &AlertingConfig, now: DateTime<U
 
     let expired = db::alerts::purge_expired_silences(pool, now).await?;
     let escalations = crate::oncall::runner::maintenance(pool, now).await?;
+    crate::annotations::store::purge(pool, now).await?;
 
     // Le registre des notifications ne sert qu'aux fenêtres glissantes du pipeline
     // (plafond horaire, battement, délai minimal) : au-delà, il ne vaut rien.

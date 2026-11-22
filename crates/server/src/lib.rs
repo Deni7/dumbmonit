@@ -6,6 +6,7 @@
 
 pub mod agent_tls;
 pub mod alerting;
+pub mod annotations;
 pub mod api;
 pub mod auth;
 pub mod backup;

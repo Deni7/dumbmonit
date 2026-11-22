@@ -238,6 +238,9 @@ pub struct ActiveAlertView {
     /// Tickets ouverts pour cette alerte par les canaux Jira, GLPI, Zammad,
     /// GitHub ou GitLab (vide sans canal de tickets).
     pub tickets: Vec<crate::notify::tickets::TicketLink>,
+    /// Le repère de changement du même équipement qui précède le
+    /// déclenchement de moins de 30 minutes (« après le changement : … »).
+    pub after_change: Option<crate::annotations::AfterChange>,
 }
 
 impl ActiveAlertView {
@@ -276,6 +279,7 @@ impl ActiveAlertView {
             last_notified_at: alert.state.last_notified_at,
             notify_count: alert.state.notify_count,
             tickets: Vec::new(),
+            after_change: None,
         }
     }
 }
@@ -1351,6 +1355,8 @@ pub async fn list_active(
     // les liens de tickets sont un confort, pas l'objet de la page.
     let mut tickets =
         crate::notify::tickets::links_by_fingerprint(&state.pool).await.unwrap_or_default();
+    // Une lecture, elle aussi : les repères qui ont pu précéder un déclenchement.
+    let changes = crate::annotations::changes_before_alerts(&state.pool, &alerts).await;
 
     Ok(Json(
         alerts
@@ -1371,7 +1377,12 @@ pub async fn list_active(
             .map(|alert| {
                 let rule = rules.get(&alert.rule_uid);
                 let links = tickets.remove(&alert.fingerprint).unwrap_or_default();
-                ActiveAlertView { tickets: links, ..ActiveAlertView::new(alert, rule, now) }
+                let after_change = changes.cited_by(&alert);
+                ActiveAlertView {
+                    tickets: links,
+                    after_change,
+                    ..ActiveAlertView::new(alert, rule, now)
+                }
             })
             .collect(),
     ))

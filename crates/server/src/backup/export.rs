@@ -120,6 +120,7 @@ pub async fn collect(pool: &SqlitePool, cipher: &Cipher, options: ExportOptions)
             .await?
             .map(|(logo_type, bytes)| BundleReportLogo { logo_type, data: BASE64.encode(bytes) }),
         slos: slos(pool, &refs).await?,
+        annotations: crate::backup::annotations::collect(pool, &refs).await?,
         auth_policy: crate::auth::settings::get::<Value>(pool, crate::auth::policy::SETTINGS_KEY)
             .await?,
         monitor_templates: monitor_templates::collect_templates(pool, &channel_names).await?,
@@ -1180,6 +1181,7 @@ pub fn sections() -> BTreeMap<&'static str, &'static str> {
         ("status_pages", "Public status pages and the services they list."),
         ("incidents", "Incidents and maintenance announcements, with their post-mortems."),
         ("slos", "Service level objectives: target, window and the monitors they cover."),
+        ("annotations", "Change markers drawn on the charts, with the monitors they apply to."),
         ("users", "Accounts, their role, email address and SSO link."),
         ("auth_policy", "Authentication policy: two-factor required for admins and operators."),
         ("agent_tokens", "Agent enrolment tokens, as hashes: installed agents keep working."),

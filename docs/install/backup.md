@@ -70,6 +70,7 @@ recovery**: a bundle whose passphrase is lost is lost.
 | `slos` | Service level objectives: target, window, alerting on or off, and the monitors and folders they cover. |
 | `monitor_templates` | Monitor templates: name, type, settings and tags (never a secret), check interval and notification channels, by name. |
 | `target_channels` | The notification channels each monitor picked for itself, by channel name. |
+| `annotations` | Change markers drawn on the charts, with the monitors, folder or tags they apply to. |
 | `users` | Accounts: username, display name, email address, role, SSO link, enabled or not. |
 | `auth_policy` | The authentication policy: whether admins and operators must use two-factor authentication. |
 | `agent_tokens` | Agent enrolment tokens, as hashes. Installed agents keep pushing after a restore. Tokens from an older backup are renamed to opaque `tok_…` identifiers. |

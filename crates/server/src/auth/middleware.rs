@@ -154,6 +154,11 @@ pub const OPERATOR_ROUTES: &[(&str, &str)] = &[
     // Lancer à la main une action de remédiation définie par un
     // administrateur, depuis une alerte en cours (`api::remediation::run_action`).
     ("POST", "/remediation/actions/*/run"),
+    // Repères de changement : documenter un déploiement ou une maintenance est un
+    // geste d'exploitation (`api::annotations`).
+    ("POST", "/annotations"),
+    ("PATCH", "/annotations/*"),
+    ("DELETE", "/annotations/*"),
 ];
 
 /// Préfixes de routes interdits aux jetons d'API, quelle que soit leur portée :
@@ -680,6 +685,9 @@ mod tests {
         yes(Method::PUT, "/alerts/rules/2/overrides/7");
         yes(Method::DELETE, "/alerts/rules/2/overrides/7");
         yes(Method::POST, "/remediation/actions/3/run");
+        yes(Method::POST, "/annotations");
+        yes(Method::PATCH, "/annotations/4");
+        yes(Method::DELETE, "/api/annotations/4");
 
         no(Method::PUT, "/alerts/abc123/ack");
         no(Method::POST, "/alerts//ack");
@@ -708,6 +716,8 @@ mod tests {
         no(Method::POST, "/remediation/policies/1/arm");
         no(Method::POST, "/remediation/policies/1/confirm");
         no(Method::POST, "/runbooks");
+        no(Method::PUT, "/annotations/4");
+        no(Method::POST, "/annotations/4");
     }
 
     #[test]

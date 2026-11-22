@@ -153,6 +153,7 @@ pub async fn restore(
         templates::restore_target_channels(&mut tx, &bundle.target_channels, &refs, &channels)
             .await?,
     );
+    report.push(crate::backup::annotations::restore(&mut tx, &bundle.annotations, &refs).await?);
     report.push(restore_incidents(&mut tx, bundle).await?);
     report.push(restore_agent_tokens(&mut tx, bundle).await?);
     report.push(restore_api_tokens(&mut tx, bundle).await?);

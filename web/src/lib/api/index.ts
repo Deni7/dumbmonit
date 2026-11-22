@@ -100,6 +100,7 @@ export * from './teams';
 export * from './clients';
 export * from './mail_server';
 export * from './slos';
+export * from './annotations';
 export {
 	ApiError,
 	toApiError,

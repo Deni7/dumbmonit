@@ -475,6 +475,10 @@
 				</p>
 			{/if}
 
+			{#if alert?.after_change}
+				<p class="mt-2 text-ink-2">{m.w5annot_alert_after_change({ title: alert.after_change.title })}</p>
+			{/if}
+
 			{#if tickets.length > 0}
 				<p class="mt-2 text-ink-2">
 					{m.alerts_row_tickets()}
