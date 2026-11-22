@@ -151,9 +151,8 @@ pub struct EnvManaged {
 
 impl EnvManaged {
     pub fn from_env() -> Self {
-        let set = |key: &str| {
-            crate::config::env_var(key).is_some_and(|value| !value.trim().is_empty())
-        };
+        let set =
+            |key: &str| crate::config::env_var(key).is_some_and(|value| !value.trim().is_empty());
         Self {
             enabled: set("DUMBMONIT_BACKUP_ENABLED"),
             interval_hours: set("DUMBMONIT_BACKUP_INTERVAL_HOURS"),

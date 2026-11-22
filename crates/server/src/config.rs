@@ -300,11 +300,7 @@ impl Config {
                 self.backup_path().display().to_string(),
                 Some("DUMBMONIT_BACKUP_DIR"),
             ),
-            set(
-                "audit_keep",
-                crate::auth::audit::keep().to_string(),
-                Some("DUMBMONIT_AUDIT_KEEP"),
-            ),
+            set("audit_keep", crate::auth::audit::keep().to_string(), Some("DUMBMONIT_AUDIT_KEEP")),
             set(
                 "config_dir",
                 self.config_dir.as_ref().map_or_else(|| "-".into(), |d| d.display().to_string()),
@@ -853,10 +849,7 @@ mod tests {
         unique.dedup();
         assert_eq!(keys.len(), unique.len(), "a key appears twice");
         for key in keys {
-            assert!(
-                !["secret", "password", "token"].contains(&key),
-                "{key} must not be listed"
-            );
+            assert!(!["secret", "password", "token"].contains(&key), "{key} must not be listed");
         }
     }
 

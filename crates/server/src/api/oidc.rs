@@ -16,10 +16,10 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
+use crate::auth::client_ip::ClientIp;
 use crate::auth::middleware::AdminUser;
 use crate::auth::oidc::flow::{self, CallbackParams, FlowError};
 use crate::auth::oidc::{self, OidcConfig, Source, discovery};
-use crate::auth::client_ip::ClientIp;
 use crate::auth::{AuthResult, AuthState, audit, cookie, session};
 use crate::state::AppState;
 

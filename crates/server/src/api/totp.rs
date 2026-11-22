@@ -329,9 +329,7 @@ impl AuditQuery {
         let bound = |raw: &Option<String>, end: bool| -> AuthResult<Option<String>> {
             match raw.as_deref().map(str::trim).filter(|raw| !raw.is_empty()) {
                 None => Ok(None),
-                Some(raw) => {
-                    audit::normalise_bound(raw, end).map(Some).map_err(AuthError::Invalid)
-                }
+                Some(raw) => audit::normalise_bound(raw, end).map(Some).map_err(AuthError::Invalid),
             }
         };
         Ok(audit::Filter {
@@ -388,10 +386,7 @@ pub async fn audit_export(
     Response::builder()
         .status(StatusCode::OK)
         .header(axum::http::header::CONTENT_TYPE, content_type)
-        .header(
-            axum::http::header::CONTENT_DISPOSITION,
-            format!("attachment; filename=\"{name}\""),
-        )
+        .header(axum::http::header::CONTENT_DISPOSITION, format!("attachment; filename=\"{name}\""))
         .header(axum::http::header::CACHE_CONTROL, "no-store")
         .body(axum::body::Body::from(body))
         .map_err(|e| AuthError::Internal(e.into()))

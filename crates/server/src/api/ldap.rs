@@ -9,11 +9,11 @@ use axum::Json;
 use axum::extract::State;
 use serde::{Deserialize, Serialize};
 
+use crate::auth::client_ip::ClientIp;
 use crate::auth::ldap::client::{self, TestReport};
 use crate::auth::ldap::{self, GroupMode, LdapConfig};
 use crate::auth::middleware::AdminUser;
 use crate::auth::oidc::Source;
-use crate::auth::client_ip::ClientIp;
 use crate::auth::{AuthError, AuthResult, audit};
 use crate::state::AppState;
 

@@ -231,10 +231,7 @@ mod tests {
     fn une_borne_de_periode_se_normalise() {
         assert_eq!(normalise_bound("2026-03-01", false).unwrap(), "2026-03-01T00:00:00Z");
         assert_eq!(normalise_bound("2026-03-01", true).unwrap(), "2026-03-01T23:59:59Z");
-        assert_eq!(
-            normalise_bound("2026-03-01 08:30:00", true).unwrap(),
-            "2026-03-01T08:30:00Z"
-        );
+        assert_eq!(normalise_bound("2026-03-01 08:30:00", true).unwrap(), "2026-03-01T08:30:00Z");
         assert!(normalise_bound("hier", false).is_err());
     }
 
@@ -260,10 +257,7 @@ mod tests {
         let csv = to_csv(&[entry]);
         let lines: Vec<&str> = csv.split("\r\n").collect();
         assert_eq!(lines[0], "id,at,actor,action,subject,ip");
-        assert_eq!(
-            lines[1],
-            "7,\"2026-03-01T08:00:00Z\",\"'+admin\",\"login\",\"\",\"10.0.0.1\""
-        );
+        assert_eq!(lines[1], "7,\"2026-03-01T08:00:00Z\",\"'+admin\",\"login\",\"\",\"10.0.0.1\"");
     }
 
     #[tokio::test]

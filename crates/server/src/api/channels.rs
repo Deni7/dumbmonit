@@ -316,14 +316,8 @@ pub async fn delete(
 
     if db::alerts::delete_channel(&state.pool, id).await? {
         let subject = name.unwrap_or_else(|| id.to_string());
-        audit::record(
-            &state.pool,
-            Some(&principal.label()),
-            "channel.deleted",
-            Some(&subject),
-            ip,
-        )
-        .await;
+        audit::record(&state.pool, Some(&principal.label()), "channel.deleted", Some(&subject), ip)
+            .await;
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(not_found(id))
