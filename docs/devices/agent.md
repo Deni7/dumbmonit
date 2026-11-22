@@ -18,6 +18,12 @@ A remote site can do without 8080: the agent port also serves the install
 script and the binaries, and the command shown for a relay uses 8443 only (see
 [Monitor a remote site](../install/remote-site.md)).
 
+The other way round, a machine that can only reach the web address (Cloudflare
+Tunnel, a reverse proxy that terminates TLS, a network where only web traffic
+goes out) can do without 8443: the agent then carries its encrypted channel
+inside a WebSocket on 8080 (or 443). See
+[Agents behind a proxy](../install/agents-behind-proxy.md).
+
 The direction is deliberate: the agent calls the server, never the other way
 round. It crosses NAT and home firewalls, and requires opening **no port** on
 the monitored machine.
@@ -798,8 +804,15 @@ perf_counters:             # Windows: performance counters to publish
     name: cpu_total        # value of the "counter" label; the path when omitted
 max_buffered_samples: 20000
 buffer_max_mb: 256         # disk buffer for outages, in MB (0 = memory only)
+transport: auto            # encrypted channel: auto, direct (agent port) or websocket (web address)
 log_level: info
 ```
+
+`transport` (or `DUMBMONIT_AGENT_TRANSPORT`) says how the agent reaches its
+encrypted channel: `auto` (default) tries the agent port first and, after
+repeated connection failures, the WebSocket of `server_url`, then keeps the one
+that answers; `direct` and `websocket` force one. A typo stops the agent at
+startup. See [Agents behind a proxy](../install/agents-behind-proxy.md).
 
 `sensors`, `smart`, `zfs` and `libvirt` are detected, never assumed: left at
 `true` on a machine with no probe, no `smartctl`, no pool or no `virsh`, they
@@ -1041,6 +1054,10 @@ server_urls:
   in turn.
 - The machine page shows **Server: primary**, or **Backup** with the address
   in use, since when, and the last error seen on the primary.
+- An agent that goes through the WebSocket of the web address
+  (`transport: websocket`, or `auto` after a fallback) follows the server in
+  use: the WebSocket moves to the backup's address, and the primary is tried
+  through its own WebSocket, which a standby does not open.
 - Only `https://` addresses (or the loopback) are accepted.
 
 ## Outbound proxy {#outbound-proxy}

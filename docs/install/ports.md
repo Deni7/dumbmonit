@@ -33,6 +33,12 @@ the public status pages (`/s/<slug>`). Change it with `DUMBMONIT_BIND`.
 - **Safer:** put a reverse proxy in front (see the third scenario), or reach
   the interface through a VPN such as Tailscale or WireGuard. Allow only your
   own IPs on the proxy.
+- **Agent WebSocket:** `/api/agent/ws` on this port carries the agent channel
+  for agents that cannot reach 8443 (Cloudflare Tunnel, a reverse proxy that
+  terminates TLS, a network where only web traffic goes out). The agent's own
+  TLS session travels inside it, end to end; the route needs the agent channel
+  enabled (`DUMBMONIT_AGENT_LISTEN`), not 8443 published. `DUMBMONIT_AGENT_WEBSOCKET=off`
+  closes it. See [Agents behind a proxy](agents-behind-proxy.md).
 
 ### 8443: agent channel
 
@@ -47,8 +53,11 @@ the Internet, but it still deserves a source filter. Change it with
   install command shown for a relay uses this port only, so a remote site
   never needs 8080. The command pins the key of the port's certificate and the
   SHA-256 of each binary.
-- **Closed:** agents on other networks cannot report. Agents on the same
-  network as the server can still use the web port.
+- **Closed:** agents on other networks cannot report on this port. They can
+  still go through the web address, their channel inside a WebSocket
+  (`transport: websocket`, or `auto` which falls back to it on its own), as
+  long as the channel stays enabled (`DUMBMONIT_AGENT_LISTEN` not `off`): an
+  unpublished 8443 is enough.
 - **Open on the Internet:** anyone can try a TLS handshake, but without an
   agent certificate they get nothing. Restrict it to your agents' IPs anyway.
 - **Relay gateway:** a relay agent opens its own gateway, also on 8443 by

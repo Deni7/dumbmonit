@@ -28,6 +28,13 @@ on Windows), and the check above it opens the agent WebSocket at that address
 instead of the agent port. Nothing else changes: the script and the agent come
 from the same address.
 
+When the check says the agent port does not answer (refused, timeout, another
+service on that port), it offers **Use the web address (WebSocket)**: the
+command is issued again with `--transport=websocket` and the check runs
+through the WebSocket. **Use the agent port** goes back when the WebSocket
+does not answer either, or when the server chose it for you but the agent
+port is reachable after all.
+
 Through the API, ask for it with `transport=websocket`
 (`GET /api/agent/install?base_url=…&transport=websocket`, or `"transport":
 "websocket"` when creating a token).
@@ -51,7 +58,19 @@ The WebSocket follows `server_url`: its certificate is checked by the system's
 authorities, or by `server_pin` for a self-signed one. The outbound proxy of
 the agent (`proxy:`, `HTTPS_PROXY`) is used for it. A relay can use this
 transport too: its multiplexed connection, with all the agents of its site,
-goes through the same WebSocket.
+goes through the same WebSocket. With [backup servers](../devices/agent.md#backup-servers)
+(`server_urls`), the WebSocket moves with the server in use.
+
+Inside the agent, a local bridge listens on the loopback (`127.0.0.1`, a port
+picked by the system): the agent's HTTP client dials it as it would dial the
+agent port, and each connection becomes one WebSocket to the server. Another
+program on the machine that connects to it gets nothing it could not get by
+opening the web address itself: the TLS session it would carry is checked by
+DumbMonit, and the bridge holds no credential.
+
+The machine page shows **Channel: WebSocket via the web address** for an agent
+whose last encrypted batch came that way. The server sees it from the
+connection; the agent does not declare it.
 
 ## Settings on the proxy
 
