@@ -116,6 +116,8 @@ const SELF_SERVICE: &[&str] = &[
     "/auth/passkeys/register/finish",
     "/auth/sessions/revoke-others",
     "/auth/totp/recovery-codes",
+    "/auth/notifications",
+    "/auth/notifications/test",
     "/music/speaker/report",
     "/music/speaker/play",
     "/music/spotify/playback",
@@ -436,6 +438,12 @@ fn same_origin(headers: &HeaderMap) -> Result<(), &'static str> {
     Err(NO_PROOF)
 }
 
+/// La même preuve d'origine, exigée par les routes publiques qui écrivent sans
+/// session : réinitialisation du mot de passe, acceptation d'une invitation.
+pub fn require_same_origin(headers: &HeaderMap) -> Result<(), AuthError> {
+    same_origin(headers).map_err(|reason| AuthError::Forbidden(reason.into()))
+}
+
 const CROSS_SITE: &str = "Cross-site request refused.";
 const NO_PROOF: &str = "State-changing requests must carry the header \
                         `X-Requested-With: DumbMonit` (browsers add it automatically \
@@ -660,6 +668,9 @@ mod tests {
         assert!(!is_self_service("/auth/sessions/"));
         assert!(!is_self_service("/auth/sessions/12/../../users"));
         assert!(is_self_service("/auth/totp/recovery-codes"));
+        assert!(is_self_service("/api/auth/notifications"));
+        assert!(is_self_service("/auth/notifications/test"));
+        assert!(!is_self_service("/auth/recovery"));
         assert!(!is_self_service("/auth/policy"));
         assert!(!is_self_service("/users/3/sessions"));
     }

@@ -30,6 +30,7 @@ mod ical;
 mod ingest;
 mod instance;
 mod integrations;
+mod invitations;
 mod kuma_db;
 mod kuma_import;
 mod label_monitors;
@@ -43,6 +44,7 @@ mod metrics;
 mod monitor_imports;
 mod monitor_templates;
 mod music;
+mod my_notifications;
 mod netconfig;
 mod netinventory;
 mod notify_policy;
@@ -65,6 +67,7 @@ mod prometheus;
 mod proxies;
 mod proxmox;
 mod push;
+mod recovery;
 mod redfish;
 mod relay;
 mod remediation;
@@ -194,6 +197,12 @@ pub fn router_with_hubs(
         .route("/auth/scim/token", post(scim::create_token).delete(scim::delete_token))
         .route("/users", get(users::list).post(users::create))
         .route("/users/{id}", put(users::update).delete(users::delete))
+        // Liens de réinitialisation, réglages des liens de compte, invitations et
+        // notifications personnelles (`recovery.rs`, `invitations.rs`,
+        // `my_notifications.rs`).
+        .merge(recovery::routes())
+        .merge(invitations::routes())
+        .merge(my_notifications::routes())
         .route("/collectors", get(collectors::list))
         // Compteurs plats pour Homepage / tableaux de bord tiers (`summary.rs`).
         .route("/summary", get(summary::get))
@@ -428,6 +437,10 @@ pub fn router_with_hubs(
         .route("/auth/setup", post(auth::setup))
         .route("/auth/login", post(auth::login))
         .route("/auth/login/totp", post(totp::login_step))
+        // Mot de passe oublié et invitations : le lien envoyé est l'autorisation,
+        // à usage unique (`recovery.rs`, `invitations.rs`).
+        .merge(recovery::public_routes())
+        .merge(invitations::public_routes())
         // Connexion par clé d'accès (WebAuthn), publique comme `login`.
         .merge(passkeys::public_routes())
         .route("/auth/oidc/start", get(oidc::start))
