@@ -361,6 +361,16 @@
 							<span class="text-ink-2"> · {target.address}</span>
 						</dd>
 					{/if}
+					{#if alert.labels.slo_id && /^\d+$/.test(alert.labels.slo_id)}
+						<dt class="text-ink-3">{m.w3tech_alerts_detail_slo()}</dt>
+						<dd class="break-words text-ink">
+							<a
+								href={withBase(`/status?tab=slo&slo=${alert.labels.slo_id}`)}
+								class="font-medium underline decoration-line-strong underline-offset-2 hover:decoration-ink"
+								>{alert.labels.slo || `#${alert.labels.slo_id}`}</a
+							>
+						</dd>
+					{/if}
 					<dt class="text-ink-3">{m.alerts_detail_rule()}</dt>
 					<dd class="break-words text-ink">{title}</dd>
 					{#if alert.value !== null && Number.isFinite(alert.value)}

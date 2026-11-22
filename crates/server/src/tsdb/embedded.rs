@@ -549,7 +549,12 @@ mod tests {
 
         let dir = tempfile::tempdir().unwrap();
         let binary = dir.path().join("fake-vm");
-        std::fs::write(&binary, "#!/bin/sh\nexit 1\n").unwrap();
+        // Chaque lancement s'inscrit dans un journal : le nombre de lancements dit
+        // si le superviseur a attendu la fin du délai de relance, sans dépendre de
+        // la vitesse de la machine.
+        let launches = dir.path().join("launches");
+        let script = format!("#!/bin/sh\necho x >> {}\nexit 1\n", launches.display());
+        std::fs::write(&binary, script).unwrap();
         std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o755)).unwrap();
 
         let shared = Arc::new(Shared {
@@ -585,13 +590,21 @@ mod tests {
         .await
         .expect("le pid du processus sorti n'a pas été effacé");
 
+        let cleared_at = Instant::now();
         let vm = EmbeddedVm { shared };
-        let started = Instant::now();
         vm.stop().await;
+        let launched = std::fs::read_to_string(&launches).unwrap().lines().count();
+        // Si la machine a tardé plus que le délai entre la sortie du faux binaire et
+        // l'arrêt, la relance a légitimement eu lieu : rien à conclure.
+        if cleared_at.elapsed() < FIRST_RESTART_DELAY {
+            assert_eq!(launched, 1, "stop() a attendu la fin du délai de relance");
+        }
+        // Borne large (pas de mesure fine, qui bascule sur un exécuteur de CI
+        // lent) : seulement de quoi détecter un arrêt qui attend le délai maximal.
         assert!(
-            started.elapsed() < Duration::from_millis(500),
-            "stop() a attendu la fin du délai de relance ({:?})",
-            started.elapsed()
+            cleared_at.elapsed() < Duration::from_secs(5),
+            "stop() a mis trop longtemps ({:?})",
+            cleared_at.elapsed()
         );
     }
 }
