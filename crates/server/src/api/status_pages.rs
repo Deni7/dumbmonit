@@ -2718,7 +2718,7 @@ mod tests {
 
     #[test]
     fn badge_names_the_state() {
-        let svg = render_badge("major");
+        let svg = render_badge("major", badges::Style::Flat);
         assert!(svg.contains("major outage"));
         assert!(svg.starts_with("<svg"));
     }

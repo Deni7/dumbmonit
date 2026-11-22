@@ -100,6 +100,7 @@ impl Style {
 }
 
 /// Badge à la manière de shields.io : « étiquette | valeur ».
+#[cfg(test)]
 pub(super) fn render(label: &str, value: &str, colour: &str) -> String {
     render_styled(label, value, colour, Style::Flat)
 }
@@ -364,8 +365,8 @@ mod tests {
 
     #[test]
     fn the_style_parameter_is_checked() {
-        assert_eq!(Style::parse(None).unwrap(), Style::Flat);
-        assert_eq!(Style::parse(Some("for-the-badge")).unwrap(), Style::ForTheBadge);
+        assert!(matches!(Style::parse(None), Ok(Style::Flat)));
+        assert!(matches!(Style::parse(Some("for-the-badge")), Ok(Style::ForTheBadge)));
         assert!(Style::parse(Some("plastic")).is_err());
     }
 
