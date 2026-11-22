@@ -197,6 +197,9 @@ async fn summaries(pool: &SqlitePool, only: Option<i64>) -> ApiResult<Vec<Channe
     .bind(only)
     .fetch_all(pool)
     .await?;
+    // L'adresse des clics des boutons interactifs dépend de l'adresse publique.
+    let env_url = crate::config::env_var("DUMBMONIT_PUBLIC_URL");
+    let public_url = policy_store::load_global(pool).await?.public_url(env_url.as_deref());
 
     rows.iter()
         .map(|row| {
@@ -209,16 +212,26 @@ async fn summaries(pool: &SqlitePool, only: Option<i64>) -> ApiResult<Vec<Channe
             if let Some(map) = settings.as_object_mut() {
                 map.remove(notify::channel::HEADERS_KEY);
             }
+            let id: i64 = row.try_get("id")?;
+            let kind: String = row.try_get("kind")?;
+            let interactive = settings
+                .get(notify::interactive::INTERACTIVE_KEY)
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let public_url = public_url.as_deref();
+            let callback_url =
+                notify::interactive::callback_url_for(&kind, id, interactive, public_url);
             Ok(ChannelSummary {
-                id: row.try_get("id")?,
+                id,
                 name: row.try_get("name")?,
-                kind: row.try_get("kind")?,
+                kind,
                 enabled: row.try_get::<i64, _>("enabled")? != 0,
                 settings,
                 has_secret: row.try_get::<i64, _>("has_secret")? != 0,
                 last_error: row.try_get("last_error")?,
                 last_sent_at: row.try_get("last_sent_at")?,
                 policy: serde_json::from_str(&policy).unwrap_or_default(),
+                callback_url,
             })
         })
         .collect::<Result<Vec<_>, sqlx::Error>>()
@@ -250,6 +263,7 @@ pub async fn create(
         .map_err(duplicate_name_to_conflict)?;
     policy_store::save_channel_policy(&state.pool, id, &policy).await?;
     clients::adopt(&state.pool, &access, clients::Kind::Channel, id).await?;
+    super::chat_actions::sync_telegram_webhook(&state, id, false).await;
     crate::first_run::record(&state.pool, crate::first_run::Milestone::FirstChannel).await;
     // Le nom et le type seulement : jamais les réglages, qui portent des secrets.
     let subject = format!("{} ({})", draft.name, draft.kind);
@@ -273,6 +287,8 @@ pub async fn update(
     let current_policy = summary(&state.pool, id).await?.policy;
     let policy = parse_policy(payload.policy.take(), &current_policy)?;
 
+    // Le webhook Telegram n'est retiré que s'il avait été posé par DumbMonit.
+    let was_interactive = current.kind == "telegram" && notify::interactive::enabled(&current);
     let mut draft = payload.validate(Some(&current))?;
     draft.id = Some(id);
     if draft.kind == crate::oncall::CHANNEL_KIND {
@@ -283,6 +299,7 @@ pub async fn update(
         .await
         .map_err(duplicate_name_to_conflict)?;
     policy_store::save_channel_policy(&state.pool, id, &policy).await?;
+    super::chat_actions::sync_telegram_webhook(&state, id, was_interactive).await;
     let subject = format!("{} ({})", draft.name, draft.kind);
     audit::record(&state.pool, Some(&principal.label()), "channel.updated", Some(&subject), ip)
         .await;
@@ -314,7 +331,11 @@ pub async fn delete(
         )));
     }
 
+    let config = db::alerts::get_channel(&state.pool, &state.cipher, id).await?;
     if db::alerts::delete_channel(&state.pool, id).await? {
+        if let Some(config) = config {
+            super::chat_actions::forget_telegram_webhook(config);
+        }
         let subject = name.unwrap_or_else(|| id.to_string());
         audit::record(&state.pool, Some(&principal.label()), "channel.deleted", Some(&subject), ip)
             .await;

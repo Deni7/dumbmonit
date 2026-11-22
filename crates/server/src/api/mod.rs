@@ -18,7 +18,9 @@ mod backends;
 mod backup;
 mod backup_destinations;
 mod blacklist;
+mod channel_templates;
 mod channels;
+mod chat_actions;
 pub(crate) mod clients;
 mod collectors;
 mod cves;
@@ -283,6 +285,7 @@ pub fn router_with_hubs(
         .route("/notify/channels", get(channels::list).post(channels::create))
         .route("/notify/channels/{id}", put(channels::update).delete(channels::delete))
         .route("/notify/channels/{id}/test", post(channels::test))
+        .route("/notify/template-preview", post(channel_templates::preview))
         .route("/notify/kinds", get(channels::kinds))
         .route("/agent/tokens", get(ingest::list_tokens).post(ingest::create_token))
         .route("/agent/tokens/{id}", delete(ingest::revoke_token))
@@ -492,6 +495,9 @@ pub fn router_with_hubs(
         // Liens d'action des notifications : le jeton signé est l'autorisation
         // (`alert_actions.rs`).
         .merge(alert_actions::public_routes())
+        // Boutons interactifs de Slack et Telegram : la signature de la
+        // plateforme, puis le jeton signé du bouton (`chat_actions.rs`).
+        .merge(chat_actions::public_routes())
         // Calendrier iCal d'astreinte d'une personne : l'URL secrète est
         // l'autorisation, une application de calendrier n'a pas de session.
         .merge(oncall::public_routes())

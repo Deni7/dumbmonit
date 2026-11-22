@@ -101,6 +101,7 @@ export { onMutation } from './mutations';
 export * from './teams';
 export * from './clients';
 export * from './mail_server';
+export * from './channel_templates';
 export * from './slos';
 export * from './annotations';
 export * from './alert_insights';

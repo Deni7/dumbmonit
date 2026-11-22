@@ -1715,6 +1715,28 @@ export interface ChannelKindInfo {
 	/** How the channel shows Acknowledge / Snooze links: native buttons, links in the
 	 *  message, or not at all (services with their own acknowledgement). */
 	actions?: 'buttons' | 'links' | 'none' | string;
+	/** Format of the channel's message templates; empty when the kind takes none. */
+	template_format?: MessageTemplateFormat | '';
+}
+
+/** How a channel's message templates are written, which decides how values are escaped. */
+export type MessageTemplateFormat = 'plain' | 'slack_mrkdwn' | 'html' | 'telegram_markdown_v2';
+
+/** `POST /api/notify/template-preview`: empty templates render the defaults. */
+export interface TemplatePreviewRequest {
+	kind: string;
+	title_template?: string | null;
+	body_template?: string | null;
+}
+
+/** A channel's message templates rendered on a sample disk-full alert. */
+export interface TemplatePreview {
+	format: MessageTemplateFormat;
+	title: string;
+	/** In the service's format, values escaped. */
+	body: string;
+	default_title: string;
+	default_body: string;
 }
 
 /** A channel as returned on read: never its secrets. */
@@ -1728,6 +1750,9 @@ export interface Channel {
 	last_error: string | null;
 	last_sent_at: string | null;
 	policy: ChannelPolicy;
+	/** With interactive buttons (Slack, Telegram) and a public URL: where the platform
+	 *  sends button presses. Absent otherwise. */
+	callback_url?: string;
 }
 
 /**

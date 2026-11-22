@@ -4838,6 +4838,35 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/notify/template-preview:
+    post:
+      operationId: previewMessageTemplate
+      tags: [Notifications]
+      summary: Preview a channel's message templates on a sample alert
+      description: >-
+        Renders the title and body templates (`message_title_template`,
+        `message_body_template` in the channel settings) for a channel type, on a sample
+        disk-full alert, with the escaping of that service (`plain`, `slack_mrkdwn`, `html`,
+        `telegram_markdown_v2`). Empty templates render the defaults, which give the usual
+        message. `400` with the reason when saving the channel would refuse the templates
+        (unknown variable, unclosed braces), or when the type takes no message template.
+        Changes nothing.
+      x-token-scope: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TemplatePreviewRequest" }
+      responses:
+        "200":
+          description: The rendered sample.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TemplatePreview" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /api/notify/mail-server:
     get:
       operationId: getMailServer
@@ -6583,6 +6612,64 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/public/chat/slack/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    post:
+      operationId: slackInteraction
+      tags: [Notifications]
+      summary: Button presses from a Slack channel with interactive buttons
+      description: |
+        The Interactivity Request URL of the channel's Slack app. Slack posts
+        `application/x-www-form-urlencoded` with a `payload` field; the request must carry a valid
+        `X-Slack-Signature` (HMAC-SHA256 of `v0:<timestamp>:<body>` with the channel's signing
+        secret) and an `X-Slack-Request-Timestamp` less than five minutes old, otherwise `403`
+        (also for a channel that is not an enabled interactive Slack channel). The button carries a
+        signed action token (24 hours, one use): the alerts are acknowledged or snoozed as
+        `slack:<username>`, recorded in the audit log, and the message is rewritten through
+        `response_url` ("Acknowledged by …"). A second press does nothing more. Always `200`
+        once the signature is valid, so that Slack does not retry.
+      security: []
+      x-token-scope: public
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                payload: { type: string, description: "The interaction, as JSON." }
+      responses:
+        "200": { description: Accepted. }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/public/chat/telegram/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    post:
+      operationId: telegramUpdate
+      tags: [Notifications]
+      summary: Webhook of a Telegram channel with interactive buttons
+      description: |
+        Set as the bot's webhook when the channel is saved with interactive buttons (the instance
+        public URL must be https). Telegram sends `X-Telegram-Bot-Api-Secret-Token`, a secret
+        derived from the instance secret, the channel and its bot token; without it, `403`. Only
+        `callback_query` updates are read: the button's short reference gives back the signed
+        action token (24 hours, one use), the alerts are acknowledged or snoozed as
+        `telegram:<username>`, recorded in the audit log, and the buttons are replaced by
+        "Acknowledged by …". A second press does nothing more. Always `200` once the secret is
+        valid, so that Telegram does not retry.
+      security: []
+      x-token-scope: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true, description: "A Telegram Update." }
+      responses:
+        "200": { description: Accepted. }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /api/public/status/{slug}/confirm:
     parameters:
@@ -15496,6 +15583,10 @@ components:
           type: string
           enum: [buttons, links, none]
           description: "How the channel shows the Acknowledge / Snooze action links: native buttons, links in the message, or not at all."
+        template_format:
+          type: string
+          enum: ["", plain, slack_mrkdwn, html, telegram_markdown_v2]
+          description: "Format of the channel's message templates, which decides how values are escaped; empty when the type takes no message template."
         settings:
           type: array
           items: { $ref: "#/components/schemas/ChannelField" }
@@ -15535,6 +15626,9 @@ components:
         last_error: { type: [string, "null"] }
         last_sent_at: { type: [string, "null"] }
         policy: { $ref: "#/components/schemas/ChannelPolicy" }
+        callback_url:
+          type: string
+          description: "With interactive buttons on Slack or Telegram and a public URL: where the platform sends button presses (paste it as the Slack app's Interactivity Request URL; DumbMonit registers it as the Telegram webhook). Absent otherwise."
     ChannelPayload:
       type: object
       required: [name, kind]
@@ -15670,6 +15764,22 @@ components:
         escalate_channel: { type: [integer, "null"], format: int64 }
         action_links: { type: boolean }
         resolutions_during_silence: { type: string, enum: [suppress, send] }
+    TemplatePreviewRequest:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, description: The channel type. }
+        title_template: { type: [string, "null"], description: "Empty or absent: the default, `{{title}}`." }
+        body_template: { type: [string, "null"], description: "Empty or absent: the default, `{{summary}}` then `{{url}}`." }
+    TemplatePreview:
+      type: object
+      required: [format, title, body, default_title, default_body]
+      properties:
+        format: { type: string, enum: [plain, slack_mrkdwn, html, telegram_markdown_v2] }
+        title: { type: string }
+        body: { type: string, description: In the service's format (escaped values). }
+        default_title: { type: string }
+        default_body: { type: string }
     AlertActionToken:
       type: object
       required: [token]
