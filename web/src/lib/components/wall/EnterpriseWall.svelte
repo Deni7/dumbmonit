@@ -33,7 +33,7 @@
 	import { untrack, type Component } from 'svelte';
 	import { goto } from '#lib/navigation.js';
 	import { page } from '$app/state';
-	import { AlertTriangle, CircleAlert, CircleCheck, CircleDashed, X } from 'lucide-svelte';
+	import { AlertTriangle, CircleAlert, CircleCheck, CircleDashed, Maximize, Minimize, Volume2, VolumeX, X } from 'lucide-svelte';
 	import { listAlertRules, type AlertRule } from '#lib/api/index.js';
 	import { getWallWeather } from '#lib/api/weather.js';
 	import type { WallWeather as OutdoorWeather } from '#lib/api/types.js';
@@ -62,6 +62,9 @@
 	import WallDevices from '#lib/components/wall/WallDevices.svelte';
 	import WallProblems from '#lib/components/wall/WallProblems.svelte';
 	import WallSceneControl from '#lib/components/wall/WallSceneControl.svelte';
+	import WallNotice from '#lib/components/wall/WallNotice.svelte';
+	import { clockText, parseWallParams, readWallPrefs, writeWallPrefs, type WallPrefs } from '#lib/components/wall/wallPrefs.js';
+	import { beep, unlockWallSound } from '#lib/components/wall/wallSound.js';
 	import MusicControl from '#lib/components/wall/MusicControl.svelte';
 	import MusicDock from '#lib/components/wall/MusicDock.svelte';
 	import {
@@ -151,8 +154,82 @@
 		if (event.key === 'Escape') {
 			event.preventDefault();
 			exit();
+			return;
+		}
+		// F and T: not while typing (the music link field) and not with a shortcut held.
+		if (event.ctrlKey || event.metaKey || event.altKey) return;
+		const el = event.target as HTMLElement | null;
+		if (el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))) return;
+		const key = event.key.toLowerCase();
+		if (key === 'f') {
+			event.preventDefault();
+			void toggleFullscreen();
+		} else if (key === 't') {
+			event.preventDefault();
+			themeOverride = wallTheme === 'light' ? 'dark' : 'light';
 		}
 	}
+
+	// --- This display: options, address parameters, theme, fullscreen, cursor ---
+	let prefs = $state<WallPrefs>(readWallPrefs());
+	function setPrefs(patch: Partial<WallPrefs>) {
+		prefs = { ...prefs, ...patch };
+		writeWallPrefs(prefs);
+	}
+	// `?theme=`, `?scene=` and `?music=0` configure one display without touching what is remembered.
+	const params = $derived(parseWallParams(page.url.searchParams));
+	let themeOverride = $state<'dark' | 'light' | null>(null);
+	const wallTheme = $derived(themeOverride ?? params.theme ?? 'dark');
+	const musicOff = $derived(params.music === false);
+
+	let fullscreen = $state(false);
+	$effect(() => {
+		const sync = () => (fullscreen = document.fullscreenElement !== null);
+		sync();
+		document.addEventListener('fullscreenchange', sync);
+		return () => document.removeEventListener('fullscreenchange', sync);
+	});
+	async function toggleFullscreen() {
+		try {
+			if (document.fullscreenElement) await document.exitFullscreen();
+			else await document.documentElement.requestFullscreen();
+		} catch {
+			// Refused (no gesture, or not supported): the wall stays as it is.
+		}
+	}
+
+	// The cursor goes away after 3 s without a move, and comes back with the next one.
+	const CURSOR_HIDE_MS = 3000;
+	let cursorHidden = $state(false);
+	$effect(() => {
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const arm = () => {
+			cursorHidden = false;
+			clearTimeout(timer);
+			timer = setTimeout(() => (cursorHidden = true), CURSOR_HIDE_MS);
+		};
+		arm();
+		document.addEventListener('pointermove', arm);
+		document.addEventListener('pointerdown', arm);
+		return () => {
+			clearTimeout(timer);
+			document.removeEventListener('pointermove', arm);
+			document.removeEventListener('pointerdown', arm);
+		};
+	});
+
+	// The sound: browsers keep audio locked until a gesture, so the first click, tap or
+	// key press unlocks it (the sound button on the wall is such a gesture too).
+	$effect(() => {
+		if (!prefs.criticalSound) return;
+		const unlock = () => unlockWallSound();
+		document.addEventListener('pointerdown', unlock, { capture: true });
+		document.addEventListener('keydown', unlock, { capture: true });
+		return () => {
+			document.removeEventListener('pointerdown', unlock, { capture: true });
+			document.removeEventListener('keydown', unlock, { capture: true });
+		};
+	});
 
 	// --- The verdict -----------------------------------------------------------
 	const targets = $derived(alertsStore.targets);
@@ -180,7 +257,7 @@
 	const VERDICT_ICON = { signal: CircleCheck, warning: AlertTriangle, advisory: CircleAlert, ghost: CircleDashed };
 	const Icon = $derived(VERDICT_ICON[verdict.tone]);
 
-	const clock = $derived(now.toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit', hour12: false }));
+	const clock = $derived(clockText(now, getLocale(), prefs));
 	const dateLabel = $derived(now.toLocaleDateString(getLocale(), { weekday: 'long', day: 'numeric', month: 'long' }));
 	// The shared store does not stamp its reads: each refresh replaces its lists, so a change of any is "now".
 	let checked = $state<Date | null>(null);
@@ -309,6 +386,7 @@
 	}
 
 	$effect(() => {
+		if (musicOff) return;
 		const controller = new AbortController();
 		let timer: ReturnType<typeof setTimeout> | undefined;
 		const poll = async () => {
@@ -449,8 +527,9 @@
 	// Settings sets the default, the Backdrop button changes it for this
 	// browser, and a link (`?city=`) decides for one display only.
 	let sceneChoice = $state<WallSceneChoice>(readWallScene(DEFAULT_WALL_SCENE));
-	const forcedScene = $derived(parseForcedWallScene(page.url.searchParams.get('city')));
-	const sceneCity = $derived(resolveWallScene(forcedScene ?? sceneChoice));
+	const forcedScene = $derived(parseForcedWallScene(page.url.searchParams.get('city')) ?? params.scene);
+	// The light theme is a plain, light board: the world is a night picture.
+	const sceneCity = $derived(wallTheme === 'light' ? null : resolveWallScene(forcedScene ?? sceneChoice));
 	function setScene(choice: WallSceneChoice) {
 		sceneChoice = choice;
 		writeWallScene(choice);
@@ -510,6 +589,16 @@
 		attentionBaseline = attention;
 	});
 
+	// A new critical problem beeps once (when the sound is on); the first load is silent.
+	let knownCritical: Set<string> | null = null;
+	$effect(() => {
+		const keys = new Set(sky.needsYou.filter((row) => row.rank === 0).map((row) => row.key));
+		if (alertsStore.loading) return;
+		const before = knownCritical;
+		knownCritical = keys;
+		if (before && untrack(() => prefs.criticalSound) && [...keys].some((key) => !before.has(key))) beep();
+	});
+
 	let tabHidden = $state(false);
 	$effect(() => {
 		const sync = () => (tabHidden = document.visibilityState !== 'visible');
@@ -551,6 +640,8 @@
 	class="wall fixed inset-0 z-[60] box-border bg-canvas pt-[var(--safe-top)] pr-[var(--safe-right)] pb-[var(--safe-bottom)] pl-[var(--safe-left)] text-ink"
 	class:has-world={sceneCity !== null}
 	class:tokens-night={sceneCity !== null}
+	class:sp-preview-light={wallTheme === 'light'}
+	class:cursor-hidden={cursorHidden}
 >
 	<div class="wall-stage relative h-full">
 		{#if sceneCity}
@@ -591,9 +682,10 @@
 							<h1 class="headline min-w-0" aria-live="polite">{verdict.text}</h1>
 						</header>
 					{/key}
+					<WallNotice {now} />
 					<div class="board-list mt-7 flex min-h-0 flex-1 flex-col gap-4 lg:mt-9" bind:clientHeight={leftRoom}>
 						<WallProblems {sky} {now} room={problemsRoom} bind:listed={problemListed} />
-						<WallDevices {targets} {probes} {sky} {quieted} skip={problemListed} />
+						<WallDevices {targets} {probes} {sky} {quieted} skip={problemListed} rotateSeconds={prefs.rotateSeconds} />
 					</div>
 				{/if}
 			</div>
@@ -647,7 +739,7 @@
 				sceneForced={forcedScene !== null}
 				onscene={setScene}
 			/>
-			{#if musicConfigured}
+			{#if musicConfigured && !musicOff}
 				<MusicControl
 					link={musicLink}
 					embed={musicEmbed}
@@ -663,6 +755,39 @@
 					onretry={() => void speaker.start(speakerName, { retry: true })}
 				/>
 			{/if}
+			<Button
+				variant="ghost"
+				size="sm"
+				onclick={() => {
+					const next = !prefs.criticalSound;
+					if (next) unlockWallSound();
+					setPrefs({ criticalSound: next });
+				}}
+				aria-pressed={prefs.criticalSound}
+				aria-label={prefs.criticalSound ? m.w1wall_sound_disable() : m.w1wall_sound_enable()}
+				title={prefs.criticalSound ? m.w1wall_sound_disable() : m.w1wall_sound_enable()}
+				class="min-h-10"
+			>
+				{#if prefs.criticalSound}
+					<Volume2 class="size-4" aria-hidden="true" />
+				{:else}
+					<VolumeX class="size-4" aria-hidden="true" />
+				{/if}
+			</Button>
+			<Button
+				variant="ghost"
+				size="sm"
+				onclick={() => void toggleFullscreen()}
+				aria-label={fullscreen ? m.w1wall_fullscreen_leave() : m.w1wall_fullscreen_enter()}
+				title={fullscreen ? m.w1wall_fullscreen_leave() : m.w1wall_fullscreen_enter()}
+				class="min-h-10"
+			>
+				{#if fullscreen}
+					<Minimize class="size-4" aria-hidden="true" />
+				{:else}
+					<Maximize class="size-4" aria-hidden="true" />
+				{/if}
+			</Button>
 			<Button variant="ghost" size="sm" onclick={exit} aria-label={m.wall_exit_aria()} class="min-h-10">
 				<X class="size-4" aria-hidden="true" />
 				{m.wall_exit()}
@@ -682,6 +807,11 @@
 	 */
 	.wall-stage {
 		overflow-y: auto;
+	}
+	/* No move for 3 s: the pointer goes, over every child too. */
+	.cursor-hidden,
+	.cursor-hidden :global(*) {
+		cursor: none !important;
 	}
 	.scene-box {
 		position: relative;

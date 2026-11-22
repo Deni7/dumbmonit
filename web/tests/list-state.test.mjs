@@ -3,12 +3,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+	availabilityOf,
 	cveScanChanges,
 	freeTags,
 	hasAllTags,
+	loadListQuery,
 	matchesSite,
 	parseListQuery,
 	runBulk,
+	saveListQuery,
 	serializeListQuery,
 	sortTargets,
 	splitDisabled,
@@ -138,4 +141,68 @@ test('site filter: all, none, or one location', () => {
 	assert.equal(matchesSite(3, '3'), true);
 	assert.equal(matchesSite(4, '3'), false);
 	assert.equal(matchesSite(null, '3'), false);
+});
+
+test('availability: share of hours up, none without data', () => {
+	assert.equal(availabilityOf(['up', 'up', 'down', 'none']), 2 / 3);
+	assert.equal(availabilityOf(['none', 'none']), null);
+	assert.equal(availabilityOf(null), null);
+});
+
+test('availability sort: worst first, monitors without data last in both directions', () => {
+	const list = [t(1, 'a'), t(2, 'b'), t(3, 'c')];
+	const av = (x) => ({ 1: null, 2: 0.99, 3: 0.5 })[x.id];
+	assert.deepEqual(sortTargets(list, stateOf, labelOf, 'availability', 'asc', av).map((r) => r.target.id), [3, 2, 1]);
+	assert.deepEqual(sortTargets(list, stateOf, labelOf, 'availability', 'desc', av).map((r) => r.target.id), [2, 3, 1]);
+});
+
+test('creation sort: oldest first, undated last', () => {
+	const list = [
+		t(1, 'a', { created_at: '2026-03-01T00:00:00Z' }),
+		t(2, 'b'),
+		t(3, 'c', { created_at: '2026-01-01 00:00:00' })
+	];
+	assert.deepEqual(sortTargets(list, stateOf, labelOf, 'created', 'asc').map((r) => r.target.id), [3, 1, 2]);
+	assert.deepEqual(sortTargets(list, stateOf, labelOf, 'created', 'desc').map((r) => r.target.id), [1, 3, 2]);
+});
+
+test('the new sorts round-trip through the URL', () => {
+	const q = parseListQuery(new URLSearchParams('sort=availability&dir=desc'));
+	assert.equal(q.sort, 'availability');
+	assert.equal(serializeListQuery(q), '?sort=availability&dir=desc');
+	assert.equal(parseListQuery(new URLSearchParams('sort=created')).sort, 'created');
+});
+
+test('the remembered list state skips the search text and survives blocked storage', () => {
+	const store = new Map();
+	globalThis.localStorage = {
+		getItem: (k) => store.get(k) ?? null,
+		setItem: (k, v) => store.set(k, v),
+		removeItem: (k) => store.delete(k)
+	};
+	try {
+		const q = parseListQuery(new URLSearchParams('q=nas&state=attention&sort=name'));
+		saveListQuery(q);
+		const back = loadListQuery();
+		assert.equal(back.search, '');
+		assert.equal(back.segment, 'attention');
+		assert.equal(back.sort, 'name');
+		saveListQuery(parseListQuery(new URLSearchParams('')));
+		assert.equal(loadListQuery(), null);
+		globalThis.localStorage = {
+			getItem() {
+				throw new Error('blocked');
+			},
+			setItem() {
+				throw new Error('blocked');
+			},
+			removeItem() {
+				throw new Error('blocked');
+			}
+		};
+		assert.equal(loadListQuery(), null);
+		saveListQuery(q);
+	} finally {
+		delete globalThis.localStorage;
+	}
 });

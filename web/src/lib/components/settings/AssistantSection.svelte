@@ -8,6 +8,7 @@
 	 * always visible so people can see what they will paste before creating
 	 * anything; they carry the real token only while it is on screen.
 	 */
+	import { tick } from 'svelte';
 	import { Bot, FileJson, KeyRound } from 'lucide-svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { getLocale } from '#lib/paraglide/runtime.js';
@@ -19,6 +20,7 @@
 		listApiTokens,
 		parseNetworks,
 		revokeApiToken,
+		updateApiToken,
 		type ApiToken,
 		type ApiTokenScope,
 		type CreatedApiToken
@@ -70,6 +72,7 @@
 	let creating = $state(false);
 	let createError = $state<unknown>(null);
 	let created = $state<CreatedApiToken | null>(null);
+	let createdBlock = $state<HTMLDivElement | null>(null);
 
 	/** True once the last submit went through (the button confirms in green). */
 	let createdOk = $state(false);
@@ -91,6 +94,9 @@
 			name = '';
 			networks = '';
 			createdOk = true;
+			// Keyboard and screen-reader users land on the secret, shown only once.
+			await tick();
+			createdBlock?.focus();
 		} catch (cause) {
 			createError = cause;
 		} finally {
@@ -114,6 +120,58 @@
 			revokeError = { id: token.id, cause };
 		} finally {
 			revoking = null;
+		}
+	}
+
+	// --- Edit (name, networks, expiry) -------------------------------------------
+
+	let editingId = $state<number | null>(null);
+	let editName = $state('');
+	let editNetworks = $state('');
+	/** `keep` leaves the expiry as it is; "never" stands for `null`; else days from now. */
+	let editExpiry = $state('keep');
+	let editNameError = $state<string | null>(null);
+	let editSaving = $state(false);
+	let editError = $state<unknown>(null);
+	/** The row that was just saved, to confirm it. */
+	let savedId = $state<number | null>(null);
+	/** New expiry, counted from today: never into the past, never beyond the create maximum. */
+	const EXTEND_CHOICES: { value: string; label: () => string }[] = [
+		{ value: '30', label: () => m.settings_assistant_edit_expiry_30() },
+		{ value: '90', label: () => m.settings_assistant_edit_expiry_90() },
+		{ value: '365', label: () => m.settings_assistant_edit_expiry_365() },
+		{ value: 'never', label: () => m.settings_assistant_edit_expiry_never() }
+	];
+
+	function openEdit(token: ApiToken) {
+		editingId = token.id;
+		editName = token.name;
+		editNetworks = token.allowed_networks.join(', ');
+		editExpiry = 'keep';
+		editNameError = null;
+		editError = null;
+		savedId = null;
+	}
+
+	async function submitEdit(event: SubmitEvent, token: ApiToken) {
+		event.preventDefault();
+		editError = null;
+		editNameError = editName.trim() ? null : m.settings_assistant_edit_err_name();
+		if (editNameError) return;
+		editSaving = true;
+		try {
+			const updated = await updateApiToken(token.id, {
+				name: editName.trim(),
+				allowed_networks: parseNetworks(editNetworks),
+				...(editExpiry === 'keep' ? {} : { expires_in_days: editExpiry === 'never' ? null : Number(editExpiry) })
+			});
+			tokens = tokens.map((item) => (item.id === updated.id ? updated : item));
+			editingId = null;
+			savedId = updated.id;
+		} catch (cause) {
+			editError = cause;
+		} finally {
+			editSaving = false;
 		}
 	}
 
@@ -275,9 +333,15 @@
 			<ErrorNotice error={createError} title={m.settings_assistant_create_error()} class="mt-3" />
 		{/if}
 
-		<div aria-live="polite">
+		<div role="status" aria-live="polite">
 			{#if created}
-				<div class="rise-in mt-4 rounded-[var(--radius-card)] border border-advisory/40 bg-surface p-4">
+				<div
+					bind:this={createdBlock}
+					role="group"
+					tabindex="-1"
+					aria-label={m.w2global_token_created_aria({ name: created.name })}
+					class="rise-in mt-4 rounded-[var(--radius-card)] border border-advisory/40 bg-surface p-4 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
+				>
 					<div class="flex flex-wrap items-center justify-between gap-2">
 						<div class="flex min-w-0 flex-wrap items-center gap-2">
 							<p class="font-semibold text-ink">{m.settings_assistant_created_title({ name: created.name })}</p>
@@ -434,10 +498,66 @@
 										{/if}
 									</p>
 								</div>
-								{#if !revoked}
-									<Confirm confirmLabel={m.settings_assistant_revoke_confirm()} loading={revoking === item.id} onconfirm={() => revoke(item)}>{m.settings_assistant_revoke()}</Confirm>
+								{#if !revoked && editingId !== item.id}
+									<div class="flex flex-wrap items-center gap-2">
+										<Button variant="ghost" size="sm" onclick={() => openEdit(item)} aria-label={m.settings_assistant_edit_aria({ name: item.name })}>{m.settings_assistant_edit()}</Button>
+										<Confirm confirmLabel={m.settings_assistant_revoke_confirm()} loading={revoking === item.id} onconfirm={() => revoke(item)}>{m.settings_assistant_revoke()}</Confirm>
+									</div>
 								{/if}
 							</div>
+							{#if savedId === item.id}
+								<div class="mt-2" aria-live="polite">
+									<Plate tone="signal" draw label={m.settings_assistant_edit_saved()} />
+								</div>
+							{/if}
+							{#if editingId === item.id}
+								<form class="rise-in mt-3 grid gap-4 rounded-[var(--radius-card)] border border-line-strong bg-surface-2/40 p-4 sm:grid-cols-2" onsubmit={(e) => submitEdit(e, item)} novalidate aria-label={m.settings_assistant_edit_aria({ name: item.name })}>
+									<Field label={m.settings_assistant_edit_name()} for={`token-name-${item.id}`} error={editNameError}>
+										<input
+											id={`token-name-${item.id}`}
+											type="text"
+											class="input"
+											bind:value={editName}
+											autocomplete="off"
+											maxlength="80"
+											disabled={editSaving}
+											aria-invalid={editNameError ? 'true' : undefined}
+											oninput={() => (editNameError = null)}
+										/>
+									</Field>
+									<Field
+										label={m.settings_assistant_edit_expiry()}
+										for={`token-expiry-${item.id}`}
+										help={item.expires_at === null ? m.settings_assistant_edit_expiry_help_never() : m.settings_assistant_edit_expiry_help({ date: formatDateTime(item.expires_at) })}
+									>
+										<select id={`token-expiry-${item.id}`} class="input" bind:value={editExpiry} disabled={editSaving}>
+											<option value="keep">{m.settings_assistant_edit_expiry_keep()}</option>
+											{#each EXTEND_CHOICES as choice (choice.value)}
+												<option value={choice.value}>{choice.label()}</option>
+											{/each}
+										</select>
+									</Field>
+									<Field label={m.settings_assistant_networks()} for={`token-networks-${item.id}`} help={m.settings_assistant_networks_help()} class="sm:col-span-2">
+										<input
+											id={`token-networks-${item.id}`}
+											type="text"
+											class="input font-mono"
+											bind:value={editNetworks}
+											placeholder="192.168.1.0/24, 10.8.0.5"
+											autocomplete="off"
+											spellcheck="false"
+											disabled={editSaving}
+										/>
+									</Field>
+									{#if editError}
+										<div class="sm:col-span-2"><ErrorNotice error={editError} title={m.settings_assistant_edit_error()} /></div>
+									{/if}
+									<div class="flex flex-wrap items-center gap-2 sm:col-span-2">
+										<Button type="submit" variant="secondary" loading={editSaving}>{m.settings_assistant_edit_save()}</Button>
+										<Button variant="ghost" onclick={() => (editingId = null)} disabled={editSaving}>{m.settings_assistant_edit_cancel()}</Button>
+									</div>
+								</form>
+							{/if}
 							{#if revokeError?.id === item.id}
 								<ErrorNotice error={revokeError.cause} title={m.settings_assistant_revoke_error()} class="mt-3" />
 							{/if}

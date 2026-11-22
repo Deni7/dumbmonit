@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { docTitle } from '#lib/stores/page-title.svelte.js';
 	/**
 	 * Alerts — what is firing now, what happened, the rules behind it, and what
 	 * runs on its own.
@@ -24,6 +25,7 @@
 		listDismissedAlerts,
 		createSilence,
 		deleteSilence,
+		updateSilence,
 		setAlertRuleEnabled,
 		deleteAlertRule,
 		createAlertRule,
@@ -36,6 +38,7 @@
 		type CollectorInfo
 	} from '#lib/api/index.js';
 	import { alertsStore } from '#lib/stores/alerts.svelte.js';
+	import { startPolling } from '#lib/poll.js';
 	import { instanceStore } from '#lib/stores/instance.svelte.js';
 	import { PageHeader, Button, Disclosure, ErrorNotice, Plate, Skeleton, Tabs, confetti, type TabItem } from '#lib/ui/index.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
@@ -91,6 +94,9 @@
 	let error = $state<unknown>(null);
 
 	let scheduling = $state(false);
+	/** The window the form was opened from: edited in place, or copied into a new one. */
+	let scheduleSource = $state<{ mode: 'edit' | 'duplicate'; silence: Silence } | null>(null);
+	let busySilenceId = $state<number | null>(null);
 	let removingSilenceId = $state<number | null>(null);
 	let ruleBusyId = $state<number | null>(null);
 	let actionError = $state<string | null>(null);
@@ -135,6 +141,7 @@
 		// fetch must not block the rest of the page.
 		const collectorsPromise = listCollectors(signal).catch(() => [] as CollectorInfo[]);
 		void refreshDismissed(signal);
+		let ok = true;
 		try {
 			const [r, s, h] = await Promise.all([
 				listAlertRules(signal),
@@ -147,10 +154,12 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
+			ok = false;
 		} finally {
 			loading = false;
 		}
 		collectors = await collectorsPromise;
+		return ok;
 	}
 
 	/** Best effort: the Dismissed view just stays as it was if this fails. */
@@ -194,9 +203,60 @@
 	}
 
 	async function createFromForm(payload: SilencePayload) {
-		await createSilence(payload);
-		await refreshSilences();
+		if (scheduleSource?.mode === 'edit') {
+			await updateSilence(scheduleSource.silence.id, payload);
+		} else {
+			await createSilence(payload);
+		}
+		await Promise.all([refreshSilences(), alertsStore.refresh()]);
 		scheduling = false;
+		scheduleSource = null;
+	}
+
+	function openScheduleForm(source: typeof scheduleSource) {
+		scheduleSource = source;
+		scheduling = true;
+		maintenanceOpen = true;
+	}
+
+	/** The window as the API takes it back, with a new one-off end. */
+	function withEnd(silence: Silence, endsAt: Date): SilencePayload | null {
+		const schedule = silence.schedule;
+		if (schedule.kind !== 'once') return null;
+		return {
+			name: silence.name,
+			comment: silence.comment,
+			target_id: silence.target_id,
+			matchers: silence.matchers,
+			enabled: silence.enabled,
+			schedule: { ...schedule, ends_at: endsAt.toISOString() }
+		};
+	}
+
+	async function changeEnd(silence: Silence, endsAt: Date) {
+		const payload = withEnd(silence, endsAt);
+		if (!payload) return;
+		busySilenceId = silence.id;
+		actionError = null;
+		try {
+			await updateSilence(silence.id, payload);
+			await Promise.all([refreshSilences(), alertsStore.refresh()]);
+		} catch (cause) {
+			reportError(cause, m.w1alerts_page_error_update_window());
+		} finally {
+			busySilenceId = null;
+		}
+	}
+
+	/** Ends a running one-off window now; it stays listed until it expires. */
+	function endSilence(silence: Silence) {
+		return changeEnd(silence, new Date());
+	}
+
+	function extendSilence(silence: Silence, minutes: number) {
+		if (silence.schedule.kind !== 'once') return Promise.resolve();
+		const current = new Date(silence.schedule.ends_at).getTime();
+		return changeEnd(silence, new Date(Math.max(current, Date.now()) + minutes * 60_000));
 	}
 
 	async function removeSilence(id: number) {
@@ -298,6 +358,7 @@
 			history = await listAlertHistory({ limit: 200 }, signal);
 		} catch {
 			// Kept as is: the mini history of a row just stays a little behind.
+			return false;
 		}
 	}
 
@@ -308,32 +369,23 @@
 	const LIVE_MS = 10_000;
 	$effect(() => {
 		if (tab !== 'now') return;
-		const controller = new AbortController();
-		const timer = setInterval(() => {
-			if (document.visibilityState === 'hidden') return;
-			void alertsStore.refresh(controller.signal);
-			void refreshHistory(controller.signal);
-		}, LIVE_MS);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		// The page has just read everything: the first live refresh waits one tick.
+		return startPolling(
+			async (signal) => {
+				const [, historyOk] = await Promise.all([alertsStore.refresh(signal), refreshHistory(signal)]);
+				return alertsStore.available && historyOk !== false;
+			},
+			LIVE_MS,
+			{ immediate: false }
+		);
 	});
 
-	$effect(() => {
-		const controller = new AbortController();
-		void loadAll(controller.signal);
-		// Rules, silences and history are this page's own; monitors, probes and
-		// alerts are the shared store's (polled app-wide). Same cadence either way.
-		const timer = setInterval(() => void loadAll(controller.signal), 30_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
-	});
+	// Rules, silences and history are this page's own; monitors, probes and
+	// alerts are the shared store's (polled app-wide). Same cadence either way.
+	$effect(() => startPolling(loadAll, 30_000));
 </script>
 
-<svelte:head><title>{m.alerts_page_title()} · DumbMonit</title></svelte:head>
+<svelte:head><title>{docTitle(m.alerts_page_title())}</title></svelte:head>
 
 <PageHeader title={m.alerts_page_title()}>
 	{#snippet actions()}
@@ -341,6 +393,7 @@
 			<Button
 				variant="secondary"
 				onclick={() => {
+					scheduleSource = null;
 					scheduling = !scheduling;
 					if (scheduling) maintenanceOpen = true;
 				}}
@@ -355,7 +408,14 @@
 
 {#if scheduling}
 	<div class="mb-5">
-		<ScheduleForm {targets} oncreate={createFromForm} oncancel={() => (scheduling = false)} />
+		{#key scheduleSource}
+			<ScheduleForm
+				{targets}
+				source={scheduleSource}
+				oncreate={createFromForm}
+				oncancel={() => ((scheduling = false), (scheduleSource = null))}
+			/>
+		{/key}
 	</div>
 {/if}
 
@@ -413,8 +473,13 @@
 						{silences}
 						targets={targetsMap}
 						removingId={removingSilenceId}
+						busyId={busySilenceId}
 						onremove={removeSilence}
-						onschedule={() => (scheduling = true)}
+						onschedule={() => openScheduleForm(null)}
+						onend={endSilence}
+						onextend={extendSilence}
+						onedit={(silence) => openScheduleForm({ mode: 'edit', silence })}
+						onduplicate={(silence) => openScheduleForm({ mode: 'duplicate', silence })}
 					/>
 				</Disclosure>
 			{/if}

@@ -70,6 +70,20 @@ export function createApiToken(payload: ApiTokenPayload): Promise<CreatedApiToke
 	return request<CreatedApiToken>('/tokens', { method: 'POST', body: payload });
 }
 
+/** `PATCH /api/tokens/{id}`: an absent field keeps its value. */
+export interface ApiTokenUpdate {
+	name?: string;
+	/** Replaces the list; empty means anywhere. */
+	allowed_networks?: string[];
+	/** New expiry counted from now, 1 to 3650 days; `null`: never expires. */
+	expires_in_days?: number | null;
+}
+
+/** Renames a token, changes its networks or its expiry. The secret never changes. */
+export function updateApiToken(id: number, payload: ApiTokenUpdate): Promise<ApiToken> {
+	return request<ApiToken>(`/tokens/${id}`, { method: 'PATCH', body: payload });
+}
+
 export function revokeApiToken(id: number): Promise<void> {
 	return request<void>(`/tokens/${id}`, { method: 'DELETE' });
 }

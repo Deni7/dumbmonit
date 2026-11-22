@@ -2,7 +2,7 @@
  * Instance name, language and time zone, and the setup wizard's end. Mirrors `crates/server/src/api/instance.rs`.
  */
 import { request } from './client';
-import type { InstancePatch, InstanceSettings, PublicInstance } from './types';
+import type { EffectiveSetting, InstancePatch, InstanceSettings, PublicInstance } from './types';
 
 /** Public: answered before sign-in, so the setup wizard can be offered. */
 export function getInstance(signal?: AbortSignal): Promise<PublicInstance> {
@@ -11,6 +11,11 @@ export function getInstance(signal?: AbortSignal): Promise<PublicInstance> {
 
 export function getInstanceSettings(signal?: AbortSignal): Promise<InstanceSettings> {
 	return request<InstanceSettings>('/instance/settings', { signal });
+}
+
+/** Administrators only: what the server runs with, without any secret. */
+export function getEffectiveConfig(signal?: AbortSignal): Promise<EffectiveSetting[]> {
+	return request<EffectiveSetting[]>('/instance/effective-config', { signal });
 }
 
 /** Administrators only. */

@@ -68,7 +68,8 @@ recovery**: a bundle whose passphrase is lost is lost.
 | `status_pages` | Public status pages and the services each one lists. |
 | `incidents` | Incidents and maintenance announcements, with their updates and post-mortems. |
 | `slos` | Service level objectives: target, window, alerting on or off, and the monitors and folders they cover. |
-| `users` | Accounts: username, display name, role, SSO link, enabled or not. |
+| `users` | Accounts: username, display name, email address, role, SSO link, enabled or not. |
+| `auth_policy` | The authentication policy: whether admins and operators must use two-factor authentication. |
 | `agent_tokens` | Agent enrolment tokens, as hashes. Installed agents keep pushing after a restore. Tokens from an older backup are renamed to opaque `tok_…` identifiers. |
 | `agent_update_rollout` | The rollout waves of the automatic agent updates: waves, delay, failure threshold and pause. |
 | `api_tokens` | API tokens, as hashes. Existing tokens keep working. |
@@ -188,12 +189,25 @@ disk. Copy them off the machine if you want more than that.
 | `DUMBMONIT_BACKUP_INTERVAL_HOURS` | `24` | Hours between two backups. The first one happens one interval after startup, not at startup. |
 | `DUMBMONIT_BACKUP_KEEP` | `7` | How many are kept. The oldest are removed, with their `.key`. |
 
+The schedule (on or off, hours between backups, copies kept) can also be changed
+in **Settings → Backup**. A value saved there applies without a restart and
+travels with the encrypted bundle. A variable above that is set in the
+environment still wins for its own setting, and the screen then says it is
+managed by the environment. The directory is always the one from
+`DUMBMONIT_BACKUP_DIR`.
+
 Nothing else in the directory is ever touched: only files named
 `dumbmonit-<timestamp>.db` and their `.key` are rotated.
 
 When the instance secret comes from `DUMBMONIT_SECRET` there is no file to copy,
 and none is written — keep that value in your password manager instead. The
 Backup section says which of the two cases you are in.
+
+### Downloading a copy
+
+**Settings → Backup** lists the copies on disk and downloads the `.db` of any of
+them (administrator signed in to the web interface only; each download is
+written to the audit log). The `.key` is never served: take it from the volume.
 
 ### Knowing that it ran
 
@@ -210,6 +224,10 @@ The built-in rule **DumbMonit backup did not run**
 old — one missed night can be a restart, two is a problem. The series only
 exists once a first backup has been written, so an instance with the schedule
 turned off is never nagged about it.
+
+`GET /metrics` also exposes `dumbmonit_backup_last_success_timestamp_seconds`
+and `dumbmonit_backup_last_run_ok` (0 when the last attempt failed), for a
+Prometheus that scrapes the instance; see [Metrics](../reference/metrics.md).
 
 **Settings → Backup** shows the same thing without MetricsQL: the last run and
 whether it succeeded, the files kept and their size, and **Back up now** to

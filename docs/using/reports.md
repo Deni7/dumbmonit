@@ -60,7 +60,11 @@ monthly: the email goes out on the chosen day of the month, with:
 
 Both attachments can be switched off separately. With an **availability
 objective** (for example 99.9), each monitor is marked **Met** or **Missed**
-and the report says how many met it; without one, the usual words (Healthy,
+and the report says how many met it. A single group or monitor can have an
+objective of its own (**Objectives per group or monitor** in the report's
+layout): it replaces the report's objective for those rows, a monitor's own
+beating its group's, and an **Objective** column then appears in the tables
+and the CSV; without one, the usual words (Healthy,
 Degraded, Poor) are used. The report is in English; the figures are the ones
 of the status pages.
 
@@ -105,13 +109,14 @@ A schedule keeps these options, and so does a [backup](../install/backup.md).
 report page. It builds the same report on demand, for any period of one year
 at most (both days included, in the timezone you choose, ending now if it has
 not ended). The period has shortcuts: last 7 or 30 days, this month, last
-month, last quarter; the default is the previous calendar month. In MSP mode,
+month, last quarter, this year; the default is the previous calendar month. In MSP mode,
 choose the client the report is about. Administrators only, and in MSP mode the
 members of a client for that client.
 
 The right column shows the report as it will print, rebuilt a moment after each
 change. **Print** prints only the report, black on white, with table headers
-repeated on each page; **Download PDF** gives the PDF built by the server;
+repeated on each page; **Download PDF** gives the PDF built by the server and **Open PDF** shows it in
+a new tab (`disposition=inline`);
 **CSV** gives the monitors or the incidents as CSV; **Schedule** opens a new
 scheduled report with the same options. The address of the page holds the
 options, so a report can be bookmarked or shared with another administrator.
@@ -120,7 +125,12 @@ options, so a report can be bookmarked or shared with another administrator.
 
 At the foot of the page, **Sending history** lists each scheduled report with
 its last send, the next one due and whether the last attempt succeeded (a failed
-send shows its error until the next success).
+send shows its error until the next success). Filter it by type and by result.
+A failed row has **Retry**, a real send to the saved recipients that clears the
+error when it works (once every 30 seconds per report); a sent SLA report has
+**PDF**, which builds the report again for the same period, since sent reports
+keep no attachment. Each scheduled report has **Duplicate**, which opens a new
+form with the same settings.
 
 ## Send a preview
 

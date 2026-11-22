@@ -963,3 +963,73 @@ html[data-vt='tab']::view-transition-new(root) {
 		scroll-behavior: auto !important;
 	}
 }
+
+/* ---------------------------------------------------------------------------
+   Display preferences (Settings › Appearance › Display), classes on <html>
+   set by src/lib/stores/prefs.svelte.ts.
+   ------------------------------------------------------------------------- */
+:root {
+	--density-input-min: 2.5rem;
+	--density-row-min: 3.5rem;
+}
+html.density-compact {
+	--density-input-min: 2.25rem;
+	--density-row-min: 2.75rem;
+}
+@media (min-width: 640px) {
+	html.density-compact .input {
+		min-height: var(--density-input-min);
+		padding-block: 0.375rem;
+	}
+	html.density-compact [data-list-row] > div:first-child {
+		min-height: var(--density-row-min);
+	}
+}
+/* "Reduce motion" on: same as the system setting, whatever it says. */
+html.reduce-motion .check-draw :where(path, polyline, circle) {
+	stroke-dashoffset: 0;
+	animation: none;
+}
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+	animation-duration: 0.01ms !important;
+	animation-iteration-count: 1 !important;
+	transition-duration: 0.01ms !important;
+	scroll-behavior: auto !important;
+}
+
+/* ---------------------------------------------------------------------------
+   Print: the alerts list and the public status page (the layout sets
+   `data-print-clean` on <html> there). No chrome, black on white.
+   ------------------------------------------------------------------------- */
+@media print {
+	html[data-print-clean],
+	html[data-print-clean] body {
+		background: #fff !important;
+		color: #000 !important;
+	}
+	html[data-print-clean] * {
+		color: #000 !important;
+		box-shadow: none !important;
+		text-shadow: none !important;
+		backdrop-filter: none !important;
+	}
+	html[data-print-clean] :is(nav, header, aside, [role='tablist'], [role='toolbar'], input, select, textarea, [data-print-hide]),
+	html[data-print-clean] button:not([data-list-row] button),
+	html[data-print-clean] main :is(.faceplate, .gate-panel) {
+		background: transparent !important;
+	}
+	html[data-print-clean] :is(nav, header, aside, [role='tablist'], [role='toolbar'], input, select, textarea, [data-print-hide]),
+	html[data-print-clean] button:not([data-list-row] button) {
+		display: none !important;
+	}
+	html[data-print-clean] [data-list-row] {
+		break-inside: avoid;
+		background: transparent !important;
+		border-bottom: 1px solid #999;
+	}
+	html[data-print-clean] a {
+		text-decoration: underline;
+	}
+}

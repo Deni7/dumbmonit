@@ -140,6 +140,7 @@ mod tests {
         matches!(
             path,
             "/api/health"
+                | "/api/ready"
                 | "/api/auth/status"
                 | "/api/auth/setup"
                 | "/api/auth/login"

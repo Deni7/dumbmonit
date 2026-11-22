@@ -8,7 +8,7 @@
 use std::collections::HashSet;
 
 use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::{Extension, Path, State};
 use axum::http::StatusCode;
 use chrono::Utc;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -19,8 +19,10 @@ use crate::alerting::matcher::{ChannelMatcher, Condition};
 use crate::alerting::notify_policy::ChannelPolicy;
 use crate::alerting::silence::Schedule;
 use crate::api::{ApiError, ApiResult};
-use crate::auth::clients;
+use crate::auth::client_ip::ClientIp;
+use crate::auth::middleware::CurrentPrincipal;
 use crate::auth::teams::TeamAccess;
+use crate::auth::{audit, clients};
 use crate::db;
 use crate::notify::policy_store;
 use crate::notify::{self, CHANNEL_KINDS, ChannelConfig, ChannelSummary, DeliveryReport};
@@ -105,6 +107,37 @@ fn present<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<Value>, 
 pub struct TestReport {
     pub ok: bool,
     pub message: String,
+    /// Ce qui aurait écarté une vraie alerte sur ce canal, en codes stables que
+    /// l'interface traduit : `disabled`, `min_severity_warning`,
+    /// `min_severity_critical`, `quiet_hours`, `matcher`. Vide : rien ne la retient.
+    pub filters: Vec<&'static str>,
+}
+
+/// Les réglages du canal qui retiendraient une vraie alerte. Un message de test
+/// n'a ni sévérité, ni équipement, ni règle : seuls les réglages se lisent ici ;
+/// le détail du filtre, lui, dépend de l'alerte.
+fn test_filters(
+    enabled: bool,
+    policy: &ChannelPolicy,
+    now: chrono::DateTime<Utc>,
+) -> Vec<&'static str> {
+    use crate::alerting::model::Severity;
+    let mut filters = Vec::new();
+    if !enabled {
+        filters.push("disabled");
+    }
+    match policy.min_severity {
+        Severity::Critical => filters.push("min_severity_critical"),
+        Severity::Warning => filters.push("min_severity_warning"),
+        Severity::Info => {}
+    }
+    if policy.in_quiet_hours(now) {
+        filters.push("quiet_hours");
+    }
+    if !policy.matcher.is_empty() {
+        filters.push("matcher");
+    }
+    filters
 }
 
 // --------------------------------------------------------------------------
@@ -203,6 +236,8 @@ async fn summary(pool: &SqlitePool, id: i64) -> ApiResult<ChannelSummary> {
 pub async fn create(
     TeamAccess(access): TeamAccess,
     State(state): State<AppState>,
+    Extension(CurrentPrincipal(principal)): Extension<CurrentPrincipal>,
+    ClientIp(ip): ClientIp,
     Json(mut payload): Json<ChannelPayload>,
 ) -> ApiResult<(StatusCode, Json<ChannelSummary>)> {
     let policy = parse_policy(payload.policy.take(), &ChannelPolicy::default())?;
@@ -216,11 +251,17 @@ pub async fn create(
     policy_store::save_channel_policy(&state.pool, id, &policy).await?;
     clients::adopt(&state.pool, &access, clients::Kind::Channel, id).await?;
     crate::first_run::record(&state.pool, crate::first_run::Milestone::FirstChannel).await;
+    // Le nom et le type seulement : jamais les réglages, qui portent des secrets.
+    let subject = format!("{} ({})", draft.name, draft.kind);
+    audit::record(&state.pool, Some(&principal.label()), "channel.created", Some(&subject), ip)
+        .await;
     Ok((StatusCode::CREATED, Json(summary(&state.pool, id).await?)))
 }
 
 pub async fn update(
     State(state): State<AppState>,
+    Extension(CurrentPrincipal(principal)): Extension<CurrentPrincipal>,
+    ClientIp(ip): ClientIp,
     Path(id): Path<i64>,
     Json(mut payload): Json<ChannelPayload>,
 ) -> ApiResult<Json<ChannelSummary>> {
@@ -242,6 +283,9 @@ pub async fn update(
         .await
         .map_err(duplicate_name_to_conflict)?;
     policy_store::save_channel_policy(&state.pool, id, &policy).await?;
+    let subject = format!("{} ({})", draft.name, draft.kind);
+    audit::record(&state.pool, Some(&principal.label()), "channel.updated", Some(&subject), ip)
+        .await;
     Ok(Json(summary(&state.pool, id).await?))
 }
 
@@ -249,7 +293,13 @@ pub async fn update(
 ///
 /// Une règle qui pointe vers un canal disparu ne notifie plus rien du tout, et rien
 /// ne le signale : mieux vaut refuser ici, en nommant les règles à corriger.
-pub async fn delete(State(state): State<AppState>, Path(id): Path<i64>) -> ApiResult<StatusCode> {
+pub async fn delete(
+    State(state): State<AppState>,
+    Extension(CurrentPrincipal(principal)): Extension<CurrentPrincipal>,
+    ClientIp(ip): ClientIp,
+    Path(id): Path<i64>,
+) -> ApiResult<StatusCode> {
+    let name = summary(&state.pool, id).await.map(|channel| channel.name).ok();
     let rules = db::alerts::list_rules(&state.pool).await?;
     let users: Vec<&str> = rules
         .iter()
@@ -265,6 +315,9 @@ pub async fn delete(State(state): State<AppState>, Path(id): Path<i64>) -> ApiRe
     }
 
     if db::alerts::delete_channel(&state.pool, id).await? {
+        let subject = name.unwrap_or_else(|| id.to_string());
+        audit::record(&state.pool, Some(&principal.label()), "channel.deleted", Some(&subject), ip)
+            .await;
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(not_found(id))
@@ -303,10 +356,15 @@ pub async fn test(
     };
     db::alerts::record_delivery(&state.pool, &report, Utc::now()).await?;
 
+    let policies = policy_store::load_channel_policies(&state.pool).await?;
+    let policy = policies.get(&id).cloned().unwrap_or_default();
+    let filters = test_filters(config.enabled, &policy, Utc::now());
+
     match error {
         None => Ok(Json(TestReport {
             ok: true,
             message: format!("Test message sent to \"{}\".", config.name),
+            filters,
         })),
         // Déjà expurgée par la couche notification : aucune interpolation de secret
         // n'est possible ici.
@@ -609,6 +667,17 @@ fn duplicate_name_to_conflict(error: anyhow::Error) -> ApiError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn le_test_dit_ce_qui_retiendrait_une_vraie_alerte() {
+        use crate::alerting::model::Severity;
+        let now = Utc::now();
+        let open = ChannelPolicy::default();
+        assert!(test_filters(true, &open, now).is_empty());
+        assert_eq!(test_filters(false, &open, now), vec!["disabled"]);
+        let strict = ChannelPolicy { min_severity: Severity::Critical, ..Default::default() };
+        assert_eq!(test_filters(true, &strict, now), vec!["min_severity_critical"]);
+    }
 
     fn payload(kind: &str, settings: Value, secrets: Option<Value>) -> ChannelPayload {
         ChannelPayload {

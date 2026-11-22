@@ -19,6 +19,7 @@
 	import { loadRegions } from '#lib/map/region-table.js';
 	import type { WorldPin } from '#lib/components/worldmap/WorldMap.svelte';
 	import GeoMap from './GeoMap.svelte';
+	import { startPolling } from '#lib/poll.js';
 
 	interface Props {
 		target: Target;
@@ -51,6 +52,7 @@
 			unknown = found.unknown;
 		} catch {
 			// A secondary card: the panel above already says when the account cannot be read.
+			return false;
 		}
 	}
 
@@ -63,13 +65,10 @@
 		void getBasemap(controller.signal)
 			.then((b) => (basemap = b))
 			.catch(() => {});
-		void untrack(() => load(controller.signal));
-		const timer = setInterval(() => {
-			if (document.visibilityState === 'visible') void untrack(() => load(controller.signal));
-		}, 60_000);
+		const stop = startPolling((signal) => untrack(() => load(signal)), 60_000);
 		return () => {
 			controller.abort();
-			clearInterval(timer);
+			stop();
 		};
 	});
 

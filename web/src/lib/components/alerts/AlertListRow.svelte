@@ -225,7 +225,7 @@
 	}
 </script>
 
-<li class={`group/row relative ${selected ? 'row-selected bg-signal-soft/60' : ''}`}>
+<li data-list-row class={`group/row relative ${selected ? 'row-selected bg-signal-soft/60' : ''}`}>
 	<div class={`flex min-h-14 items-center gap-1 pr-1.5 pl-3 sm:gap-2 sm:pr-2 sm:pl-4 ${selecting ? '' : 'max-sm:flex-wrap'}`}>
 		{#if selecting}
 			<label class="-ml-1 inline-flex size-10 shrink-0 cursor-pointer items-center justify-center">
@@ -359,6 +359,16 @@
 								>{target.name}</a
 							>
 							<span class="text-ink-2"> · {target.address}</span>
+						</dd>
+					{/if}
+					{#if alert.labels.slo_id && /^\d+$/.test(alert.labels.slo_id)}
+						<dt class="text-ink-3">{m.w3tech_alerts_detail_slo()}</dt>
+						<dd class="break-words text-ink">
+							<a
+								href={withBase(`/status?tab=slo&slo=${alert.labels.slo_id}`)}
+								class="font-medium underline decoration-line-strong underline-offset-2 hover:decoration-ink"
+								>{alert.labels.slo || `#${alert.labels.slo_id}`}</a
+							>
 						</dd>
 					{/if}
 					<dt class="text-ink-3">{m.alerts_detail_rule()}</dt>

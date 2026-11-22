@@ -18,6 +18,7 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { closeAgentToken, createAdKit, listAgentTokens, listTargets, type CreatedAdKit, type RelayAgent, type Target } from '#lib/api/index.js';
 	import { listRelays } from '#lib/api/relay.js';
+	import { startPolling } from '#lib/poll.js';
 	import { Button, Confirm, CopyBlock, DocLink, ErrorNotice, Field, Led, Plate } from '#lib/ui/index.js';
 
 	interface Props {
@@ -259,11 +260,9 @@
 	// Live count and latest servers, only while step 4 is on screen.
 	$effect(() => {
 		if (!open || step !== 4 || !kit) return;
-		const controller = new AbortController();
-		const { signal } = controller;
 		const id = kit.token.id;
 		const folder = kit.folder;
-		async function poll() {
+		async function poll(signal: AbortSignal) {
 			try {
 				const [tokens, targets] = await Promise.all([
 					listAgentTokens(signal),
@@ -282,14 +281,10 @@
 				pollFailed = false;
 			} catch {
 				if (!signal.aborted) pollFailed = true;
+				return false;
 			}
 		}
-		void poll();
-		const timer = setInterval(poll, POLL_MS);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(poll, POLL_MS);
 	});
 
 	function onkeydown(event: KeyboardEvent) {

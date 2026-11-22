@@ -81,9 +81,19 @@ on the same origin as your admin interface, under the same
 - Each service with its state plate (Operational, Degraded, Down, Maintenance,
   No data), its uptime over the bar's period and its **history bar** — one
   square per day — and the response time for uptime probes.
-- **Past incidents**, by day, for the last 30 days.
-- **Get updates**: the RSS feed, and an email subscription form when you set
-  one up (see [Email subscribers](#email-subscribers)).
+- **Past incidents**, by day, for the last 30 days. **Show older** loads the
+  earlier ones, twenty at a time. A resolved incident says how long it lasted
+  ("resolved in 42min").
+- **Get updates**: the RSS feed (and one feed per service), and an email
+  subscription form when you set one up (see
+  [Email subscribers](#email-subscribers)).
+
+Dates and "checked" times carry the visitor's own timezone (for example
+`UTC+1`). A **Refresh** button reloads the page's data on demand; it still
+refreshes by itself every minute. Past 8 services, a search box and an **Only
+with problems** switch help find one. Every announcement has an anchor
+(`#incident-<id>`) and a **Copy link** button: the link opens the page scrolled
+to that incident, and the RSS items point to it.
 
 ### The history bar
 
@@ -179,6 +189,13 @@ windows that name a monitor surface this way; the window's name and comment stay
 private.
 
 An announcement is shown on one page or on **all pages**.
+
+**Post update** offers **templates** (Investigating, Identified, Monitoring,
+Resolved; for a maintenance, Scheduled, In progress, Completed) that fill the
+message and propose the matching status, and a **Preview** that draws the
+announcement as the public page will show it. Tick **Do not notify
+subscribers** to publish an update (a correction, a typo) without sending
+anything.
 
 ### Past incidents
 
@@ -311,8 +328,10 @@ preview.
 
 ### Badges
 
-Every published page serves SVG badges — flat, with white text on solid
-colour, readable on both the light and dark themes of a GitHub README:
+Every published page serves SVG badges — with white text on solid colour,
+readable on both the light and dark themes of a GitHub README. `?style=` picks
+the shape: `flat` (default), `flat-square` or `for-the-badge` (larger, in
+capitals); the **Show it elsewhere** panel of the editor has the same choice.
 
 | Badge | URL |
 | --- | --- |
@@ -568,7 +587,12 @@ pages.
 ### Feed and document
 
 - `GET /api/public/status/<address>/rss` — an RSS feed of incidents and
-  maintenance windows, one item per announcement with its latest update.
+  maintenance windows, one item per announcement with its latest update, each
+  linking to the incident's permalink. `?component=<service>` keeps only the
+  announcements that touch that service (and those for the whole page).
+- `GET /api/public/status/<address>/incidents` — resolved announcements older
+  than the 30 days of the document, newest first, paged with the `next` cursor
+  passed back as `?before=`.
 - `GET /api/public/status/<address>` — the JSON document the page is built
   from, if you want to build your own: the page's title, description and look,
   the overall state, each service's `key`, `label`, `state`, uptime

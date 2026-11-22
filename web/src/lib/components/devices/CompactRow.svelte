@@ -24,7 +24,8 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import SecurityBadge from './SecurityBadge.svelte';
 	import SiteBadge from './SiteBadge.svelte';
-	import { StatusMark } from '#lib/ui/index.js';
+	import { StatusMark, Tag } from '#lib/ui/index.js';
+	import RowActions, { type RowActionHandlers } from './RowActions.svelte';
 	import AlertBell from './AlertBell.svelte';
 	import { AlertTriangle, ChevronRight } from 'lucide-svelte';
 	import { ROW_HEIGHT, SHOW, STATE_GLYPH, gridFor } from './columns';
@@ -60,6 +61,10 @@
 		open?: boolean;
 		/** Opens or closes the sub-monitors. */
 		ontoggle?: () => void;
+		/** The monitor's free tags (`key = value`), the first two shown after its kind. */
+		tags?: { label: string; title: string }[];
+		/** Quick actions of the row (check now, enable, copy address); none without. */
+		actions?: RowActionHandlers | null;
 	}
 
 	let {
@@ -77,7 +82,9 @@
 		childCount = 0,
 		trouble = 0,
 		open = false,
-		ontoggle
+		ontoggle,
+		tags = [],
+		actions = null
 	}: Props = $props();
 
 	const SLOTS = 24;
@@ -121,9 +128,13 @@
 	const shownName = $derived(depth > 0 ? ownName(target.name, parentName) : target.name);
 	/** The kind says nothing more when the name already is the kind ("Databases" under its machine). */
 	const showTag = $derived(String(tag).trim().toLowerCase() !== shownName.trim().toLowerCase());
+	/** At most two chips, the rest as "+n": the line keeps its single height. */
+	const TAGS_SHOWN = 2;
+	const shownTags = $derived(tags.slice(0, TAGS_SHOWN));
+	const moreTags = $derived(tags.slice(TAGS_SHOWN));
 </script>
 
-<div class={`relative transition-colors hover:bg-surface-2/60 ${shadowed ? 'opacity-60' : ''}`}>
+<div class={`group/row relative transition-colors hover:bg-surface-2/60 ${shadowed ? 'opacity-60' : ''}`}>
 	<div class={`${grid} ${ROW_HEIGHT}`}>
 		<span class="flex items-center justify-center">
 			<StatusMark glyph={STATE_GLYPH[state]} tone={STATE_TONE[state]} label={STATE_LABEL[state]} title={target.last_error ?? STATE_LABEL[state]} />
@@ -170,6 +181,17 @@
 					{#if showTag}<span class="shrink-0 text-ink-3" aria-hidden="true">·</span>{/if}
 				{/if}
 				{#if showTag}<span class="max-w-40 shrink-0 truncate text-ink-3" title={kind}>{tag}</span>{/if}
+				{#if tags.length > 0}
+					<!-- Tags only where the line is wide; they give way (truncate) before the address does. -->
+					<span class="hidden min-w-0 shrink-[2] items-center gap-1 overflow-hidden @3xl:flex">
+						{#each shownTags as chip (chip.label)}
+							<Tag title={chip.title}>{chip.label}</Tag>
+						{/each}
+						{#if moreTags.length > 0}
+							<Tag title={moreTags.map((c) => c.title).join('\n')}>{`+${moreTags.length}`}</Tag>
+						{/if}
+					</span>
+				{/if}
 			</span>
 		</span>
 
@@ -195,6 +217,10 @@
 
 		<span class="tnum truncate text-right text-[0.75rem] text-ink-3" title={target.last_probe_at ? formatDateTime(target.last_probe_at) : undefined}>
 			{formatAge(target.last_probe_at)}
+		</span>
+
+		<span class="flex items-center justify-center">
+			{#if actions}<RowActions {target} {actions} />{/if}
 		</span>
 	</div>
 </div>

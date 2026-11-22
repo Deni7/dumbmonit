@@ -20,6 +20,10 @@ use crate::state::AppState;
 /// plus qu'on ne l'observe — et la contrainte est aussi posée en base.
 const MIN_INTERVAL_SECS: u64 = 10;
 const DEFAULT_INTERVAL_SECS: u64 = 60;
+/// Période maximale : une semaine. Au-delà, l'équipement passerait pour muet.
+const MAX_INTERVAL_SECS: u64 = 7 * 24 * 3600;
+/// Longueur maximale de la note libre d'un moniteur.
+const MAX_NOTE_CHARS: usize = 2000;
 
 /// Longueur maximale d'un nom, en caractères. Un nom devient une étiquette
 /// `host` sur chaque échantillon : VictoriaMetrics plafonne les valeurs
@@ -64,6 +68,10 @@ pub struct TargetView {
     pub credential_public: BTreeMap<String, String>,
     /// Dossier plat et libre, affiché sur `/targets`. Vide : aucun dossier.
     pub group_name: String,
+    /// Note libre, pour les humains (migration 0263). Vide : aucune.
+    pub note: String,
+    /// Date de création (UTC, sans suffixe).
+    pub created_at: Option<String>,
     /// Rang manuel (drag, Haut/Bas), départagé par l'interface seulement entre
     /// cibles de même état et de même dossier.
     pub position: i64,
@@ -109,11 +117,16 @@ fn error_kind(message: &str) -> &'static str {
 
 impl TargetView {
     fn new(target: Target, status: Option<db::targets::TargetStatus>) -> Self {
-        let (last_probe_at, last_error, via_agent, managed) = match status {
-            Some(status) => {
-                (status.last_probe_at, status.last_error, status.via_agent, status.managed)
-            }
-            None => (None, None, None, None),
+        let (last_probe_at, last_error, via_agent, managed, note, created_at) = match status {
+            Some(status) => (
+                status.last_probe_at,
+                status.last_error,
+                status.via_agent,
+                status.managed,
+                status.note,
+                status.created_at,
+            ),
+            None => (None, None, None, None, String::new(), None),
         };
         let error_kind = last_error.as_deref().map(error_kind);
         Self {
@@ -138,6 +151,8 @@ impl TargetView {
                 .map(|(key, value)| (key.to_owned(), value))
                 .collect(),
             group_name: target.group_name,
+            note,
+            created_at,
             position: target.position,
             managed,
             location_id: None,
@@ -185,6 +200,9 @@ pub struct TargetPayload {
     /// pas sortir la cible de son dossier en la modifiant.
     #[serde(default, deserialize_with = "deserialize_present")]
     pub group_name: Option<Option<String>>,
+    /// Note libre. Absente lors d'une modification : conservée ; vide : effacée.
+    #[serde(default)]
+    pub note: Option<String>,
     /// Emplacement de la carte du monde ; `null` : aucun. Absent lors d'une
     /// modification : conserver l'affectation, comme pour `group_name`.
     #[serde(default, deserialize_with = "deserialize_present")]
@@ -210,6 +228,18 @@ pub struct TargetPayload {
     /// le change.
     #[serde(default)]
     pub client_id: Option<i64>,
+}
+
+/// Note libre nettoyée (espaces de bord retirés) ; `None` : absente, à conserver.
+fn clean_note(note: Option<&String>) -> ApiResult<Option<String>> {
+    let Some(note) = note else { return Ok(None) };
+    let note = note.trim();
+    if note.chars().count() > MAX_NOTE_CHARS {
+        return Err(ApiError::BadRequest(format!(
+            "The note must be at most {MAX_NOTE_CHARS} characters."
+        )));
+    }
+    Ok(Some(note.to_string()))
 }
 
 impl TargetPayload {
@@ -279,6 +309,11 @@ impl TargetPayload {
         if interval_secs < MIN_INTERVAL_SECS {
             return Err(ApiError::BadRequest(format!(
                 "The polling interval must be at least {MIN_INTERVAL_SECS} seconds."
+            )));
+        }
+        if interval_secs > MAX_INTERVAL_SECS {
+            return Err(ApiError::BadRequest(format!(
+                "The polling interval must be at most {MAX_INTERVAL_SECS} seconds (7 days)."
             )));
         }
 
@@ -538,6 +573,7 @@ pub async fn create(
     let multisite = payload.multisite.clone().flatten();
     let wanted_client = payload.client_id;
     let cve_scan = payload.cve_scan.unwrap_or(true);
+    let note = clean_note(payload.note.as_ref())?;
     let input = payload.validate(&state, None)?;
     let client = clients::target_client_for(&state.pool, &access, wanted_client)
         .await
@@ -560,6 +596,9 @@ pub async fn create(
     }
     if !cve_scan {
         db::targets::set_cve_scan(&state.pool, &[id], false).await?;
+    }
+    if let Some(note) = note.filter(|note| !note.is_empty()) {
+        db::targets::set_note(&state.pool, id, &note).await?;
     }
     let target = load(&state, id).await?;
     crate::packs::apply_thresholds(&state.pool, &target).await;
@@ -594,6 +633,7 @@ pub async fn update(
     let new_multisite = payload.multisite.clone();
     let wanted_client = payload.client_id;
     let new_cve_scan = payload.cve_scan;
+    let new_note = clean_note(payload.note.as_ref())?;
     let before = load(&state, id).await?;
     let current_client =
         clients::target_client(&state.pool, id).await?.ok_or_else(|| not_found(id))?;
@@ -665,6 +705,9 @@ pub async fn update(
     }
     if let Some(location) = new_location {
         super::locations::set_location(&state.pool, &[id], location).await?;
+    }
+    if let Some(note) = new_note {
+        db::targets::set_note(&state.pool, id, &note).await?;
     }
     if let Some(cve_scan) = new_cve_scan {
         db::targets::set_cve_scan(&state.pool, &[id], cve_scan).await?;

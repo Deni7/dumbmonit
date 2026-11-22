@@ -31,6 +31,7 @@
 	import { formatRelative } from '#lib/format.js';
 	import { Button, Disclosure, EmptyState, ErrorNotice, Plate, Skeleton } from '#lib/ui/index.js';
 	import PasswordInput from '#lib/components/settings/PasswordInput.svelte';
+	import { startPolling } from '#lib/poll.js';
 	import {
 		EMPTY_VIEW,
 		aggregateByCve,
@@ -186,24 +187,24 @@
 	const refreshing = $derived(summary?.refreshing ?? false);
 	$effect(() => {
 		if (!refreshing) return;
-		const controller = new AbortController();
-		const timer = setInterval(async () => {
-			try {
-				const next = await getCveSummary(undefined, controller.signal);
-				const was = untrack(() => summary?.refreshing);
-				summary = next;
-				if (was && !next.refreshing) {
-					void loadFindings(controller.signal);
-					void loadInventory(controller.signal);
+		return startPolling(
+			async (signal) => {
+				try {
+					const next = await getCveSummary(undefined, signal);
+					const was = untrack(() => summary?.refreshing);
+					summary = next;
+					if (was && !next.refreshing) {
+						void loadFindings(signal);
+						void loadInventory(signal);
+					}
+				} catch {
+					/* the next tick tries again */
+					return false;
 				}
-			} catch {
-				/* the next tick tries again */
-			}
-		}, POLL_MS);
-		return () => {
-			clearInterval(timer);
-			controller.abort();
-		};
+			},
+			POLL_MS,
+			{ immediate: false }
+		);
 	});
 
 	async function save(input: { enabled: boolean; nvd_api_key?: string }): Promise<boolean> {

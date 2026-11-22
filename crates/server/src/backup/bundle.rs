@@ -218,6 +218,11 @@ pub struct Bundle {
     /// `agent.enrolment` de `settings`, migration 0233).
     #[serde(default)]
     pub agent_enrolment: Option<Value>,
+    /// Planification des sauvegardes locales modifiée depuis l'interface (clé
+    /// `backup.schedule` de `settings`). Absente tant qu'elle n'a pas été changée ;
+    /// l'environnement (`DUMBMONIT_BACKUP_*`) l'emporte toujours à l'exécution.
+    #[serde(default)]
+    pub backup_schedule: Option<Value>,
     /// Météo du mur : lieu et unité (clé `wall.weather` de `settings`).
     /// Absente tant qu'aucun lieu n'a été choisi.
     #[serde(default)]
@@ -240,6 +245,11 @@ pub struct Bundle {
     /// désigné par référence comme celui des rapports SLA.
     #[serde(default)]
     pub slos: Vec<BundleSlo>,
+    /// Politique d'authentification : second facteur exigé des administrateurs
+    /// et des opérateurs (clé `auth.policy` de `settings`). Absente tant
+    /// qu'elle n'a jamais été réglée.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth_policy: Option<Value>,
 }
 
 /// Serveur de courriel enregistré et son mot de passe.
@@ -327,6 +337,9 @@ pub struct BundleTarget {
     /// encore : c'est aussi ce que vaut « sans dossier ».
     #[serde(default)]
     pub group_name: String,
+    /// Note libre de l'équipement (migration 0263). Vide dans un lot plus ancien.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub note: String,
     /// Rang manuel dans `/targets` (migration 0038). Zéro par défaut pour un
     /// lot plus ancien : les cibles restaurées arrivent alors toutes à la même
     /// hauteur plutôt que dans un ordre inventé.
@@ -904,6 +917,9 @@ pub struct BundleUser {
     /// Désactivé par le fournisseur (SCIM), pas par un administrateur.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub disabled_by_scim: bool,
+    /// Adresse électronique facultative du compte (migration 0275).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub email: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1151,6 +1167,7 @@ mod tests {
                 tags: BTreeMap::new(),
                 credential: Some(serde_json::json!({"type": "snmp_v2c", "community": "s3cret"})),
                 group_name: "Rack A".to_string(),
+                note: "Racked by Sam, ask before a reboot".to_string(),
                 position: 3,
                 location: None,
                 multisite: None,
@@ -1170,6 +1187,7 @@ mod tests {
         assert_eq!(reopened.targets[0].address, "192.168.1.1");
         assert_eq!(reopened.targets[0].credential.as_ref().unwrap()["community"], "s3cret");
         assert_eq!(reopened.targets[0].group_name, "Rack A");
+        assert_eq!(reopened.targets[0].note, "Racked by Sam, ask before a reboot");
         assert_eq!(reopened.targets[0].position, 3);
     }
 
@@ -1185,6 +1203,7 @@ mod tests {
         });
         let bundle: Bundle = serde_json::from_value(json).unwrap();
         assert_eq!(bundle.targets[0].group_name, "");
+        assert_eq!(bundle.targets[0].note, "");
         assert_eq!(bundle.targets[0].position, 0);
     }
 

@@ -4,9 +4,12 @@
 	 * window, the availability attained, what is left of the error budget (a
 	 * bar with its words, never colour alone) and the current burn rate. A row
 	 * opens in place: the budget over the window, the burn rate by window and,
-	 * for administrators, edit and delete. Everyone reads; administrators write.
+	 * for those who may write, edit and delete. Everyone reads; administrators write,
+	 * and so do operators restricted by their teams, on their own monitors.
+	 * `?slo=<id>` opens that row (the link of a burn-rate alert).
 	 */
 	import { Gauge, Plus } from 'lucide-svelte';
+	import { page } from '$app/state';
 	import { m } from '#lib/paraglide/messages.js';
 	import { deleteSlo, getSlo, listSlos, type Slo, type SloDetail } from '#lib/api/index.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
@@ -14,6 +17,9 @@
 	import { Button, Confirm, EmptyState, ErrorNotice, Panel, Plate, Skeleton, type Tone } from '#lib/ui/index.js';
 	import Chart from '#lib/components/Chart.svelte';
 	import SloForm from './SloForm.svelte';
+
+	/** Administrators, and team-restricted operators (the server checks each monitor). */
+	const canWrite = $derived(auth.isAdmin || (auth.scoped && auth.canOperate));
 
 	let slos = $state<Slo[]>([]);
 	let loading = $state(true);
@@ -23,6 +29,9 @@
 		loadError = null;
 		try {
 			slos = await listSlos(signal);
+			const asked = Number(page.url.searchParams.get('slo'));
+			const linked = slos.find((s) => s.id === asked);
+			if (linked && open === null) void toggle(linked);
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			loadError = cause;
@@ -125,7 +134,7 @@
 <div class="grid gap-4">
 	<div class="flex flex-wrap items-start justify-between gap-3">
 		<p class="max-w-2xl text-sm text-ink-2 max-sm:hidden">{m.slo_tab_description()}</p>
-		{#if auth.isAdmin && editing === null}
+		{#if canWrite && editing === null}
 			<Button variant="secondary" onclick={() => (editing = 'new')}>
 				<Plus class="size-4" aria-hidden="true" />
 				{m.slo_new()}
@@ -150,7 +159,7 @@
 				icon={Gauge}
 				title={m.slo_empty_title()}
 				description={m.slo_empty_description()}
-				primary={auth.isAdmin ? { label: m.slo_new(), onclick: () => (editing = 'new') } : undefined}
+				primary={canWrite ? { label: m.slo_new(), onclick: () => (editing = 'new') } : undefined}
 			/>
 		{/if}
 	{:else}
@@ -235,7 +244,7 @@
 												</div>
 											</div>
 										</div>
-										{#if auth.isAdmin}
+										{#if canWrite}
 											<div class="flex flex-wrap items-center gap-2">
 												<Button variant="secondary" size="sm" onclick={() => (editing = slo.id)}>{m.slo_edit()}</Button>
 												<Confirm confirmLabel={m.slo_delete_confirm()} loading={deleting === slo.id} onconfirm={() => remove(slo)}>{m.slo_delete()}</Confirm>

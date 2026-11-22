@@ -73,6 +73,7 @@ mod scim;
 mod security;
 mod self_monitoring;
 mod seo_files;
+mod sessions;
 mod skipped_features;
 mod slos;
 pub(crate) mod spa;
@@ -169,6 +170,8 @@ pub fn router_with_hubs(
         .route("/auth/me", get(auth::me))
         // Second facteur et journal d'audit (`totp.rs`).
         .merge(totp::routes())
+        // Sessions ouvertes, déconnexion d'un compte, politique (`sessions.rs`).
+        .merge(sessions::routes())
         // Clés d'accès : liste, ajout, renommage, suppression (`passkeys.rs`).
         .merge(passkeys::routes())
         .route(
@@ -251,8 +254,9 @@ pub fn router_with_hubs(
         .route("/alerts/rules", get(alerts::list_rules).post(alerts::create_rule))
         .route("/alerts/rules/{id}", put(alerts::update_rule).delete(alerts::delete_rule))
         .route("/alerts/rules/{id}/enable", post(alerts::set_rule_enabled))
+        .route("/alerts/rules/{id}/reset", post(alerts::reset_rule))
         .route("/alerts/silences", get(alerts::list_silences).post(alerts::create_silence))
-        .route("/alerts/silences/{id}", delete(alerts::delete_silence))
+        .route("/alerts/silences/{id}", put(alerts::update_silence).delete(alerts::delete_silence))
         .route("/notify/channels", get(channels::list).post(channels::create))
         .route("/notify/channels/{id}", put(channels::update).delete(channels::delete))
         .route("/notify/channels/{id}/test", post(channels::test))
@@ -277,7 +281,7 @@ pub fn router_with_hubs(
         // Mise à jour automatique des agents : réglages, état, « Update now ».
         .merge(agent_updates::routes())
         .route("/tokens", get(tokens::list).post(tokens::create))
-        .route("/tokens/{id}", delete(tokens::revoke))
+        .route("/tokens/{id}", delete(tokens::revoke).patch(tokens::update))
         // Actions sur les conteneurs d'une machine (`agent_commands.rs`).
         .merge(agent_commands::ui_routes())
         // Journal d'événements Windows d'une machine : règles et événements (`agent_events.rs`).
@@ -408,6 +412,7 @@ pub fn router_with_hubs(
     // inutilisable.
     let public = Router::new()
         .route("/health", get(health::health))
+        .route("/ready", get(health::ready))
         // La spécification OpenAPI de tout ce qui suit : publique, sans secret.
         .route("/openapi.json", get(openapi::spec))
         // Mode produit et fin de l'assistant : l'interface choisit son habillage

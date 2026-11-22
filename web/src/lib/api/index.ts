@@ -84,6 +84,7 @@ import type {
 	IncidentUpdatePayload,
 	PostmortemPayload,
 	PublicDayDetail,
+	PublicOlderIncidents,
 	PublicStatus,
 	StatusSubscriber,
 	StatusSubscribePayload,
@@ -103,6 +104,8 @@ export {
 	ApiError,
 	toApiError,
 	setUnauthorizedHandler,
+	setTotpSetupHandler,
+	TOTP_SETUP_REQUIRED,
 	setDemoRefusalHandler,
 	setClientView,
 	getClientView
@@ -402,6 +405,11 @@ export function setAlertRuleEnabled(id: number, enabled: boolean): Promise<Alert
 	});
 }
 
+/** Resets a built-in rule to the values it ships with. */
+export function resetAlertRule(id: number): Promise<AlertRule> {
+	return request<AlertRule>(`/alerts/rules/${id}/reset`, { method: 'POST' });
+}
+
 /** Lists the maintenance windows, or an empty array if the route does not exist yet. */
 export async function listSilences(signal?: AbortSignal): Promise<Silence[]> {
 	try {
@@ -415,6 +423,11 @@ export async function listSilences(signal?: AbortSignal): Promise<Silence[]> {
 
 export function createSilence(payload: SilencePayload): Promise<Silence> {
 	return request<Silence>('/alerts/silences', { method: 'POST', body: payload });
+}
+
+/** Edits a maintenance window (also how "end now" and "extend" are done). */
+export function updateSilence(id: number, payload: SilencePayload): Promise<Silence> {
+	return request<Silence>(`/alerts/silences/${id}`, { method: 'PUT', body: payload });
 }
 
 export function deleteSilence(id: number): Promise<void> {
@@ -562,12 +575,13 @@ export async function getAuthStatus(signal?: AbortSignal): Promise<AuthState> {
 			saml: { enabled: Boolean(status?.saml?.enabled), label: status?.saml?.label || 'SAML' },
 			passkeys: Boolean(status?.passkeys),
 			demo: Boolean(status?.demo),
-			https: status?.https ?? null
+			https: status?.https ?? null,
+			totpSetupRequired: status?.totp_setup_required === true
 		};
 	} catch (cause) {
 		if (cause instanceof DOMException && cause.name === 'AbortError') throw cause;
 		if (cause instanceof ApiError && cause.missing) {
-			return { available: false, configured: false, authenticated: true, user: null, oidc: NO_OIDC, ldap: { enabled: false }, saml: { enabled: false, label: 'SAML' }, passkeys: false, demo: false, https: null };
+			return { available: false, configured: false, authenticated: true, user: null, oidc: NO_OIDC, ldap: { enabled: false }, saml: { enabled: false, label: 'SAML' }, passkeys: false, demo: false, https: null, totpSetupRequired: false };
 		}
 		throw cause;
 	}
@@ -1047,6 +1061,12 @@ export function setStatusPageAccess(
 	body: { mode: StatusPageAccess; password?: string }
 ): Promise<StatusPage> {
 	return request<StatusPage>(`/status-pages/${id}/access`, { method: 'PUT', body });
+}
+
+/** The next slice of resolved incidents older than the page's 30 days. */
+export function getPublicOlderIncidents(slug: string, before?: string, signal?: AbortSignal): Promise<PublicOlderIncidents> {
+	const query = before ? `?before=${encodeURIComponent(before)}` : '';
+	return request<PublicOlderIncidents>(`/public/status/${encodeURIComponent(slug)}/incidents${query}`, { signal });
 }
 
 export function getPublicStatusDay(slug: string, date: string, signal?: AbortSignal): Promise<PublicDayDetail> {

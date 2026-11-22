@@ -91,6 +91,7 @@ per-rule thresholds in **Alerts → Rules**.
 | DumbMonit metric writes failing | Batches refused by VictoriaMetrics, or samples dropped, in the last 15 minutes | 5 min, warning |
 | DumbMonit database growing fast | `dumbmonit.db` more than doubled in a day and is over 100 MB | 1 h, warning |
 | DumbMonit backup did not run | No successful local backup for two days ([details](backup.md#scheduled-local-backups)) | 1 h, warning |
+| DumbMonit API token expiring soon | An API token that is not revoked expires within 7 days | 5 min, warning |
 
 These rules need VictoriaMetrics to be evaluated. When VictoriaMetrics itself
 is down for good, or the whole host is, no rule can fire: that is the
@@ -108,6 +109,7 @@ heartbeat's job.
 | `dumbmonit_instance_sample_writes_failed_total` | Batches VictoriaMetrics refused or did not answer, since the server started. |
 | `dumbmonit_instance_samples_dropped_total` | Samples dropped before reaching the write buffer, since the server started. |
 | `dumbmonit_instance_vm_restarts_total` | Restarts of the embedded VictoriaMetrics since the server started (embedded only). |
+| `dumbmonit_instance_api_tokens_expiring` | API tokens, not revoked, whose expiry falls within the next 7 days. |
 
 They carry no `target` label: the alerts they raise are not attached to a
 monitor. For a Prometheus of your own, `GET /metrics` exposes the same kind of

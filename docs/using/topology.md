@@ -52,6 +52,14 @@ before deduced. Each box hangs from one link; the others are drawn lighter.
   (fit). The buttons in the corner do the same.
 - **Show** narrows the map to a folder or to a relay site; the checkbox hides
   unmonitored virtual machines and containers.
+- **Find a device on the map** (above the map) searches by name; picking a result
+  selects the node, highlights its chain and centres the map on it, also outside
+  *Correct the map*.
+- **Site** shows one site only, and **Only problems** keeps the monitors that are
+  down, impacted or misconfigured, with the devices they hang from for context.
+- The panel of a node has a **Copy link** button. The link
+  (`/targets?tab=map&node=<id>`) opens the map centred on that node with its panel
+  open.
 - On a phone the page opens on the **List** view: the same tree, indented.
 
 ## Correct the map
@@ -108,6 +116,8 @@ links go.
 
 - **SVG image** and **PNG image**: the whole map with a title, the scope, the
   date and the legend, on a white ground, whatever the theme on screen.
+- **Export as CSV** (List view only): one line per device with its site, type,
+  state, folder, network and parent device.
 - **Print / PDF (A4 landscape)** and **(A3 landscape)**: the browser prints
   only that sheet, scaled to the page. Choose *Save as PDF* in the print dialog
   for a PDF.

@@ -13,7 +13,7 @@
 	 * With `traffic` (weathermap), clicking a link that has port counters opens
 	 * its traffic panel: rates each way, errors, the last hour.
 	 */
-	import type { Snippet } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { Maximize, Minus, Plus, X } from 'lucide-svelte';
 	import MapContent from './MapContent.svelte';
@@ -37,6 +37,8 @@
 		edgePanel?: Snippet<[string]>;
 		/** Weathermap: links show their load and open a traffic panel. */
 		traffic?: boolean;
+		/** Centres the view on a node (a search, a deep link); a new `n` asks again. */
+		centerRequest?: { id: string; n: number } | null;
 	}
 
 	let {
@@ -49,7 +51,8 @@
 		onattach,
 		editor,
 		edgePanel,
-		traffic = false
+		traffic = false,
+		centerRequest = null
 	}: Props = $props();
 
 	/** Key of the link whose traffic panel is open. */
@@ -157,6 +160,21 @@
 			const k = Math.max(view.k, Math.min(1, MAX));
 			view = { k, x: width / 2 - p.x * k, y: height / 3 - p.y * k };
 		}
+	});
+
+	// A node asked for by name or by link: centred in the part of the map the panel leaves free.
+	let centered = 0;
+	$effect(() => {
+		const request = centerRequest;
+		if (!request || !width || !height || request.n === centered) return;
+		const p = layout.nodes.find((n) => n.node.id === request.id);
+		if (!p) return;
+		untrack(() => {
+			centered = request.n;
+			const k = Math.min(MAX, Math.max(view.k, 1));
+			const free = width >= 640 ? width - 336 : width;
+			view = { k, x: free / 2 - p.x * k, y: (width >= 640 ? height / 2 : height / 3) - p.y * k };
+		});
 	});
 
 	function inPanel(target: EventTarget | null): boolean {

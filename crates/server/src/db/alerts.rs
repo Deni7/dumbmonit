@@ -173,6 +173,23 @@ pub async fn list_enabled_rules(pool: &SqlitePool) -> Result<Vec<Rule>> {
     rows.iter().map(rule_from_row).collect()
 }
 
+/// Dernier passage en alerte de chaque règle, d'après l'historique (RFC 3339).
+pub async fn last_fired_by_rule(
+    pool: &SqlitePool,
+) -> Result<std::collections::HashMap<String, String>> {
+    let rows = sqlx::query(
+        "SELECT rule_uid, MAX(at) AS last FROM alert_history
+         WHERE to_phase = 'firing' GROUP BY rule_uid",
+    )
+    .fetch_all(pool)
+    .await
+    .context("lecture du dernier déclenchement des règles")?;
+    rows.iter()
+        .map(|row| Ok((row.try_get("rule_uid")?, row.try_get("last")?)))
+        .collect::<Result<_, sqlx::Error>>()
+        .map_err(Into::into)
+}
+
 /// Crée ou remplace une règle, désignée par son `uid`.
 pub async fn upsert_rule(pool: &SqlitePool, rule: &Rule) -> Result<i64> {
     let row = sqlx::query(
@@ -907,6 +924,25 @@ pub async fn create_silence(pool: &SqlitePool, silence: &Silence) -> Result<i64>
     Ok(row.try_get("id")?)
 }
 
+/// Remplace une fenêtre existante. Renvoie `false` si elle n'existe pas.
+pub async fn update_silence(pool: &SqlitePool, silence: &Silence) -> Result<bool> {
+    let result = sqlx::query(
+        "UPDATE silences SET name = ?, comment = ?, target_id = ?, matchers = ?, schedule = ?,
+         enabled = ? WHERE id = ?",
+    )
+    .bind(&silence.name)
+    .bind(&silence.comment)
+    .bind(silence.target_id)
+    .bind(serde_json::to_string(&silence.matchers)?)
+    .bind(serde_json::to_string(&silence.schedule)?)
+    .bind(i64::from(silence.enabled))
+    .bind(silence.id)
+    .execute(pool)
+    .await
+    .context("mise à jour du silence")?;
+    Ok(result.rows_affected() > 0)
+}
+
 pub async fn delete_silence(pool: &SqlitePool, id: i64) -> Result<bool> {
     let result = sqlx::query("DELETE FROM silences WHERE id = ?").bind(id).execute(pool).await?;
     Ok(result.rows_affected() > 0)
@@ -1389,5 +1425,34 @@ mod tests {
         crate::db::targets::record_probe(&pool, id, None).await.unwrap();
         assert_eq!(lift_recovered_silences(&pool).await.unwrap(), 1);
         assert!(list_silences(&pool).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn modifier_un_silence_remplace_ses_champs_et_ignore_les_inconnus() {
+        let dir = tempfile::tempdir().unwrap();
+        let pool = crate::db::open(&dir.path().join("t.db")).await.unwrap();
+        let now = Utc::now();
+        let mut silence = Silence {
+            id: 0,
+            name: "Mise à jour".into(),
+            comment: String::new(),
+            target_id: None,
+            matchers: Default::default(),
+            schedule: Schedule::Once { starts_at: now, ends_at: now + chrono::TimeDelta::hours(2) },
+            enabled: true,
+        };
+        silence.id = create_silence(&pool, &silence).await.unwrap();
+
+        // « Terminer maintenant » : la fin est ramenée à l'instant présent.
+        silence.name = "Mise à jour terminée".into();
+        silence.schedule = Schedule::Once { starts_at: now, ends_at: now };
+        assert!(update_silence(&pool, &silence).await.unwrap());
+        let stored = list_silences(&pool).await.unwrap();
+        assert_eq!(stored.len(), 1);
+        assert_eq!(stored[0].name, "Mise à jour terminée");
+        assert_eq!(stored[0].schedule, silence.schedule);
+
+        silence.id += 100;
+        assert!(!update_silence(&pool, &silence).await.unwrap());
     }
 }

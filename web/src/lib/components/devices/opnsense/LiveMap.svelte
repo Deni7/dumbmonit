@@ -26,6 +26,7 @@
 	import { arcPoints, countryName, dominant } from '#lib/map/live.js';
 	import { getBasemap } from '#lib/api/locations.js';
 	import type { Basemap } from '#lib/api/types.js';
+	import { startPolling } from '#lib/poll.js';
 
 	interface Props {
 		target: Target;
@@ -60,6 +61,7 @@
 		} catch (cause) {
 			if (signal.aborted) return;
 			error = cause;
+			return false;
 		}
 	}
 
@@ -69,13 +71,10 @@
 		live = null;
 		const controller = new AbortController();
 		void getBasemap(controller.signal).then((b) => (basemap = b)).catch(() => {});
-		void poll(controller.signal);
-		const timer = setInterval(() => {
-			if (document.visibilityState === 'visible') void poll(controller.signal);
-		}, 5000);
+		const stop = startPolling(poll, 5000);
 		return () => {
 			controller.abort();
-			clearInterval(timer);
+			stop();
 		};
 	});
 

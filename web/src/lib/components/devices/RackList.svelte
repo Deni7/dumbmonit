@@ -26,6 +26,7 @@
 	import { ROW_INTRINSIC } from './columns';
 	import type { RiverCell } from '#lib/components/enterprise/fleet.js';
 	import RackTile from './RackTile.svelte';
+	import type { RowActionHandlers } from './RowActions.svelte';
 	import type { RackRow } from './rack';
 	import type { RackView } from './view';
 
@@ -83,9 +84,13 @@
 		river?: Map<TargetId, RiverCell[]>;
 		/** Opens or closes a parent's sub-monitors; `open` is its current state. Compact layout only. */
 		ontoggle?: ((id: TargetId, open: boolean) => void) | null;
+		/** id → the free tags as chips, shown on the compact lines. */
+		tags?: Map<TargetId, { label: string; title: string }[]>;
+		/** Quick actions of each compact line (check now, enable, copy address). */
+		rowActions?: RowActionHandlers | null;
 	}
 
-	let { rows, sparklines, kindLabels, sites = new Map(), showSite = true, reorder = null, layout = 'compact', names = new Map(), security = new Map(), alertCounts = new Map(), selection = null, river = new Map(), ontoggle = null }: Props = $props();
+	let { rows, sparklines, kindLabels, sites = new Map(), showSite = true, reorder = null, layout = 'compact', names = new Map(), security = new Map(), alertCounts = new Map(), selection = null, river = new Map(), ontoggle = null, tags = new Map(), rowActions = null }: Props = $props();
 
 	const LIST_CLASS: Record<RackView, string> = {
 		compact: 'flex flex-col divide-y divide-line',
@@ -118,6 +123,8 @@
 					trouble={row.trouble ?? 0}
 					open={row.open ?? false}
 					ontoggle={ontoggle ? () => ontoggle?.(id, row.open ?? false) : undefined}
+					tags={tags.get(id) ?? []}
+					actions={rowActions}
 				/>
 			{:else}
 				<RackTile
@@ -140,6 +147,7 @@
 			cost more than building them.
 		-->
 		<li
+			data-list-row
 			class={`relative flex min-w-0 items-stretch gap-1.5 first:rounded-t-[inherit] last:rounded-b-[inherit] ${layout === 'compact' ? `overflow-hidden [content-visibility:auto] ${ROW_INTRINSIC}` : ''}`}
 			{@attach (node) => {
 				reorder?.registerRow(id, node);

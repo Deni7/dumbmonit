@@ -34,22 +34,29 @@ them (Compact layout, unfiltered and unsorted list) or with the keyboard
 
 One toolbar holds everything:
 
-- the **search** box (name, address or kind);
+- the **search** box (name, address, kind or tag);
 - **Filter**, which opens the state (All, Needs attention, Reporting,
   Disabled), kind, site, sort and tag filters — the number on the button counts the
   ones in use, and **Clear filters** resets them. The tag filter is one button
   that opens a searchable checklist and summarises the chosen tags on one line,
-  with a × to clear them. Filters live in the address,
-  so a filtered list can be bookmarked or shared;
+  with a × to clear them. The sort can also be by availability over the last
+  24 hours (worst first) or by the date the monitor was added. Filters live in
+  the address, so a filtered list can be bookmarked or shared; opened without
+  any, the list comes back with the view, filters and sort you left it with
+  (the search text is not remembered);
 - **Compact** / **Tiles**;
 - **Create folder** (administrators): a name field opens under the toolbar;
 - **Select** (administrators), which turns on a checkbox per monitor and a
-  floating bar at the bottom with the bulk actions (enable, disable, move to a
-  folder, delete, and under **More** location, relay and CVE check); **Done**
+  floating bar at the bottom with the bulk actions (enable, disable, silence for
+  1 hour to 7 days, move to a folder, delete, and under **More** location, relay and CVE check); **Done**
   or Escape leaves the mode;
 - **⋯** (more actions): the topology **Map**, **Import websites (CSV)** and
   **Import from Uptime Kuma**;
 - **Add a monitor**, the primary action.
+
+Each line ends with a **⋯** menu (shown on hover or focus, always on a phone):
+**Probe now**, **Enable** / **Disable** (administrators) and **Copy address**. A
+monitor's free tags show as small chips after its kind on wide lists.
 
 ## A monitor
 
@@ -63,8 +70,15 @@ monitor is behind the gear. Actions:
 | Probe now (pulse icon) | Runs one probe immediately and reports how many samples and series it produced. The first thing to try when a monitor shows no data. |
 | Snooze (bell icon) | A small menu: **Snooze 1 h**, or **Snooze until…** for a custom end. A one-off maintenance window on this monitor; the menu lifts it again. |
 | Logs | Opens the log search filtered on this monitor. |
+| Duplicate | Opens the add form filled in from this monitor, its name ending in "(copy)". Secrets (credentials, secret-looking options, HTTP headers) are never copied: type them again. Not offered for agents or monitors managed by Docker labels. |
 | Settings (gear) | Opens the same form as when adding, prefilled. Leaving the credential empty keeps the stored one. For an agent it also holds the relay mode, log collection, the services to watch on its machine and re-enrolment. |
 | More (⋯), Delete | Asks "Delete for good?" inline for five seconds, then deletes the monitor. Its series stay in VictoriaMetrics until retention expires. |
+
+Beside the address, a button copies it, and the arrows at the top right of the
+page go to the previous and next monitor in the list order. The tags and the
+**note** (free text set in the form's *More options*) appear under the title,
+and a **Maintenance windows** block lists the active and upcoming windows that
+cover this monitor, with a link to manage them.
 
 Below: **Alerts on this monitor** — each active alert offers *Ack*, *Snooze*
 and *Ignore*, and a rule ignored on this monitor is listed separately with
@@ -110,6 +124,10 @@ setup wizard's *Add your first monitors* step offers the same choice.
 See [Add your first monitor](../install/first-device.md) for the form and the
 [monitor types](../devices/index.md) for what each type needs. When editing, the
 form opens **More options** by itself if the monitor already uses one.
+
+The check interval is a preset (30 s to 15 min) or **Custom…**: a whole number
+and a unit (seconds to days), from 10 seconds to 7 days. Leaving the form with
+unsaved changes asks for confirmation.
 
 ## Deleting
 

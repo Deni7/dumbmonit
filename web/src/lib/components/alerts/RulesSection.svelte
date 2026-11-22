@@ -20,15 +20,17 @@
 		Target,
 		CollectorInfo
 	} from '#lib/api/index.js';
-	import { listChannels } from '#lib/api/index.js';
+	import { listChannels, resetAlertRule } from '#lib/api/index.js';
+	import { page } from '$app/state';
+	import { tick, untrack } from 'svelte';
 	import { alertsStore } from '#lib/stores/alerts.svelte.js';
-	import { Button, Confirm, Field, Panel, Plate, Toggle, EmptyState } from '#lib/ui/index.js';
+	import { Button, Confirm, Field, Panel, Plate, Toggle, EmptyState, reducedMotion } from '#lib/ui/index.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import { withoutOnCall } from '#lib/components/oncall/gate.js';
 	import { instanceStore } from '#lib/stores/instance.svelte.js';
 	import { SlidersHorizontal, ChevronDown, ChevronUp, Search } from 'lucide-svelte';
-	import { formatDuration } from '#lib/format.js';
-	import { severityTone, severityWord } from './helpers';
+	import { formatDuration, formatRelative } from '#lib/format.js';
+	import { severityRank, severityTone, severityWord } from './helpers';
 	import { kindLabel as kindLabelOf } from '#lib/kind-label.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import FileManagedBadge from '#lib/components/settings/FileManagedBadge.svelte';
@@ -36,7 +38,7 @@
 	import { ruleKinds } from './rules-filter';
 	import Segmented from '#lib/components/devices/Segmented.svelte';
 	import RuleEditor from './rules/RuleEditor.svelte';
-	import { anomalySummary } from './rules/options';
+	import { anomalySummary, payloadFrom } from './rules/options';
 
 	interface Props {
 		rules: AlertRule[];
@@ -165,13 +167,45 @@
 	]);
 
 	const filtered = $derived(search.trim() !== '' || kindFilter !== '' || quick !== 'all');
+
+	type SortKey = 'default' | 'name' | 'severity' | 'fired';
+	let sort = $state<SortKey>('default');
+	const sortOptions = $derived([
+		{ value: 'default' as const, label: m.w1alerts_rules_sort_default() },
+		{ value: 'name' as const, label: m.w1alerts_rules_sort_name() },
+		{ value: 'severity' as const, label: m.w1alerts_rules_sort_severity() },
+		{ value: 'fired' as const, label: m.w1alerts_rules_sort_fired() }
+	]);
+
+	/** When the rule last fired, in ms; 0 when never. Live alerts count as now. */
+	function firedAt(rule: AlertRule): number {
+		if ((firingByRule.get(rule.uid) ?? 0) > 0) return Date.now();
+		const at = Date.parse(rule.last_fired_at ? (/[zZ]|[+-]\d\d:?\d\d$/.test(rule.last_fired_at) ? rule.last_fired_at : `${rule.last_fired_at}Z`) : '');
+		return Number.isNaN(at) ? 0 : at;
+	}
+
+	function sorted(list: AlertRule[]): AlertRule[] {
+		if (sort === 'default') return list;
+		const copy = [...list];
+		if (sort === 'name') copy.sort((a, b) => a.name.localeCompare(b.name, getLocale()));
+		else if (sort === 'severity') {
+			copy.sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || a.name.localeCompare(b.name, getLocale()));
+		} else copy.sort((a, b) => firedAt(b) - firedAt(a) || a.name.localeCompare(b.name, getLocale()));
+		return copy;
+	}
+
 	const shown = $derived(searchResults.filter((rule) => matchesQuick(rule, quick)));
+
+	/** The group a rule is filed under: its device kind, or '' for universal rules. */
+	function groupKindOf(rule: AlertRule): string {
+		return [...ruleKinds(rule, knownKinds)].sort((a, b) => a.localeCompare(b, getLocale()))[0] ?? '';
+	}
 
 	/** Shown rules by device kind (universal ones under ''), owned kinds first. */
 	const groups = $derived.by(() => {
 		const byKind = new Map<string, AlertRule[]>();
-		for (const rule of shown) {
-			const kind = [...ruleKinds(rule, knownKinds)].sort((a, b) => a.localeCompare(b, getLocale()))[0] ?? '';
+		for (const rule of sorted(shown)) {
+			const kind = groupKindOf(rule);
 			const list = byKind.get(kind);
 			if (list) list.push(rule);
 			else byKind.set(kind, [rule]);
@@ -196,6 +230,67 @@
 		if (open) next.add(kind);
 		else next.delete(kind);
 		openGroups = next;
+	}
+
+	// --- Opened from the history: `?rule=<uid>` unfolds, scrolls to and marks the rule ---
+
+	let markedId = $state<number | null>(null);
+	let consumedLink = '';
+	$effect(() => {
+		const uid = page.url.searchParams.get('rule');
+		if (!uid || uid === consumedLink || rows.length === 0) return;
+		const rule = untrack(() => rows.find((r) => r.uid === uid));
+		if (!rule) return;
+		consumedLink = uid;
+		untrack(() => {
+			// Filters would hide it: the link wins over them.
+			search = '';
+			kindFilter = '';
+			quick = 'all';
+			const kind = groupKindOf(rule);
+			openGroups = new Set(openGroups).add(kind);
+			markedId = rule.id;
+		});
+		void tick().then(() => {
+			document.getElementById(`rule-row-${rule.id}`)?.scrollIntoView({ block: 'center', behavior: reducedMotion() ? 'auto' : 'smooth' });
+		});
+		if (markTimer) clearTimeout(markTimer);
+		markTimer = setTimeout(() => (markedId = null), 4000);
+	});
+	let markTimer: ReturnType<typeof setTimeout> | null = null;
+	$effect(() => () => {
+		if (markTimer) clearTimeout(markTimer);
+	});
+
+	// --- Clone and reset ------------------------------------------------------
+
+	let cloneNote = $state<string | null>(null);
+	let actionError = $state<string | null>(null);
+	let resettingId = $state<number | null>(null);
+
+	/** A new rule with the same settings, under a "(copy)" name; shipped rules clone into your own. */
+	async function clone(rule: AlertRule) {
+		actionError = null;
+		cloneNote = null;
+		const copyName = m.w1alerts_rules_copy_name({ name: rule.name });
+		try {
+			await oncreate({ ...payloadFrom(rule), uid: undefined, name: copyName, enabled: false });
+			cloneNote = m.w1alerts_rules_cloned({ name: copyName });
+		} catch (cause) {
+			actionError = cause instanceof Error ? cause.message : m.w1alerts_rules_error_clone();
+		}
+	}
+
+	async function resetToDefaults(rule: AlertRule) {
+		resettingId = rule.id;
+		actionError = null;
+		try {
+			onSaved(await resetAlertRule(rule.id));
+		} catch (cause) {
+			actionError = cause instanceof Error ? cause.message : m.w1alerts_rules_error_reset();
+		} finally {
+			resettingId = null;
+		}
 	}
 
 	let editingId = $state<number | null>(null);
@@ -470,7 +565,8 @@
 	{@const editing = editingId === rule.id}
 	{@const showQuery = shownQueryIds.has(rule.id)}
 	<div
-		class={`rise-in rounded-[var(--radius-card)] border bg-surface px-4 py-3 shadow-lift max-sm:[contain-intrinsic-size:auto_120px] max-sm:[content-visibility:auto] ${editing ? 'border-line-strong' : 'border-line'} ${rule.enabled || editing ? '' : 'opacity-70'}`}
+		id={`rule-row-${rule.id}`}
+		class={`rise-in rounded-[var(--radius-card)] border bg-surface px-4 py-3 shadow-lift max-sm:[contain-intrinsic-size:auto_120px] max-sm:[content-visibility:auto] ${markedId === rule.id ? 'border-signal bg-signal-soft' : editing ? 'border-line-strong' : 'border-line'} ${rule.enabled || editing ? '' : 'opacity-70'}`}
 		style={`--rise-delay: ${Math.min(i, 10) * 30}ms`}
 	>
 		<div class="flex flex-wrap items-start gap-x-4 gap-y-3">
@@ -506,6 +602,9 @@
 					<span class="text-ink-3" aria-hidden="true">·</span>
 					{m.alerts_rules_notifies({ channels: channelsLabel(rule) })}
 				</p>
+				<p class="mt-0.5 text-[0.8125rem] text-ink-2">
+					{m.w1alerts_rules_last_fired({ when: formatRelative(rule.last_fired_at) })}
+				</p>
 				{#if rule.kind === 'anomaly' && !editing}
 					<p class="tnum mt-0.5 text-[0.75rem] text-ink-2">{anomalySummary(rule)}</p>
 				{/if}
@@ -540,6 +639,20 @@
 						<Button variant="ghost" size="sm" onclick={() => (editingId = rule.id)} aria-label={m.alerts_rules_edit_aria({ name: rule.name })}>
 							{m.alerts_rules_edit()}
 						</Button>
+					{/if}
+					<Button variant="ghost" size="sm" onclick={() => void clone(rule)} aria-label={m.w1alerts_rules_clone_aria({ name: rule.name })}>
+						{m.w1alerts_rules_clone()}
+					</Button>
+					{#if rule.builtin}
+						<Confirm
+							size="sm"
+							variant="secondary"
+							confirmLabel={m.w1alerts_rules_reset_confirm()}
+							loading={resettingId === rule.id}
+							onconfirm={() => resetToDefaults(rule)}
+						>
+							{m.w1alerts_rules_reset()}
+						</Confirm>
 					{/if}
 					<Toggle
 						id={`rule-toggle-${rule.id}`}
@@ -587,6 +700,7 @@
 			<Search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3" aria-hidden="true" />
 			<input
 				type="search"
+				data-page-search
 				class="input !pl-9"
 				placeholder={m.alerts_rules_search_placeholder()}
 				bind:value={search}
@@ -604,14 +718,30 @@
 		</label>
 	</div>
 
+	<div class="mb-3 flex flex-wrap items-center gap-3">
 	<Segmented
 		options={quickOptions}
 		value={quick}
 		onchange={(v) => (quick = v)}
 		label={m.alerts_rules_quick_label()}
 		size="sm"
-		class="mb-3 max-sm:w-full"
+		class="max-sm:w-full"
 	/>
+	<label class="flex items-center gap-2 text-[0.8125rem] text-ink-2">
+		<span>{m.w1alerts_rules_sort_label()}</span>
+		<select class="input !min-h-10 !w-auto !py-1.5 text-sm sm:!min-h-9" bind:value={sort}>
+			{#each sortOptions as option (option.value)}
+				<option value={option.value}>{option.label}</option>
+			{/each}
+		</select>
+	</label>
+	</div>
+	{#if cloneNote}
+		<p class="mb-3 text-[0.8125rem] font-medium text-ink" role="status" aria-live="polite">{cloneNote}</p>
+	{/if}
+	{#if actionError}
+		<p class="mb-3 text-[0.8125rem] font-medium text-warning-ink" role="alert">{actionError}</p>
+	{/if}
 	<p class="tnum mb-3 text-[0.8125rem] text-ink-2" aria-live="polite">
 		{m.alerts_rules_count({ shown: shown.length, total: rows.length })}
 	</p>

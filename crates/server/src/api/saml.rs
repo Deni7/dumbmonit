@@ -20,6 +20,7 @@ use crate::auth::middleware::AdminUser;
 use crate::auth::oidc::pkce;
 use crate::auth::saml::flow::{self, Correlation, FlowError, Ticket};
 use crate::auth::saml::{self, Endpoints, SamlConfig, import};
+use crate::auth::session::{SignIn, Via};
 use crate::auth::{AuthError, AuthResult, AuthState, audit, cookie, oidc, session, users};
 use crate::state::AppState;
 
@@ -256,7 +257,9 @@ pub async fn complete(
     // Un compte existe désormais : le garde de session ne doit plus tenir
     // l'instance pour vierge.
     auth.remember_configured(true);
-    let token = match session::create(&state.pool, user.id).await {
+    let user_agent = session::user_agent(&headers);
+    let signin = SignIn { via: Via::Saml, ip, user_agent: user_agent.as_deref() };
+    let token = match session::create(&state.pool, user.id, &signin).await {
         Ok(token) => token,
         Err(error) => return failure(FlowError::Internal(error)),
     };

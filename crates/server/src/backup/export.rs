@@ -102,6 +102,10 @@ pub async fn collect(pool: &SqlitePool, cipher: &Cipher, options: ExportOptions)
         agent_enrolment: Some(serde_json::to_value(
             crate::collectors::agent::enrolment::load_settings(pool).await?,
         )?),
+        backup_schedule: crate::backup::local::stored_override(pool)
+            .await?
+            .map(serde_json::to_value)
+            .transpose()?,
         // Seulement quand un lieu est choisi : sans lieu, rien à restaurer.
         wall_weather: match crate::weather::load_settings(pool).await? {
             settings if settings.place.is_some() => Some(serde_json::to_value(settings)?),
@@ -115,6 +119,8 @@ pub async fn collect(pool: &SqlitePool, cipher: &Cipher, options: ExportOptions)
             .await?
             .map(|(logo_type, bytes)| BundleReportLogo { logo_type, data: BASE64.encode(bytes) }),
         slos: slos(pool, &refs).await?,
+        auth_policy: crate::auth::settings::get::<Value>(pool, crate::auth::policy::SETTINGS_KEY)
+            .await?,
     })
 }
 
@@ -558,7 +564,7 @@ async fn targets(
 ) -> Result<Vec<BundleTarget>> {
     let rows = sqlx::query(
         "SELECT id, name, address, kind, profile_id, parent_id, via_agent, interval_secs,
-                enabled, cve_scan, tags, credential_enc, group_name, position,
+                enabled, cve_scan, tags, credential_enc, group_name, note, position,
                 (SELECT l.name FROM locations l WHERE l.id = targets.location_id) AS location
          FROM targets ORDER BY id",
     )
@@ -618,6 +624,7 @@ async fn targets(
             tags: serde_json::from_str(&tags).unwrap_or_default(),
             credential,
             group_name: row.try_get("group_name")?,
+            note: row.try_get("note")?,
             position: row.try_get("position")?,
             location: row.try_get("location")?,
             multisite: multisite.remove(&id).map(|config| BundleMultisite {
@@ -1000,7 +1007,7 @@ async fn users(
     let rows = sqlx::query(
         "SELECT id, username, display_name, role, password_hash, oidc_subject, oidc_issuer,
                 saml_subject, saml_issuer, created_at, disabled, totp_secret, totp_enabled,
-                scim_id, scim_external_id, scim_email, disabled_by_scim
+                scim_id, scim_external_id, scim_email, disabled_by_scim, email
          FROM users ORDER BY id",
     )
     .fetch_all(pool)
@@ -1028,6 +1035,7 @@ async fn users(
             scim_external_id: row.try_get("scim_external_id")?,
             scim_email: row.try_get("scim_email")?,
             disabled_by_scim: row.try_get::<i64, _>("disabled_by_scim")? != 0,
+            email: row.try_get("email")?,
         };
 
         if options.include_account_secrets {
@@ -1168,7 +1176,8 @@ pub fn sections() -> BTreeMap<&'static str, &'static str> {
         ("status_pages", "Public status pages and the services they list."),
         ("incidents", "Incidents and maintenance announcements, with their post-mortems."),
         ("slos", "Service level objectives: target, window and the monitors they cover."),
-        ("users", "Accounts, their role and their SSO link."),
+        ("users", "Accounts, their role, email address and SSO link."),
+        ("auth_policy", "Authentication policy: two-factor required for admins and operators."),
         ("agent_tokens", "Agent enrolment tokens, as hashes: installed agents keep working."),
         ("api_tokens", "API tokens, as hashes: existing tokens keep working."),
         ("push_monitors", "Heartbeat tokens, so the URLs your cron jobs call stay the same."),
@@ -1193,6 +1202,7 @@ pub fn sections() -> BTreeMap<&'static str, &'static str> {
             "Network configuration versions, only when you include them: they hold device secrets.",
         ),
         ("instance", "Instance name, language, time zone and setup state."),
+        ("backup_schedule", "The schedule of the local backups, when you changed it."),
         ("clients", "MSP clients, their members, branding, and what belongs to each."),
         (
             "netscan_schedules",

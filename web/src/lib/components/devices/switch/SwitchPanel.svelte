@@ -70,6 +70,7 @@
 		} catch (cause) {
 			// The panel is an addition to the page: a failed read leaves it as it was.
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
+			return false;
 		}
 	}
 

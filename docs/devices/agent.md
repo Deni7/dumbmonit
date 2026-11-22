@@ -445,6 +445,8 @@ Windows) in place of its other flags does the same.
 | `--no-firewall` | `-NoFirewall` | Leave the local firewall alone. |
 | `--proxy=URL` | `-Proxy` | Outbound HTTP proxy to reach the server, `http://[user:password@]host:port` or `none` (`-Proxy` also takes `system`). Used for the downloads and written to `agent.yaml`. See [Outbound proxy](#outbound-proxy). |
 | `--no-proxy=LIST` | `-NoProxy` | Hosts reached without the proxy, comma-separated. |
+| `--version=X.Y.Z` | `-Version` | Install only if the agent binary is exactly this version. The server ships its own binary, so this refuses to install anything else (after a server upgrade, for instance) and leaves the agent already in place untouched. |
+| `--dry-run` | `-DryRun` | Print what would be done (system, source of the binary, checksum check, files written, service) and stop: nothing is downloaded, written or started, and no administrator rights are needed. The token is never printed. Works with `--uninstall` too. |
 | `--uninstall` | `-Uninstall` | Uninstall the agent and delete its configuration. |
 | `--help` | | Show the help. |
 

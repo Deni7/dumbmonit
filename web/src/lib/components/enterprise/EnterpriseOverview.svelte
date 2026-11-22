@@ -22,6 +22,7 @@
 	import FirstRun from '#lib/components/overview/FirstRun.svelte';
 	import NeedsAttention from '#lib/components/overview/NeedsAttention.svelte';
 	import FleetLatency from '#lib/components/overview/FleetLatency.svelte';
+	import UpdatedAgo from '#lib/components/alerts/UpdatedAgo.svelte';
 	import AlertTrend from '#lib/components/overview/AlertTrend.svelte';
 	import ComingUp from '#lib/components/overview/ComingUp.svelte';
 	import { fleetStore } from './fleet.svelte.js';
@@ -152,6 +153,9 @@
 			{/snippet}
 		</EmptyState>
 	{:else}
+		<div class="flex justify-end">
+			<UpdatedAgo updatedAt={alertsStore.updatedAt} onrefresh={() => Promise.all([alertsStore.refresh(), fleetStore.refresh()]).then(() => {})} />
+		</div>
 		<div class="grid grid-cols-2 gap-3 lg:grid-cols-3">
 			{#each kpis as kpi, i (kpi.id)}
 				<div class={`min-w-0 rounded-xl border border-line bg-surface px-4 py-3.5 max-lg:last:col-span-2 sm:px-[18px] sm:py-4 ${animate ? 'rise-in' : ''}`} style={`--rise-delay: ${i * 40}ms`}>

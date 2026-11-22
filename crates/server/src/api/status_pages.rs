@@ -15,7 +15,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, HeaderName, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, post, put};
@@ -32,6 +32,7 @@ pub(crate) mod access;
 mod badges;
 pub(crate) mod branding;
 pub mod delivery;
+mod older;
 mod postmortem;
 mod subscribers;
 mod timeline;
@@ -134,6 +135,7 @@ pub fn public_routes() -> Router<AppState> {
         .route("/public/status/{slug}/banner.js", get(public_banner_js))
         .route("/public/status/{slug}/badge.svg", get(public_badge))
         .route("/public/status/{slug}/rss", get(public_rss))
+        .route("/public/status/{slug}/incidents", get(older::older))
         .route("/public/status/{slug}/uptime.svg", get(badges::page_uptime))
         .route("/public/status/{slug}/response.svg", get(badges::page_response))
         .route("/public/status/{slug}/components/{key}/badge.svg", get(badges::item_status))
@@ -1246,6 +1248,10 @@ pub struct UpdatePayload {
     /// part à personne.
     #[serde(default)]
     pub at: Option<String>,
+    /// `false` : le message est publié sans prévenir les abonnés. Absent : ils
+    /// le sont (sauf message daté).
+    #[serde(default)]
+    pub notify: Option<bool>,
 }
 
 /// Poste un message et fait avancer le statut de l'annonce.
@@ -1312,7 +1318,7 @@ pub async fn add_update(
     let incident = db::status_pages::get_incident(&state.pool, id)
         .await?
         .ok_or_else(|| incident_not_found(id))?;
-    if at.is_none() {
+    if at.is_none() && payload.notify.unwrap_or(true) {
         subscribers::announce(&state, incident.clone(), Some(body));
     }
     let mut views = incident_views(&state, vec![incident]).await?;
@@ -1464,6 +1470,9 @@ struct DayBucket {
 
 #[derive(Debug, Serialize)]
 struct PublicIncident {
+    /// Ancre de l'annonce (`#incident-<anchor>`), lien permanent y compris dans
+    /// le flux RSS : début et titre en slug, jamais l'identifiant interne.
+    anchor: String,
     title: String,
     kind: String,
     status: String,
@@ -1471,6 +1480,9 @@ struct PublicIncident {
     starts_at: String,
     ends_at: Option<String>,
     updates: Vec<PublicUpdate>,
+    /// Clés publiques des services touchés ; vide : toute la page.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    components: Vec<String>,
     /// Post-mortem publié d'un incident résolu ; absent sinon.
     #[serde(skip_serializing_if = "Option::is_none")]
     postmortem: Option<postmortem::PublicPostmortem>,
@@ -1994,9 +2006,11 @@ fn to_public_incident(
     incident: Incident,
     updates: Vec<IncidentUpdate>,
     postmortem: Option<Postmortem>,
+    components: Vec<String>,
 ) -> PublicIncident {
     let postmortem = postmortem::public(postmortem, &incident.status);
     PublicIncident {
+        anchor: incident_anchor(&incident.starts_at, &incident.title),
         title: incident.title,
         kind: incident.kind,
         status: incident.status,
@@ -2011,8 +2025,19 @@ fn to_public_incident(
                 created_at: update.created_at,
             })
             .collect(),
+        components,
         postmortem,
     }
+}
+
+/// Ancre publique d'une annonce : `AAAAMMJJ-HHMM-<titre en slug>` (titre coupé à
+/// 40 caractères). Stable tant que le titre ne change pas.
+fn incident_anchor(starts_at: &str, title: &str) -> String {
+    let stamp: String = starts_at.chars().filter(char::is_ascii_digit).take(12).collect();
+    let stamp = if stamp.len() > 8 { format!("{}-{}", &stamp[..8], &stamp[8..]) } else { stamp };
+    let slug: String = slugify(title).chars().take(40).collect();
+    let slug = slug.trim_end_matches('-');
+    if slug.is_empty() { stamp } else { format!("{stamp}-{slug}") }
 }
 
 /// Clé publique d'un service : son libellé en slug, suffixée en cas de doublon.
@@ -2190,6 +2215,8 @@ async fn build_public(
     let mut n_degraded = 0usize;
     let mut n_maintenance = 0usize;
     let mut n_items = 0usize;
+    // Clé publique de chaque service, pour dire quels services touche une annonce.
+    let mut key_of: HashMap<TargetId, String> = HashMap::new();
     for item in items {
         let Some(target) = targets.get(&item.target_id) else { continue };
         let mut state_word = item_state(target, statuses.get(&target.id), &metrics, now);
@@ -2255,6 +2282,7 @@ async fn build_public(
                 .collect()
         };
         let key = unique_key(&item.label, &mut keys);
+        key_of.insert(target.id, key.clone());
         let public_item = PublicItem {
             key,
             target_id: preview.then_some(target.id),
@@ -2306,6 +2334,12 @@ async fn build_public(
         "operational"
     };
 
+    let mut incident_keys: HashMap<i64, Vec<String>> = HashMap::new();
+    for (incident_id, target_id) in db::status_pages::incident_component_rows(&state.pool).await? {
+        if let Some(key) = key_of.get(&target_id) {
+            incident_keys.entry(incident_id).or_default().push(key.clone());
+        }
+    }
     let (maintenance, past): (Vec<Incident>, Vec<Incident>) =
         incidents.into_iter().partition(|incident| incident.kind == "maintenance");
     let cutoff = format_timestamp(now - TimeDelta::days(PAST_INCIDENTS_DAYS));
@@ -2318,7 +2352,8 @@ async fn build_public(
         .map(|incident| {
             let updates = updates.remove(&incident.id).unwrap_or_default();
             let postmortem = postmortems.remove(&incident.id);
-            to_public_incident(incident, updates, postmortem)
+            let components = incident_keys.remove(&incident.id).unwrap_or_default();
+            to_public_incident(incident, updates, postmortem, components)
         })
         .collect();
     let public_maintenance = maintenance
@@ -2330,7 +2365,8 @@ async fn build_public(
         .map(|incident| {
             let updates = updates.remove(&incident.id).unwrap_or_default();
             let postmortem = postmortems.remove(&incident.id);
-            to_public_incident(incident, updates, postmortem)
+            let components = incident_keys.remove(&incident.id).unwrap_or_default();
+            to_public_incident(incident, updates, postmortem, components)
         })
         .collect();
 
@@ -2425,16 +2461,18 @@ fn xml_escape(text: &str) -> String {
 }
 
 /// Badge d'état global de la page : « status | operational ».
-fn render_badge(overall: &str) -> String {
+fn render_badge(overall: &str, style: badges::Style) -> String {
     let (word, colour) = badges::overall_word(overall);
-    badges::render("status", word, colour)
+    badges::render_styled("status", word, colour, style)
 }
 
 pub async fn public_badge(
     State(state): State<AppState>,
     Path(slug): Path<String>,
     headers: HeaderMap,
+    Query(query): Query<badges::StyleQuery>,
 ) -> ApiResult<Response> {
+    let style = badges::Style::parse(query.style.as_deref())?;
     let (body, private) = load_public_checked(&state, &slug, &headers).await?;
     let overall = body.get("overall").and_then(Value::as_str).unwrap_or("unknown");
     Ok(access::seal(
@@ -2443,7 +2481,7 @@ pub async fn public_badge(
                 (header::CONTENT_TYPE, "image/svg+xml; charset=utf-8"),
                 (header::CACHE_CONTROL, "public, max-age=60"),
             ],
-            render_badge(overall),
+            render_badge(overall, style),
         )
             .into_response(),
         private,
@@ -2459,11 +2497,21 @@ fn rfc2822(stored: &str) -> String {
     parse_stored(stored).map(|at| at.to_rfc2822()).unwrap_or_default()
 }
 
+/// Réglages du flux RSS.
+#[derive(Debug, Deserialize)]
+pub struct RssQuery {
+    /// Clé publique d'un service : le flux ne garde que les annonces qui le
+    /// touchent (et celles qui valent pour toute la page).
+    #[serde(default)]
+    component: Option<String>,
+}
+
 pub async fn public_rss(
     State(state): State<AppState>,
     Path(slug): Path<String>,
     headers: HeaderMap,
     origin: super::oidc::Origin,
+    Query(query): Query<RssQuery>,
 ) -> ApiResult<Response> {
     let (body, private) = load_public_checked(&state, &slug, &headers).await?;
     // Le domaine public de la page s'il y en a un ; sinon l'origine de la requête.
@@ -2481,8 +2529,19 @@ pub async fn public_rss(
         .into_iter()
         .filter_map(|key| body.get(key).and_then(Value::as_array))
         .flatten();
+    let component = query.component.as_deref().map(str::trim).filter(|c| !c.is_empty());
     for entry in entries {
+        if let Some(wanted) = component {
+            let touched = entry.get("components").and_then(Value::as_array);
+            if touched.is_some_and(|keys| !keys.iter().any(|key| key.as_str() == Some(wanted))) {
+                continue;
+            }
+        }
         let field = |name: &str| entry.get(name).and_then(Value::as_str).unwrap_or("");
+        let permalink = match entry.get("anchor").and_then(Value::as_str) {
+            Some(anchor) => format!("{link}#incident-{anchor}"),
+            None => link.clone(),
+        };
         let latest = entry
             .get("updates")
             .and_then(Value::as_array)
@@ -2497,7 +2556,7 @@ pub async fn public_rss(
              <description>{description}</description></item>",
             title = xml_escape(field("title")),
             status = xml_escape(field("status")),
-            link = xml_escape(&link),
+            link = xml_escape(&permalink),
             guid = xml_escape(&format!("{slug}:{}:{}", field("starts_at"), field("title"))),
             date = rfc2822(field("starts_at")),
             description = xml_escape(latest),
@@ -2669,7 +2728,7 @@ mod tests {
 
     #[test]
     fn badge_names_the_state() {
-        let svg = render_badge("major");
+        let svg = render_badge("major", badges::Style::Flat);
         assert!(svg.contains("major outage"));
         assert!(svg.starts_with("<svg"));
     }

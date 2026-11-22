@@ -35,6 +35,7 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			if (!status) error = cause;
+			return false;
 		}
 	}
 

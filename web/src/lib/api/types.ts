@@ -27,6 +27,17 @@ export interface Health {
 	victoria: ComponentHealth;
 	/** Public demo mode (`DUMBMONIT_DEMO=1`): read-only, fictional data. */
 	demo: boolean;
+	/** Data volume, for signed-in callers; absent when the system cannot measure it. */
+	data_disk?: { free_bytes: number; total_bytes: number; database_bytes: number };
+}
+
+/** One entry of `GET /api/instance/effective-config`: a non-secret setting the server runs with. */
+export interface EffectiveSetting {
+	/** Stable English identifier, turned into a label by the About section. */
+	key: string;
+	value: string;
+	/** The environment variable that sets it, when there is one. */
+	env: string | null;
 }
 
 // --- Credentials ------------------------------------------------------------
@@ -145,6 +156,10 @@ export interface Target {
 	credential_public: Record<string, string>;
 	/** Flat folder shown on `/targets`. Empty: no folder. */
 	group_name: string;
+	/** Free-text note for humans; empty or absent: none. Older servers omit it. */
+	note?: string;
+	/** Creation date (UTC); older servers omit it. */
+	created_at?: string | null;
 	/** Manual rank, tiebreaking only within the same state and folder. */
 	position: number;
 	/** Location assigned on the world map; `null`: none (it may still sit at one through its site). */
@@ -233,6 +248,8 @@ export interface TargetPayload {
 	tags?: Record<string, string>;
 	/** Flat folder shown on `/targets`. Absent or empty: no folder. */
 	group_name?: string;
+	/** Free-text note (at most 2000 characters). Absent on edit keeps it; empty clears it. */
+	note?: string;
 	/** Location on the world map; `null`: none. Absent on edit keeps it. */
 	location_id?: LocationId | null;
 	credential?: Credential;
@@ -601,6 +618,8 @@ export interface AlertRule {
 	builtin: boolean;
 	/** Per-device overrides of this rule. */
 	overrides: RuleOverride[];
+	/** Last time the rule went to firing, from the alert history (UTC); `null` = never in the retained history. */
+	last_fired_at: string | null;
 }
 
 /**
@@ -1238,6 +1257,8 @@ export interface User {
 	totp_enabled: boolean;
 	created_at: string;
 	last_login_at: string | null;
+	/** Optional contact address; never used to sign in. */
+	email?: string | null;
 	/** What the account may reach, when the server tells (`/api/auth/me`). */
 	access?: AccessInfo;
 }
@@ -1292,6 +1313,8 @@ export interface AuthStatus {
 	demo: boolean;
 	/** HTTPS on the web port, for the "session in clear" banner. */
 	https?: HttpsStatus;
+	/** The instance policy holds this session at two-factor enrolment. */
+	totp_setup_required?: boolean;
 }
 
 /** `AuthStatus.https`: nothing secret, the fingerprint is what every client receives. */
@@ -1400,6 +1423,8 @@ export interface CreateUserPayload {
 	role: Role;
 	/** Optional only while single sign-on is enabled. */
 	password?: string;
+	/** Optional contact address; blank means none. */
+	email?: string;
 }
 
 export interface UpdateUserPayload {
@@ -1408,6 +1433,8 @@ export interface UpdateUserPayload {
 	disabled?: boolean;
 	/** Resets the password and closes the account's sessions. */
 	password?: string;
+	/** Blank clears it; absent keeps it. */
+	email?: string;
 }
 
 /** Where the effective OIDC configuration comes from. */
@@ -1571,6 +1598,8 @@ export interface AuthState {
 	demo: boolean;
 	/** HTTPS on the web port; `null` for a server that does not say. */
 	https: HttpsStatus | null;
+	/** The instance policy asks this session to set up two-factor first. */
+	totpSetupRequired: boolean;
 }
 
 /** A passkey (WebAuthn credential) of the current account. Mirrors `auth::passkeys::PasskeyView`. */
@@ -1664,6 +1693,8 @@ export interface ChannelPayload {
 export interface ChannelTestReport {
 	ok: boolean;
 	message: string;
+	/** Settings that would hold back a real alert on this channel (channel tests only). */
+	filters?: string[];
 }
 
 // --- Agents (enrolment tokens) ----------------------------------------------
@@ -2424,6 +2455,8 @@ export interface IncidentUpdatePayload {
 	body: string;
 	/** Past date of the message, to complete a history; omitted: now, and subscribers are notified. */
 	at?: string;
+	/** `false`: publish without notifying subscribers. Omitted: they are notified. */
+	notify?: boolean;
 }
 
 /** One step of a post-mortem timeline. Mirrors `db::status_pages::TimelineEntry`. */
@@ -2625,6 +2658,10 @@ export interface PublicIncidentUpdate {
 }
 
 export interface PublicIncident {
+	/** Anchor and permalink: `#incident-<anchor>` (start and title in a slug, never the internal id). */
+	anchor: string;
+	/** Public keys of the services touched; absent: the whole page. */
+	components?: string[];
 	title: string;
 	kind: IncidentKind;
 	status: IncidentStatus;
@@ -2693,6 +2730,13 @@ export interface PublicStatus {
 	incidents: PublicIncident[];
 	/** Scheduled or in-progress maintenance windows. */
 	maintenance: PublicIncident[];
+}
+
+/** One slice of past incidents older than the page's 30 days. */
+export interface PublicOlderIncidents {
+	incidents: PublicIncident[];
+	/** Cursor of the next slice; absent at the end. */
+	next?: string;
 }
 
 // --- Proxmox Backup Server (crates/server/src/api/pbs.rs) --------------------
@@ -3345,6 +3389,32 @@ export interface TotpEnrolment {
 	otpauth_uri: string;
 	issuer: string;
 	account: string;
+}
+
+/** How a session was opened. Mirrors `auth::session::Via`. */
+export type SessionVia = 'password' | 'passkey' | 'ldap' | 'oidc' | 'saml';
+
+/** One open session of the current account. Mirrors `auth::session::SessionView`. */
+export interface Session {
+	/** Public part of the session cookie: it names the session, it cannot open it. */
+	id: string;
+	created_at: string;
+	/** Updated at most every five minutes. */
+	last_seen_at: string | null;
+	expires_at: string;
+	ip: string | null;
+	user_agent: string | null;
+	browser: string | null;
+	os: string | null;
+	via: SessionVia | null;
+	/** The session making the request: it is closed by signing out. */
+	current: boolean;
+}
+
+/** Mirrors `auth::policy::Policy`. */
+export interface AuthPolicy {
+	/** Admins and operators signing in with a local password must use two-factor. */
+	require_totp: boolean;
 }
 
 /** Mirrors `auth::audit::Entry`. */
@@ -4308,6 +4378,8 @@ export interface BackupSchedule {
 	files: BackupFile[];
 	total_bytes: number;
 	directory_error: string | null;
+	/** Settings a `DUMBMONIT_BACKUP_*` variable fixes: the interface cannot change them. */
+	env_managed: { enabled: boolean; interval_hours: boolean; keep: boolean };
 }
 
 /** Response of `GET /api/backup`. */

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { docTitle } from '#lib/stores/page-title.svelte.js';
 	/**
 	 * Setup wizard, after the first administrator signs in (and again from
 	 * Settings → General). It opens on "Your first alert": one thing to watch,
@@ -147,7 +148,7 @@
 	}
 </script>
 
-<svelte:head><title>{m.wizard_title()} · DumbMonit</title></svelte:head>
+<svelte:head><title>{docTitle(m.wizard_title())}</title></svelte:head>
 
 <div class="min-h-dvh bg-canvas text-ink">
 	<header class="border-b border-line">

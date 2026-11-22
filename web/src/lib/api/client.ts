@@ -9,6 +9,7 @@
 import { m } from '#lib/paraglide/messages.js';
 import { shareFlight } from './flight';
 import { notifyMutation } from './mutations';
+import { reportNetworkFailure, reportNetworkSuccess } from './connection';
 
 /** Normalised error, always carrying a message that can be displayed as is. */
 export class ApiError extends Error {
@@ -18,6 +19,8 @@ export class ApiError extends Error {
 	readonly missing: boolean;
 	/** True when the public demo refused a change (403 with `demo: true`). */
 	readonly demo: boolean;
+	/** Machine-readable reason the server gave (`code`), when it gave one. */
+	code: string | null = null;
 
 	/** Set on the 401 of a private status page: what the visitor has to provide. */
 	access: 'password' | 'users' | null = null;
@@ -68,7 +71,7 @@ export function toApiError(cause: unknown): ApiError {
 }
 
 interface RequestOptions {
-	method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+	method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 	body?: unknown;
 	query?: Record<string, string | number | boolean | undefined>;
 	signal?: AbortSignal;
@@ -103,6 +106,19 @@ let unauthorizedHandler: UnauthorizedHandler | null = null;
 /** Installs the 401 reaction. Called once, from the auth store. */
 export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
 	unauthorizedHandler = handler;
+}
+
+/** Code of the 403 the server answers while the instance policy requires two-factor first. */
+export const TOTP_SETUP_REQUIRED = 'totp_setup_required';
+
+/**
+ * Single reaction to that 403, installed by the auth store: the session is
+ * held at two-factor enrolment, and the layout shows only that.
+ */
+let totpSetupHandler: (() => void) | null = null;
+
+export function setTotpSetupHandler(handler: (() => void) | null): void {
+	totpSetupHandler = handler;
 }
 
 const BASE = '/api';
@@ -174,19 +190,30 @@ async function fetchSettled(url: string, init: RequestInit): Promise<Settled> {
 }
 
 /** Extracts the error message from the `{ "error": "..." }` body returned by the server. */
-function readError(settled: Settled): { message: string; demo: boolean; access: 'password' | 'users' | null } {
-	const fallback = { message: m.api_error_status({ status: settled.status }), demo: false, access: null };
+function readError(settled: Settled): {
+	message: string;
+	demo: boolean;
+	access: 'password' | 'users' | null;
+	code: string | null;
+} {
+	const fallback = { message: m.api_error_status({ status: settled.status }), demo: false, access: null, code: null };
 	try {
 		const text = settled.text;
 		if (!text) return fallback;
 		const parsed: unknown = JSON.parse(text);
 		if (parsed && typeof parsed === 'object' && 'error' in parsed) {
-			const { error: message, demo, access } = parsed as { error: unknown; demo?: unknown; access?: unknown };
+			const { error: message, demo, access, code } = parsed as {
+				error: unknown;
+				demo?: unknown;
+				access?: unknown;
+				code?: unknown;
+			};
 			if (typeof message === 'string' && message.trim()) {
 				return {
 					message,
 					demo: demo === true,
-					access: access === 'password' || access === 'users' ? access : null
+					access: access === 'password' || access === 'users' ? access : null,
+					code: typeof code === 'string' ? code : null
 				};
 			}
 		}
@@ -248,18 +275,23 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 		// A cancelled request is not an outage: propagate it as is so the caller
 		// can ignore it silently.
 		if (cause instanceof DOMException && cause.name === 'AbortError') throw cause;
+		reportNetworkFailure();
 		throw new ApiError(m.api_error_unreachable(), 0);
 	}
+	// Any answer, even an error status, proves the server is reachable.
+	reportNetworkSuccess();
 
 	if (!response.ok) {
-		const { message, demo, access } = readError(response);
+		const { message, demo, access, code } = readError(response);
 		// The session has expired, or the instance has just been protected: notify
 		// once, at the client level, rather than screen by screen.
 		if (response.status === 401 && !allowUnauthorized) unauthorizedHandler?.();
 		const refusedByDemo = demo && response.status === 403;
 		if (refusedByDemo) demoRefusalHandler?.(message);
+		if (response.status === 403 && code === TOTP_SETUP_REQUIRED) totpSetupHandler?.();
 		const failure = new ApiError(message, response.status, anticipated && response.status === 404, refusedByDemo);
 		failure.access = access;
+		failure.code = code;
 		throw failure;
 	}
 

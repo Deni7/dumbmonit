@@ -276,25 +276,34 @@ Every other write is admin only and answers `403` to an operator.
 | `POST` | `/api/auth/login/totp` | public | `{"pending": "…", "code": "123456"}` — the ticket from the first step and a code (or a recovery code). `204` with the session cookie. |
 | `GET` | `/api/auth/oidc/start` | public | Redirects the browser to the identity provider. |
 | `GET` | `/api/auth/oidc/callback` | public | Return from the provider (`code`, `state`): opens the session and redirects to the UI. |
-| `GET` | `/api/auth/me` | session only | The current account: `id`, `username`, `display_name`, `role` (`admin`, `operator`, `viewer`), `auth` (`password`, `oidc`), `disabled`, `totp_enabled`, `created_at`, `last_login_at`. |
+| `GET` | `/api/auth/me` | session only | The current account: `id`, `username`, `display_name`, `email` (optional, never used to sign in), `role` (`admin`, `operator`, `viewer`), `auth` (`password`, `oidc`), `disabled`, `totp_enabled`, `created_at`, `last_login_at`. |
 | `POST` | `/api/auth/logout` | session only | Ends the session and clears the cookie. |
 | `POST` | `/api/auth/password` | session only | `{"current_password": "…", "new_password": "…"}`. Signs out every other session. |
 | `GET` | `/api/auth/totp` | session only | Two-factor state of the current account: `enabled`, `pending`, `recovery_codes_left`. |
 | `POST` | `/api/auth/totp/enroll` | session only | `{"password": "…"}`. Proposes a secret: `secret` (base32), `otpauth_uri`, `issuer`, `account`. Nothing is enforced until verified. |
 | `POST` | `/api/auth/totp/verify` | session only | `{"code": "123456"}`. Confirms the enrolment and returns `{"recovery_codes": […]}` — shown once. |
 | `DELETE` | `/api/auth/totp` | session only | `{"password": "…"}`. Removes the second factor. `204`. |
-| `GET` | `/api/auth/audit?limit=200` | admin, session only | The latest security events: `id`, `at`, `actor`, `action` (`login`, `login.failed`, `password.changed`, `token.created`, `user.updated`, …), `subject`, `ip`. |
+| `POST` | `/api/auth/totp/recovery-codes` | session only | `{"code": "123456"}` (a current code from the app) or `{"password": "…"}`. Replaces the recovery codes without turning two-factor off; the old ones stop working. Returns `{"recovery_codes": […]}` — shown once. `409` when two-factor is off. |
+| `GET` | `/api/auth/sessions` | session only | The open sessions of the current account, most recently active first: `id` (public part of the cookie, it cannot open the session), `created_at`, `last_seen_at` (updated at most every five minutes), `expires_at`, `ip`, `user_agent`, `browser`, `os`, `via` (`password`, `passkey`, `ldap`, `oidc`, `saml`), `current`. |
+| `DELETE` | `/api/auth/sessions/{id}` | session only | Signs out one of your other sessions. `204`; `404` for a session that is not yours; `409` for the current one (use logout). |
+| `POST` | `/api/auth/sessions/revoke-others` | session only | Signs out every other session of the current account. `{"closed": n}`. |
+| `GET` | `/api/auth/policy` | admin, session only | `{"require_totp": bool}`. |
+| `PUT` | `/api/auth/policy` | admin, session only | `{"require_totp": true}` requires two-factor from admins and operators who sign in with a local password; an absent field means off. Held accounts get `403` with `"code": "totp_setup_required"` on every route but `GET /api/auth/me`, `GET /api/auth/totp`, `POST /api/auth/totp/enroll`, `POST /api/auth/totp/verify` and logout; `/api/auth/status` says `totp_setup_required: true`. Single sign-on (OIDC, SAML), LDAP and passkey sessions are exempt. |
+| `GET` | `/api/auth/audit?limit=200` | admin, session only | The latest security events: `id`, `at`, `actor`, `action` (`login`, `login.failed`, `password.changed`, `token.created`, `user.updated`, …), `subject`, `ip`. Filters (combined with "and"): `actor` (part of the name), `action`, `ip`, `since` and `until` (UTC, `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS`). `before=<id>` returns the events older than that one, for the next page. |
+| `GET` | `/api/auth/audit/export?format=csv\|json` | admin, session only | The same filters, as a file (up to 100 000 events). Recorded in the audit log. In the CSV, a cell a spreadsheet could read as a formula starts with an apostrophe. |
 | `GET` | `/api/auth/oidc/config` | admin, session only | The SSO settings and where they come from (environment or database); the client secret is never returned. |
 | `PUT` | `/api/auth/oidc/config` | admin, session only | `{"issuer", "client_id", "client_secret", "provider_name", "scopes", "auto_create", "admin_groups", "groups_claim", "public_url"}`. An absent or empty `client_secret` keeps the stored one; an absent `auto_create` means off. |
 | `DELETE` | `/api/auth/oidc/config` | admin, session only | Forgets the stored SSO settings (environment variables, if any, apply again). `204`. |
 | `POST` | `/api/auth/oidc/test` | admin, session only | Fetches the provider's discovery document and reports what it found. |
 | `GET` | `/api/users` | admin, session only | Every account, in the shape of `/api/auth/me`. |
-| `POST` | `/api/users` | admin, session only | `{"username", "display_name", "role", "password"}`. `password` may be omitted only when SSO is enabled. `201`. |
-| `PUT` | `/api/users/{id}` | admin, session only | Any of `display_name`, `role`, `disabled`, `password`; an omitted field keeps its value. Cannot demote or disable the last administrator. |
+| `POST` | `/api/users` | admin, session only | `{"username", "display_name", "email", "role", "password"}`. `password` may be omitted only when SSO is enabled; `email` is optional (`400` when it is not an address). `201`. |
+| `PUT` | `/api/users/{id}` | admin, session only | Any of `display_name`, `email` (blank clears it), `role`, `disabled`, `password`; an omitted field keeps its value. Cannot demote or disable the last administrator. |
 | `DELETE` | `/api/users/{id}` | admin, session only | `204`. Not yourself, not the last administrator. |
 | `DELETE` | `/api/users/{id}/totp` | admin, session only | Resets another account's second factor (a locked-out colleague). `204`. |
+| `DELETE` | `/api/users/{id}/sessions` | admin, session only | Signs the account out everywhere (for your own account, the session making the request stays). `{"closed": n}`. |
 | `GET` | `/api/tokens` | session only | Every API token: `id`, `name`, `prefix`, `scope`, `created_at`, `created_by` (the account that created it), `expires_at` (`null`: never), `expired`, `allowed_networks` (empty: anywhere), `last_used_at`, `last_used_ip`, `revoked_at`. Never the secret. |
 | `POST` | `/api/tokens` | admin, session only | `{"name": "Grafana", "scope": "read", "expires_in_days": 90, "allowed_networks": ["192.168.1.0/24"]}`. `name` is required (80 characters at most); `scope` is `read` (default) or `write`; `expires_in_days` runs from 1 to 3650, `null` or absent for a token that never expires; `allowed_networks` takes up to 32 addresses or CIDR ranges, stored in network form (`192.168.1.7/24` becomes `192.168.1.0/24`), empty or absent for anywhere. `201` with the token fields plus `secret` (shown once). `400` names an invalid network. |
+| `PATCH` | `/api/tokens/{id}` | admin, session only | Any of `name`, `allowed_networks` (replaces the list; empty: anywhere) and `expires_in_days` (a new expiry counted from now, 1 to 3650; `null`: never expires), checked as on creation; an omitted field keeps its value. The secret and the scope never change. Returns the token; `404` when unknown or revoked. |
 | `DELETE` | `/api/tokens/{id}` | admin, session only | Revoke. `204`; `404` when unknown or already revoked. |
 
 A token as listed:
@@ -348,6 +357,7 @@ them, and a proxy default without the nonce leaves a blank page.
 | Method | Route | Auth | Purpose |
 |---|---|---|---|
 | `GET` | `/api/health` | public | Server version and the state of its dependencies. Always `200`: a failing component is in the body. |
+| `GET` | `/api/ready` | public | Readiness probe: `200` when the database and VictoriaMetrics answer, `503` otherwise, with a body `{"ready":…,"database":…,"victoria":…}`. Use `/api/health` for liveness. |
 | `GET` | `/api/update` | session or token | Running version, latest release, `update_available`; the server asks GitHub once a day at most. `POST /api/update/check` looks now, `PUT /api/update/settings` turns the check on or off. See [Update](../install/update.md). |
 | `GET` | `/api/upgrade-notes` | admin session | Configuration changes a release asks for in your `docker-compose.yml`, with the block to copy and where this instance stands. `POST /api/upgrade-notes/close` closes some for good, `POST /api/upgrade-notes/announce` records that the window was shown. See [Update](../install/update.md#configuration-changes-after-an-update). |
 
@@ -367,6 +377,9 @@ VictoriaMetrics, `false` when `DUMBMONIT_VM_URL` points at an external one.
 | `POST` | `/api/backup` | admin, session only | `{"passphrase": "…", "include_account_secrets": false}`. Returns the bundle itself as a JSON file: a cleartext header (`format`, `version`, `created_at`, `summary`, `kdf`) and a `payload` encrypted with AES-256-GCM under a key derived from the passphrase by Argon2id. At least 16 characters, or `400`. |
 | `POST` | `/api/backup/restore` | admin, session only | `{"bundle": {…}, "passphrase": "…", "apply": false}`. Dry run unless `apply` is `true`; both run the same code, the dry run inside a transaction that is rolled back. Answers the report: per section, `created`, `updated`, `skipped` and `notes`, plus `warnings`. `400` on a wrong passphrase, a modified file, or a bundle written in a newer format version. |
 | `POST` | `/api/backup/local` | admin, session only | Writes one scheduled-style local backup right now and answers the new `schedule`. |
+| `PUT` | `/api/backup/schedule` | admin, session only | `{"enabled": true, "interval_hours": 24, "keep": 7}`. Saves the schedule of the local backups; a `DUMBMONIT_BACKUP_*` variable that is set still wins (`schedule.env_managed` says which). Answers the new `schedule`. |
+| `GET` | `/api/backup/local/files` | admin, session only | The local backups on disk, newest first. |
+| `GET` | `/api/backup/local/files/{name}` | admin, session only | Downloads one local backup (the SQLite file, never `secret.key`). The name is checked strictly (`dumbmonit-YYYYMMDD-HHMMSS.db`). Audited. |
 
 A bundle carries every credential of the instance, re-encrypted with the
 passphrase, so these routes refuse API tokens with an explanation: only an
@@ -661,6 +674,7 @@ A `target_id` that no longer exists is shown as "(deleted monitor)" by the UI.
 | `PUT` | `/api/alerts/rules/{id}` | Update. A built-in rule keeps its query. |
 | `DELETE` | `/api/alerts/rules/{id}` | `204`. Built-in rules cannot be deleted. |
 | `POST` | `/api/alerts/rules/{id}/enable` | `{"enabled": false}`. Returns the rule. |
+| `POST` | `/api/alerts/rules/{id}/reset` | Restores a built-in rule's shipped values (per-monitor overrides are kept). `409` for a rule you created. Admin. |
 
 A rule:
 
@@ -693,6 +707,7 @@ Creating one needs at least `name` and `query`; `kind` (`threshold`,
 |---|---|---|
 | `GET` | `/api/alerts/silences` | Every window, with `active_now`, `active_until` and `next_start_at` (RFC 3339, computed by the server). |
 | `POST` | `/api/alerts/silences` | Create. `201`. Operator. |
+| `PUT` | `/api/alerts/silences/{id}` | Replace name, comment, scope and schedule (same body as create). Operator. To end a window now, set a one-off end at the current time. |
 | `DELETE` | `/api/alerts/silences/{id}` | `204`. Operator. |
 
 ```json
@@ -789,8 +804,10 @@ tokens need the `write` scope for changes. See [Email reports](../using/reports.
 | `GET` | `/api/reports/schedules/{id}` | admin | One report. |
 | `PUT` | `/api/reports/schedules/{id}` | admin | Full replacement. |
 | `DELETE` | `/api/reports/schedules/{id}` | admin | `204`. |
-| `GET` | `/api/reports/sla` | admin | The availability (SLA) report of a period, as a file. Query: `from`, `to` (inclusive days, `YYYY-MM-DD`; none: the previous calendar month; a year at most), `tz` (IANA, default `UTC`), `format` (`pdf` default, `csv` for the monitors, `incidents_csv`), `objective` (percent), `page` (status page id whose title heads the PDF), `title`. See [SLA reports](../using/reports.md#sla). |
+| `GET` | `/api/reports/sla` | admin | The availability (SLA) report of a period, as a file. Query: `from`, `to` (inclusive days, `YYYY-MM-DD`; none: the previous calendar month; a year at most), `tz` (IANA, default `UTC`), `format` (`pdf` default, `csv` for the monitors, `incidents_csv`), `objective` (percent), `page` (status page id whose title heads the PDF), `title`, `objectives` (JSON of per-group and per-monitor objectives), `disposition` (`attachment` default, `inline`). See [SLA reports](../using/reports.md#sla). |
 | `POST` | `/api/reports/schedules/{id}/send-test` | admin | Emails a preview to the saved recipients: `{"sent": 2, "failed": 0}`. Does not touch the schedule. `400` without a usable email channel; `409` within 30 seconds of the previous preview. |
+| `POST` | `/api/reports/schedules/{id}/retry` | admin | Sends again a report whose last send failed (a real send): `{"sent": 2, "failed": 0}`; the recorded error is cleared on success. `409` when the last send did not fail or within 30 seconds of the previous retry. |
+| `GET` | `/api/reports/schedules/{id}/pdf` | admin | The PDF of the last SLA report sent, built again for the same period. `disposition=inline` shows it in the browser. `404` before the first send, `400` for a digest. |
 
 ## Status pages and incidents
 

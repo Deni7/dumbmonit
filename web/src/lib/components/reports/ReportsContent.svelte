@@ -12,12 +12,13 @@
 	import { page } from '$app/state';
 	import ClientAssign from '#lib/components/ClientAssign.svelte';
 	import { m } from '#lib/paraglide/messages.js';
-	import { Info, Mail, Plus } from 'lucide-svelte';
-	import { listChannels, listStatusPages, type Channel, type StatusPage } from '#lib/api/index.js';
-	import { listReportSchedules, slaRequestFrom, type ReportSchedule, type ReportSchedulePayload } from '#lib/api/reports.js';
+	import { Copy, FileText, Info, Mail, Plus, RotateCcw } from 'lucide-svelte';
+	import { listChannels, listStatusPages, toApiError, type Channel, type StatusPage } from '#lib/api/index.js';
+	import { downloadScheduledReportPdf, listReportSchedules, retryReportSend, slaRequestFrom, type ReportSchedule, type ReportSchedulePayload } from '#lib/api/reports.js';
 	import { Button, EmptyState, ErrorNotice, Panel, Plate, Skeleton } from '#lib/ui/index.js';
 	import { formatDateTime, formatRelative } from '#lib/format.js';
 	import ReportEditor from '#lib/components/settings/ReportEditor.svelte';
+	import { KIND_FILTERS, OUTCOME_FILTERS, canDownloadPdf, canRetry, duplicateDraft, filterHistory, outcomeOf, type KindFilter, type OutcomeFilter } from './history';
 
 	const DOCS_URL = 'https://dumbmonit.selfhostr.io/docs/using/reports/';
 
@@ -42,6 +43,9 @@
 		};
 	});
 	let adding = $state(untrack(() => draft !== null));
+	/** A scheduled report being copied: the new form starts from it. */
+	let copy = $state<ReportSchedulePayload | null>(null);
+	let copyKey = $state(0);
 	let showInfo = $state(false);
 
 	const emailChannels = $derived(channels.filter((channel) => channel.kind === 'smtp'));
@@ -95,6 +99,70 @@
 	function saved(item: ReportSchedule) {
 		schedules = schedules.some((s) => s.id === item.id) ? schedules.map((s) => (s.id === item.id ? item : s)) : [...schedules, item];
 		adding = false;
+		copy = null;
+	}
+
+	function duplicate(schedule: ReportSchedule) {
+		copy = duplicateDraft(schedule, m.reports_history_copy_name({ name: schedule.name }));
+		copyKey += 1;
+		adding = true;
+		requestAnimationFrame(() => document.getElementById(`report-copy`)?.scrollIntoView({ block: 'center' }));
+	}
+
+	// ---- History: filters, retry, PDF ----------------------------------------------
+
+	let kindFilter = $state<KindFilter>('all');
+	let outcomeFilter = $state<OutcomeFilter>('all');
+	const shown = $derived(filterHistory(schedules, kindFilter, outcomeFilter));
+	const KIND_LABEL: Record<KindFilter, () => string> = {
+		all: () => m.reports_history_filter_all_types(),
+		digest: () => m.reports_history_kind_digest(),
+		sla: () => m.reports_history_kind_sla()
+	};
+	const OUTCOME_LABEL: Record<OutcomeFilter, () => string> = {
+		all: () => m.reports_history_filter_all_results(),
+		sent: () => m.reports_history_sent(),
+		failed: () => m.reports_history_filter_failed(),
+		waiting: () => m.reports_history_waiting()
+	};
+
+	let retrying = $state<number | null>(null);
+	let pdfBusy = $state<number | null>(null);
+	/** What the last retry or PDF answered, for the row it concerned. */
+	let note = $state<{ id: number; ok: boolean; text: string } | null>(null);
+
+	async function retry(schedule: ReportSchedule) {
+		retrying = schedule.id;
+		note = null;
+		try {
+			const result = await retryReportSend(schedule.id);
+			note = { id: schedule.id, ok: result.failed === 0, text: m.reports_history_retry_done({ sent: result.sent, failed: result.failed }) };
+			const list = await listReportSchedules();
+			schedules = Array.isArray(list) ? list : schedules;
+		} catch (cause) {
+			note = { id: schedule.id, ok: false, text: toApiError(cause).message };
+		} finally {
+			retrying = null;
+		}
+	}
+
+	/** The sent report's PDF, made again for the same period, in a new tab. */
+	async function openPdf(schedule: ReportSchedule) {
+		pdfBusy = schedule.id;
+		note = null;
+		const tab = window.open('about:blank', '_blank');
+		try {
+			const { blob } = await downloadScheduledReportPdf(schedule.id);
+			const url = URL.createObjectURL(blob);
+			if (tab) tab.location.href = url;
+			else window.open(url, '_blank');
+			setTimeout(() => URL.revokeObjectURL(url), 60_000);
+		} catch (cause) {
+			tab?.close();
+			note = { id: schedule.id, ok: false, text: toApiError(cause).message };
+		} finally {
+			pdfBusy = null;
+		}
 	}
 
 	function removed(id: number) {
@@ -153,24 +221,35 @@
 		<div class="grid gap-6">
 			{#each schedules as schedule (schedule.id)}
 				<div class="grid gap-3 border-t border-line pt-6 first:border-t-0 first:pt-0">
-					<ClientAssign kind="report" id={schedule.id} />
+					<div class="flex flex-wrap items-center justify-between gap-2">
+						<ClientAssign kind="report" id={schedule.id} />
+						<Button variant="ghost" size="sm" onclick={() => duplicate(schedule)}>
+							<Copy class="size-4" aria-hidden="true" />
+							{m.reports_history_duplicate()}
+						</Button>
+					</div>
 					<ReportEditor {schedule} channels={emailChannels} {defaultTimezone} {timezones} {pages} onsaved={saved} ondeleted={removed} />
 				</div>
 			{/each}
 
 			{#if adding}
-				<div class="border-t border-line pt-6 first:border-t-0 first:pt-0">
+				<div id="report-copy" class="border-t border-line pt-6 first:border-t-0 first:pt-0">
+					{#key copyKey}
 					<ReportEditor
 						schedule={null}
-						{draft}
+						draft={copy ?? draft}
 						channels={emailChannels}
 						{defaultTimezone}
 						{timezones}
 						{pages}
 						onsaved={saved}
 						ondeleted={removed}
-						oncancel={() => (adding = false)}
+						oncancel={() => {
+							adding = false;
+							copy = null;
+						}}
 					/>
+					{/key}
 				</div>
 			{:else if schedules.length === 0}
 				<EmptyState icon={Mail} title={m.settings_reports_empty_title()} description={m.settings_reports_empty_description()}>
@@ -201,9 +280,26 @@
 	{:else if schedules.length === 0}
 		<p class="px-5 py-4 text-sm text-ink-2">{m.reports_history_empty()}</p>
 	{:else}
+		<div class="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line px-5 py-3">
+			<label class="flex items-center gap-2 text-sm text-ink-2">
+				{m.reports_history_filter_type()}
+				<select class="input w-auto" bind:value={kindFilter}>
+					{#each KIND_FILTERS as option (option)}<option value={option}>{KIND_LABEL[option]()}</option>{/each}
+				</select>
+			</label>
+			<label class="flex items-center gap-2 text-sm text-ink-2">
+				{m.reports_history_filter_result()}
+				<select class="input w-auto" bind:value={outcomeFilter}>
+					{#each OUTCOME_FILTERS as option (option)}<option value={option}>{OUTCOME_LABEL[option]()}</option>{/each}
+				</select>
+			</label>
+		</div>
+		{#if shown.length === 0}
+			<p class="px-5 py-4 text-sm text-ink-2" role="status">{m.reports_history_filter_none()}</p>
+		{/if}
 		<ul class="divide-y divide-line" role="list">
-			{#each schedules as schedule (schedule.id)}
-				<li class="grid gap-1 px-5 py-3 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1.2fr)_minmax(0,1fr)_auto] sm:items-center sm:gap-4">
+			{#each shown as schedule (schedule.id)}
+				<li class="grid gap-1 px-5 py-3 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)] sm:items-center sm:gap-4">
 					<div class="min-w-0">
 						<p class="truncate font-semibold text-ink">{schedule.name}</p>
 						<p class="text-[0.8125rem] text-ink-2">{schedule.kind === 'sla' ? m.reports_history_kind_sla() : m.reports_history_kind_digest()}</p>
@@ -223,14 +319,33 @@
 						{/if}
 					</p>
 					<div class="min-w-0">
-						{#if schedule.last_error}
-							<Plate tone="warning" label={m.reports_history_failed({ error: schedule.last_error })} />
-						{:else if schedule.last_sent_at}
+						{#if outcomeOf(schedule) === 'failed'}
+							<Plate tone="warning" label={m.reports_history_failed({ error: schedule.last_error ?? '' })} />
+						{:else if outcomeOf(schedule) === 'sent'}
 							<Plate tone="signal" label={m.reports_history_sent()} />
 						{:else}
 							<Plate tone="ghost" label={m.reports_history_waiting()} />
 						{/if}
 					</div>
+					{#if canRetry(schedule) || canDownloadPdf(schedule) || note?.id === schedule.id}
+						<div class="flex flex-wrap items-center gap-2 sm:col-span-4">
+							{#if canRetry(schedule)}
+								<Button variant="secondary" size="sm" loading={retrying === schedule.id} onclick={() => void retry(schedule)}>
+									<RotateCcw class="size-4" aria-hidden="true" />
+									{m.reports_history_retry()}
+								</Button>
+							{/if}
+							{#if canDownloadPdf(schedule)}
+								<Button variant="ghost" size="sm" loading={pdfBusy === schedule.id} onclick={() => void openPdf(schedule)}>
+									<FileText class="size-4" aria-hidden="true" />
+									{m.reports_history_pdf()}
+								</Button>
+							{/if}
+							{#if note?.id === schedule.id}
+								<p class={`text-[0.8125rem] ${note.ok ? 'text-ink-2' : 'text-warning'}`} role="status">{note.text}</p>
+							{/if}
+						</div>
+					{/if}
 				</li>
 			{/each}
 		</ul>

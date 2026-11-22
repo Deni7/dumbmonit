@@ -214,6 +214,7 @@ pub async fn import(
             enabled: None,
             tags,
             group_name: Some(Some(folder)),
+            note: None,
             location_id: None,
             multisite: None,
             credential: None,

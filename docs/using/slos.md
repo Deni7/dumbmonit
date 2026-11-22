@@ -7,7 +7,9 @@ DumbMonit tracks how much of it is left and warns you when it is being spent
 too fast, before the target is missed.
 
 SLOs live under **Status → SLOs**. Everyone can read them; administrators
-create, edit and delete them.
+create, edit and delete them. Accounts restricted by [teams](teams.md)
+only see the SLOs whose monitors all belong to their teams, and an operator can
+only create or change an SLO made of monitors their teams let them manage.
 
 ## Create an SLO
 
@@ -75,8 +77,9 @@ grouping, [notification policy](../alerting/notifications.md), quiet hours,
 [maintenance windows](../alerting/maintenance.md) and acknowledgement. A slow
 burn that turns fast notifies again, as a warning, under the same alert. The
 alert clears as soon as the short window is clean again, without waiting for
-the hour or the six hours to empty. It is attached to no monitor: it carries the
-SLO's name instead.
+the hour or the six hours to empty. It is attached to the first monitor the SLO
+covers (the lowest id, so the alert keeps its identity), shows the SLO's name
+in its message, and links to the SLO page.
 
 You can retune the rule like any other in **Alerts → Rules**: its threshold
 (`1` opens on a slow burn, `2` on a fast burn only), its severity, hold and

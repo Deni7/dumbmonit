@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## Unreleased
+## 0.20.0-dev.1 — 2026-11-22 (pre-release on dev)
 
 ### Added
 
@@ -26,7 +26,62 @@ All notable changes to this project are documented here. The format follows
   encrypted and are written only where a step says `{{secret.password}}`. The monitor page lists
   the last run step by step; see the [HTTP scenario](docs/devices/http-scenario.md) guide.
 
+- **Monitors.** Duplicate a monitor (secrets are not copied); a ⋯ menu on each row (Check now,
+  Enable/Disable, Copy address); tags on rows and on the monitor page, and the search finds them;
+  sorts by availability and by date added; the list remembers its view, filters and sort; previous
+  and next monitor on its page; a free note; a custom check interval (10 s to 7 days); bulk silence
+  for the selection; the maintenance windows that cover a monitor on its page; a warning before
+  leaving the form with unsaved changes.
+- **Maintenance windows.** End now, extend (+30 min, +1 h, +4 h), edit, duplicate; search and filters
+  in the list; preset lengths for a one-off window (`PUT /api/alerts/silences/{id}`).
+- **Notification channels.** Switch a channel on or off from the list, duplicate it, search the list;
+  the test result says when a real alert would have been filtered (severity floor, quiet hours,
+  matcher); a confirmation before disabling or deleting the last enabled channel.
+- **Alert rules and history.** Last fired time on each rule, sorts by name, severity and last fired,
+  clone a rule, reset a built-in rule to its shipped values; history links to the rule and filters
+  by rule or text; unsaved-changes warning in the rule and channel editors.
+- **Status pages.** A link to each incident (also in the RSS feed), older incidents on demand, the
+  time zone next to dates, a Refresh button, a service filter past 8 services, RSS per service
+  (`?component=`), badge styles (`?style=flat|flat-square|for-the-badge`), message templates and a
+  preview for incidents and updates, "Do not notify subscribers" on an update, the duration of a
+  resolved incident.
+- **Reports.** "This year" period, SLA objectives per group or per monitor, open the PDF in a tab,
+  retry a failed send, download the PDF of a sent report again, history filters, duplicate a
+  scheduled report.
+- **Wall.** 12 h or 24 h clock with or without seconds, F for fullscreen and T for the theme, the
+  cursor hides when idle, an optional sound for a new critical problem, `?theme=`, `?scene=` and
+  `?music=0`, a line for the incident or maintenance in progress, optional rotation of the monitor
+  pages when they overflow.
+- **Overview and map.** Alert trend over 7, 14 or 30 days, "updated … ago"; on the map, search a
+  node, filter by site or problems, CSV export of the list view, `?node=` links with Copy link.
+- **Everywhere.** Open critical alerts in the tab title and a red dot on the tab icon; the instance
+  name in tab titles; `/` focuses the page search, `g ,` opens Settings, `j`/`k` move between rows
+  and `a` acknowledges; palette entries for the audit log and API tokens; a "Connection lost" banner;
+  display preferences (12/24 h, first day of the week, density, reduced motion); print styles for
+  alerts and status pages; a message when JavaScript is off; Try again, Previous page and Search on
+  the error page.
+- **Sign-in and accounts.** Caps Lock warning, last user name remembered, a "Forgot password?" link,
+  a password strength meter on setup and password change.
+- **Audit log.** Its own section in Settings › Team, filters (person, action, IP, period), Load more,
+  CSV and JSON export, readable labels for every action; sign-out, OIDC and LDAP changes, instance
+  settings, channels and backup downloads are now recorded; `DUMBMONIT_AUDIT_KEEP` sets how many
+  entries are kept.
+- **Backups and operations.** The backup schedule is editable in Settings (environment variables
+  still win), local backups can be listed and downloaded, `/metrics` gains backup, monitor-state,
+  session and expiring-token metrics, `GET /api/ready` answers 503 when the database or
+  VictoriaMetrics is down, `/api/health` carries the data disk space for signed-in callers,
+  `dumbmonit --check-config` validates the configuration, Settings › About lists the effective
+  configuration, the agent installer takes `--version=` and `--dry-run` (`-Version`, `-DryRun` on
+  Windows), and the API reference has curl examples.
+- **SLOs for team accounts.** Team-restricted accounts see and manage the SLOs made of their own
+  monitors; burn-rate alerts are attached to a monitor and link to their SLO.
+
 ### Changed
+
+- **Refreshes back off on errors.** Every panel that refreshes on its own now goes through one
+  poller, which slows down while the server does not answer and pauses in a hidden tab.
+- **Translations reviewed.** The texts added since 0.19.0 were reread in the eight other languages
+  (terminology, typography, register).
 
 - **Monitors list in the style of Alerts.** A smaller toolbar (search, Filter, Compact/Tiles, a
   folder button and Select), "Add a monitor" in the page header, one column header above the list,

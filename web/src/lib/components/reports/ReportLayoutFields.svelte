@@ -22,6 +22,7 @@
 	} from '#lib/api/reports.js';
 	import { Field, Segmented } from '#lib/ui/index.js';
 	import ReportLogoField from './ReportLogoField.svelte';
+	import ObjectiveOverrides from './ObjectiveOverrides.svelte';
 
 	interface Props {
 		layout: ReportLayout;
@@ -137,6 +138,10 @@
 			></textarea>
 		</Field>
 	{/if}
+
+	<div class={span}>
+		<ObjectiveOverrides bind:objectives={layout.objectives} idPrefix={idPrefix} {disabled} />
+	</div>
 
 	<div class={span}>
 		<ReportLogoField

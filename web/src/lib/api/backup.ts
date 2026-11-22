@@ -51,6 +51,20 @@ export function runLocalBackup(): Promise<BackupStatus['schedule']> {
 	return request<BackupStatus['schedule']>('/backup/local', { method: 'POST' });
 }
 
+/** Saves the schedule of the local backups (a setting fixed by the environment still wins). */
+export function setBackupSchedule(schedule: {
+	enabled: boolean;
+	interval_hours: number;
+	keep: number;
+}): Promise<BackupStatus['schedule']> {
+	return request<BackupStatus['schedule']>('/backup/schedule', { method: 'PUT', body: schedule });
+}
+
+/** Download link of one local backup (administrator session): a link, not a fetch. */
+export function localBackupUrl(name: string): string {
+	return `/api/backup/local/files/${encodeURIComponent(name)}`;
+}
+
 /** Hands the bundle to the browser as a file. */
 export function saveBundle(bundle: BackupEnvelope): void {
 	const stamp = new Date().toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-');

@@ -141,7 +141,9 @@ pub fn csv_monitors(data: &ReportData, objective: Option<f64>) -> String {
         "avg_response_ms",
         "p95_response_ms",
     ];
-    if objective.is_some() {
+    // Les colonnes d'objectif paraissent dès qu'il y en a un, du rapport ou d'une ligne.
+    let with_objective = objective.is_some() || data.devices.iter().any(|d| d.objective.is_some());
+    if with_objective {
         header.extend(["objective_percent", "objective"]);
     }
     out.push_str(&csv_row(&header.iter().map(|h| (*h).to_string()).collect::<Vec<_>>()));
@@ -156,9 +158,10 @@ pub fn csv_monitors(data: &ReportData, objective: Option<f64>) -> String {
             number(device.latency_avg_ms, 1),
             number(device.latency_p95_ms, 1),
         ];
-        if let Some(goal) = objective {
-            cells.push(number(Some(goal), 3));
-            cells.push(status_word(device.uptime, objective).to_lowercase().replace(' ', "_"));
+        if with_objective {
+            let goal = device.objective.or(objective);
+            cells.push(number(goal, 3));
+            cells.push(status_word(device.uptime, goal).to_lowercase().replace(' ', "_"));
         }
         out.push_str(&csv_row(&cells));
     }
@@ -537,7 +540,10 @@ fn summary_section(sheet: &mut Sheet, data: &ReportData, options: &Options) {
     if let Some(goal) = options.objective {
         let measured: Vec<&DeviceStat> =
             data.devices.iter().filter(|d| d.uptime.is_some()).collect();
-        let met = measured.iter().filter(|d| status_word(d.uptime, Some(goal)) == "Met").count();
+        let met = measured
+            .iter()
+            .filter(|d| status_word(d.uptime, Some(d.objective.unwrap_or(goal))) == "Met")
+            .count();
         sheet.note(&format!(
             "SLA objective {goal:.3}%: met by {met} of {} monitor(s) with data. Fleet \
              availability: {}.",
@@ -621,29 +627,33 @@ fn chart_section(sheet: &mut Sheet, data: &ReportData, objective: Option<f64>) {
 
 fn groups_table(sheet: &mut Sheet, data: &ReportData, objective: Option<f64>) {
     sheet.heading("Availability by group");
-    let placed = table_open(
-        sheet,
-        &[
-            ("Group", 3.0, false),
-            ("Monitors", 0.9, true),
-            ("Availability", 1.2, true),
-            ("Status", 0.9, false),
-            ("Previous", 1.2, true),
-        ],
-    );
+    // Une colonne « Objective » seulement quand un groupe a le sien.
+    let own = data.groups.iter().any(|g| g.objective.is_some());
+    let mut specs = vec![
+        ("Group", 3.0, false),
+        ("Monitors", 0.9, true),
+        ("Availability", 1.2, true),
+        ("Status", 0.9, false),
+        ("Previous", 1.2, true),
+    ];
+    if own {
+        specs.insert(3, ("Objective", 1.1, true));
+    }
+    let placed = table_open(sheet, &specs);
     for group in &data.groups {
-        let word = status_word(group.uptime, objective);
-        table_row(
-            sheet,
-            &placed,
-            &[
-                plain(group.name.clone()),
-                plain(group.devices.to_string()),
-                (pct(group.uptime), INK, Font::Bold),
-                status_cell(word),
-                muted(pct(group.previous_uptime)),
-            ],
-        );
+        let goal = group.objective.or(objective);
+        let word = status_word(group.uptime, goal);
+        let mut cells = vec![
+            plain(group.name.clone()),
+            plain(group.devices.to_string()),
+            (pct(group.uptime), INK, Font::Bold),
+        ];
+        if own {
+            cells.push(muted(goal.map_or_else(|| "-".to_string(), |g| pct(Some(g)))));
+        }
+        cells.push(status_cell(word));
+        cells.push(muted(pct(group.previous_uptime)));
+        table_row(sheet, &placed, &cells);
     }
 }
 
@@ -653,31 +663,35 @@ fn monitors_table(sheet: &mut Sheet, data: &ReportData, objective: Option<f64>, 
         sheet.note("No monitor is being monitored.");
         return;
     }
-    let placed = table_open(
-        sheet,
-        &[
-            ("Monitor", 3.0, false),
-            ("Group", 1.7, false),
-            ("Availability", 1.25, true),
-            ("Status", 0.95, false),
-            ("Incidents", 0.9, true),
-            ("Downtime", 1.0, true),
-        ],
-    );
+    // Une colonne « Objective » seulement quand un moniteur (ou son groupe) a le sien.
+    let own = data.devices.iter().any(|d| d.objective.is_some());
+    let mut specs = vec![
+        ("Monitor", 3.0, false),
+        ("Group", 1.7, false),
+        ("Availability", 1.25, true),
+        ("Status", 0.95, false),
+        ("Incidents", 0.9, true),
+        ("Downtime", 1.0, true),
+    ];
+    if own {
+        specs.insert(3, ("Objective", 1.1, true));
+    }
+    let placed = table_open(sheet, &specs);
     for device in data.devices.iter().take(cap) {
-        let word = status_word(device.uptime, objective);
-        table_row(
-            sheet,
-            &placed,
-            &[
-                plain(device.name.clone()),
-                muted(device.group.clone()),
-                (pct(device.uptime), INK, Font::Bold),
-                status_cell(word),
-                plain(device.incidents.to_string()),
-                plain(duration(TimeDelta::seconds(device.downtime_secs))),
-            ],
-        );
+        let goal = device.objective.or(objective);
+        let word = status_word(device.uptime, goal);
+        let mut cells = vec![
+            plain(device.name.clone()),
+            muted(device.group.clone()),
+            (pct(device.uptime), INK, Font::Bold),
+        ];
+        if own {
+            cells.push(muted(goal.map_or_else(|| "-".to_string(), |g| pct(Some(g)))));
+        }
+        cells.push(status_cell(word));
+        cells.push(plain(device.incidents.to_string()));
+        cells.push(plain(duration(TimeDelta::seconds(device.downtime_secs))));
+        table_row(sheet, &placed, &cells);
     }
     if data.devices.len() > cap {
         sheet.note(&format!(
@@ -1047,6 +1061,31 @@ mod tests {
         assert_eq!(status_word(Some(99.899), Some(99.9)), "Missed");
         assert_eq!(status_word(None, Some(99.9)), "No data");
         assert_eq!(status_word(Some(99.95), None), "Healthy");
+    }
+
+    #[test]
+    fn a_group_or_monitor_objective_replaces_the_one_of_the_report() {
+        let mut data = sample();
+        let mut objectives = crate::reports::layout::Objectives::default();
+        objectives.groups.insert("Edge".into(), 99.99);
+        objectives.monitors.insert("Idle".into(), 90.0);
+        data.apply_objectives(&objectives);
+        let web = data.devices.iter().find(|d| d.name.starts_with("Web")).expect("web");
+        assert_eq!(web.objective, Some(99.99), "the group's objective");
+        let idle = data.devices.iter().find(|d| d.name == "Idle").expect("idle");
+        assert_eq!(idle.objective, Some(90.0), "the monitor beats its group");
+        let ungrouped = data.devices.iter().find(|d| d.name.starts_with('=')).expect("other");
+        assert_eq!(ungrouped.objective, None);
+        // 99.95 meets the report's 99.9 but not the group's 99.99.
+        let csv = csv_monitors(&data, Some(99.9));
+        assert!(csv.contains(",99.990,missed\r\n"), "{csv}");
+        assert!(csv.contains(",90.000,no_data\r\n"), "{csv}");
+        assert!(csv.contains(",99.900,missed\r\n"), "the report's own objective elsewhere: {csv}");
+        // The tables gain an "Objective" column only when a row has its own.
+        let text = text_of(&pdf(&data, Tz::UTC, &options()));
+        assert!(text.contains("(Objective)"), "own objectives are shown");
+        let plain = text_of(&pdf(&sample(), Tz::UTC, &options()));
+        assert!(!plain.contains("(Objective)"), "no column without overrides");
     }
 
     #[test]

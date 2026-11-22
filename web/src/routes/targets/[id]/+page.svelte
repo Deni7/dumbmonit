@@ -100,6 +100,15 @@
 	import { catalogLayout, ratedFamilies, withCatalogUnits } from '#lib/components/devices/catalog.js';
 	import CatalogViews from '#lib/components/devices/CatalogViews.svelte';
 	import SilenceControl from '#lib/components/devices/SilenceControl.svelte';
+	import CopyAddress from '#lib/components/devices/CopyAddress.svelte';
+	import MaintenanceWindows from '#lib/components/devices/MaintenanceWindows.svelte';
+	import { neighbours } from '#lib/components/devices/neighbours.js';
+	import { buildRack } from '#lib/components/devices/rack.js';
+	import { buildFolders } from '#lib/components/devices/folders.js';
+	import { splitDisabled, freeTags } from '#lib/components/devices/listState.js';
+	import { alertsStore } from '#lib/stores/alerts.svelte.js';
+	import { startPolling } from '#lib/poll.js';
+	import { tagChip } from '#lib/tag-chip.js';
 	import TargetMenu from '#lib/components/devices/TargetMenu.svelte';
 	import ManagedNotice from '#lib/components/devices/ManagedNotice.svelte';
 	import { auth } from '#lib/stores/auth.svelte.js';
@@ -117,10 +126,11 @@
 		Panel,
 		Plate,
 		Skeleton,
+		Tag,
 		confetti,
 		type Tone
 	} from '#lib/ui/index.js';
-	import { Activity, ArrowUpRight, ChevronDown, ExternalLink, PowerOff, Search, ServerOff } from 'lucide-svelte';
+	import { Activity, ArrowUpRight, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, PowerOff, Search, ServerOff } from 'lucide-svelte';
 	import KindIcon from '#lib/components/KindIcon.svelte';
 
 	const id = $derived(Number(page.params.id));
@@ -190,6 +200,34 @@
 		return target.kind === 'agent' ? (hostname ?? '') : target.address;
 	});
 
+	// --- Free tags, and the monitors around this one in the list ------------
+	/** Free tags (not the options of the type) as chips; the options live in the form. */
+	const tagChips = $derived.by(() => {
+		if (!target) return [];
+		const keys = new Set((collector?.options ?? []).map((o) => o.key));
+		return freeTags(target.tags, keys)
+			.map((pair) => {
+				const at = pair.indexOf('=');
+				return tagChip(pair.slice(0, at), pair.slice(at + 1));
+			})
+			.sort((a, b) => a.label.localeCompare(b.label, 'en'));
+	});
+
+	/** The list's default order (folders, state tier, manual position, name), disabled monitors last. */
+	const listOrder = $derived.by(() => {
+		const all = alertsStore.targets;
+		if (all.length === 0) return [];
+		const stateOf = (t: Target) => displayState(t, alertsStore.probes.get(t.id));
+		const { active, disabled } = splitDisabled(all, stateOf);
+		return [...buildFolders(all, stateOf, active).flatMap((section) => section.rows), ...buildRack(all, stateOf, disabled)].map(
+			(row) => row.target
+		);
+	});
+	const around = $derived.by(() => {
+		const at = listOrder.findIndex((t) => t.id === id);
+		return at === -1 ? { prev: null, next: null } : neighbours(listOrder, listOrder[at]);
+	});
+
 	// --- Security score (opt-in in Settings) ---------------------------------
 	// A badge in the header when the score is on and this kind is rated; the
 	// report opens under the header, straight away when the link said so
@@ -205,17 +243,16 @@
 		const targetId = id;
 		security = null;
 		securityOpen = untrack(() => page.url.hash === '#security');
-		const controller = new AbortController();
-		const load = () =>
-			getTargetSecurity(targetId, controller.signal)
-				.then((report) => (security = report))
-				.catch(() => {});
-		void load();
-		const timer = setInterval(() => void load(), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(
+			(signal) =>
+				getTargetSecurity(targetId, signal)
+					.then((report) => {
+						security = report;
+						return true;
+					})
+					.catch(() => false),
+			60_000
+		);
 	});
 
 	/** Scrolls the report into view once it is there (opened from a link or the badge). */
@@ -523,6 +560,7 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
+			return false;
 		} finally {
 			loading = false;
 		}
@@ -621,19 +659,19 @@
 		osInfo = null;
 		probeResult = null;
 		probeError = null;
-		const controller = new AbortController();
-		void loadTarget(controller.signal);
-		void loadContext(controller.signal);
-		const timer = setInterval(() => {
-			void loadTarget(controller.signal);
-			void loadContext(controller.signal);
-			void loadInstruments(controller.signal);
-			refreshKey += 1;
+		// The instruments load in their own effect at first, then here with the
+		// rest; only the device itself decides whether the page backs off.
+		let first = true;
+		return startPolling(async (signal) => {
+			const reads: Promise<unknown>[] = [loadTarget(signal), loadContext(signal)];
+			if (!first) {
+				reads.push(loadInstruments(signal));
+				refreshKey += 1;
+			}
+			first = false;
+			const [targetOk] = await Promise.all(reads);
+			return targetOk !== false;
 		}, 30_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
 	});
 
 	// Instruments need the kind (service or device) and follow the range.
@@ -665,8 +703,30 @@
 
 <svelte:head><title>{m.devices_target_page_title({ name: target?.name ?? m.devices_target_title_fallback() })}</title></svelte:head>
 
-<nav class="mb-4 text-sm max-sm:-mt-1 max-sm:mb-1">
+<nav class="mb-4 flex items-center justify-between gap-3 text-sm max-sm:-mt-1 max-sm:mb-1" aria-label={m.w1monitors_detail_nav_aria()}>
 	<a href={withBase('/targets')} class="inline-flex min-h-10 items-center gap-1 text-ink-2 hover:text-ink hover:underline sm:min-h-0">{m.devices_target_back()}</a>
+	{#if around.prev || around.next}
+		<span class="flex items-center gap-1">
+			{#if around.prev}
+				<a
+					href={withBase(`/targets/${around.prev.id}`)}
+					class="inline-flex min-h-10 min-w-10 items-center justify-center rounded-md text-ink-2 hover:bg-surface-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal sm:min-h-0 sm:size-8"
+					aria-label={m.w1monitors_detail_prev({ name: around.prev.name })}
+					title={m.w1monitors_detail_prev({ name: around.prev.name })}
+					data-sveltekit-noscroll
+				><ChevronLeft class="size-4" aria-hidden="true" /></a>
+			{/if}
+			{#if around.next}
+				<a
+					href={withBase(`/targets/${around.next.id}`)}
+					class="inline-flex min-h-10 min-w-10 items-center justify-center rounded-md text-ink-2 hover:bg-surface-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal sm:min-h-0 sm:size-8"
+					aria-label={m.w1monitors_detail_next({ name: around.next.name })}
+					title={m.w1monitors_detail_next({ name: around.next.name })}
+					data-sveltekit-noscroll
+				><ChevronRight class="size-4" aria-hidden="true" /></a>
+			{/if}
+		</span>
+	{/if}
 </nav>
 
 {#if missing}
@@ -702,6 +762,7 @@
 						{#if identity}
 							<span class="text-ink-3" aria-hidden="true">·</span>
 							<span class="tnum break-all" title={target.address}>{identity}</span>
+							<CopyAddress value={identity} class="-mx-1.5" />
 						{/if}
 						<span class="text-ink-3" aria-hidden="true">·</span>
 						<span class="tnum text-ink-3">{m.devices_target_every({ interval: formatDuration(target.interval_secs) })}</span>
@@ -724,6 +785,13 @@
 							</a>
 						{/if}
 					</div>
+					{#if tagChips.length > 0}
+						<ul class="mt-2 flex flex-wrap items-center gap-1.5" aria-label={m.w1monitors_detail_tags_aria()}>
+							{#each tagChips as chip (chip.label)}
+								<li><Tag title={chip.title} class="!max-w-64">{chip.label}</Tag></li>
+							{/each}
+						</ul>
+					{/if}
 					<div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
 						<Plate {tone} label={STATE_LABEL[stateNow]} size="md" pulse={blink} />
 						{#if certificate}
@@ -822,6 +890,15 @@
 			</p>
 		{/if}
 	</section>
+
+	{#if target.note}
+		<section class="mt-4 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 sm:px-6" aria-labelledby="monitor-note-title">
+			<h2 id="monitor-note-title" class="label-tape">{m.w1monitors_detail_note_title()}</h2>
+			<p class="mt-1 text-sm break-words whitespace-pre-wrap text-ink">{target.note}</p>
+		</section>
+	{/if}
+
+	<MaintenanceWindows {target} {refreshKey} class="mt-4" />
 
 	{#if idle}
 		<!-- One line instead of a stack of empty panels. -->

@@ -17,7 +17,7 @@ use crate::api::status_pages::{
     PROBE_KINDS, first_up_query, instant_map, presence_slots, probe_uptime_query, rescale, selector,
 };
 use crate::db;
-use crate::reports::layout::Scope;
+use crate::reports::layout::{Objectives, Scope};
 use crate::reports::schedule::{Frequency, Period};
 use crate::state::AppState;
 
@@ -41,6 +41,9 @@ pub struct DeviceStat {
     /// pour les sondes (HTTP, TCP…), qui mesurent une durée.
     pub latency_avg_ms: Option<f64>,
     pub latency_p95_ms: Option<f64>,
+    /// Objectif propre à ce moniteur ou à son groupe (rapport SLA), qui
+    /// remplace celui du rapport ; voir [`ReportData::apply_objectives`].
+    pub objective: Option<f64>,
 }
 
 #[derive(Debug, Clone)]
@@ -49,6 +52,8 @@ pub struct GroupStat {
     pub devices: usize,
     pub uptime: Option<f64>,
     pub previous_uptime: Option<f64>,
+    /// Objectif propre à ce groupe, qui remplace celui du rapport.
+    pub objective: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -101,6 +106,16 @@ pub struct ReportData {
 }
 
 impl ReportData {
+    /// Pose sur chaque ligne l'objectif propre à son moniteur ou à son groupe.
+    pub fn apply_objectives(&mut self, objectives: &Objectives) {
+        for device in &mut self.devices {
+            device.objective = objectives.for_monitor(&device.name, &device.group);
+        }
+        for group in &mut self.groups {
+            group.objective = objectives.for_group(&group.name);
+        }
+    }
+
     /// Équipements les plus instables : le plus d'incidents, puis le plus
     /// d'indisponibilité. Ceux qui n'ont rien eu n'y figurent pas.
     pub fn unstable(&self) -> Vec<&DeviceStat> {
@@ -270,6 +285,7 @@ pub fn assemble(input: Inputs<'_>) -> ReportData {
             downtime_secs: per_device.remove(&d.id).map(merged_secs).unwrap_or(0),
             latency_avg_ms: input.latency.get(&d.id).map(|(avg, _)| *avg),
             latency_p95_ms: input.latency.get(&d.id).map(|(_, p95)| *p95),
+            objective: None,
         })
         .collect();
     // Les moins disponibles d'abord ; les équipements sans mesure à la fin.
@@ -291,6 +307,7 @@ pub fn assemble(input: Inputs<'_>) -> ReportData {
             devices: members.len(),
             uptime: mean(members.iter().filter_map(|d| d.uptime)),
             previous_uptime: mean(members.iter().filter_map(|d| d.previous_uptime)),
+            objective: None,
         })
         .collect();
     groups.sort_by(|a, b| match (a.uptime, b.uptime) {

@@ -39,6 +39,13 @@ fn main() -> Result<()> {
         std::process::exit(dumbmonit_server::ha::cli::run(&args[1..]));
     }
 
+    // `dumbmonit --check-config` : lit l'environnement comme au démarrage, dit ce
+    // qui ne va pas et les valeurs effectives (jamais un secret), puis sort. Ni
+    // base, ni réseau, ni privilèges abandonnés.
+    if args.iter().any(|arg| arg == "--check-config" || arg == "check-config") {
+        std::process::exit(check_config());
+    }
+
     init_tracing();
 
     let config = Config::from_env().context("invalid configuration")?;
@@ -394,6 +401,31 @@ async fn run(mut config: Config, startup: Startup) -> Result<()> {
 
     info!("clean shutdown");
     Ok(())
+}
+
+/// Corps de `--check-config`. Rend le code de sortie : 0 si la configuration se
+/// lit, 1 sinon. Les avertissements n'en changent pas.
+fn check_config() -> i32 {
+    match Config::from_env() {
+        Err(error) => {
+            eprintln!("Configuration problem:");
+            for cause in error.chain() {
+                eprintln!("  - {cause}");
+            }
+            1
+        }
+        Ok(config) => {
+            println!("Configuration is valid. Effective settings (no secret shown):");
+            for setting in config.effective() {
+                let env = setting.env.map(|name| format!("  [{name}]")).unwrap_or_default();
+                println!("  {:<22} {}{env}", setting.key, setting.value);
+            }
+            for warning in config.warnings() {
+                println!("warning: {warning}");
+            }
+            0
+        }
+    }
 }
 
 fn init_tracing() {

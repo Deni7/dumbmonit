@@ -15,6 +15,8 @@ use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
 use crate::api::{ApiError, ApiResult};
+use crate::auth::audit;
+use crate::auth::client_ip::ClientIp;
 use crate::auth::middleware::AdminIdentity;
 use crate::instance::{self, InstanceSettings, LANGUAGES, MAX_NAME_LEN};
 use crate::state::AppState;
@@ -26,7 +28,9 @@ pub fn public_routes() -> Router<AppState> {
 
 /// Routes sous le garde de session.
 pub fn routes() -> Router<AppState> {
-    Router::new().route("/instance/settings", get(read).put(update))
+    Router::new()
+        .route("/instance/settings", get(read).put(update))
+        .route("/instance/effective-config", get(effective_config))
 }
 
 /// Réponse publique, volontairement minimale.
@@ -70,14 +74,66 @@ async fn read(State(state): State<AppState>) -> Json<InstanceSettings> {
 }
 
 async fn update(
-    _: AdminIdentity,
+    AdminIdentity(principal): AdminIdentity,
     State(state): State<AppState>,
+    ClientIp(ip): ClientIp,
     Json(patch): Json<InstancePatch>,
 ) -> ApiResult<Json<InstanceSettings>> {
     let mut value = instance::load(&state.pool).await;
+    let changed = changed_fields(&patch);
     apply(&mut value, patch)?;
     instance::save(&state.pool, &value).await?;
+    // Les noms des champs seulement, pas leurs valeurs.
+    if !changed.is_empty() {
+        audit::record(
+            &state.pool,
+            Some(&principal.label()),
+            "instance.settings",
+            Some(&changed.join(", ")),
+            ip,
+        )
+        .await;
+    }
     Ok(Json(effective(&state, value)))
+}
+
+/// `GET /api/instance/effective-config` — les réglages effectifs hors secrets
+/// (section « À propos »). Les sauvegardes locales y sont données telles qu'elles
+/// s'appliquent, réglage de l'interface compris.
+async fn effective_config(
+    _: AdminIdentity,
+    State(state): State<AppState>,
+) -> Json<Vec<crate::config::EffectiveSetting>> {
+    let mut settings = state.config.effective();
+    let backup = crate::backup::local::Settings::load(&state.pool, &state.config).await;
+    for setting in &mut settings {
+        match setting.key {
+            "backup_enabled" => {
+                setting.value = if backup.enabled { "on" } else { "off" }.to_string();
+            }
+            "backup_interval" => {
+                setting.value = format!("{} h", backup.interval.as_secs() / 3600);
+            }
+            "backup_keep" => setting.value = backup.keep.to_string(),
+            _ => {}
+        }
+    }
+    Json(settings)
+}
+
+/// Les champs qu'une modification touche, pour le journal d'audit.
+fn changed_fields(patch: &InstancePatch) -> Vec<&'static str> {
+    [
+        ("setup_completed", patch.setup_completed.is_some()),
+        ("name", patch.name.is_some()),
+        ("language", patch.language.is_some()),
+        ("timezone", patch.timezone.is_some()),
+        ("oncall_enabled", patch.oncall_enabled.is_some()),
+        ("accent", patch.accent.is_some()),
+    ]
+    .into_iter()
+    .filter_map(|(name, set)| set.then_some(name))
+    .collect()
 }
 
 /// Valide et applique une modification. Rien n'est écrit si un champ est refusé.
