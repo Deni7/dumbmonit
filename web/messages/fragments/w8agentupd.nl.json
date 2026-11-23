@@ -1,7 +1,0 @@
-{
-	"settings_agentupdates_status_reinstall": "Herinstallatie nodig",
-	"settings_agentupdates_hint_reinstall": "Deze versie van de Windows-agent kan zijn eigen binary niet vervangen: voer de installatieopdracht eenmalig opnieuw uit op de machine, latere versies werken zichzelf bij.",
-	"settings_agentupdates_status_unknown_key": "Onbekende ondertekeningssleutel",
-	"settings_agentupdates_hint_unknown_key": "Deze agent is ouder dan de huidige ondertekeningssleutel en kan de update niet controleren: zet Niet-ondertekende builds accepteren (ontwikkeling) aan tot hij is bijgewerkt, of voer de installatieopdracht opnieuw uit.",
-	"settings_agentupdates_reinstall_command": "Installatieopdracht ophalen"
-}

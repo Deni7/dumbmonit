@@ -1,7 +1,0 @@
-{
-	"settings_agentupdates_status_reinstall": "再インストールが必要",
-	"settings_agentupdates_hint_reinstall": "このバージョンの Windows エージェントは自身のバイナリを置き換えられません。マシン上でインストールコマンドを一度再実行してください。以降のバージョンは自動で更新されます。",
-	"settings_agentupdates_status_unknown_key": "不明な署名キー",
-	"settings_agentupdates_hint_unknown_key": "このエージェントは現在の署名キーより古いため、更新を検証できません。更新が終わるまで「未署名のビルドを受け入れる（開発用）」を有効にするか、インストールコマンドを再実行してください。",
-	"settings_agentupdates_reinstall_command": "インストールコマンドを取得"
-}

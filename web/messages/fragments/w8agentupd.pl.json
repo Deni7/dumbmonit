@@ -1,7 +1,0 @@
-{
-	"settings_agentupdates_status_reinstall": "Wymagana ponowna instalacja",
-	"settings_agentupdates_hint_reinstall": "Ta wersja agenta Windows nie może zastąpić własnego pliku binarnego: uruchom raz ponownie polecenie instalacji na tej maszynie, kolejne wersje aktualizują się same.",
-	"settings_agentupdates_status_unknown_key": "Nieznany klucz podpisu",
-	"settings_agentupdates_hint_unknown_key": "Ten agent jest starszy niż obecny klucz podpisu i nie może zweryfikować aktualizacji: włącz Akceptuj niepodpisane buildy (rozwój), dopóki się nie zaktualizuje, albo uruchom ponownie polecenie instalacji.",
-	"settings_agentupdates_reinstall_command": "Pobierz polecenie instalacji"
-}

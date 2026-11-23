@@ -1,7 +1,0 @@
-{
-	"settings_agentupdates_status_reinstall": "Reinstall needed",
-	"settings_agentupdates_hint_reinstall": "This Windows agent version cannot replace its own binary: re-run the install command on the machine once, later versions update themselves.",
-	"settings_agentupdates_status_unknown_key": "Unknown signing key",
-	"settings_agentupdates_hint_unknown_key": "This agent predates the current signing key and cannot verify the update: turn on Accept unsigned builds (development) until it has updated, or re-run the install command.",
-	"settings_agentupdates_reinstall_command": "Get the install command"
-}

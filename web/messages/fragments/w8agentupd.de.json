@@ -1,7 +1,0 @@
-{
-	"settings_agentupdates_status_reinstall": "Neuinstallation nötig",
-	"settings_agentupdates_hint_reinstall": "Diese Version des Windows-Agenten kann ihre eigene Binärdatei nicht ersetzen: Führen Sie den Installationsbefehl einmal auf dem Rechner erneut aus, spätere Versionen aktualisieren sich selbst.",
-	"settings_agentupdates_status_unknown_key": "Unbekannter Signaturschlüssel",
-	"settings_agentupdates_hint_unknown_key": "Dieser Agent ist älter als der aktuelle Signaturschlüssel und kann das Update nicht prüfen: Aktivieren Sie „Unsignierte Builds akzeptieren (Entwicklung)“, bis er aktualisiert ist, oder führen Sie den Installationsbefehl erneut aus.",
-	"settings_agentupdates_reinstall_command": "Installationsbefehl anzeigen"
-}
