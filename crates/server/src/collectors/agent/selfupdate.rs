@@ -1357,6 +1357,8 @@ mod tests {
     #[test]
     fn only_agents_that_can_and_want_to_update_are_ordered_in_waves() {
         let policy = Rollout::default();
+        // Agents d'avant la clé actuelle : sans « unsigned », ils seraient tenus à l'écart.
+        let settings = Settings { allow_unsigned: true, ..Settings::default() };
         let mut paris = row(1, host());
         paris.site = Some("Paris".into());
         paris.group = "prod".into();
@@ -1373,7 +1375,7 @@ mod tests {
         let pilot = row(9, HostState { canary: true, ..host() });
         let hosts = vec![paris, pinned, container, gone, current, newer, failed, forgiven, pilot];
 
-        let members = rollout_members(&hosts, &shipped(), &Settings::default(), &policy, NOW);
+        let members = rollout_members(&hosts, &shipped(), &settings, &policy, NOW);
         let by_id = |id: TargetId| members.iter().find(|member| member.id == id);
         for excluded in [2, 3, 4] {
             assert!(by_id(excluded).is_none(), "agent {excluded} ne fait partie d'aucune vague");
@@ -1390,7 +1392,7 @@ mod tests {
         assert!(by_id(9).unwrap().canary);
 
         let forgiving = Rollout { forgiven_before_ms: NOW, ..Rollout::default() };
-        let members = rollout_members(&hosts, &shipped(), &Settings::default(), &forgiving, NOW);
+        let members = rollout_members(&hosts, &shipped(), &settings, &forgiving, NOW);
         let state = |id: TargetId| members.iter().find(|member| member.id == id).unwrap().state;
         assert_eq!(state(8), MemberState::Idle, "un échec pardonné ne compte plus");
         assert_eq!(state(7), MemberState::Idle);
@@ -1404,7 +1406,7 @@ mod tests {
             max_failure_percent: 50,
             ..Rollout::default()
         };
-        let settings = Settings::default();
+        let settings = Settings { allow_unsigned: true, ..Settings::default() };
         let mut hosts: Vec<HostRow> = (1..=6).map(|id| row(id, host())).collect();
         let first = wave_plan(&hosts, &shipped(), &settings, &policy, NOW).expect("des vagues");
         assert_eq!(first.open_count, 1);

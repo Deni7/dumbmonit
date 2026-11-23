@@ -532,7 +532,8 @@ async fn an_old_windows_agent_is_asked_for_a_reinstall_and_offered_nothing() {
         assert_eq!(agent_status(&view, target)["status"], "reinstall", "{version}");
     }
     // Avec le correctif, l'offre revient.
-    let reply = push_version(&fleet, "nas", "0.20.2", Some(&secret), windows).await;
+    let reply =
+        push_version(&fleet, "nas", env!("CARGO_PKG_VERSION"), Some(&secret), windows).await;
     let offer = &reply.body["agent_update"];
     assert_eq!(offer["file"], "dumbmonit-agent-windows-x86_64.exe", "{}", reply.body);
     assert!(offer["signature"].is_string(), "{}", reply.body);
