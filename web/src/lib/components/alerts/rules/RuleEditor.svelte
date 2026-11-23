@@ -16,7 +16,6 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import {
 		escalateOptions as escalateChoices,
-		holdOptions as holdChoices,
 		windowOptions as windowChoices,
 		repeatOptions as repeatChoices,
 		severityOptions,
@@ -28,6 +27,8 @@
 		withCurrent,
 		type SeverityWord
 	} from './options';
+	import { HOLD_UNITS, durationText, thresholdShape, toStored, type DurationUnit } from './units';
+	import UnitInput from './UnitInput.svelte';
 	import OverridesEditor from './OverridesEditor.svelte';
 	import BacktestPanel from './BacktestPanel.svelte';
 	import UnsavedBadge from '#lib/components/settings/UnsavedBadge.svelte';
@@ -62,14 +63,30 @@
 	// Drafts snapshot the rule as the server held it when the editor opened;
 	// a background refresh must not overwrite what the operator is typing.
 	const initial = untrack(() => rule);
+	// The unit decides how the threshold is typed (units.ts): a duration in
+	// minutes, hours or days, nothing at all for an on/off signal, else a number.
+	const shape = thresholdShape(initial.unit);
+	const flag = shape.kind === 'flag';
+	const durationBase = shape.kind === 'duration' ? shape.base : 1;
+	const durationChoices = shape.kind === 'duration' ? shape.choices : HOLD_UNITS;
+	const startThreshold = durationText(initial.threshold, durationBase, durationChoices);
+	const startClear = durationText(initial.clear_threshold, durationBase, durationChoices, startThreshold.unit);
+	// No hold reads "0 minutes", not "0 days".
+	const startHold = initial.for_secs === 0 ? { text: '0', unit: 'm' as DurationUnit } : durationText(initial.for_secs, 1, HOLD_UNITS);
 	let name = $state(initial.name);
 	let description = $state(initial.description);
 	let query = $state(initial.query);
-	let threshold = $state(String(initial.threshold));
-	// Empty string: no hysteresis. The field is a text input so "no value" stays distinct from 0.
-	let clearThreshold = $state(initial.clear_threshold === null ? '' : String(initial.clear_threshold));
+	// Text (or the number a bound number field hands back), so an emptied field stays distinct from 0.
+	let threshold = $state<string | number | null>(shape.kind === 'duration' ? startThreshold.text : String(initial.threshold));
+	let thresholdUnit = $state<DurationUnit>(startThreshold.unit);
+	// Empty: no hysteresis.
+	let clearThreshold = $state<string | number | null>(
+		initial.clear_threshold === null ? '' : shape.kind === 'duration' ? startClear.text : String(initial.clear_threshold)
+	);
+	let clearUnit = $state<DurationUnit>(startClear.unit);
 	let operator = $state<RuleOperator>(initial.operator);
-	let forSecs = $state(initial.for_secs);
+	let holdText = $state<string | number | null>(startHold.text);
+	let holdUnit = $state<DurationUnit>(startHold.unit);
 	let severity = $state<SeverityWord>(toSeverityWord(initial.severity));
 	let selected = $state<number[]>([...initial.channels]);
 	let repeatSecs = $state(initial.repeat_secs ?? 0);
@@ -93,9 +110,12 @@
 		description,
 		query,
 		threshold,
+		thresholdUnit,
 		clearThreshold,
+		clearUnit,
 		operator,
-		forSecs,
+		holdText,
+		holdUnit,
 		severity,
 		selected: [...selected].sort((a, b) => a - b),
 		repeatSecs,
@@ -109,7 +129,6 @@
 	}));
 	tracker.markClean();
 
-	const holdOptions = $derived(withCurrent(holdChoices(), rule.for_secs));
 	const repeatOptions = $derived(withCurrent(repeatChoices(), rule.repeat_secs ?? 0));
 	const escalateOptions = $derived(withCurrent(escalateChoices(), rule.escalate_after_secs ?? 0));
 	const windowOptions = $derived(withCurrent(windowChoices(), rule.params.log_window_secs ?? 300));
@@ -151,14 +170,31 @@
 			error = m.alerts_rules_edit_error_query();
 			return null;
 		}
-		const thresholdValue = anomaly ? rule.threshold : Number(threshold);
+		const forValue = toStored(holdText, holdUnit, 1, true);
+		if (forValue === null || forValue < 0) {
+			error = m.w8rules_editor_error_hold();
+			return null;
+		}
+		// An on/off rule keeps its comparison as shipped: there is nothing to set.
+		const thresholdValue =
+			anomaly || flag
+				? rule.threshold
+				: shape.kind === 'duration'
+					? (toStored(threshold, thresholdUnit, durationBase) ?? Number.NaN)
+					: String(threshold ?? '').trim() === ''
+						? Number.NaN
+						: Number(threshold);
 		if (!Number.isFinite(thresholdValue)) {
 			error = m.alerts_rules_error_threshold();
 			return null;
 		}
-		let clearValue: number | null = null;
-		if (!anomaly && clearThreshold.trim() !== '') {
-			clearValue = Number(clearThreshold);
+		let clearValue: number | null = flag ? rule.clear_threshold : null;
+		const clearFilled = clearThreshold !== null && String(clearThreshold).trim() !== '';
+		if (!anomaly && !flag && clearFilled) {
+			clearValue =
+				shape.kind === 'duration'
+					? (toStored(clearThreshold, clearUnit, durationBase) ?? Number.NaN)
+					: Number(clearThreshold);
 			if (!Number.isFinite(clearValue)) {
 				error = m.alerts_rules_edit_error_clear_number();
 				return null;
@@ -203,7 +239,7 @@
 			operator,
 			threshold: thresholdValue,
 			clear_threshold: clearValue,
-			for_secs: forSecs,
+			for_secs: forValue,
 			severity: fromSeverityWord(severity),
 			channels: selected,
 			params,
@@ -265,6 +301,19 @@
 		<Field label={m.alerts_rules_edit_detection()} for={`${prefix}-params`} help={m.alerts_rules_edit_detection_help()}>
 			<p id={`${prefix}-params`} class="tnum text-[0.8125rem] text-ink-2">{anomalySummary(rule)}</p>
 		</Field>
+	{:else if flag}
+		<div class="grid gap-4 sm:grid-cols-3">
+			<div class="grid content-start gap-1 sm:col-span-2">
+				<p class="text-sm font-semibold text-ink">{m.w8rules_editor_flag_label()}</p>
+				{#if rule.description}
+					<p class="text-[0.8125rem] text-ink">{rule.description}</p>
+				{/if}
+				<p class="text-[0.8125rem] text-ink-2">{m.w8rules_editor_flag_nothing()}</p>
+			</div>
+			<Field label={m.w8rules_editor_hold_label()} for={`${prefix}-for`} help={m.w8rules_editor_hold_help()}>
+				<UnitInput id={`${prefix}-for`} bind:value={holdText} bind:unit={holdUnit} choices={HOLD_UNITS} label={m.w8rules_editor_hold_label()} min={0} />
+			</Field>
+		</div>
 	{:else}
 		<div class="grid gap-4 sm:grid-cols-3">
 			<Field label={m.alerts_rules_operator()} for={`${prefix}-op`}>
@@ -274,26 +323,28 @@
 					{/each}
 				</select>
 			</Field>
-			<Field label={m.alerts_rules_threshold()} for={`${prefix}-threshold`} required>
-				<div class="relative">
-					<input
-						id={`${prefix}-threshold`}
-						type="number"
-						step="any"
-						class={`input tnum ${rule.unit ? 'pr-12' : ''}`}
-						bind:value={threshold}
-					/>
-					{#if rule.unit}
-						<span class="label-tape pointer-events-none absolute top-1/2 right-3 -translate-y-1/2" aria-hidden="true">{rule.unit}</span>
-					{/if}
-				</div>
-			</Field>
-			<Field label={m.alerts_rules_hold_for()} for={`${prefix}-for`} help={m.alerts_rules_edit_hold_help()}>
-				<select id={`${prefix}-for`} class="input" bind:value={forSecs}>
-					{#each holdOptions as option (option.value)}
-						<option value={option.value}>{option.label}</option>
-					{/each}
-				</select>
+			{#if shape.kind === 'duration'}
+				<Field label={m.alerts_rules_threshold()} for={`${prefix}-threshold`} required help={m.w8rules_editor_threshold_duration_help()}>
+					<UnitInput id={`${prefix}-threshold`} bind:value={threshold} bind:unit={thresholdUnit} choices={durationChoices} label={m.alerts_rules_threshold()} />
+				</Field>
+			{:else}
+				<Field label={m.alerts_rules_threshold()} for={`${prefix}-threshold`} required>
+					<div class="relative">
+						<input
+							id={`${prefix}-threshold`}
+							type="number"
+							step="any"
+							class={`input tnum ${rule.unit ? 'pr-12' : ''}`}
+							bind:value={threshold}
+						/>
+						{#if rule.unit}
+							<span class="label-tape pointer-events-none absolute top-1/2 right-3 -translate-y-1/2" aria-hidden="true">{rule.unit}</span>
+						{/if}
+					</div>
+				</Field>
+			{/if}
+			<Field label={m.w8rules_editor_hold_label()} for={`${prefix}-for`} help={m.w8rules_editor_hold_help()}>
+				<UnitInput id={`${prefix}-for`} bind:value={holdText} bind:unit={holdUnit} choices={HOLD_UNITS} label={m.w8rules_editor_hold_label()} min={0} />
 			</Field>
 		</div>
 		<div class="grid gap-4 sm:grid-cols-3">
@@ -302,19 +353,30 @@
 				for={`${prefix}-clear`}
 				help={m.alerts_rules_edit_clear_help()}
 			>
-				<div class="relative">
-					<input
+				{#if shape.kind === 'duration'}
+					<UnitInput
 						id={`${prefix}-clear`}
-						type="number"
-						step="any"
-						class={`input tnum ${rule.unit ? 'pr-12' : ''}`}
 						bind:value={clearThreshold}
+						bind:unit={clearUnit}
+						choices={durationChoices}
+						label={clearLabel(operator)}
 						placeholder={m.alerts_over_none_placeholder()}
 					/>
-					{#if rule.unit}
-						<span class="label-tape pointer-events-none absolute top-1/2 right-3 -translate-y-1/2" aria-hidden="true">{rule.unit}</span>
-					{/if}
-				</div>
+				{:else}
+					<div class="relative">
+						<input
+							id={`${prefix}-clear`}
+							type="number"
+							step="any"
+							class={`input tnum ${rule.unit ? 'pr-12' : ''}`}
+							bind:value={clearThreshold}
+							placeholder={m.alerts_over_none_placeholder()}
+						/>
+						{#if rule.unit}
+							<span class="label-tape pointer-events-none absolute top-1/2 right-3 -translate-y-1/2" aria-hidden="true">{rule.unit}</span>
+						{/if}
+					</div>
+				{/if}
 			</Field>
 		</div>
 	{/if}
@@ -381,12 +443,8 @@
 			</select>
 		</Field>
 		{#if anomaly}
-			<Field label={m.alerts_rules_hold_for()} for={`${prefix}-for`} help={m.alerts_rules_edit_hold_anomaly_help()}>
-				<select id={`${prefix}-for`} class="input" bind:value={forSecs}>
-					{#each holdOptions as option (option.value)}
-						<option value={option.value}>{option.label}</option>
-					{/each}
-				</select>
+			<Field label={m.w8rules_editor_hold_label()} for={`${prefix}-for`} help={m.w8rules_editor_hold_anomaly_help()}>
+				<UnitInput id={`${prefix}-for`} bind:value={holdText} bind:unit={holdUnit} choices={HOLD_UNITS} label={m.w8rules_editor_hold_label()} min={0} />
 			</Field>
 		{/if}
 	</div>

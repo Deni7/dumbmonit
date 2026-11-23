@@ -28,7 +28,12 @@ pub(super) const PRODUCED: &[&str] = &[
     "dumbmonit_synology_pool_scrub_age_seconds",
     "dumbmonit_synology_certificate_expires_in_seconds",
     "dumbmonit_synology_certificate_broken",
+    "dumbmonit_abb_device_last_success_seconds",
 ];
+
+/// Âge maximal par défaut, en jours, de la dernière sauvegarde Active Backup
+/// réussie d'un appareil (règle `synology_abb_device_backup_too_old`).
+const ABB_DEVICE_MAX_AGE_DAYS: f64 = 3.0;
 
 pub(super) fn rules() -> Vec<Rule> {
     vec![
@@ -154,6 +159,30 @@ pub(super) fn rules() -> Vec<Rule> {
                 "Synology Hyper Backup success too old",
                 RuleKind::Threshold,
                 "dumbmonit_synology_backup_last_success_age_seconds",
+            )
+        },
+        // Âge de la dernière sauvegarde Active Backup réussie de chaque appareil :
+        // le réglage que l'on attend, « plus de N jours ». Il complète le rythme
+        // appris de `synology_abb_device_overdue`, qui n'a rien à régler. Trois
+        // jours laissent passer un week-end sans poste allumé ; un serveur
+        // sauvegardé chaque nuit gagne à descendre à un jour.
+        Rule {
+            description: "The last successful Active Backup for Business run of this device is \
+                          older than this limit. Set it to how long this device may go without \
+                          a backup. A device that never succeeded has no age yet and is not \
+                          covered."
+                .to_string(),
+            operator: Operator::Gt,
+            threshold: ABB_DEVICE_MAX_AGE_DAYS * 86_400.0,
+            for_duration: Duration::from_secs(30 * 60),
+            severity: Severity::Warning,
+            unit: "s".to_string(),
+            repeat_interval: Some(Duration::from_secs(24 * 3600)),
+            ..base(
+                "synology_abb_device_backup_too_old",
+                "Active Backup device backup too old",
+                RuleKind::Threshold,
+                "dumbmonit_abb_device_last_success_seconds",
             )
         },
         Rule {
@@ -323,6 +352,19 @@ mod tests {
         assert!(now.threshold < soon.threshold);
         assert!(now.severity > soon.severity);
         assert!(soon.clear_threshold.unwrap() > soon.threshold);
+    }
+
+    #[test]
+    fn l_age_de_sauvegarde_d_un_appareil_se_regle_en_duree() {
+        let rule =
+            rules().into_iter().find(|r| r.uid == "synology_abb_device_backup_too_old").unwrap();
+        // Un âge en secondes, que l'éditeur montre et fait saisir en jours.
+        assert_eq!(rule.query, "dumbmonit_abb_device_last_success_seconds");
+        assert_eq!(rule.unit, "s");
+        assert_eq!(rule.operator, Operator::Gt);
+        assert_eq!(rule.threshold, 3.0 * 86_400.0);
+        assert_eq!(rule.threshold % 86_400.0, 0.0, "the default reads as whole days");
+        assert!(rule.clear_threshold.is_none());
     }
 
     #[test]

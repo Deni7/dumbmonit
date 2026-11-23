@@ -4,6 +4,8 @@
 	import type { AlertRulePayload, AlertSeverity, RuleOperator } from '#lib/api/index.js';
 	import { Button, Field, Panel } from '#lib/ui/index.js';
 	import { severityWord } from '../helpers';
+	import { HOLD_UNITS, toStored, type DurationUnit } from './units';
+	import UnitInput from './UnitInput.svelte';
 
 	interface Props {
 		oncreate: (payload: AlertRulePayload) => Promise<void>;
@@ -23,7 +25,9 @@
 	let query = $state('');
 	let operator = $state<RuleOperator>('>');
 	let threshold = $state('');
-	let forSecs = $state('300');
+	// Five minutes, typed as a number and a unit (units.ts).
+	let holdText = $state<string | number | null>('5');
+	let holdUnit = $state<DurationUnit>('m');
 	let severity = $state<AlertSeverity>('warning');
 
 	function reset() {
@@ -31,7 +35,8 @@
 		query = '';
 		operator = '>';
 		threshold = '';
-		forSecs = '300';
+		holdText = '5';
+		holdUnit = 'm';
 		severity = 'warning';
 		formError = null;
 	}
@@ -52,8 +57,8 @@
 			formError = m.alerts_rules_error_threshold();
 			return;
 		}
-		const forValue = Number(forSecs);
-		if (!Number.isInteger(forValue) || forValue < 0) {
+		const forValue = toStored(holdText, holdUnit, 1, true);
+		if (forValue === null || forValue < 0) {
 			formError = m.alerts_rules_error_hold();
 			return;
 		}
@@ -124,8 +129,8 @@
 				</select>
 			</Field>
 		</div>
-		<Field label={m.alerts_rules_hold_for()} for="rule-for" help={m.alerts_rules_hold_for_help()}>
-			<input id="rule-for" type="number" min="0" class="input" bind:value={forSecs} />
+		<Field label={m.w8rules_editor_hold_label()} for="rule-for" help={m.w8rules_editor_hold_help()}>
+			<UnitInput id="rule-for" bind:value={holdText} bind:unit={holdUnit} choices={HOLD_UNITS} label={m.w8rules_editor_hold_label()} min={0} />
 		</Field>
 
 		{#if formError}

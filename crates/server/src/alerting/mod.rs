@@ -61,6 +61,7 @@ pub mod rules;
 pub mod silence;
 pub mod source;
 pub mod suppress;
+pub mod units;
 
 pub use engine::{AlertingConfig, EvalReport, evaluate_once, spawn};
 pub use group::{AlertGroup, AlertOutcome, NotifyReason};

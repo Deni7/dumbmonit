@@ -395,9 +395,13 @@ pub(super) fn rules() -> Vec<Rule> {
         // modèle juge l'appareil en retard *par rapport à ses propres habitudes*
         // (jours de repos exclus, tolérance dérivée de son intervalle habituel).
         // Une demi-heure de `for` laisse passer une relecture de l'historique.
+        // Rien à régler ici (unité `bool`) : l'âge fixe, « plus de N jours », est
+        // la règle `synology_abb_device_backup_too_old`.
         Rule {
-            description: "No successful Active Backup for Business run for this device for \
-                          longer than its usual rhythm allows (off-days excluded)."
+            description: "Compared with this device's usual rhythm: fires when it is late by \
+                          its own standard (median gap between successful runs, off-days \
+                          excluded). Nothing to set; for a fixed limit in days, use \"Active \
+                          Backup device backup too old\"."
                 .to_string(),
             operator: Operator::Gt,
             threshold: 0.0,

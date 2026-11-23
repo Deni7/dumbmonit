@@ -15515,7 +15515,7 @@ components:
           description: Channel ids; empty means every enabled channel.
           items: { type: integer, format: int64 }
         params: { $ref: "#/components/schemas/AnomalyParams" }
-        unit: { type: string }
+        unit: { type: string, description: "Display unit of `threshold`. `s`, `min`, `h` and `d` mark a duration stored in that unit (the UI types it in minutes, hours or days); `bool` marks an on/off signal with nothing to set; anything else (`%`, `°C`, `GiB`…) is a suffix." }
         repeat_secs: { type: [integer, "null"] }
         escalate_after_secs: { type: [integer, "null"] }
         enabled: { type: boolean }

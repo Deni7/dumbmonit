@@ -1,0 +1,12 @@
+{
+	"w8rules_editor_error_hold": "Koşulun ne kadar sürmesi gerektiğini girin: 0 veya daha büyük bir sayı.",
+	"w8rules_editor_flag_label": "Ne zaman tetiklenir",
+	"w8rules_editor_flag_nothing": "Bu kural açık/kapalı bir sinyal okur: ayarlanacak bir eşik yoktur. Yine de size bildirilmeden önce ne kadar sürmesi gerektiğini seçebilirsiniz.",
+	"w8rules_editor_hold_anomaly_help": "Size bildirilmeden önce anormalliğin ne kadar sürmesi gerektiği. 0 hemen bildirir.",
+	"w8rules_editor_hold_help": "Size bildirilmeden önce koşulun ne kadar sürmesi gerektiği. 0, onu gören ilk kontrolde bildirir.",
+	"w8rules_editor_hold_label": "Süresi",
+	"w8rules_editor_threshold_duration_help": "Bir yaş ya da gecikme: size uygun birimle girin.",
+	"w8rules_list_summary_flag": "açık/kapalı sinyal",
+	"w8rules_overrides_flag": "Açık/kapalı kural: cihaz başına ayarlanacak bir şey yok, yalnızca uygulanıp uygulanmayacağı.",
+	"w8rules_unitinput_aria": "{field}: birim"
+}

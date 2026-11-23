@@ -1,0 +1,12 @@
+{
+	"w8rules_editor_error_hold": "Indica quanto deve durare la condizione: un numero, 0 o più.",
+	"w8rules_editor_flag_label": "Quando scatta",
+	"w8rules_editor_flag_nothing": "Questa regola legge un segnale acceso/spento: non c'è alcuna soglia da impostare. Puoi comunque scegliere quanto deve durare prima di essere avvisato.",
+	"w8rules_editor_hold_anomaly_help": "Quanto deve durare l'anomalia prima che tu venga avvisato. 0 avvisa subito.",
+	"w8rules_editor_hold_help": "Quanto deve persistere la condizione prima che tu venga avvisato. 0 avvisa al primo controllo che la rileva.",
+	"w8rules_editor_hold_label": "Deve durare",
+	"w8rules_editor_threshold_duration_help": "Un'età o un ritardo: inseriscilo nell'unità che preferisci.",
+	"w8rules_list_summary_flag": "segnale acceso/spento",
+	"w8rules_overrides_flag": "Regola acceso/spento: niente da impostare per dispositivo, solo se si applica.",
+	"w8rules_unitinput_aria": "{field}: unità"
+}

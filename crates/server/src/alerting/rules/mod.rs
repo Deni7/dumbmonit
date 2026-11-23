@@ -21,6 +21,7 @@ mod builtin_proxmox;
 mod builtin_services;
 mod builtin_vendors;
 mod cloud;
+mod flags;
 mod homeassistant;
 mod immich;
 mod jellyfin;
@@ -168,6 +169,8 @@ pub fn builtin_rules() -> Vec<Rule> {
     rules.extend(postgres::rules());
     rules.extend(synology::rules());
     rules.extend(selfhosted::apps_rules());
+    // Les règles « tout ou rien » portent l'unité `bool` : rien à régler (`flags.rs`).
+    flags::mark_flags(&mut rules);
     rules
 }
 
