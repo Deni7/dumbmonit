@@ -10895,6 +10895,757 @@
 	"w8rules_list_summary_flag": "сигнал «вкл/выкл»",
 	"w8rules_overrides_flag": "Правило «вкл/выкл»: для отдельного устройства настраивать нечего, только применять его или нет.",
 	"w8rules_unitinput_aria": "{field}: единица",
+	"w9dash_agents_connected": "Подключён",
+	"w9dash_agents_disconnected": "Отключён",
+	"w9dash_agents_empty": "Агенты пока не установлены.",
+	"w9dash_agents_install": "Установить агент",
+	"w9dash_agents_last_contact": "Последняя связь {ago}",
+	"w9dash_agents_manage": "Управление агентами",
+	"w9dash_agents_never_seen": "Ни разу не подключался",
+	"w9dash_agents_on_latest": "{count} на {version}, последняя",
+	"w9dash_agents_on_version": "{count} на {version}",
+	"w9dash_agents_title": "Агенты",
+	"w9dash_agents_total": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} агент",
+				"countPlural=few": "{count} агента",
+				"countPlural=many": "{count} агентов",
+				"countPlural=other": "{count} агента"
+			}
+		}
+	],
+	"w9dash_agents_update": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Обновить {count}",
+				"countPlural=few": "Обновить {count}",
+				"countPlural=many": "Обновить {count}",
+				"countPlural=other": "Обновить {count}"
+			}
+		}
+	],
+	"w9dash_common_all_alerts": "Все оповещения",
+	"w9dash_common_error": "Не удалось получить эти показатели.",
+	"w9dash_common_last_30_days": "Последние 30 дней",
+	"w9dash_common_sev_critical": "Критично",
+	"w9dash_common_sev_warning": "Предупреждение",
+	"w9dash_common_this_site": "Этот объект",
+	"w9dash_common_today_at": "Сегодня {time}",
+	"w9dash_events_alerts": "Оповещения",
+	"w9dash_events_all": "Все",
+	"w9dash_events_audit": "Журнал аудита",
+	"w9dash_events_changes": "Изменения",
+	"w9dash_events_empty": "В последнее время ничего не происходило.",
+	"w9dash_events_empty_filter": "В последнее время ничего такого.",
+	"w9dash_events_filter": "Показать",
+	"w9dash_events_history": "Вся история",
+	"w9dash_events_title": "Последние события",
+	"w9dash_expiries_all": "Все сроки",
+	"w9dash_expiries_bar_hint": "Заполняется по мере приближения даты, шкала {days} дн.",
+	"w9dash_expiries_more": "Показать все ({count})",
+	"w9dash_expiries_sub": "Ближайшие {days} дн.",
+	"w9dash_expiries_title": "Сроки и прогнозы",
+	"w9dash_expiries_vulns": "Уязвимости",
+	"w9dash_kpi_all_up": "Все работают",
+	"w9dash_kpi_avail_delta": "{delta} п.п. к предыдущим 30 дням",
+	"w9dash_kpi_avail_note": "Цель {target}%",
+	"w9dash_kpi_bars_label": "Одна полоса на монитор, по объектам; высокая полоса — монитор не работает",
+	"w9dash_kpi_budget_left": "Остаток бюджета ошибок",
+	"w9dash_kpi_critical": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} критичное",
+				"countPlural=few": "{count} критичных",
+				"countPlural=many": "{count} критичных",
+				"countPlural=other": "{count} критичного"
+			}
+		}
+	],
+	"w9dash_kpi_down": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} не работает",
+				"countPlural=few": "{count} не работают",
+				"countPlural=many": "{count} не работают",
+				"countPlural=other": "{count} не работают"
+			}
+		}
+	],
+	"w9dash_kpi_last_closed": "Последнее закрыто {ago}",
+	"w9dash_kpi_none_open": "Открытых нет",
+	"w9dash_kpi_opened_label": "Оповещения за день, последние {days} дн.",
+	"w9dash_kpi_opened_week": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} открыто на этой неделе, {previous} на прошлой",
+				"countPlural=few": "{count} открыто на этой неделе, {previous} на прошлой",
+				"countPlural=many": "{count} открыто на этой неделе, {previous} на прошлой",
+				"countPlural=other": "{count} открыто на этой неделе, {previous} на прошлой"
+			}
+		}
+	],
+	"w9dash_kpi_paused": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} приостановлен",
+				"countPlural=few": "{count} приостановлено",
+				"countPlural=many": "{count} приостановлено",
+				"countPlural=other": "{count} приостановлено"
+			}
+		}
+	],
+	"w9dash_kpi_sites": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} объект",
+				"countPlural=few": "{count} объекта",
+				"countPlural=many": "{count} объектов",
+				"countPlural=other": "{count} объекта"
+			}
+		}
+	],
+	"w9dash_kpi_today": "Сегодня",
+	"w9dash_kpi_warning": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} предупреждение",
+				"countPlural=few": "{count} предупреждения",
+				"countPlural=many": "{count} предупреждений",
+				"countPlural=other": "{count} предупреждения"
+			}
+		}
+	],
+	"w9dash_maint_empty": "На ближайшие {days} дн. обслуживание не запланировано, приостановленных мониторов нет.",
+	"w9dash_maint_error": "Не удалось получить окна обслуживания.",
+	"w9dash_maint_lasts": "Длительность {duration}",
+	"w9dash_maint_lasts_recurring": "Длительность {duration}, повторяется",
+	"w9dash_maint_now": "Сейчас",
+	"w9dash_maint_running": "Идёт",
+	"w9dash_maint_schedule": "Запланировать",
+	"w9dash_maint_strip_label": "Окна обслуживания на ближайшие {days} дн. по объектам",
+	"w9dash_maint_sub": "Ближайшие {days} дн.",
+	"w9dash_maint_title": "Обслуживание",
+	"w9dash_pages_all": "Все страницы статуса",
+	"w9dash_pages_create": "Создать страницу статуса",
+	"w9dash_pages_draft": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Черновик, {count} сервис",
+				"countPlural=few": "Черновик, {count} сервиса",
+				"countPlural=many": "Черновик, {count} сервисов",
+				"countPlural=other": "Черновик, {count} сервиса"
+			}
+		}
+	],
+	"w9dash_pages_empty": "Страниц статуса пока нет.",
+	"w9dash_pages_error": "Не удалось получить страницы статуса.",
+	"w9dash_pages_maintenance": "Обслуживание",
+	"w9dash_pages_major": "Серьёзный сбой",
+	"w9dash_pages_operational": "Работает",
+	"w9dash_pages_partial": "Частичный сбой",
+	"w9dash_pages_password": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "С паролем, {count} сервис",
+				"countPlural=few": "С паролем, {count} сервиса",
+				"countPlural=many": "С паролем, {count} сервисов",
+				"countPlural=other": "С паролем, {count} сервиса"
+			}
+		}
+	],
+	"w9dash_pages_post": "Опубликовать новость",
+	"w9dash_pages_public": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Публичная, {count} сервис",
+				"countPlural=few": "Публичная, {count} сервиса",
+				"countPlural=many": "Публичная, {count} сервисов",
+				"countPlural=other": "Публичная, {count} сервиса"
+			}
+		}
+	],
+	"w9dash_pages_title": "Страницы статуса",
+	"w9dash_pages_users": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Только для вошедших, {count} сервис",
+				"countPlural=few": "Только для вошедших, {count} сервиса",
+				"countPlural=many": "Только для вошедших, {count} сервисов",
+				"countPlural=other": "Только для вошедших, {count} сервиса"
+			}
+		}
+	],
+	"w9dash_problems_ack_recovery": "Пока снова не ответит",
+	"w9dash_problems_calm_since": "Открытых проблем нет с {time}.",
+	"w9dash_problems_calm_text": "Все мониторы отвечают, открытых оповещений нет.",
+	"w9dash_problems_calm_title": "Ничего не требует вашего внимания.",
+	"w9dash_problems_col_acked": "Подтверждено",
+	"w9dash_problems_col_age": "Длится",
+	"w9dash_problems_col_monitor": "Монитор",
+	"w9dash_problems_col_problem": "Проблема",
+	"w9dash_problems_col_severity": "Важность",
+	"w9dash_problems_lasted": "Длилось {span}",
+	"w9dash_problems_maintenance_link": "Тишина и обслуживание",
+	"w9dash_problems_no_answer": "Не отвечает на проверки",
+	"w9dash_problems_no_site": "Без объекта",
+	"w9dash_problems_not_acked": "Не подтверждено",
+	"w9dash_problems_not_notified": "Уведомление не отправлено",
+	"w9dash_problems_notified": "Уведомление {ago}",
+	"w9dash_problems_place": "{kind}, {site}",
+	"w9dash_problems_resolved": "Недавно решённые",
+	"w9dash_problems_resolved_plate": "Решено",
+	"w9dash_problems_since": "с {time}",
+	"w9dash_problems_site_clear": "ничего не открыто",
+	"w9dash_problems_sub": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} открыта, сначала самые серьёзные",
+				"countPlural=few": "{count} открыты, сначала самые серьёзные",
+				"countPlural=many": "{count} открыто, сначала самые серьёзные",
+				"countPlural=other": "{count} открыто, сначала самые серьёзные"
+			}
+		}
+	],
+	"w9dash_problems_title": "Проблемы",
+	"w9dash_response_acked_fast": "Подтверждены за 15 мин",
+	"w9dash_response_alerts": "Оповещения",
+	"w9dash_response_before": "было {previous}",
+	"w9dash_response_before_pct": "было {previous}, {pct}%",
+	"w9dash_response_chart_label": "Оповещения по дням за {days} дн., по важности",
+	"w9dash_response_mtta": "MTTA",
+	"w9dash_response_mttr": "MTTR",
+	"w9dash_response_noisiest": "Самый шумный:",
+	"w9dash_response_noisiest_rule": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{rule}, {count} оповещение",
+				"countPlural=few": "{rule}, {count} оповещения",
+				"countPlural=many": "{rule}, {count} оповещений",
+				"countPlural=other": "{rule}, {count} оповещения"
+			}
+		}
+	],
+	"w9dash_response_title": "Оповещения и реакция",
+	"w9dash_response_tune": "Настроить правило",
+	"w9dash_slo_all": "Все цели",
+	"w9dash_slo_create": "Задать цель",
+	"w9dash_slo_empty": "Целей уровня обслуживания пока нет.",
+	"w9dash_slo_error": "Не удалось получить цели.",
+	"w9dash_slo_fast": "Быстрый расход",
+	"w9dash_slo_left": "Осталось {percent}% бюджета",
+	"w9dash_slo_more": "Показать все ({count})",
+	"w9dash_slo_slow": "Медленный расход",
+	"w9dash_slo_spent": "Бюджет исчерпан",
+	"w9dash_slo_target": "Цель {target}%",
+	"w9dash_slo_title": "SLO",
+	"w9dash_slo_unmeasured": "Не измерено",
+	"w9dash_slo_window": "За {days} дн.",
+	"w9dash_status_degraded": "Ухудшено",
+	"w9dash_status_paused": "Приостановлен",
+	"w9dash_status_up": "Работает",
+	"w9layout_backups_changed": "Изменено",
+	"w9layout_backups_duration": "Длительность",
+	"w9layout_backups_empty": "Заданий резервного копирования пока нет: здесь появятся задания PBS, Synology, restic, borg и Veeam.",
+	"w9layout_backups_engine": "Система",
+	"w9layout_backups_failed": "Ошибка",
+	"w9layout_backups_job": "Задание",
+	"w9layout_backups_last_success": "Последний успех",
+	"w9layout_backups_never": "Никогда",
+	"w9layout_backups_ok": "ОК",
+	"w9layout_backups_reports": "Отчёты",
+	"w9layout_backups_running": "Выполняется",
+	"w9layout_backups_runs": "Последние 14 запусков",
+	"w9layout_backups_runs_failed": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Последний {count} запуск, ошибок: {failed}",
+				"countPlural=few": "Последние {count} запуска, ошибок: {failed}",
+				"countPlural=many": "Последние {count} запусков, ошибок: {failed}",
+				"countPlural=other": "Последние {count} запуска, ошибок: {failed}"
+			}
+		}
+	],
+	"w9layout_backups_runs_ok": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Последний {count} запуск успешен",
+				"countPlural=few": "Последние {count} запуска успешны",
+				"countPlural=many": "Последние {count} запусков успешны",
+				"countPlural=other": "Последние {count} запуска успешны"
+			}
+		}
+	],
+	"w9layout_backups_stale": "Устарело",
+	"w9layout_backups_status": "Статус",
+	"w9layout_backups_sub_check": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} задание, проверить: {check}",
+				"countPlural=few": "{count} задания, проверить: {check}",
+				"countPlural=many": "{count} заданий, проверить: {check}",
+				"countPlural=other": "{count} задания, проверить: {check}"
+			}
+		}
+	],
+	"w9layout_backups_sub_fresh": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} задание, актуально",
+				"countPlural=few": "{count} задания, все актуальны",
+				"countPlural=many": "{count} заданий, все актуальны",
+				"countPlural=other": "{count} задания, все актуальны"
+			}
+		}
+	],
+	"w9layout_backups_title": "Резервные копии",
+	"w9layout_category_backups": "Резервные копии",
+	"w9layout_category_network": "Сеть",
+	"w9layout_category_other": "Прочее",
+	"w9layout_category_servers": "Серверы",
+	"w9layout_category_services": "Сервисы",
+	"w9layout_category_storage": "Хранилище",
+	"w9layout_count_up_of": "{up} / {total}",
+	"w9layout_fleet_empty": "Мониторов пока нет: добавьте первый, и он появится здесь.",
+	"w9layout_health_degraded": "Ухудшен",
+	"w9layout_health_down": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} не работает",
+				"countPlural=few": "{count} не работают",
+				"countPlural=many": "{count} не работают",
+				"countPlural=other": "{count} не работают"
+			}
+		}
+	],
+	"w9layout_health_healthy": "В норме",
+	"w9layout_health_idle": "Ничего не отслеживается",
+	"w9layout_hex_site_aria": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{site}: работает {up} из {count} монитора, не работает {down}",
+				"countPlural=few": "{site}: работает {up} из {count} мониторов, не работает {down}",
+				"countPlural=many": "{site}: работает {up} из {count} мониторов, не работает {down}",
+				"countPlural=other": "{site}: работает {up} из {count} мониторов, не работает {down}"
+			}
+		}
+	],
+	"w9layout_hex_sub": "Одна ячейка на монитор, по площадкам и категориям",
+	"w9layout_hex_title": "Карта парка",
+	"w9layout_hybrid_act_now": "Действовать сейчас",
+	"w9layout_hybrid_band_label": "Что требует внимания сейчас",
+	"w9layout_matrix_cell_degraded": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{up} / {total}, {count} ухудшен",
+				"countPlural=few": "{up} / {total}, {count} ухудшены",
+				"countPlural=many": "{up} / {total}, {count} ухудшены",
+				"countPlural=other": "{up} / {total}, {count} ухудшены"
+			}
+		}
+	],
+	"w9layout_matrix_cell_down": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{up} / {total}, {count} не работает",
+				"countPlural=few": "{up} / {total}, {count} не работают",
+				"countPlural=many": "{up} / {total}, {count} не работают",
+				"countPlural=other": "{up} / {total}, {count} не работают"
+			}
+		}
+	],
+	"w9layout_matrix_cell_paused": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{up} / {total}, {count} приостановлен",
+				"countPlural=few": "{up} / {total}, {count} приостановлены",
+				"countPlural=many": "{up} / {total}, {count} приостановлены",
+				"countPlural=other": "{up} / {total}, {count} приостановлены"
+			}
+		}
+	],
+	"w9layout_matrix_next_maintenance": "Следующее обслуживание",
+	"w9layout_matrix_none": "Нет",
+	"w9layout_matrix_site": "Площадка",
+	"w9layout_matrix_sub": "Одна отметка на монитор",
+	"w9layout_matrix_title": "Состояние по площадкам и категориям",
+	"w9layout_matrix_wan": "Задержка WAN, {range}",
+	"w9layout_matrix_wan_local": "Эта площадка",
+	"w9layout_matrix_wan_none": "Данных пока нет",
+	"w9layout_monitor_title": "{name}, {kind}: {status}",
+	"w9layout_monitor_title_bare": "{name}: {status}",
+	"w9layout_ms": "{value} мс",
+	"w9layout_next_deadlines_link": "Все сроки",
+	"w9layout_next_empty": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "В ближайший {count} день ничего не запланировано и не истекает.",
+				"countPlural=few": "В ближайшие {count} дня ничего не запланировано и не истекает.",
+				"countPlural=many": "В ближайшие {count} дней ничего не запланировано и не истекает.",
+				"countPlural=other": "В ближайшие {count} дня ничего не запланировано и не истекает."
+			}
+		}
+	],
+	"w9layout_next_maint_active": "Идёт обслуживание",
+	"w9layout_next_maint_meta": "Окно обслуживания, {duration}",
+	"w9layout_next_maintenance_link": "Обслуживание",
+	"w9layout_next_now": "Сейчас",
+	"w9layout_next_title": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Ближайший {count} день",
+				"countPlural=few": "Ближайшие {count} дня",
+				"countPlural=many": "Ближайшие {count} дней",
+				"countPlural=other": "Ближайшие {count} дня"
+			}
+		}
+	],
+	"w9layout_next_until": "до {time}",
+	"w9layout_noc_problems_title": "Проблемы по площадкам",
+	"w9layout_none_planned": "Не запланировано",
+	"w9layout_pct": "{value} %",
+	"w9layout_rate": "{value} {unit}",
+	"w9layout_services_30d": "30 дней",
+	"w9layout_services_all": "Все мониторы",
+	"w9layout_services_beats": "Последние проверки",
+	"w9layout_services_beats_failed": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Последняя {count} проверка, сбоев: {failed}",
+				"countPlural=few": "Последние {count} проверки, сбоев: {failed}",
+				"countPlural=many": "Последние {count} проверок, сбоев: {failed}",
+				"countPlural=other": "Последние {count} проверки, сбоев: {failed}"
+			}
+		}
+	],
+	"w9layout_services_beats_ok": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Последняя {count} проверка пройдена",
+				"countPlural=few": "Последние {count} проверки пройдены",
+				"countPlural=many": "Последние {count} проверок пройдены",
+				"countPlural=other": "Последние {count} проверки пройдены"
+			}
+		}
+	],
+	"w9layout_services_check": "Проверка",
+	"w9layout_services_empty": "Проверок сервисов пока нет: здесь появятся проверки HTTP, DNS, TLS, SMTP или ping.",
+	"w9layout_services_p95": "p95",
+	"w9layout_services_state": "Состояние",
+	"w9layout_services_sub": "Проверки HTTP, DNS, TLS и другие, худшие сверху",
+	"w9layout_services_title": "Сервисы",
+	"w9layout_sites_last_backup": "Последняя копия",
+	"w9layout_sites_no_backup": "Нет данных",
+	"w9layout_sites_sub": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} монитор",
+				"countPlural=few": "{count} монитора",
+				"countPlural=many": "{count} мониторов",
+				"countPlural=other": "{count} монитора"
+			}
+		}
+	],
+	"w9layout_sites_title": "Площадка",
+	"w9layout_sites_up_of": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "/ {count} работает",
+				"countPlural=few": "/ {count} работают",
+				"countPlural=many": "/ {count} работают",
+				"countPlural=other": "/ {count} работают"
+			}
+		}
+	],
+	"w9layout_sites_wan": "WAN",
+	"w9layout_state_error": "Не удалось загрузить эти данные. Скоро будет новая попытка.",
+	"w9layout_status_degraded": "Ухудшен",
+	"w9layout_status_down": "Не работает",
+	"w9layout_status_paused": "Приостановлен",
+	"w9layout_status_up": "Работает",
+	"w9layout_sun_aria": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Работает {up} из {count} монитора; не работает {down}, ухудшено {degraded}",
+				"countPlural=few": "Работает {up} из {count} мониторов; не работает {down}, ухудшено {degraded}",
+				"countPlural=many": "Работает {up} из {count} мониторов; не работает {down}, ухудшено {degraded}",
+				"countPlural=other": "Работает {up} из {count} мониторов; не работает {down}, ухудшено {degraded}"
+			}
+		}
+	],
+	"w9layout_sun_category_title": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{site}, {category}: {count} монитор",
+				"countPlural=few": "{site}, {category}: {count} монитора",
+				"countPlural=many": "{site}, {category}: {count} мониторов",
+				"countPlural=other": "{site}, {category}: {count} монитора"
+			}
+		}
+	],
+	"w9layout_sun_center": "мониторов работает",
+	"w9layout_sun_rings": "Внутреннее кольцо: площадка · среднее: категория · внешнее: монитор",
+	"w9layout_sun_sub": "Площадка, категория, монитор",
+	"w9layout_sun_title": "Парк по площадкам",
+	"w9layout_switch_classic": "Классический",
+	"w9layout_switch_command": "Командный",
+	"w9layout_switch_hybrid": "Гибридный",
+	"w9layout_switch_legend": "Вид обзора",
+	"w9layout_switch_noc": "NOC",
+	"w9layout_top_cpu": "CPU",
+	"w9layout_top_disk": "Диск",
+	"w9layout_top_empty": "Данных пока нет: агенты и сборщики передают сюда CPU, память, диски и сеть.",
+	"w9layout_top_forecast": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{site}, заполнится примерно через {count} день",
+				"countPlural=few": "{site}, заполнится примерно через {count} дня",
+				"countPlural=many": "{site}, заполнится примерно через {count} дней",
+				"countPlural=other": "{site}, заполнится примерно через {count} дня"
+			}
+		}
+	],
+	"w9layout_top_mem": "Память",
+	"w9layout_top_metric": "Показатель",
+	"w9layout_top_net": "Сеть",
+	"w9layout_top_sub_pct": "% занято сейчас, тренд за {range}",
+	"w9layout_top_sub_rate": "Мбит/с сейчас, тренд за {range}",
+	"w9layout_top_title": "Основные потребители",
+	"w9layout_top_title_cpu": "Топ-5 по CPU",
+	"w9layout_top_title_disk": "Топ-5 по дискам",
+	"w9layout_top_title_mem": "Топ-5 по памяти",
+	"w9layout_top_title_net": "Топ-5 по сети",
+	"w9layout_when_today": "Сегодня {time}",
+	"w9layout_when_today_bare": "Сегодня",
+	"w9layout_when_tomorrow": "Завтра {time}",
+	"w9layout_when_tomorrow_bare": "Завтра",
+	"w9layout_when_weekday": "{day} {time}",
+	"w9layout_when_yesterday": "Вчера {time}",
+	"w9layout_when_yesterday_bare": "Вчера",
 	"wall_band_problems": "Проблемы",
 	"wall_band_problems_note": "Критические оповещения и недоступные мониторы",
 	"wall_devices_aria": "Мониторы",

@@ -10562,6 +10562,661 @@
 	"w8rules_list_summary_flag": "开/关信号",
 	"w8rules_overrides_flag": "开/关规则：无需按设备设置，只需决定是否适用。",
 	"w8rules_unitinput_aria": "{field}：单位",
+	"w9dash_agents_connected": "已连接",
+	"w9dash_agents_disconnected": "已断开",
+	"w9dash_agents_empty": "还没有安装代理。",
+	"w9dash_agents_install": "安装代理",
+	"w9dash_agents_last_contact": "最后联系 {ago}",
+	"w9dash_agents_manage": "管理代理",
+	"w9dash_agents_never_seen": "从未连接",
+	"w9dash_agents_on_latest": "{count} 个为 {version}（最新）",
+	"w9dash_agents_on_version": "{count} 个为 {version}",
+	"w9dash_agents_title": "代理",
+	"w9dash_agents_total": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个代理"
+			}
+		}
+	],
+	"w9dash_agents_update": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "更新 {count} 个"
+			}
+		}
+	],
+	"w9dash_common_all_alerts": "全部告警",
+	"w9dash_common_error": "无法读取这些数据。",
+	"w9dash_common_last_30_days": "最近 30 天",
+	"w9dash_common_sev_critical": "严重",
+	"w9dash_common_sev_warning": "警告",
+	"w9dash_common_this_site": "本站点",
+	"w9dash_common_today_at": "今天 {time}",
+	"w9dash_events_alerts": "告警",
+	"w9dash_events_all": "全部",
+	"w9dash_events_audit": "审计日志",
+	"w9dash_events_changes": "变更",
+	"w9dash_events_empty": "最近没有发生任何事。",
+	"w9dash_events_empty_filter": "最近没有此类事件。",
+	"w9dash_events_filter": "显示",
+	"w9dash_events_history": "完整历史",
+	"w9dash_events_title": "最近事件",
+	"w9dash_expiries_all": "全部到期项",
+	"w9dash_expiries_bar_hint": "日期越近填充越满，刻度为 {days} 天",
+	"w9dash_expiries_more": "查看全部 {count} 项",
+	"w9dash_expiries_sub": "未来 {days} 天",
+	"w9dash_expiries_title": "到期与预测",
+	"w9dash_expiries_vulns": "漏洞",
+	"w9dash_kpi_all_up": "全部正常",
+	"w9dash_kpi_avail_delta": "较前 30 天 {delta} 个百分点",
+	"w9dash_kpi_avail_note": "目标 {target}%",
+	"w9dash_kpi_bars_label": "每个监控一根柱，按站点分组；高柱表示该监控已宕机",
+	"w9dash_kpi_budget_left": "剩余错误预算",
+	"w9dash_kpi_critical": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个严重"
+			}
+		}
+	],
+	"w9dash_kpi_down": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个宕机"
+			}
+		}
+	],
+	"w9dash_kpi_last_closed": "上一个关闭于 {ago}",
+	"w9dash_kpi_none_open": "无未处理",
+	"w9dash_kpi_opened_label": "最近 {days} 天每日新增告警",
+	"w9dash_kpi_opened_week": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "本周新增 {count} 个，上周 {previous} 个"
+			}
+		}
+	],
+	"w9dash_kpi_paused": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个已暂停"
+			}
+		}
+	],
+	"w9dash_kpi_sites": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个站点"
+			}
+		}
+	],
+	"w9dash_kpi_today": "今天",
+	"w9dash_kpi_warning": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个警告"
+			}
+		}
+	],
+	"w9dash_maint_empty": "未来 {days} 天没有计划维护，也没有暂停的监控。",
+	"w9dash_maint_error": "无法读取维护窗口。",
+	"w9dash_maint_lasts": "持续 {duration}",
+	"w9dash_maint_lasts_recurring": "持续 {duration}，重复",
+	"w9dash_maint_now": "现在",
+	"w9dash_maint_running": "进行中",
+	"w9dash_maint_schedule": "安排",
+	"w9dash_maint_strip_label": "未来 {days} 天的维护窗口，按站点",
+	"w9dash_maint_sub": "未来 {days} 天",
+	"w9dash_maint_title": "维护",
+	"w9dash_pages_all": "全部状态页",
+	"w9dash_pages_create": "创建状态页",
+	"w9dash_pages_draft": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "草稿，{count} 个服务"
+			}
+		}
+	],
+	"w9dash_pages_empty": "还没有状态页。",
+	"w9dash_pages_error": "无法读取状态页。",
+	"w9dash_pages_maintenance": "维护中",
+	"w9dash_pages_major": "重大中断",
+	"w9dash_pages_operational": "运行正常",
+	"w9dash_pages_partial": "部分中断",
+	"w9dash_pages_password": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "密码保护，{count} 个服务"
+			}
+		}
+	],
+	"w9dash_pages_post": "发布更新",
+	"w9dash_pages_public": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "公开，{count} 个服务"
+			}
+		}
+	],
+	"w9dash_pages_title": "状态页",
+	"w9dash_pages_users": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "仅限已登录用户，{count} 个服务"
+			}
+		}
+	],
+	"w9dash_problems_ack_recovery": "直到恢复响应",
+	"w9dash_problems_calm_since": "自 {time} 起无未解决问题。",
+	"w9dash_problems_calm_text": "所有监控均有响应，没有未处理的告警。",
+	"w9dash_problems_calm_title": "目前无需处理。",
+	"w9dash_problems_col_acked": "已确认",
+	"w9dash_problems_col_age": "持续",
+	"w9dash_problems_col_monitor": "监控",
+	"w9dash_problems_col_problem": "问题",
+	"w9dash_problems_col_severity": "严重性",
+	"w9dash_problems_lasted": "持续 {span}",
+	"w9dash_problems_maintenance_link": "静默与维护",
+	"w9dash_problems_no_answer": "检查无响应",
+	"w9dash_problems_no_site": "无站点",
+	"w9dash_problems_not_acked": "未确认",
+	"w9dash_problems_not_notified": "未发送通知",
+	"w9dash_problems_notified": "{ago}已通知",
+	"w9dash_problems_place": "{kind}，{site}",
+	"w9dash_problems_resolved": "最近已解决",
+	"w9dash_problems_resolved_plate": "已解决",
+	"w9dash_problems_since": "自 {time}",
+	"w9dash_problems_site_clear": "无未解决问题",
+	"w9dash_problems_sub": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个未解决，最严重的在前"
+			}
+		}
+	],
+	"w9dash_problems_title": "问题",
+	"w9dash_response_acked_fast": "15 分钟内确认",
+	"w9dash_response_alerts": "告警",
+	"w9dash_response_before": "此前 {previous}",
+	"w9dash_response_before_pct": "此前 {previous}，{pct}%",
+	"w9dash_response_chart_label": "{days} 天内每日告警，按严重性",
+	"w9dash_response_mtta": "MTTA",
+	"w9dash_response_mttr": "MTTR",
+	"w9dash_response_noisiest": "最频繁：",
+	"w9dash_response_noisiest_rule": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{rule}，{count} 个告警"
+			}
+		}
+	],
+	"w9dash_response_title": "告警与响应",
+	"w9dash_response_tune": "调整规则",
+	"w9dash_slo_all": "全部目标",
+	"w9dash_slo_create": "设定目标",
+	"w9dash_slo_empty": "还没有服务等级目标。",
+	"w9dash_slo_error": "无法读取目标。",
+	"w9dash_slo_fast": "快速消耗",
+	"w9dash_slo_left": "剩余 {percent}% 预算",
+	"w9dash_slo_more": "查看全部 {count} 个",
+	"w9dash_slo_slow": "缓慢消耗",
+	"w9dash_slo_spent": "预算已耗尽",
+	"w9dash_slo_target": "目标 {target}%",
+	"w9dash_slo_title": "SLO",
+	"w9dash_slo_unmeasured": "未测量",
+	"w9dash_slo_window": "{days} 天内",
+	"w9dash_status_degraded": "降级",
+	"w9dash_status_paused": "已暂停",
+	"w9dash_status_up": "正常",
+	"w9layout_backups_changed": "变更量",
+	"w9layout_backups_duration": "时长",
+	"w9layout_backups_empty": "尚未上报备份任务：PBS、Synology、restic、borg 和 Veeam 的任务会显示在这里。",
+	"w9layout_backups_engine": "引擎",
+	"w9layout_backups_failed": "失败",
+	"w9layout_backups_job": "任务",
+	"w9layout_backups_last_success": "上次成功",
+	"w9layout_backups_never": "从未",
+	"w9layout_backups_ok": "正常",
+	"w9layout_backups_reports": "报告",
+	"w9layout_backups_running": "运行中",
+	"w9layout_backups_runs": "最近 14 次运行",
+	"w9layout_backups_runs_failed": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "最近 {count} 次运行，{failed} 次失败"
+			}
+		}
+	],
+	"w9layout_backups_runs_ok": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "最近 {count} 次运行全部成功"
+			}
+		}
+	],
+	"w9layout_backups_stale": "已过期",
+	"w9layout_backups_status": "状态",
+	"w9layout_backups_sub_check": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个任务，{check} 个需检查"
+			}
+		}
+	],
+	"w9layout_backups_sub_fresh": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个任务，全部为最新"
+			}
+		}
+	],
+	"w9layout_backups_title": "备份",
+	"w9layout_category_backups": "备份",
+	"w9layout_category_network": "网络",
+	"w9layout_category_other": "其他",
+	"w9layout_category_servers": "服务器",
+	"w9layout_category_services": "服务",
+	"w9layout_category_storage": "存储",
+	"w9layout_count_up_of": "{up} / {total}",
+	"w9layout_fleet_empty": "还没有监控项：添加一个后会显示在这里。",
+	"w9layout_health_degraded": "降级",
+	"w9layout_health_down": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个宕机"
+			}
+		}
+	],
+	"w9layout_health_healthy": "健康",
+	"w9layout_health_idle": "未监控任何项",
+	"w9layout_hex_site_aria": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{site}：{count} 个监控项中 {up} 个正常，{down} 个宕机"
+			}
+		}
+	],
+	"w9layout_hex_sub": "每个监控项一格，按站点再按类别",
+	"w9layout_hex_title": "设备总览图",
+	"w9layout_hybrid_act_now": "立即处理",
+	"w9layout_hybrid_band_label": "当前需要您处理的事项",
+	"w9layout_matrix_cell_degraded": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{up} / {total}，{count} 个降级"
+			}
+		}
+	],
+	"w9layout_matrix_cell_down": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{up} / {total}，{count} 个宕机"
+			}
+		}
+	],
+	"w9layout_matrix_cell_paused": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{up} / {total}，{count} 个已暂停"
+			}
+		}
+	],
+	"w9layout_matrix_next_maintenance": "下次维护",
+	"w9layout_matrix_none": "无",
+	"w9layout_matrix_site": "站点",
+	"w9layout_matrix_sub": "每个监控项一个标记",
+	"w9layout_matrix_title": "按站点和类别查看健康状况",
+	"w9layout_matrix_wan": "WAN 延迟，{range}",
+	"w9layout_matrix_wan_local": "本站点",
+	"w9layout_matrix_wan_none": "暂无数据",
+	"w9layout_monitor_title": "{name}，{kind}：{status}",
+	"w9layout_monitor_title_bare": "{name}：{status}",
+	"w9layout_ms": "{value} 毫秒",
+	"w9layout_next_deadlines_link": "所有到期事项",
+	"w9layout_next_empty": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "未来 {count} 天内没有计划或到期事项。"
+			}
+		}
+	],
+	"w9layout_next_maint_active": "维护进行中",
+	"w9layout_next_maint_meta": "维护窗口，{duration}",
+	"w9layout_next_maintenance_link": "维护",
+	"w9layout_next_now": "现在",
+	"w9layout_next_title": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "未来 {count} 天"
+			}
+		}
+	],
+	"w9layout_next_until": "至 {time}",
+	"w9layout_noc_problems_title": "按站点查看问题",
+	"w9layout_none_planned": "无计划",
+	"w9layout_pct": "{value}%",
+	"w9layout_rate": "{value} {unit}",
+	"w9layout_services_30d": "30 天",
+	"w9layout_services_all": "所有监控项",
+	"w9layout_services_beats": "最近检查",
+	"w9layout_services_beats_failed": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "最近 {count} 次检查，{failed} 次失败"
+			}
+		}
+	],
+	"w9layout_services_beats_ok": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "最近 {count} 次检查全部通过"
+			}
+		}
+	],
+	"w9layout_services_check": "检查",
+	"w9layout_services_empty": "还没有服务检查：HTTP、DNS、TLS、SMTP 或 ping 检查会显示在这里。",
+	"w9layout_services_p95": "p95",
+	"w9layout_services_state": "状态",
+	"w9layout_services_sub": "HTTP、DNS、TLS 等检查，最差的排前",
+	"w9layout_services_title": "服务",
+	"w9layout_sites_last_backup": "上次备份",
+	"w9layout_sites_no_backup": "未上报",
+	"w9layout_sites_sub": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个监控项"
+			}
+		}
+	],
+	"w9layout_sites_title": "站点",
+	"w9layout_sites_up_of": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "/ {count} 正常"
+			}
+		}
+	],
+	"w9layout_sites_wan": "WAN",
+	"w9layout_state_error": "无法加载这些数据，稍后将重试。",
+	"w9layout_status_degraded": "降级",
+	"w9layout_status_down": "宕机",
+	"w9layout_status_paused": "已暂停",
+	"w9layout_status_up": "正常",
+	"w9layout_sun_aria": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个监控项中 {up} 个正常；{down} 个宕机，{degraded} 个降级"
+			}
+		}
+	],
+	"w9layout_sun_category_title": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{site}，{category}：{count} 个监控项"
+			}
+		}
+	],
+	"w9layout_sun_center": "个监控项正常",
+	"w9layout_sun_rings": "内环：站点 · 中环：类别 · 外环：监控项",
+	"w9layout_sun_sub": "站点、类别、监控项",
+	"w9layout_sun_title": "按站点查看设备",
+	"w9layout_switch_classic": "经典",
+	"w9layout_switch_command": "指挥台",
+	"w9layout_switch_hybrid": "混合",
+	"w9layout_switch_legend": "总览布局",
+	"w9layout_switch_noc": "NOC",
+	"w9layout_top_cpu": "CPU",
+	"w9layout_top_disk": "磁盘",
+	"w9layout_top_empty": "暂无数据：代理和采集器会在此上报 CPU、内存、磁盘和网络。",
+	"w9layout_top_forecast": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{site}，约 {count} 天后写满"
+			}
+		}
+	],
+	"w9layout_top_mem": "内存",
+	"w9layout_top_metric": "指标",
+	"w9layout_top_net": "网络",
+	"w9layout_top_sub_pct": "当前使用率（%），{range} 趋势",
+	"w9layout_top_sub_rate": "当前 Mb/s，{range} 趋势",
+	"w9layout_top_title": "资源占用排行",
+	"w9layout_top_title_cpu": "CPU 前 5",
+	"w9layout_top_title_disk": "磁盘前 5",
+	"w9layout_top_title_mem": "内存前 5",
+	"w9layout_top_title_net": "网络前 5",
+	"w9layout_when_today": "今天 {time}",
+	"w9layout_when_today_bare": "今天",
+	"w9layout_when_tomorrow": "明天 {time}",
+	"w9layout_when_tomorrow_bare": "明天",
+	"w9layout_when_weekday": "{day} {time}",
+	"w9layout_when_yesterday": "昨天 {time}",
+	"w9layout_when_yesterday_bare": "昨天",
 	"wall_band_problems": "问题",
 	"wall_band_problems_note": "严重告警和宕机的监控项",
 	"wall_devices_aria": "监控项",
