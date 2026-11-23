@@ -21,6 +21,32 @@ export interface Release {
 
 export const RELEASES: Release[] = [
 	{
+		version: '0.20.0-dev.2',
+		date: '2026-11-23',
+		highlights: [
+			{
+				title: 'Custom roles and wall accounts',
+				text: 'Build roles from a list of permissions, and give room displays an account that only sees the wall.'
+			},
+			{
+				title: 'Off-site backups',
+				text: 'Copy backups on a schedule to S3-compatible storage, SFTP or WebDAV.'
+			},
+			{
+				title: 'Quieter, better alerts',
+				text: 'Test a rule on past data, see the noisiest rules with MTTA and MTTR, mark changes on charts, and act from Slack or Telegram.'
+			},
+			{
+				title: 'Accounts and monitors',
+				text: 'Password reset and invitations by email, personal notifications, bulk edit and monitor templates.'
+			},
+			{
+				title: 'Five more languages',
+				text: 'The interface now speaks Japanese, Korean, Dutch, Polish and Turkish.'
+			}
+		]
+	},
+	{
 		version: '0.20.0-dev.1',
 		date: '2026-11-22',
 		highlights: [

@@ -3,6 +3,74 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 0.20.0-dev.2 — 2026-11-23 (pre-release on dev)
+
+### Added
+
+- **Custom roles.** Settings › Team & access › Custom roles: a named role built from a fixed list of
+  permissions (view, handle alerts, manage monitors, notifications, status pages, maintenance
+  windows, read reports). Users, secrets, backups and authentication settings stay admin-only. The
+  server refuses every route a permission does not list; a role in use cannot be deleted.
+  `/api/roles`, in the backup.
+- **Wall display role.** A `wall` account sees the room display and nothing else, with a sign-out
+  on the wall itself.
+- **Agents through Cloudflare Tunnel, reverse proxies and corporate proxies.** When the agent port
+  cannot be reached, agents go through the web address: they open a WebSocket to `/api/agent/ws`
+  and carry their usual TLS session inside it (TLS 1.3, client certificate, pinned authority, end
+  to end). The proxy only sees opaque binary messages, and its own certificate proves nothing about
+  the agent. `transport:` in `agent.yaml` (`DUMBMONIT_AGENT_TRANSPORT`, `--transport` /
+  `-Transport` in the installers): `auto` (default) tries the agent port first, switches to the
+  WebSocket after repeated connection failures if it answers, and remembers it; `direct` and
+  `websocket` force one. A relay can use it too: its multiplexed connection goes through the same
+  WebSocket. The route is no way around the channel: nothing passes without a complete handshake
+  inside, a session without a client certificate only reaches enrolment and is closed after a
+  minute, install files are not served there, requests carrying an `Origin` header or the session
+  cookie are refused, and connections per address (`DUMBMONIT_AGENT_WS_MAX_PER_IP`), incoming rate
+  (`DUMBMONIT_AGENT_WS_RATE_KIB`), message size and idle time are bounded; `DUMBMONIT_AGENT_WEBSOCKET=off`
+  closes it. Opened through a tunnel or proxy that presents another certificate, the add screen
+  shows a command with `--transport=websocket` and checks the channel through the WebSocket
+  (`transport=websocket` in `GET /api/agent/install` and token creation). New page: Agents behind a
+  proxy, with Cloudflare Tunnel, nginx, Traefik and Caddy settings. When the agent port does not
+  answer, the check of the add screen offers **Use the web address (WebSocket)** (and back), which
+  issues the command again with that transport. The machine page shows **Channel: WebSocket via the
+  web address** when its last encrypted batch came that way (seen by the server). With backup
+  servers (`server_urls`), the WebSocket follows the server in use and the primary is tried through
+  its own WebSocket.
+- **Off-site backups.** Each scheduled backup is also copied to S3-compatible storage, SFTP or WebDAV,
+  keeping the last copies you choose, with a test button.
+- **Rule backtest and alert noise.** Replay a rule over past data before saving it; the Noise tab
+  ranks the noisiest rules and monitors with MTTA and MTTR.
+- **Change markers.** Mark deploys and changes from the UI, the API or CI; markers show on charts
+  and next to alerts.
+- **Maintenance calendar** (month and week views) and **status page languages** (translated
+  titles and texts, with a default language for visitors).
+- **Chat buttons and message templates.** Acknowledge or silence from Slack and Telegram (Teams
+  gets link buttons); templates for notification messages per channel, with a preview.
+- **Accounts.** Password reset by email, invitations by email with role and teams, and personal
+  notification preferences (email or push, folders and tags, quiet hours).
+- **Monitors.** Bulk edit, per-monitor notification channels, monitor templates, and a windowed
+  list for large fleets.
+- **Five more interface languages:** Japanese, Korean, Dutch, Polish and Turkish.
+
+### Fixed
+
+- **Installing through a relay could wait or fail silently.** The relay now reports the gateway it
+  really opened (bound address) or why it could not (port already used, permission, address), and
+  whether it is on the encrypted channel it needs for tunnels. The add screen shows the *Through
+  &lt;relay&gt;* command only once the gateway listens and has passed the relay's own test (labelled
+  as such); otherwise it names the cause — gateway switched off, relay agent older than 0.14.2,
+  relay offline, port that cannot be opened, loopback only, no encrypted channel — with the fix
+  (setting, `gateway_listen` line, commands to find what holds the port, firewall commands for
+  firewalld, ufw and Windows). The relay's *Relay* panel shows the same causes. A `gateway_listen`
+  in the relay's `agent.yaml` now sets the port written into the site's install command.
+- Saving a monitor as a non-admin keeps its masked secrets instead of storing `***`.
+
+### Changed
+
+- Design and accessibility pass on the new screens (labels, live regions, focus, 390 px layouts).
+- Large source files split into modules; a few hot paths made cheaper (backtest, annotations,
+  message templates).
+
 ## 0.20.0-dev.1 — 2026-11-22 (pre-release on dev)
 
 ### Added
@@ -75,28 +143,6 @@ All notable changes to this project are documented here. The format follows
   Windows), and the API reference has curl examples.
 - **SLOs for team accounts.** Team-restricted accounts see and manage the SLOs made of their own
   monitors; burn-rate alerts are attached to a monitor and link to their SLO.
-- **Agents through Cloudflare Tunnel, reverse proxies and corporate proxies.** When the agent port
-  cannot be reached, agents go through the web address: they open a WebSocket to `/api/agent/ws`
-  and carry their usual TLS session inside it (TLS 1.3, client certificate, pinned authority, end
-  to end). The proxy only sees opaque binary messages, and its own certificate proves nothing about
-  the agent. `transport:` in `agent.yaml` (`DUMBMONIT_AGENT_TRANSPORT`, `--transport` /
-  `-Transport` in the installers): `auto` (default) tries the agent port first, switches to the
-  WebSocket after repeated connection failures if it answers, and remembers it; `direct` and
-  `websocket` force one. A relay can use it too: its multiplexed connection goes through the same
-  WebSocket. The route is no way around the channel: nothing passes without a complete handshake
-  inside, a session without a client certificate only reaches enrolment and is closed after a
-  minute, install files are not served there, requests carrying an `Origin` header or the session
-  cookie are refused, and connections per address (`DUMBMONIT_AGENT_WS_MAX_PER_IP`), incoming rate
-  (`DUMBMONIT_AGENT_WS_RATE_KIB`), message size and idle time are bounded; `DUMBMONIT_AGENT_WEBSOCKET=off`
-  closes it. Opened through a tunnel or proxy that presents another certificate, the add screen
-  shows a command with `--transport=websocket` and checks the channel through the WebSocket
-  (`transport=websocket` in `GET /api/agent/install` and token creation). New page: Agents behind a
-  proxy, with Cloudflare Tunnel, nginx, Traefik and Caddy settings. When the agent port does not
-  answer, the check of the add screen offers **Use the web address (WebSocket)** (and back), which
-  issues the command again with that transport. The machine page shows **Channel: WebSocket via the
-  web address** when its last encrypted batch came that way (seen by the server). With backup
-  servers (`server_urls`), the WebSocket follows the server in use and the primary is tried through
-  its own WebSocket.
 
 ### Changed
 
@@ -128,15 +174,6 @@ All notable changes to this project are documented here. The format follows
 ### Fixed
 
 - **Last 24 h was empty in the monitors table.** The history was only loaded for the tiles view.
-- **Installing through a relay could wait or fail silently.** The relay now reports the gateway it
-  really opened (bound address) or why it could not (port already used, permission, address), and
-  whether it is on the encrypted channel it needs for tunnels. The add screen shows the *Through
-  &lt;relay&gt;* command only once the gateway listens and has passed the relay's own test (labelled
-  as such); otherwise it names the cause — gateway switched off, relay agent older than 0.14.2,
-  relay offline, port that cannot be opened, loopback only, no encrypted channel — with the fix
-  (setting, `gateway_listen` line, commands to find what holds the port, firewall commands for
-  firewalld, ufw and Windows). The relay's *Relay* panel shows the same causes. A `gateway_listen`
-  in the relay's `agent.yaml` now sets the port written into the site's install command.
 
 ## 0.19.0 — 2026-11-19
 
