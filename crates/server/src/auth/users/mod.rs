@@ -16,6 +16,12 @@ use sqlx::{Row, SqlitePool};
 use crate::auth::custom_roles::Assigned;
 use crate::auth::permissions;
 
+mod changes;
+mod validate;
+
+pub use changes::{AccountChanges, apply_changes, set_disabled, set_role};
+pub use validate::{EMAIL_MAX_LEN, normalize_email, validate_username};
+
 /// Rôle d'un compte. Sérialisé en minuscules, tel qu'il est stocké et exposé.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -436,152 +442,6 @@ pub async fn set_email(pool: &SqlitePool, id: i64, email: Option<&str>) -> Resul
     Ok(())
 }
 
-/// Ferme les sessions d'un écran mural qui quitte ce rôle, avant le
-/// changement. Sa session se renouvelle tant qu'il affiche le mur : laissée
-/// ouverte, elle donnerait au premier passant devant l'écran tout ce que le
-/// nouveau rôle permet. Sans effet sur un autre compte.
-const CLOSE_WALL_SESSIONS: &str = "DELETE FROM auth_sessions WHERE user_id = ?
-     AND EXISTS (SELECT 1 FROM users WHERE id = ? AND role = 'wall')";
-
-/// Pose un rôle livré, pour une décision des groupes d'un fournisseur
-/// d'identité : le rôle personnalisé du compte ne survit qu'à `viewer` (celui
-/// qu'un administrateur lui a donné tient tant que les groupes ne disent rien
-/// de plus que « lecteur »).
-const SET_BUILT_IN_ROLE: &str = "UPDATE users SET role = ?,
-         custom_role_id = CASE WHEN ? = 'viewer' THEN custom_role_id ELSE NULL END
-     WHERE id = ?";
-
-pub async fn set_role(pool: &SqlitePool, id: i64, role: Role) -> Result<()> {
-    let mut tx = pool.begin().await.context("ouverture de la transaction")?;
-    if !role.is_wall() {
-        sqlx::query(CLOSE_WALL_SESSIONS)
-            .bind(id)
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .context("fermeture des sessions de l'écran mural")?;
-    }
-    sqlx::query(SET_BUILT_IN_ROLE)
-        .bind(role.as_str())
-        .bind(role.as_str())
-        .bind(id)
-        .execute(&mut *tx)
-        .await
-        .context("mise à jour du rôle")?;
-    tx.commit().await.context("validation de la transaction")?;
-    Ok(())
-}
-
-pub async fn set_disabled(pool: &SqlitePool, id: i64, disabled: bool) -> Result<()> {
-    sqlx::query(
-        "UPDATE users SET disabled = ?, disabled_by_ldap = 0, disabled_by_scim = 0
-         WHERE id = ?",
-    )
-    .bind(i64::from(disabled))
-    .bind(id)
-    .execute(pool)
-    .await
-    .context("activation ou désactivation du compte")?;
-    Ok(())
-}
-
-/// Changements d'un compte appliqués d'un seul bloc.
-#[derive(Default)]
-pub struct AccountChanges<'a> {
-    pub display_name: Option<&'a str>,
-    /// `Some(None)` efface l'adresse ; `None` n'y touche pas.
-    pub email: Option<Option<&'a str>>,
-    /// Rôle livré choisi par un administrateur : retire le rôle personnalisé.
-    pub role: Option<Role>,
-    /// Rôle personnalisé choisi par un administrateur : le rôle livré devient
-    /// `viewer`. Appliqué après `role`.
-    pub custom_role: Option<i64>,
-    pub password_hash: Option<&'a str>,
-    pub disabled: Option<bool>,
-    /// Ferme les sessions du compte dans la même transaction.
-    pub close_sessions: bool,
-}
-
-/// Applique tous les changements ou aucun : un échec en cours de route ne laisse
-/// pas un compte à moitié modifié.
-pub async fn apply_changes(pool: &SqlitePool, id: i64, changes: &AccountChanges<'_>) -> Result<()> {
-    let mut tx = pool.begin().await.context("ouverture de la transaction")?;
-    if let Some(display_name) = changes.display_name {
-        sqlx::query("UPDATE users SET display_name = ? WHERE id = ?")
-            .bind(display_name)
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .context("mise à jour du nom affiché")?;
-    }
-    if let Some(email) = changes.email {
-        sqlx::query("UPDATE users SET email = ? WHERE id = ?")
-            .bind(email)
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .context("mise à jour de l'adresse électronique")?;
-    }
-    if let Some(role) = changes.role {
-        if !role.is_wall() {
-            sqlx::query(CLOSE_WALL_SESSIONS)
-                .bind(id)
-                .bind(id)
-                .execute(&mut *tx)
-                .await
-                .context("fermeture des sessions de l'écran mural")?;
-        }
-        sqlx::query("UPDATE users SET role = ?, custom_role_id = NULL WHERE id = ?")
-            .bind(role.as_str())
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .context("mise à jour du rôle")?;
-    }
-    if let Some(custom) = changes.custom_role {
-        sqlx::query(CLOSE_WALL_SESSIONS)
-            .bind(id)
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .context("fermeture des sessions de l'écran mural")?;
-        sqlx::query("UPDATE users SET role = 'viewer', custom_role_id = ? WHERE id = ?")
-            .bind(custom)
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .context("attribution du rôle personnalisé")?;
-    }
-    if let Some(hash) = changes.password_hash {
-        sqlx::query("UPDATE users SET password_hash = ? WHERE id = ?")
-            .bind(hash)
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .context("mise à jour du mot de passe")?;
-    }
-    if let Some(disabled) = changes.disabled {
-        sqlx::query(
-            "UPDATE users SET disabled = ?, disabled_by_ldap = 0, disabled_by_scim = 0
-             WHERE id = ?",
-        )
-        .bind(i64::from(disabled))
-        .bind(id)
-        .execute(&mut *tx)
-        .await
-        .context("activation ou désactivation du compte")?;
-    }
-    if changes.close_sessions {
-        sqlx::query("DELETE FROM auth_sessions WHERE user_id = ?")
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .context("fermeture des sessions")?;
-    }
-    tx.commit().await.context("validation de la transaction")?;
-    Ok(())
-}
-
 /// Rattache un compte existant à son identité chez le fournisseur.
 pub async fn link_oidc(pool: &SqlitePool, id: i64, issuer: &str, subject: &str) -> Result<()> {
     sqlx::query("UPDATE users SET oidc_issuer = ?, oidc_subject = ? WHERE id = ?")
@@ -728,83 +588,9 @@ pub async fn reset_all(pool: &SqlitePool) -> Result<()> {
     Ok(())
 }
 
-/// Vérifie la forme d'un identifiant : court, sans espace, en ASCII imprimable.
-///
-/// La règle est volontairement souple — un courriel passe — parce qu'un
-/// fournisseur OIDC peut envoyer l'un ou l'autre et qu'on voudra les faire
-/// correspondre.
-pub fn validate_username(username: &str) -> Result<(), String> {
-    let trimmed = username.trim();
-    if trimmed.is_empty() {
-        return Err("Enter a username.".into());
-    }
-    if trimmed.chars().count() > 64 {
-        return Err("The username must be 64 characters or fewer.".into());
-    }
-    if trimmed.chars().any(|c| c.is_whitespace() || c.is_control()) {
-        return Err("The username cannot contain spaces.".into());
-    }
-    Ok(())
-}
-
-/// Longueur maximale d'une adresse électronique (RFC 5321 : 254 utiles).
-pub const EMAIL_MAX_LEN: usize = 254;
-
-/// Vérifie et normalise une adresse électronique saisie : vide vaut « aucune ».
-///
-/// La vérification reste celle qu'un humain attend — une partie locale, un `@`,
-/// un domaine avec un point, ni espace ni caractère de contrôle — sans prétendre
-/// valider la RFC 5322 : l'adresse ne sert qu'à savoir qui joindre.
-pub fn normalize_email(raw: &str) -> Result<Option<String>, String> {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return Ok(None);
-    }
-    let invalid = || format!("\"{trimmed}\" is not a valid email address.");
-    if trimmed.chars().count() > EMAIL_MAX_LEN {
-        return Err(format!("The email address must be {EMAIL_MAX_LEN} characters or fewer."));
-    }
-    if trimmed.chars().any(|c| c.is_whitespace() || c.is_control()) {
-        return Err(invalid());
-    }
-    let Some((local, domain)) = trimmed.rsplit_once('@') else { return Err(invalid()) };
-    let domain_ok = domain.contains('.')
-        && !domain.starts_with('.')
-        && !domain.ends_with('.')
-        && !domain.contains("..")
-        && !domain.contains('@');
-    if local.is_empty() || local.contains('@') || !domain_ok {
-        return Err(invalid());
-    }
-    Ok(Some(format!("{local}@{}", domain.to_lowercase())))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn emails_are_optional_checked_and_normalised() {
-        assert_eq!(normalize_email(""), Ok(None));
-        assert_eq!(normalize_email("   "), Ok(None));
-        assert_eq!(
-            normalize_email(" Jane.Doe@Example.ORG "),
-            Ok(Some("Jane.Doe@example.org".to_string()))
-        );
-        for bad in [
-            "jane",
-            "jane@",
-            "@example.org",
-            "jane@localhost",
-            "ja ne@example.org",
-            "jane@example..org",
-            "jane@.example.org",
-            "a@b@example.org",
-        ] {
-            assert!(normalize_email(bad).is_err(), "{bad}");
-        }
-        assert!(normalize_email(&format!("{}@example.org", "a".repeat(250))).is_err());
-    }
 
     #[test]
     fn roles_round_trip_through_their_text_form() {
@@ -818,14 +604,5 @@ mod tests {
         assert!(Role::Wall.is_wall());
         assert!(!Role::Wall.is_admin() && !Role::Wall.can_operate());
         assert!(!Role::Viewer.is_wall());
-    }
-
-    #[test]
-    fn usernames_are_short_and_without_spaces() {
-        assert!(validate_username("admin").is_ok());
-        assert!(validate_username("jane.doe@example.org").is_ok());
-        assert!(validate_username("").is_err());
-        assert!(validate_username("jane doe").is_err());
-        assert!(validate_username(&"a".repeat(65)).is_err());
     }
 }
