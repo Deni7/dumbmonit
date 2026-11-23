@@ -1,0 +1,321 @@
+{
+	"w9dash_agents_connected": "Verbonden",
+	"w9dash_agents_disconnected": "Niet verbonden",
+	"w9dash_agents_empty": "Nog geen agent geïnstalleerd.",
+	"w9dash_agents_install": "Agent installeren",
+	"w9dash_agents_last_contact": "Laatste contact {ago}",
+	"w9dash_agents_manage": "Agents beheren",
+	"w9dash_agents_never_seen": "Nooit gezien",
+	"w9dash_agents_on_latest": "{count} op {version}, de nieuwste",
+	"w9dash_agents_on_version": "{count} op {version}",
+	"w9dash_agents_title": "Agents",
+	"w9dash_agents_total": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} agent",
+				"countPlural=other": "{count} agents"
+			}
+		}
+	],
+	"w9dash_agents_update": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} bijwerken",
+				"countPlural=other": "{count} bijwerken"
+			}
+		}
+	],
+	"w9dash_common_all_alerts": "Alle meldingen",
+	"w9dash_common_error": "Deze cijfers konden niet worden gelezen.",
+	"w9dash_common_last_30_days": "Laatste 30 dagen",
+	"w9dash_common_sev_critical": "Kritiek",
+	"w9dash_common_sev_warning": "Waarschuwing",
+	"w9dash_common_this_site": "Deze locatie",
+	"w9dash_common_today_at": "Vandaag {time}",
+	"w9dash_events_alerts": "Meldingen",
+	"w9dash_events_all": "Alles",
+	"w9dash_events_audit": "Auditlogboek",
+	"w9dash_events_changes": "Wijzigingen",
+	"w9dash_events_empty": "Er is de laatste tijd niets gebeurd.",
+	"w9dash_events_empty_filter": "De laatste tijd niets van dit soort.",
+	"w9dash_events_filter": "Tonen",
+	"w9dash_events_history": "Volledige geschiedenis",
+	"w9dash_events_title": "Recente gebeurtenissen",
+	"w9dash_expiries_all": "Alle vervaldata",
+	"w9dash_expiries_bar_hint": "Vult zich naarmate de datum nadert, op een schaal van {days} dagen",
+	"w9dash_expiries_more": "Alle {count} bekijken",
+	"w9dash_expiries_sub": "Komende {days} dagen",
+	"w9dash_expiries_title": "Vervaldata en prognoses",
+	"w9dash_expiries_vulns": "Kwetsbaarheden",
+	"w9dash_kpi_all_up": "Alles actief",
+	"w9dash_kpi_avail_delta": "{delta} pp t.o.v. de 30 dagen ervoor",
+	"w9dash_kpi_avail_note": "Doel {target}%",
+	"w9dash_kpi_bars_label": "Eén balk per monitor, per locatie gegroepeerd; een hoge balk is een monitor die uitvalt",
+	"w9dash_kpi_budget_left": "Resterend foutbudget",
+	"w9dash_kpi_critical": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} kritiek",
+				"countPlural=other": "{count} kritiek"
+			}
+		}
+	],
+	"w9dash_kpi_down": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} uitgevallen",
+				"countPlural=other": "{count} uitgevallen"
+			}
+		}
+	],
+	"w9dash_kpi_last_closed": "Laatste gesloten {ago}",
+	"w9dash_kpi_none_open": "Geen open",
+	"w9dash_kpi_opened_label": "Geopende meldingen per dag, laatste {days} dagen",
+	"w9dash_kpi_opened_week": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} geopend deze week, {previous} de week ervoor",
+				"countPlural=other": "{count} geopend deze week, {previous} de week ervoor"
+			}
+		}
+	],
+	"w9dash_kpi_paused": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} gepauzeerd",
+				"countPlural=other": "{count} gepauzeerd"
+			}
+		}
+	],
+	"w9dash_kpi_sites": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} locatie",
+				"countPlural=other": "{count} locaties"
+			}
+		}
+	],
+	"w9dash_kpi_today": "Vandaag",
+	"w9dash_kpi_warning": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} waarschuwing",
+				"countPlural=other": "{count} waarschuwingen"
+			}
+		}
+	],
+	"w9dash_maint_empty": "Geen onderhoud gepland in de komende {days} dagen en geen monitor gepauzeerd.",
+	"w9dash_maint_error": "De onderhoudsvensters konden niet worden gelezen.",
+	"w9dash_maint_lasts": "Duurt {duration}",
+	"w9dash_maint_lasts_recurring": "Duurt {duration}, terugkerend",
+	"w9dash_maint_now": "Nu",
+	"w9dash_maint_running": "Bezig",
+	"w9dash_maint_schedule": "Plannen",
+	"w9dash_maint_strip_label": "Onderhoudsvensters van de komende {days} dagen, per locatie",
+	"w9dash_maint_sub": "Komende {days} dagen",
+	"w9dash_maint_title": "Onderhoud",
+	"w9dash_pages_all": "Alle statuspagina’s",
+	"w9dash_pages_create": "Statuspagina maken",
+	"w9dash_pages_draft": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Concept, {count} dienst",
+				"countPlural=other": "Concept, {count} diensten"
+			}
+		}
+	],
+	"w9dash_pages_empty": "Nog geen statuspagina.",
+	"w9dash_pages_error": "De statuspagina’s konden niet worden gelezen.",
+	"w9dash_pages_maintenance": "Onderhoud",
+	"w9dash_pages_major": "Grote storing",
+	"w9dash_pages_operational": "Operationeel",
+	"w9dash_pages_partial": "Gedeeltelijke storing",
+	"w9dash_pages_password": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Met wachtwoord, {count} dienst",
+				"countPlural=other": "Met wachtwoord, {count} diensten"
+			}
+		}
+	],
+	"w9dash_pages_post": "Update plaatsen",
+	"w9dash_pages_public": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Openbaar, {count} dienst",
+				"countPlural=other": "Openbaar, {count} diensten"
+			}
+		}
+	],
+	"w9dash_pages_title": "Statuspagina’s",
+	"w9dash_pages_users": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Alleen aangemelde gebruikers, {count} dienst",
+				"countPlural=other": "Alleen aangemelde gebruikers, {count} diensten"
+			}
+		}
+	],
+	"w9dash_problems_ack_recovery": "Tot hij weer antwoordt",
+	"w9dash_problems_calm_since": "Geen open probleem sinds {time}.",
+	"w9dash_problems_calm_text": "Elke monitor antwoordt en er is geen melding open.",
+	"w9dash_problems_calm_title": "Niets heeft je nodig.",
+	"w9dash_problems_col_acked": "Bevestigd",
+	"w9dash_problems_col_age": "Duur",
+	"w9dash_problems_col_monitor": "Monitor",
+	"w9dash_problems_col_problem": "Probleem",
+	"w9dash_problems_col_severity": "Ernst",
+	"w9dash_problems_lasted": "Duurde {span}",
+	"w9dash_problems_maintenance_link": "Stiltes en onderhoud",
+	"w9dash_problems_no_answer": "Reageert niet op de controles",
+	"w9dash_problems_no_site": "Geen locatie",
+	"w9dash_problems_not_acked": "Niet bevestigd",
+	"w9dash_problems_not_notified": "Geen melding verstuurd",
+	"w9dash_problems_notified": "Gemeld {ago}",
+	"w9dash_problems_place": "{kind}, {site}",
+	"w9dash_problems_resolved": "Recent opgelost",
+	"w9dash_problems_resolved_plate": "Opgelost",
+	"w9dash_problems_since": "sinds {time}",
+	"w9dash_problems_site_clear": "niets open",
+	"w9dash_problems_sub": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} open, ernstigste eerst",
+				"countPlural=other": "{count} open, ernstigste eerst"
+			}
+		}
+	],
+	"w9dash_problems_title": "Problemen",
+	"w9dash_response_acked_fast": "Binnen 15 min bevestigd",
+	"w9dash_response_alerts": "Meldingen",
+	"w9dash_response_before": "eerder {previous}",
+	"w9dash_response_before_pct": "eerder {previous}, {pct}%",
+	"w9dash_response_chart_label": "Meldingen per dag over {days} dagen, per ernst",
+	"w9dash_response_mtta": "MTTA",
+	"w9dash_response_mttr": "MTTR",
+	"w9dash_response_noisiest": "Luidruchtigste:",
+	"w9dash_response_noisiest_rule": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{rule}, {count} melding",
+				"countPlural=other": "{rule}, {count} meldingen"
+			}
+		}
+	],
+	"w9dash_response_title": "Meldingen en reactie",
+	"w9dash_response_tune": "Regel bijstellen",
+	"w9dash_slo_all": "Alle doelstellingen",
+	"w9dash_slo_create": "Doel instellen",
+	"w9dash_slo_empty": "Nog geen servicelevel-doelstelling.",
+	"w9dash_slo_error": "De doelstellingen konden niet worden gelezen.",
+	"w9dash_slo_fast": "Snel verbruik",
+	"w9dash_slo_left": "{percent}% budget over",
+	"w9dash_slo_more": "Alle {count} bekijken",
+	"w9dash_slo_slow": "Langzaam verbruik",
+	"w9dash_slo_spent": "Budget op",
+	"w9dash_slo_target": "Doel {target}%",
+	"w9dash_slo_title": "SLO’s",
+	"w9dash_slo_unmeasured": "Niet gemeten",
+	"w9dash_slo_window": "Over {days} dagen",
+	"w9dash_status_degraded": "Verminderd",
+	"w9dash_status_paused": "Gepauzeerd",
+	"w9dash_status_up": "Actief"
+}

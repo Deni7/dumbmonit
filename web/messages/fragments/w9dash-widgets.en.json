@@ -1,0 +1,321 @@
+{
+	"w9dash_agents_connected": "Connected",
+	"w9dash_agents_disconnected": "Disconnected",
+	"w9dash_agents_empty": "No agent installed yet.",
+	"w9dash_agents_install": "Install an agent",
+	"w9dash_agents_last_contact": "Last contact {ago}",
+	"w9dash_agents_manage": "Manage agents",
+	"w9dash_agents_never_seen": "Never seen",
+	"w9dash_agents_on_latest": "{count} on {version}, latest",
+	"w9dash_agents_on_version": "{count} on {version}",
+	"w9dash_agents_title": "Agents",
+	"w9dash_agents_total": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} agent",
+				"countPlural=other": "{count} agents"
+			}
+		}
+	],
+	"w9dash_agents_update": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Update {count}",
+				"countPlural=other": "Update {count}"
+			}
+		}
+	],
+	"w9dash_common_all_alerts": "All alerts",
+	"w9dash_common_error": "Could not read these figures.",
+	"w9dash_common_last_30_days": "Last 30 days",
+	"w9dash_common_sev_critical": "Critical",
+	"w9dash_common_sev_warning": "Warning",
+	"w9dash_common_this_site": "This site",
+	"w9dash_common_today_at": "Today {time}",
+	"w9dash_events_alerts": "Alerts",
+	"w9dash_events_all": "All",
+	"w9dash_events_audit": "Audit log",
+	"w9dash_events_changes": "Changes",
+	"w9dash_events_empty": "Nothing happened lately.",
+	"w9dash_events_empty_filter": "Nothing of this kind lately.",
+	"w9dash_events_filter": "Show",
+	"w9dash_events_history": "Full history",
+	"w9dash_events_title": "Recent events",
+	"w9dash_expiries_all": "All deadlines",
+	"w9dash_expiries_bar_hint": "Fills as the date comes closer, on a {days}-day scale",
+	"w9dash_expiries_more": "See all {count}",
+	"w9dash_expiries_sub": "Next {days} days",
+	"w9dash_expiries_title": "Expiries and forecasts",
+	"w9dash_expiries_vulns": "Vulnerabilities",
+	"w9dash_kpi_all_up": "All up",
+	"w9dash_kpi_avail_delta": "{delta} pt vs the previous 30 days",
+	"w9dash_kpi_avail_note": "Objective {target}%",
+	"w9dash_kpi_bars_label": "One bar per monitor, grouped by site; a tall bar is a monitor down",
+	"w9dash_kpi_budget_left": "Error budget left",
+	"w9dash_kpi_critical": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} critical",
+				"countPlural=other": "{count} critical"
+			}
+		}
+	],
+	"w9dash_kpi_down": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} down",
+				"countPlural=other": "{count} down"
+			}
+		}
+	],
+	"w9dash_kpi_last_closed": "Last one closed {ago}",
+	"w9dash_kpi_none_open": "None open",
+	"w9dash_kpi_opened_label": "Alerts opened per day over the last {days} days",
+	"w9dash_kpi_opened_week": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} opened this week, {previous} the week before",
+				"countPlural=other": "{count} opened this week, {previous} the week before"
+			}
+		}
+	],
+	"w9dash_kpi_paused": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} paused",
+				"countPlural=other": "{count} paused"
+			}
+		}
+	],
+	"w9dash_kpi_sites": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} site",
+				"countPlural=other": "{count} sites"
+			}
+		}
+	],
+	"w9dash_kpi_today": "Today",
+	"w9dash_kpi_warning": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} warning",
+				"countPlural=other": "{count} warnings"
+			}
+		}
+	],
+	"w9dash_maint_empty": "No maintenance planned in the next {days} days and no monitor paused.",
+	"w9dash_maint_error": "Could not read the maintenance windows.",
+	"w9dash_maint_lasts": "Lasts {duration}",
+	"w9dash_maint_lasts_recurring": "Lasts {duration}, repeats",
+	"w9dash_maint_now": "Now",
+	"w9dash_maint_running": "In progress",
+	"w9dash_maint_schedule": "Schedule",
+	"w9dash_maint_strip_label": "Maintenance windows over the next {days} days, by site",
+	"w9dash_maint_sub": "Next {days} days",
+	"w9dash_maint_title": "Maintenance",
+	"w9dash_pages_all": "All status pages",
+	"w9dash_pages_create": "Create a status page",
+	"w9dash_pages_draft": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Draft, {count} service",
+				"countPlural=other": "Draft, {count} services"
+			}
+		}
+	],
+	"w9dash_pages_empty": "No status page yet.",
+	"w9dash_pages_error": "Could not read the status pages.",
+	"w9dash_pages_maintenance": "Maintenance",
+	"w9dash_pages_major": "Major outage",
+	"w9dash_pages_operational": "Operational",
+	"w9dash_pages_partial": "Partial outage",
+	"w9dash_pages_password": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Password protected, {count} service",
+				"countPlural=other": "Password protected, {count} services"
+			}
+		}
+	],
+	"w9dash_pages_post": "Post update",
+	"w9dash_pages_public": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Public, {count} service",
+				"countPlural=other": "Public, {count} services"
+			}
+		}
+	],
+	"w9dash_pages_title": "Status pages",
+	"w9dash_pages_users": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Signed-in users only, {count} service",
+				"countPlural=other": "Signed-in users only, {count} services"
+			}
+		}
+	],
+	"w9dash_problems_ack_recovery": "Until it answers again",
+	"w9dash_problems_calm_since": "No open problem since {time}.",
+	"w9dash_problems_calm_text": "Every monitor answers and no alert is open.",
+	"w9dash_problems_calm_title": "Nothing needs you.",
+	"w9dash_problems_col_acked": "Acknowledged",
+	"w9dash_problems_col_age": "Age",
+	"w9dash_problems_col_monitor": "Monitor",
+	"w9dash_problems_col_problem": "Problem",
+	"w9dash_problems_col_severity": "Severity",
+	"w9dash_problems_lasted": "Lasted {span}",
+	"w9dash_problems_maintenance_link": "Silences and maintenance",
+	"w9dash_problems_no_answer": "No answer to its checks",
+	"w9dash_problems_no_site": "No site",
+	"w9dash_problems_not_acked": "Not acknowledged",
+	"w9dash_problems_not_notified": "No notification sent",
+	"w9dash_problems_notified": "Notified {ago}",
+	"w9dash_problems_place": "{kind}, {site}",
+	"w9dash_problems_resolved": "Recently resolved",
+	"w9dash_problems_resolved_plate": "Resolved",
+	"w9dash_problems_since": "since {time}",
+	"w9dash_problems_site_clear": "nothing open",
+	"w9dash_problems_sub": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} open, worst first",
+				"countPlural=other": "{count} open, worst first"
+			}
+		}
+	],
+	"w9dash_problems_title": "Problems",
+	"w9dash_response_acked_fast": "Acknowledged within 15 min",
+	"w9dash_response_alerts": "Alerts",
+	"w9dash_response_before": "{previous} before",
+	"w9dash_response_before_pct": "{previous} before, {pct}%",
+	"w9dash_response_chart_label": "Alerts per day over {days} days, by severity",
+	"w9dash_response_mtta": "MTTA",
+	"w9dash_response_mttr": "MTTR",
+	"w9dash_response_noisiest": "Noisiest:",
+	"w9dash_response_noisiest_rule": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{rule}, {count} alert",
+				"countPlural=other": "{rule}, {count} alerts"
+			}
+		}
+	],
+	"w9dash_response_title": "Alerts and response",
+	"w9dash_response_tune": "Tune rule",
+	"w9dash_slo_all": "All objectives",
+	"w9dash_slo_create": "Set an objective",
+	"w9dash_slo_empty": "No service level objective yet.",
+	"w9dash_slo_error": "Could not read the objectives.",
+	"w9dash_slo_fast": "Fast burn",
+	"w9dash_slo_left": "{percent}% budget left",
+	"w9dash_slo_more": "See all {count}",
+	"w9dash_slo_slow": "Slow burn",
+	"w9dash_slo_spent": "Budget spent",
+	"w9dash_slo_target": "Target {target}%",
+	"w9dash_slo_title": "SLOs",
+	"w9dash_slo_unmeasured": "Not measured",
+	"w9dash_slo_window": "Over {days} days",
+	"w9dash_status_degraded": "Degraded",
+	"w9dash_status_paused": "Paused",
+	"w9dash_status_up": "Up"
+}
