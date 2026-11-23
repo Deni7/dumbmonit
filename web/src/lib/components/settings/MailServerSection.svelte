@@ -226,15 +226,15 @@
 		</form>
 
 		<div class="mt-6 grid gap-3 border-t border-line pt-4">
-			<div class="flex flex-wrap items-end gap-2">
-				<Field label={m.settings_mail_test_to()} for="mail-test-to" error={testToError} help={m.settings_mail_test_help()} class="min-w-0 flex-[1_1_16rem]">
-					<input id="mail-test-to" type="email" class="input" bind:value={testTo} placeholder="you@example.com" autocomplete="email" spellcheck="false" disabled={testing} oninput={() => (testToError = null)} />
-				</Field>
-				<Button variant="secondary" onclick={() => void sendTest()} loading={testing} disabled={saving || !canTest}>
-					<Send class="size-4" aria-hidden="true" />
-					{m.settings_mail_test()}
-				</Button>
-			</div>
+			<Field label={m.settings_mail_test_to()} for="mail-test-to" error={testToError} help={m.settings_mail_test_help()}>
+				<div class="flex flex-wrap items-center gap-2">
+					<input id="mail-test-to" type="email" class="input min-w-0 flex-[1_1_14rem]" bind:value={testTo} placeholder="you@example.com" autocomplete="email" spellcheck="false" disabled={testing} oninput={() => (testToError = null)} />
+					<Button variant="secondary" class="shrink-0 max-sm:w-full" onclick={() => void sendTest()} loading={testing} disabled={saving || !canTest}>
+						<Send class="size-4 shrink-0" aria-hidden="true" />
+						<span>{m.settings_mail_test()}</span>
+					</Button>
+				</div>
+			</Field>
 			<div aria-live="polite" class="empty:hidden">
 				{#if testError}
 					<ErrorNotice error={testError} title={m.settings_mail_test_error()} hint={m.settings_mail_test_error_hint()} />
