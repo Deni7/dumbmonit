@@ -10601,6 +10601,7 @@
 	"w6accounts_resetlink_sent": "Ligação de reposição de {username} enviada para {email}",
 	"w6accounts_resetlink_title_copy": "Cria uma ligação de reposição para copiar e entregar",
 	"w6accounts_resetlink_title_email": "Envia uma ligação de reposição da palavra-passe para {email}",
+	"w6design_gate_checking": "A verificar a ligação…",
 	"w6roles_audit_created": "Função personalizada criada",
 	"w6roles_audit_deleted": "Função personalizada eliminada",
 	"w6roles_audit_updated": "Função personalizada alterada",

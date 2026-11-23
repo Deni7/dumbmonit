@@ -10486,6 +10486,7 @@
 	"w6accounts_resetlink_sent": "{username} 的重置链接已发送至 {email}",
 	"w6accounts_resetlink_title_copy": "创建一个可复制转交的密码重置链接",
 	"w6accounts_resetlink_title_email": "向 {email} 发送密码重置链接",
+	"w6design_gate_checking": "正在检查链接…",
 	"w6roles_audit_created": "自定义角色已创建",
 	"w6roles_audit_deleted": "自定义角色已删除",
 	"w6roles_audit_updated": "自定义角色已更改",

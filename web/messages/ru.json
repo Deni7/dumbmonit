@@ -10817,6 +10817,7 @@
 	"w6accounts_resetlink_sent": "Ссылка сброса для {username} отправлена на {email}",
 	"w6accounts_resetlink_title_copy": "Создаёт ссылку сброса, чтобы скопировать и передать",
 	"w6accounts_resetlink_title_email": "Отправляет ссылку сброса пароля на {email}",
+	"w6design_gate_checking": "Проверяем ссылку…",
 	"w6roles_audit_created": "Пользовательская роль создана",
 	"w6roles_audit_deleted": "Пользовательская роль удалена",
 	"w6roles_audit_updated": "Пользовательская роль изменена",

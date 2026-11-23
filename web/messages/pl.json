@@ -10833,6 +10833,7 @@
 	"w6accounts_resetlink_sent": "Link resetu dla {username} wysłano na {email}",
 	"w6accounts_resetlink_title_copy": "Tworzy link resetu hasła do skopiowania i przekazania",
 	"w6accounts_resetlink_title_email": "Wysyła e-mailem link resetu hasła na {email}",
+	"w6design_gate_checking": "Sprawdzanie linku…",
 	"w6roles_audit_created": "Utworzono rolę niestandardową",
 	"w6roles_audit_deleted": "Usunięto rolę niestandardową",
 	"w6roles_audit_updated": "Zmieniono rolę niestandardową",

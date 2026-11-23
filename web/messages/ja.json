@@ -10485,6 +10485,7 @@
 	"w6accounts_resetlink_sent": "{username}のリセットリンクを{email}に送信しました",
 	"w6accounts_resetlink_title_copy": "コピーして渡せる、パスワードリセットのリンクを作成します",
 	"w6accounts_resetlink_title_email": "パスワードリセットのリンクを{email}にメールで送信します",
+	"w6design_gate_checking": "リンクを確認しています…",
 	"w6roles_audit_created": "カスタムロールを作成しました",
 	"w6roles_audit_deleted": "カスタムロールを削除しました",
 	"w6roles_audit_updated": "カスタムロールを変更しました",

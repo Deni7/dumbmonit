@@ -10601,6 +10601,7 @@
 	"w6accounts_resetlink_sent": "Resetlink voor {username} verzonden naar {email}",
 	"w6accounts_resetlink_title_copy": "Maakt een wachtwoordresetlink aan om te kopiëren en door te geven",
 	"w6accounts_resetlink_title_email": "Mailt een wachtwoordresetlink naar {email}",
+	"w6design_gate_checking": "Link wordt gecontroleerd…",
 	"w6roles_audit_created": "Aangepaste rol aangemaakt",
 	"w6roles_audit_deleted": "Aangepaste rol verwijderd",
 	"w6roles_audit_updated": "Aangepaste rol gewijzigd",

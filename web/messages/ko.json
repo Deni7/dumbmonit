@@ -10485,6 +10485,7 @@
 	"w6accounts_resetlink_sent": "{username}의 재설정 링크를 {email}(으)로 보냈습니다",
 	"w6accounts_resetlink_title_copy": "복사해서 전달할 비밀번호 재설정 링크를 만듭니다",
 	"w6accounts_resetlink_title_email": "{email}(으)로 비밀번호 재설정 링크를 이메일로 보냅니다",
+	"w6design_gate_checking": "링크를 확인하는 중…",
 	"w6roles_audit_created": "사용자 지정 역할을 만들었습니다",
 	"w6roles_audit_deleted": "사용자 지정 역할을 삭제했습니다",
 	"w6roles_audit_updated": "사용자 지정 역할을 변경했습니다",

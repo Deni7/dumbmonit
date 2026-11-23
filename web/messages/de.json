@@ -10601,6 +10601,7 @@
 	"w6accounts_resetlink_sent": "Rücksetzlink für {username} an {email} gesendet",
 	"w6accounts_resetlink_title_copy": "Erstellt einen Rücksetzlink zum Kopieren und Weitergeben",
 	"w6accounts_resetlink_title_email": "Sendet einen Link zum Zurücksetzen des Passworts an {email}",
+	"w6design_gate_checking": "Link wird geprüft…",
 	"w6roles_audit_created": "Eigene Rolle angelegt",
 	"w6roles_audit_deleted": "Eigene Rolle gelöscht",
 	"w6roles_audit_updated": "Eigene Rolle geändert",

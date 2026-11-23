@@ -10601,6 +10601,7 @@
 	"w6accounts_resetlink_sent": "Reset link for {username} sent to {email}",
 	"w6accounts_resetlink_title_copy": "Creates a password reset link to copy and hand over",
 	"w6accounts_resetlink_title_email": "Emails a password reset link to {email}",
+	"w6design_gate_checking": "Checking the link…",
 	"w6roles_audit_created": "Custom role created",
 	"w6roles_audit_deleted": "Custom role deleted",
 	"w6roles_audit_updated": "Custom role changed",

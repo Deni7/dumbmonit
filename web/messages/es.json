@@ -10601,6 +10601,7 @@
 	"w6accounts_resetlink_sent": "Enlace de restablecimiento de {username} enviado a {email}",
 	"w6accounts_resetlink_title_copy": "Crea un enlace de restablecimiento para copiar y entregar",
 	"w6accounts_resetlink_title_email": "Envía un enlace para restablecer la contraseña a {email}",
+	"w6design_gate_checking": "Comprobando el enlace…",
 	"w6roles_audit_created": "Rol personalizado creado",
 	"w6roles_audit_deleted": "Rol personalizado eliminado",
 	"w6roles_audit_updated": "Rol personalizado modificado",

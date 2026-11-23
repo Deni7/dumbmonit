@@ -10601,6 +10601,7 @@
 	"w6accounts_resetlink_sent": "Lien de réinitialisation de {username} envoyé à {email}",
 	"w6accounts_resetlink_title_copy": "Crée un lien de réinitialisation à copier et à transmettre",
 	"w6accounts_resetlink_title_email": "Envoie un lien de réinitialisation du mot de passe à {email}",
+	"w6design_gate_checking": "Vérification du lien…",
 	"w6roles_audit_created": "Rôle personnalisé créé",
 	"w6roles_audit_deleted": "Rôle personnalisé supprimé",
 	"w6roles_audit_updated": "Rôle personnalisé modifié",

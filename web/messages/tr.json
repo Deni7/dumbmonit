@@ -10601,6 +10601,7 @@
 	"w6accounts_resetlink_sent": "{username} için sıfırlama bağlantısı {email} adresine gönderildi",
 	"w6accounts_resetlink_title_copy": "Kopyalayıp teslim edeceğiniz bir parola sıfırlama bağlantısı oluşturur",
 	"w6accounts_resetlink_title_email": "{email} adresine bir parola sıfırlama bağlantısı e-postalar",
+	"w6design_gate_checking": "Bağlantı kontrol ediliyor…",
 	"w6roles_audit_created": "Özel rol oluşturuldu",
 	"w6roles_audit_deleted": "Özel rol silindi",
 	"w6roles_audit_updated": "Özel rol değiştirildi",
