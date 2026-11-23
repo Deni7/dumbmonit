@@ -289,6 +289,9 @@ jobs:
             openssl pkeyutl -verify -pubin -inkey "$public" -rawin -in "$binary" -sigfile "$binary.sig"
             cp "$binary.sig" signatures/
           done
+          # `umask 077` protects the key above; the signatures are public and
+          # the server (uid 65532) must read them inside the image.
+          chmod 0644 signatures/*.sig dist/*.sig
           ls -l signatures
 
       - id: push
