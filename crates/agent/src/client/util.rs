@@ -80,10 +80,10 @@ pub(super) fn http_client(
 }
 
 /// Intervalle des pings HTTP/2 sur le canal chiffré.
-pub(super) const HTTP2_PING_INTERVAL: Duration = Duration::from_secs(30);
+const HTTP2_PING_INTERVAL: Duration = Duration::from_secs(30);
 
 /// Délai de réponse à un ping HTTP/2 : au-delà, la connexion est abandonnée.
-pub(super) const HTTP2_PING_TIMEOUT: Duration = Duration::from_secs(20);
+const HTTP2_PING_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// Client des mises à niveau du relais : HTTP/1.1 seul (une mise à niveau
 /// n'existe pas en HTTP/2), sans connexion gardée en réserve, et des sondes

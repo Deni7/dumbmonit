@@ -380,7 +380,10 @@ impl PushClient {
         self.upgrade_to(RELAY_MUX_PROTOCOL).await
     }
 
-    pub(super) async fn upgrade_to(&self, protocol: &'static str) -> Result<reqwest::Upgraded, PushError> {
+    pub(super) async fn upgrade_to(
+        &self,
+        protocol: &'static str,
+    ) -> Result<reqwest::Upgraded, PushError> {
         let channel = self.channel();
         let Some(http) = channel.upgrade.as_ref().filter(|_| channel.encrypted) else {
             return Err(PushError::Transport(
