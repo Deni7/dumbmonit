@@ -1,0 +1,7 @@
+{
+	"w8wp_discovery_label": "Afficher dans la liste des pages publiques",
+	"w8wp_discovery_on": "Les extensions de site, comme le bandeau WordPress, trouvent cette page dans la liste des pages publiques du serveur.",
+	"w8wp_discovery_off": "Absente de la liste des pages publiques. La page reste lisible à son adresse.",
+	"w8wp_discovery_unpublished": "Seules les pages publiées figurent dans la liste des pages publiques.",
+	"w8wp_discovery_private": "Une page privée ne figure jamais dans la liste des pages publiques."
+}

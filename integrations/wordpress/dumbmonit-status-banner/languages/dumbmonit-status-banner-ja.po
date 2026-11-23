@@ -1,0 +1,184 @@
+# Japanese translation of DumbMonit Status Banner.
+msgid ""
+msgstr ""
+"Project-Id-Version: DumbMonit Status Banner 2.0.0\n"
+"Language: ja\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"X-Domain: dumbmonit-status-banner\n"
+
+msgid "All systems operational"
+msgstr "すべてのシステムが正常に稼働しています"
+
+msgid "Maintenance in progress"
+msgstr "メンテナンス中"
+
+msgid "Incident in progress"
+msgstr "障害対応中"
+
+#, php-format
+msgid "%d service is down"
+msgid_plural "%d services are down"
+msgstr[0] "%d 件のサービスが停止しています"
+
+#, php-format
+msgid "Affected: %s"
+msgstr "影響を受けるサービス: %s"
+
+msgid "Details"
+msgstr "詳細"
+
+msgid "Dismiss"
+msgstr "閉じる"
+
+msgid "DumbMonit status banner"
+msgstr "DumbMonit ステータスバナー"
+
+msgid "DumbMonit banner"
+msgstr "DumbMonit バナー"
+
+msgid "Status page"
+msgstr "ステータスページ"
+
+msgid "DumbMonit address"
+msgstr "DumbMonit のアドレス"
+
+msgid "Your DumbMonit server, for example https://monit.example.com. A private (LAN) address works."
+msgstr "DumbMonit サーバーのアドレスです (例: https://monit.example.com)。プライベート (LAN) アドレスも使えます。"
+
+msgid "Find status pages"
+msgstr "ステータスページを検索"
+
+msgid "Page address"
+msgstr "ページのアドレス"
+
+msgid "Pick a page found on the server, or type its address: the part after /s/ in its link."
+msgstr "サーバーで見つかったページを選ぶか、アドレス (リンクの /s/ 以降の部分) を入力してください。"
+
+msgid "Choose a page"
+msgstr "ページを選択"
+
+msgid "Searching…"
+msgstr "検索中…"
+
+msgid "Pick one of the pages found."
+msgstr "見つかったページから 1 つ選んでください。"
+
+msgid "No listed public page was found on this server."
+msgstr "このサーバーには一覧に載っている公開ページがありません。"
+
+msgid "This server does not list its pages (it may be older than this plugin). Type the page address instead."
+msgstr "このサーバーはページの一覧を提供していません (このプラグインより古い可能性があります)。ページのアドレスを直接入力してください。"
+
+#, php-format
+msgid "The server could not be reached: %s"
+msgstr "サーバーに接続できません: %s"
+
+msgid "The search failed. Try again."
+msgstr "検索に失敗しました。もう一度お試しください。"
+
+msgid "The server did not answer with a DumbMonit document."
+msgstr "サーバーの応答が DumbMonit のドキュメントではありません。"
+
+msgid "Services"
+msgstr "サービス"
+
+msgid "Only the ticked services count; none ticked means all of them."
+msgstr "チェックしたサービスだけが対象です。何もチェックしなければすべてが対象です。"
+
+msgid "Save a reachable page first to choose its services."
+msgstr "サービスを選ぶには、まず接続できるページを保存してください。"
+
+msgid "Display"
+msgstr "表示"
+
+msgid "Placement"
+msgstr "配置"
+
+msgid "Bar at the top of every page"
+msgstr "各ページの上部にバーを表示"
+
+msgid "Bar at the bottom of every page"
+msgstr "各ページの下部にバーを表示"
+
+msgid "Only where the [dumbmonit_status] shortcode or the widget is placed"
+msgstr "[dumbmonit_status] ショートコードまたはウィジェットを置いた場所のみ"
+
+msgid "When to show"
+msgstr "表示するタイミング"
+
+msgid "Only when something is wrong"
+msgstr "問題があるときだけ"
+
+msgid "Always"
+msgstr "常に"
+
+msgid "Options"
+msgstr "オプション"
+
+msgid "Name the affected services"
+msgstr "影響を受けるサービス名を表示"
+
+msgid "Link to the status page"
+msgstr "ステータスページへのリンク"
+
+msgid "Visitors can dismiss the banner"
+msgstr "訪問者がバナーを閉じられる"
+
+msgid "Cache duration"
+msgstr "キャッシュ時間"
+
+msgid "Seconds before DumbMonit is asked again, 15 to 3600."
+msgstr "DumbMonit に再度問い合わせるまでの秒数 (15〜3600)。"
+
+msgid "Colours"
+msgstr "色"
+
+msgid "Follow the status: green, amber, red or blue"
+msgstr "状態に合わせる: 緑、黄、赤、青"
+
+msgid "Custom colours"
+msgstr "カスタムカラー"
+
+msgid "Background, light mode"
+msgstr "背景 (ライトモード)"
+
+msgid "Text, light mode"
+msgstr "文字 (ライトモード)"
+
+msgid "Background, dark mode"
+msgstr "背景 (ダークモード)"
+
+msgid "Text, dark mode"
+msgstr "文字 (ダークモード)"
+
+msgid "Texts"
+msgstr "テキスト"
+
+msgid "Leave a field empty to use the default text, translated for each visitor. {count} is replaced by the number of services down."
+msgstr "空欄にすると、訪問者ごとの言語に翻訳された既定のテキストを使います。{count} は停止中のサービス数に置き換えられます。"
+
+msgid "Invalid DumbMonit address: expected http:// or https:// followed by the server name. It was not saved."
+msgstr "DumbMonit のアドレスが無効です。http:// または https:// に続けてサーバー名を入力してください。保存されませんでした。"
+
+msgid "Invalid page address: 2 to 40 lowercase letters, digits or hyphens. It was not saved."
+msgstr "ページのアドレスが無効です。小文字、数字、ハイフンで 2〜40 文字にしてください。保存されませんでした。"
+
+#, php-format
+msgid "Saved, but the status page could not be fetched: %s"
+msgstr "保存しましたが、ステータスページを取得できませんでした: %s"
+
+#, php-format
+msgid "DumbMonit status banner: the status page cannot be fetched (%s). No banner is shown."
+msgstr "DumbMonit ステータスバナー: ステータスページを取得できません (%s)。バナーは表示されません。"
+
+msgid "DumbMonit status"
+msgstr "DumbMonit ステータス"
+
+msgid "The status of your DumbMonit page, with the settings of the banner."
+msgstr "DumbMonit ページの状態を、バナーの設定で表示します。"
+
+msgid "This widget uses the settings in Settings › DumbMonit banner."
+msgstr "このウィジェットは「設定 › DumbMonit バナー」の設定を使います。"

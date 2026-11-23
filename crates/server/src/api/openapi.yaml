@@ -5302,8 +5302,8 @@ paths:
       description: >-
         A full replacement: `title` is required and every omitted field goes back
         to its default — except `accent`, `footer_text`, `homepage_url`,
-        `subscribe_channel_id`, `subscribe_email`, `domain` and `hide_branding`, which keep their
-        stored value when omitted.
+        `subscribe_channel_id`, `subscribe_email`, `domain`, `hide_branding` and `listed`, which
+        keep their stored value when omitted.
       x-token-scope: write
       x-permissions: [status_pages.manage]
       requestBody:
@@ -6347,6 +6347,33 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
 
   # -------------------------------------------------- pages de statut publiques
+  /api/public/status:
+    get:
+      operationId: listPublicStatusPages
+      x-codeSamples:
+        - lang: Shell
+          label: curl
+          source: |
+            # No token: lists the pages anyone may read.
+            curl -sk https://dumbmonit.example:8080/api/public/status
+      tags: [Public status]
+      summary: Directory of the public status pages
+      description: >-
+        The status pages a website can show, for clients that know the server
+        address and let their user pick a page (the WordPress plugin's "Find
+        status pages"). Only pages that are published, readable by anyone (no
+        password, no accounts) and left in the directory (`listed`, on by
+        default) are listed; titles are as written. Cached for thirty seconds,
+        like the status documents. Not served on a page's own domain.
+      security: []
+      x-token-scope: public
+      responses:
+        "200":
+          description: The listed pages, sorted by title.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicStatusDirectory" }
+
   /api/public/status/{slug}:
     parameters:
       - $ref: "#/components/parameters/Slug"
@@ -16292,6 +16319,7 @@ components:
         access_mode: { type: string, enum: [public, password, users], description: "Who can read the page; set through `PUT /api/status-pages/{id}/access`." }
         has_password: { type: boolean, description: A page password is stored (the hash is never returned). }
         hide_branding: { type: boolean, description: "White label: the public page shows no DumbMonit name, icon or app name; its browser-tab icon is the page logo, or none." }
+        listed: { type: boolean, description: "Shown in the public directory (GET /api/public/status) when the page is also published and public." }
         group_labels:
           type: array
           items: { $ref: "#/components/schemas/StatusPageGroupLabel" }
@@ -16366,6 +16394,7 @@ components:
         show_calendar: { type: boolean, default: false, description: Public 90-day calendar. Omitted keeps the saved value. }
         show_latency: { type: boolean, default: false, description: Public response-time graph per service. Omitted keeps the saved value. }
         hide_branding: { type: boolean, default: false, description: "White label: nothing of DumbMonit on the public page (tab title, icon, app name). The tab icon becomes the page logo, or none. Omitted keeps the saved value." }
+        listed: { type: boolean, default: true, description: "List the page in the public directory (GET /api/public/status); only published, public pages are ever listed. Omitted keeps the saved value." }
         subscribe_email: { type: boolean, description: "Lets visitors subscribe by email. The emails go through `subscribe_channel_id` when set, otherwise through the email server of the instance (`/api/notify/mail-server`). Omitted keeps the saved value, unless `subscribe_channel_id` is given: a channel opens it, `null` closes it (as before this field)." }
         subscribe_channel_id: { type: [integer, "null"], format: int64, description: "An `smtp` channel that sends the subscriber emails instead of the email server; `null`: the email server. Omitted keeps the saved channel." }
         seo:
@@ -16701,6 +16730,22 @@ components:
                 type: object
                 additionalProperties: { type: string }
                 description: Written service or group name to its translation.
+
+    PublicStatusDirectory:
+      type: object
+      required: [pages]
+      properties:
+        pages:
+          type: array
+          items:
+            type: object
+            required: [slug, title, url, default_lang, languages]
+            properties:
+              slug: { type: string, description: "Address of the page: its document is /api/public/status/{slug}." }
+              title: { type: string }
+              url: { type: string, description: "The public page: absolute when the server knows its address (the page's domain, or the address it is managed from), else /s/{slug}, relative to the server." }
+              default_lang: { type: string, description: "Default interface language of the page (en when the admin set none)." }
+              languages: { type: array, items: { type: string }, description: "Languages the page's texts can be read in: the default one first, then those translated by the admin. Pass one as ?lang= to the page's document." }
 
     PublicStatus:
       type: object

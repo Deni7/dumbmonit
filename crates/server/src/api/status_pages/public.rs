@@ -187,6 +187,7 @@ pub(super) static CACHE: LazyLock<Mutex<HashMap<String, CachedStatus>>> =
 /// l'annonce d'un incident soit visible sans attendre.
 pub(crate) fn invalidate_cache() {
     CACHE.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clear();
+    super::discovery::invalidate();
     // Le domaine ou le slug d'une page a pu changer.
     crate::status_host::invalidate();
 }

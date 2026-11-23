@@ -1,0 +1,184 @@
+# Chinese (Simplified) translation of DumbMonit Status Banner.
+msgid ""
+msgstr ""
+"Project-Id-Version: DumbMonit Status Banner 2.0.0\n"
+"Language: zh_CN\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"X-Domain: dumbmonit-status-banner\n"
+
+msgid "All systems operational"
+msgstr "所有系统运行正常"
+
+msgid "Maintenance in progress"
+msgstr "正在维护"
+
+msgid "Incident in progress"
+msgstr "正在处理事件"
+
+#, php-format
+msgid "%d service is down"
+msgid_plural "%d services are down"
+msgstr[0] "%d 项服务已中断"
+
+#, php-format
+msgid "Affected: %s"
+msgstr "受影响：%s"
+
+msgid "Details"
+msgstr "详情"
+
+msgid "Dismiss"
+msgstr "关闭"
+
+msgid "DumbMonit status banner"
+msgstr "DumbMonit 状态横幅"
+
+msgid "DumbMonit banner"
+msgstr "DumbMonit 横幅"
+
+msgid "Status page"
+msgstr "状态页"
+
+msgid "DumbMonit address"
+msgstr "DumbMonit 地址"
+
+msgid "Your DumbMonit server, for example https://monit.example.com. A private (LAN) address works."
+msgstr "你的 DumbMonit 服务器，例如 https://monit.example.com。也可以使用私有（局域网）地址。"
+
+msgid "Find status pages"
+msgstr "查找状态页"
+
+msgid "Page address"
+msgstr "页面地址"
+
+msgid "Pick a page found on the server, or type its address: the part after /s/ in its link."
+msgstr "选择在服务器上找到的页面，或输入其地址：即链接中 /s/ 之后的部分。"
+
+msgid "Choose a page"
+msgstr "选择页面"
+
+msgid "Searching…"
+msgstr "正在搜索…"
+
+msgid "Pick one of the pages found."
+msgstr "请从找到的页面中选择一个。"
+
+msgid "No listed public page was found on this server."
+msgstr "此服务器上没有找到已列出的公开页面。"
+
+msgid "This server does not list its pages (it may be older than this plugin). Type the page address instead."
+msgstr "此服务器不提供页面列表（可能比本插件旧）。请直接输入页面地址。"
+
+#, php-format
+msgid "The server could not be reached: %s"
+msgstr "无法连接服务器：%s"
+
+msgid "The search failed. Try again."
+msgstr "搜索失败，请重试。"
+
+msgid "The server did not answer with a DumbMonit document."
+msgstr "服务器返回的不是 DumbMonit 文档。"
+
+msgid "Services"
+msgstr "服务"
+
+msgid "Only the ticked services count; none ticked means all of them."
+msgstr "只统计勾选的服务；未勾选任何服务时统计全部。"
+
+msgid "Save a reachable page first to choose its services."
+msgstr "请先保存一个可访问的页面，再选择其服务。"
+
+msgid "Display"
+msgstr "显示"
+
+msgid "Placement"
+msgstr "位置"
+
+msgid "Bar at the top of every page"
+msgstr "每个页面顶部的横条"
+
+msgid "Bar at the bottom of every page"
+msgstr "每个页面底部的横条"
+
+msgid "Only where the [dumbmonit_status] shortcode or the widget is placed"
+msgstr "仅在放置了 [dumbmonit_status] 短代码或小工具的位置"
+
+msgid "When to show"
+msgstr "何时显示"
+
+msgid "Only when something is wrong"
+msgstr "仅在出现问题时"
+
+msgid "Always"
+msgstr "始终"
+
+msgid "Options"
+msgstr "选项"
+
+msgid "Name the affected services"
+msgstr "列出受影响的服务"
+
+msgid "Link to the status page"
+msgstr "链接到状态页"
+
+msgid "Visitors can dismiss the banner"
+msgstr "访客可以关闭横幅"
+
+msgid "Cache duration"
+msgstr "缓存时长"
+
+msgid "Seconds before DumbMonit is asked again, 15 to 3600."
+msgstr "再次请求 DumbMonit 前的秒数，15 到 3600。"
+
+msgid "Colours"
+msgstr "颜色"
+
+msgid "Follow the status: green, amber, red or blue"
+msgstr "跟随状态：绿色、琥珀色、红色或蓝色"
+
+msgid "Custom colours"
+msgstr "自定义颜色"
+
+msgid "Background, light mode"
+msgstr "背景，浅色模式"
+
+msgid "Text, light mode"
+msgstr "文字，浅色模式"
+
+msgid "Background, dark mode"
+msgstr "背景，深色模式"
+
+msgid "Text, dark mode"
+msgstr "文字，深色模式"
+
+msgid "Texts"
+msgstr "文字内容"
+
+msgid "Leave a field empty to use the default text, translated for each visitor. {count} is replaced by the number of services down."
+msgstr "留空则使用默认文字，并按每位访客的语言翻译。{count} 会被替换为中断服务的数量。"
+
+msgid "Invalid DumbMonit address: expected http:// or https:// followed by the server name. It was not saved."
+msgstr "DumbMonit 地址无效：应为 http:// 或 https:// 加服务器名称。未保存。"
+
+msgid "Invalid page address: 2 to 40 lowercase letters, digits or hyphens. It was not saved."
+msgstr "页面地址无效：须为 2 到 40 个小写字母、数字或连字符。未保存。"
+
+#, php-format
+msgid "Saved, but the status page could not be fetched: %s"
+msgstr "已保存，但无法获取状态页：%s"
+
+#, php-format
+msgid "DumbMonit status banner: the status page cannot be fetched (%s). No banner is shown."
+msgstr "DumbMonit 状态横幅：无法获取状态页（%s），不显示横幅。"
+
+msgid "DumbMonit status"
+msgstr "DumbMonit 状态"
+
+msgid "The status of your DumbMonit page, with the settings of the banner."
+msgstr "你的 DumbMonit 页面状态，使用横幅的设置。"
+
+msgid "This widget uses the settings in Settings › DumbMonit banner."
+msgstr "此小工具使用“设置 › DumbMonit 横幅”中的设置。"

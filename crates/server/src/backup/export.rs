@@ -848,7 +848,7 @@ async fn status_pages(
              accent, scenes, scene_rotation, simple, footer_text, homepage_url, domain, seo,
              access_mode, access_password_hash, subscribe_channel_id,
              subscribe_sms_channel_id, subscribe_webhook, subscribe_slack, hide_branding,
-             subscribe_email
+             subscribe_email, listed
          FROM status_pages ORDER BY id",
     )
     .fetch_all(pool)
@@ -938,6 +938,7 @@ async fn status_pages(
             default_lang: Some(crate::db::status_lang::default_lang(pool, id).await?)
                 .filter(|lang| !lang.is_empty()),
             translations: crate::db::status_lang::list(pool, id).await?,
+            listed: Some(row.try_get::<i64, _>("listed")? != 0),
         });
     }
     Ok(out)

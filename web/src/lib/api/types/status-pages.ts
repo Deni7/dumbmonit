@@ -86,6 +86,8 @@ export interface StatusPage {
 	has_password: boolean;
 	/** White label: the public page names nothing of DumbMonit; its tab icon is the logo, or none. */
 	hide_branding: boolean;
+	/** Shown in the public directory (`GET /api/public/status`) when also published and public. */
+	listed: boolean;
 	/** Checked monitor folders (dynamic): their current members are shown. */
 	groups: string[];
 	/** Public names of the monitors that come in through a ticked group; none: the monitor name. */
@@ -124,6 +126,8 @@ export interface StatusPagePayload {
 	group_labels?: StatusPageGroupLabel[];
 	/** White label (no DumbMonit name or icon on the public page); omitted: kept. */
 	hide_branding?: boolean;
+	/** Listed in the public directory of status pages; omitted: kept (on for a new page). */
+	listed?: boolean;
 }
 
 export type StatusSubscriptionKind = 'email' | 'sms' | 'webhook' | 'slack';

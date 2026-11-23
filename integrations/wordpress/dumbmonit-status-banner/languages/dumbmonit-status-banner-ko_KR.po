@@ -1,0 +1,184 @@
+# Korean translation of DumbMonit Status Banner.
+msgid ""
+msgstr ""
+"Project-Id-Version: DumbMonit Status Banner 2.0.0\n"
+"Language: ko_KR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"X-Domain: dumbmonit-status-banner\n"
+
+msgid "All systems operational"
+msgstr "모든 시스템이 정상 작동 중입니다"
+
+msgid "Maintenance in progress"
+msgstr "점검 진행 중"
+
+msgid "Incident in progress"
+msgstr "장애 대응 중"
+
+#, php-format
+msgid "%d service is down"
+msgid_plural "%d services are down"
+msgstr[0] "서비스 %d개가 중단되었습니다"
+
+#, php-format
+msgid "Affected: %s"
+msgstr "영향받는 서비스: %s"
+
+msgid "Details"
+msgstr "자세히"
+
+msgid "Dismiss"
+msgstr "닫기"
+
+msgid "DumbMonit status banner"
+msgstr "DumbMonit 상태 배너"
+
+msgid "DumbMonit banner"
+msgstr "DumbMonit 배너"
+
+msgid "Status page"
+msgstr "상태 페이지"
+
+msgid "DumbMonit address"
+msgstr "DumbMonit 주소"
+
+msgid "Your DumbMonit server, for example https://monit.example.com. A private (LAN) address works."
+msgstr "DumbMonit 서버 주소입니다. 예: https://monit.example.com. 사설(LAN) 주소도 사용할 수 있습니다."
+
+msgid "Find status pages"
+msgstr "상태 페이지 찾기"
+
+msgid "Page address"
+msgstr "페이지 주소"
+
+msgid "Pick a page found on the server, or type its address: the part after /s/ in its link."
+msgstr "서버에서 찾은 페이지를 고르거나 주소(링크에서 /s/ 뒤의 부분)를 입력하세요."
+
+msgid "Choose a page"
+msgstr "페이지 선택"
+
+msgid "Searching…"
+msgstr "검색 중…"
+
+msgid "Pick one of the pages found."
+msgstr "찾은 페이지 중 하나를 고르세요."
+
+msgid "No listed public page was found on this server."
+msgstr "이 서버에서 목록에 있는 공개 페이지를 찾지 못했습니다."
+
+msgid "This server does not list its pages (it may be older than this plugin). Type the page address instead."
+msgstr "이 서버는 페이지 목록을 제공하지 않습니다(이 플러그인보다 오래된 버전일 수 있습니다). 페이지 주소를 직접 입력하세요."
+
+#, php-format
+msgid "The server could not be reached: %s"
+msgstr "서버에 연결할 수 없습니다: %s"
+
+msgid "The search failed. Try again."
+msgstr "검색에 실패했습니다. 다시 시도하세요."
+
+msgid "The server did not answer with a DumbMonit document."
+msgstr "서버가 DumbMonit 문서로 응답하지 않았습니다."
+
+msgid "Services"
+msgstr "서비스"
+
+msgid "Only the ticked services count; none ticked means all of them."
+msgstr "체크한 서비스만 반영됩니다. 아무것도 체크하지 않으면 모두 반영됩니다."
+
+msgid "Save a reachable page first to choose its services."
+msgstr "서비스를 고르려면 먼저 연결 가능한 페이지를 저장하세요."
+
+msgid "Display"
+msgstr "표시"
+
+msgid "Placement"
+msgstr "위치"
+
+msgid "Bar at the top of every page"
+msgstr "모든 페이지 상단의 막대"
+
+msgid "Bar at the bottom of every page"
+msgstr "모든 페이지 하단의 막대"
+
+msgid "Only where the [dumbmonit_status] shortcode or the widget is placed"
+msgstr "[dumbmonit_status] 단축 코드나 위젯을 넣은 곳에만"
+
+msgid "When to show"
+msgstr "표시 시점"
+
+msgid "Only when something is wrong"
+msgstr "문제가 있을 때만"
+
+msgid "Always"
+msgstr "항상"
+
+msgid "Options"
+msgstr "옵션"
+
+msgid "Name the affected services"
+msgstr "영향받는 서비스 이름 표시"
+
+msgid "Link to the status page"
+msgstr "상태 페이지 링크"
+
+msgid "Visitors can dismiss the banner"
+msgstr "방문자가 배너를 닫을 수 있음"
+
+msgid "Cache duration"
+msgstr "캐시 시간"
+
+msgid "Seconds before DumbMonit is asked again, 15 to 3600."
+msgstr "DumbMonit에 다시 요청하기까지의 시간(초), 15~3600."
+
+msgid "Colours"
+msgstr "색상"
+
+msgid "Follow the status: green, amber, red or blue"
+msgstr "상태에 따라: 초록, 주황, 빨강, 파랑"
+
+msgid "Custom colours"
+msgstr "사용자 지정 색상"
+
+msgid "Background, light mode"
+msgstr "배경, 라이트 모드"
+
+msgid "Text, light mode"
+msgstr "글자, 라이트 모드"
+
+msgid "Background, dark mode"
+msgstr "배경, 다크 모드"
+
+msgid "Text, dark mode"
+msgstr "글자, 다크 모드"
+
+msgid "Texts"
+msgstr "문구"
+
+msgid "Leave a field empty to use the default text, translated for each visitor. {count} is replaced by the number of services down."
+msgstr "비워 두면 방문자마다 그 언어로 번역된 기본 문구를 사용합니다. {count}는 중단된 서비스 수로 바뀝니다."
+
+msgid "Invalid DumbMonit address: expected http:// or https:// followed by the server name. It was not saved."
+msgstr "DumbMonit 주소가 올바르지 않습니다. http:// 또는 https:// 뒤에 서버 이름이 와야 합니다. 저장되지 않았습니다."
+
+msgid "Invalid page address: 2 to 40 lowercase letters, digits or hyphens. It was not saved."
+msgstr "페이지 주소가 올바르지 않습니다. 소문자, 숫자, 하이픈으로 2~40자여야 합니다. 저장되지 않았습니다."
+
+#, php-format
+msgid "Saved, but the status page could not be fetched: %s"
+msgstr "저장했지만 상태 페이지를 가져오지 못했습니다: %s"
+
+#, php-format
+msgid "DumbMonit status banner: the status page cannot be fetched (%s). No banner is shown."
+msgstr "DumbMonit 상태 배너: 상태 페이지를 가져올 수 없습니다(%s). 배너가 표시되지 않습니다."
+
+msgid "DumbMonit status"
+msgstr "DumbMonit 상태"
+
+msgid "The status of your DumbMonit page, with the settings of the banner."
+msgstr "배너 설정을 사용해 DumbMonit 페이지의 상태를 보여 줍니다."
+
+msgid "This widget uses the settings in Settings › DumbMonit banner."
+msgstr "이 위젯은 설정 › DumbMonit 배너의 설정을 사용합니다."

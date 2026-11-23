@@ -35,23 +35,72 @@ of the API keeps its rules.
 
 ## WordPress
 
-Copy `integrations/wordpress/dumbmonit-status-banner` into
-`wp-content/plugins/`, activate it, then open **Settings > DumbMonit Banner**
-and enter the status page URL
-(`https://monit.example.com/api/public/status/my-page`), the position and the
-show mode. The plugin fetches the JSON on the server, caches it for one minute
-and escapes everything it prints.
+The plugin needs WordPress 6.5 or later and PHP 7.4 or later.
 
-The DumbMonit server may be on a private (LAN) address: the plugin only ever
-requests the exact URL you saved (checked against the
-`/api/public/status/<address>` pattern, redirects disabled). If the address is
-invalid, the settings page shows an error and keeps the previous value. If the
-status page cannot be fetched, a warning is shown in the WordPress admin (and
-when saving), instead of failing silently.
+1. Download the `.zip` from the page's settings in DumbMonit and upload it in
+   **Plugins > Add New > Upload Plugin**, or copy
+   `integrations/wordpress/dumbmonit-status-banner` into `wp-content/plugins/`.
+   Activate it.
+2. Open **Settings > DumbMonit banner** and type the address of your DumbMonit
+   server (`https://monit.example.com`).
+3. Click **Find status pages** and pick a page in the list. The list comes from
+   `GET /api/public/status`: the published pages anyone may read, except those
+   whose **Show in the list of public pages** switch is off in DumbMonit. You
+   can also type the page's address (the part after `/s/` in its link), or
+   paste the link of the page into the first field.
+4. Choose the other settings and save. The page is fetched right away; an
+   error is shown if it cannot be.
 
-The banner text is translatable (text domain `dumbmonit-status-banner`, template
-in `languages/`); it follows the WordPress site language. The public status JSON
-carries no language, so it cannot choose one.
+| Setting | Choices |
+|---|---|
+| Placement | A bar at the top or at the bottom of every page, or only where the `[dumbmonit_status]` shortcode or the **DumbMonit status** widget is placed. |
+| When to show | Only when something is wrong, or always ("All systems operational"). |
+| Services | Tick the services that count for the banner; none ticked means all of them. |
+| Options | Name the affected services; link to the status page; let visitors dismiss the banner (a cookie hides it for a day, until something else goes wrong). |
+| Cache duration | 15 to 3600 seconds (default 60) before DumbMonit is asked again. |
+| Colours | Follow the status (green, amber, red, blue, light and dark), or your own colours for light and dark mode. |
+| Texts | Your own sentence for each state; `{count}` is replaced by the number of services down. An empty field keeps the translated default. |
+
+### Languages
+
+The banner follows each visitor's language with no setting: the WordPress
+language of the page being viewed, or the current language of Polylang or
+WPML. That language is sent to DumbMonit as `?lang=`, so the service names you
+translated in the page's [languages](../using/status-pages.md#languages) come
+back in it. The plugin's own texts ship in English, German, Spanish, French,
+Italian, Portuguese (Portugal and Brazil), Russian, Chinese (Simplified),
+Japanese, Korean, Dutch, Polish and Turkish, as `languages/*.l10n.php` files
+read directly by WordPress, with their `.po` sources and a `.pot` template for
+new translations. A regional variant uses its language (`fr_CA` reads
+`fr_FR`). Your own texts are registered with Polylang (**Languages >
+Translations**) and WPML (**String Translation**) so they can be translated
+there too.
+
+### Shortcode
+
+`[dumbmonit_status]` prints the banner inline. Its attributes are optional and
+override the settings: `page` (another page of the same server), `show`
+(`issues` or `always`), and `names`, `link`, `dismissible` (`yes` or `no`):
+
+```text
+[dumbmonit_status page="shop" show="always" link="no"]
+```
+
+The server is always the one in the settings, so a post author cannot make
+the site request another address.
+
+### Safety
+
+Everything printed is escaped. The plugin requests only the address saved by
+an administrator (an `http` or `https` URL, re-checked before each request,
+redirects disabled, 3-second timeout); a private (LAN) address works. If
+DumbMonit cannot be reached, no banner is shown and the page loads normally;
+the failure is cached for a short while so it never slows page views down,
+and a warning is shown in the WordPress admin. The settings page is limited to
+administrators (`manage_options`) and its forms carry WordPress nonces.
+
+Settings saved by version 1.x are read as they are: the old status page URL
+becomes the server address and the page address.
 
 ## PHP include
 

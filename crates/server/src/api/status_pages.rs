@@ -32,6 +32,7 @@ pub(crate) mod access;
 mod badges;
 pub(crate) mod branding;
 pub mod delivery;
+mod discovery;
 mod lang;
 mod older;
 mod postmortem;
@@ -145,6 +146,7 @@ pub fn routes() -> Router<AppState> {
 /// Routes publiques, sans authentification.
 pub fn public_routes() -> Router<AppState> {
     Router::new()
+        .route("/public/status", get(discovery::list))
         .route("/public/status/{slug}", get(public_status))
         .route("/public/status/{slug}/banner.js", get(public_banner_js))
         .route("/public/status/{slug}/badge.svg", get(public_badge))
@@ -259,6 +261,11 @@ pub struct StatusPagePayload {
     /// valeur enregistrée est gardée (`false` à la création).
     #[serde(default)]
     pub hide_branding: Option<bool>,
+    /// Figure dans l'annuaire public `GET /api/public/status` (s'il est aussi
+    /// publié et public). Absent : la valeur enregistrée est gardée (`true` à
+    /// la création).
+    #[serde(default)]
+    pub listed: Option<bool>,
 }
 
 /// Distingue un champ absent (`None`, par `default`) d'un `null` explicite
@@ -349,6 +356,7 @@ impl StatusPagePayload {
             self.show_latency.unwrap_or_else(|| existing.is_some_and(|page| page.show_latency));
         let hide_branding =
             self.hide_branding.unwrap_or_else(|| existing.is_some_and(|page| page.hide_branding));
+        let listed = self.listed.unwrap_or_else(|| existing.is_none_or(|page| page.listed));
         let footer_text = match self.footer_text {
             Some(text) => text.trim().to_string(),
             None => existing.map(|page| page.footer_text.clone()).unwrap_or_default(),
@@ -476,6 +484,7 @@ impl StatusPagePayload {
             seo,
             hide_branding,
             subscribe_email,
+            listed,
             groups,
             group_labels,
         })

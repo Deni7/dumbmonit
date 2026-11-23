@@ -1,0 +1,185 @@
+# German translation of DumbMonit Status Banner.
+msgid ""
+msgstr ""
+"Project-Id-Version: DumbMonit Status Banner 2.0.0\n"
+"Language: de_DE\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Domain: dumbmonit-status-banner\n"
+
+msgid "All systems operational"
+msgstr "Alle Systeme funktionieren"
+
+msgid "Maintenance in progress"
+msgstr "Wartung läuft"
+
+msgid "Incident in progress"
+msgstr "Aktuelle Störung"
+
+#, php-format
+msgid "%d service is down"
+msgid_plural "%d services are down"
+msgstr[0] "%d Dienst ist ausgefallen"
+msgstr[1] "%d Dienste sind ausgefallen"
+
+#, php-format
+msgid "Affected: %s"
+msgstr "Betroffen: %s"
+
+msgid "Details"
+msgstr "Details"
+
+msgid "Dismiss"
+msgstr "Schließen"
+
+msgid "DumbMonit status banner"
+msgstr "DumbMonit-Statusbanner"
+
+msgid "DumbMonit banner"
+msgstr "DumbMonit-Banner"
+
+msgid "Status page"
+msgstr "Statusseite"
+
+msgid "DumbMonit address"
+msgstr "DumbMonit-Adresse"
+
+msgid "Your DumbMonit server, for example https://monit.example.com. A private (LAN) address works."
+msgstr "Ihr DumbMonit-Server, zum Beispiel https://monit.example.com. Eine private Adresse (LAN) funktioniert."
+
+msgid "Find status pages"
+msgstr "Statusseiten suchen"
+
+msgid "Page address"
+msgstr "Seitenadresse"
+
+msgid "Pick a page found on the server, or type its address: the part after /s/ in its link."
+msgstr "Wählen Sie eine auf dem Server gefundene Seite oder geben Sie ihre Adresse ein: den Teil nach /s/ in ihrem Link."
+
+msgid "Choose a page"
+msgstr "Seite wählen"
+
+msgid "Searching…"
+msgstr "Suche läuft…"
+
+msgid "Pick one of the pages found."
+msgstr "Wählen Sie eine der gefundenen Seiten."
+
+msgid "No listed public page was found on this server."
+msgstr "Auf diesem Server wurde keine gelistete öffentliche Seite gefunden."
+
+msgid "This server does not list its pages (it may be older than this plugin). Type the page address instead."
+msgstr "Dieser Server listet seine Seiten nicht auf (er ist vielleicht älter als dieses Plugin). Geben Sie stattdessen die Seitenadresse ein."
+
+#, php-format
+msgid "The server could not be reached: %s"
+msgstr "Der Server ist nicht erreichbar: %s"
+
+msgid "The search failed. Try again."
+msgstr "Die Suche ist fehlgeschlagen. Bitte erneut versuchen."
+
+msgid "The server did not answer with a DumbMonit document."
+msgstr "Der Server hat nicht mit einem DumbMonit-Dokument geantwortet."
+
+msgid "Services"
+msgstr "Dienste"
+
+msgid "Only the ticked services count; none ticked means all of them."
+msgstr "Nur die markierten Dienste zählen; ist keiner markiert, zählen alle."
+
+msgid "Save a reachable page first to choose its services."
+msgstr "Speichern Sie zuerst eine erreichbare Seite, um ihre Dienste zu wählen."
+
+msgid "Display"
+msgstr "Anzeige"
+
+msgid "Placement"
+msgstr "Position"
+
+msgid "Bar at the top of every page"
+msgstr "Leiste oben auf jeder Seite"
+
+msgid "Bar at the bottom of every page"
+msgstr "Leiste unten auf jeder Seite"
+
+msgid "Only where the [dumbmonit_status] shortcode or the widget is placed"
+msgstr "Nur dort, wo der Shortcode [dumbmonit_status] oder das Widget platziert ist"
+
+msgid "When to show"
+msgstr "Wann anzeigen"
+
+msgid "Only when something is wrong"
+msgstr "Nur bei Problemen"
+
+msgid "Always"
+msgstr "Immer"
+
+msgid "Options"
+msgstr "Optionen"
+
+msgid "Name the affected services"
+msgstr "Betroffene Dienste nennen"
+
+msgid "Link to the status page"
+msgstr "Link zur Statusseite"
+
+msgid "Visitors can dismiss the banner"
+msgstr "Besucher können das Banner schließen"
+
+msgid "Cache duration"
+msgstr "Cache-Dauer"
+
+msgid "Seconds before DumbMonit is asked again, 15 to 3600."
+msgstr "Sekunden, bis DumbMonit erneut abgefragt wird, 15 bis 3600."
+
+msgid "Colours"
+msgstr "Farben"
+
+msgid "Follow the status: green, amber, red or blue"
+msgstr "Dem Status folgen: Grün, Gelb, Rot oder Blau"
+
+msgid "Custom colours"
+msgstr "Eigene Farben"
+
+msgid "Background, light mode"
+msgstr "Hintergrund, heller Modus"
+
+msgid "Text, light mode"
+msgstr "Text, heller Modus"
+
+msgid "Background, dark mode"
+msgstr "Hintergrund, dunkler Modus"
+
+msgid "Text, dark mode"
+msgstr "Text, dunkler Modus"
+
+msgid "Texts"
+msgstr "Texte"
+
+msgid "Leave a field empty to use the default text, translated for each visitor. {count} is replaced by the number of services down."
+msgstr "Lassen Sie ein Feld leer, um den Standardtext in der Sprache des Besuchers zu verwenden. {count} wird durch die Zahl der ausgefallenen Dienste ersetzt."
+
+msgid "Invalid DumbMonit address: expected http:// or https:// followed by the server name. It was not saved."
+msgstr "Ungültige DumbMonit-Adresse: erwartet wird http:// oder https:// gefolgt vom Servernamen. Sie wurde nicht gespeichert."
+
+msgid "Invalid page address: 2 to 40 lowercase letters, digits or hyphens. It was not saved."
+msgstr "Ungültige Seitenadresse: 2 bis 40 Kleinbuchstaben, Ziffern oder Bindestriche. Sie wurde nicht gespeichert."
+
+#, php-format
+msgid "Saved, but the status page could not be fetched: %s"
+msgstr "Gespeichert, aber die Statusseite konnte nicht abgerufen werden: %s"
+
+#, php-format
+msgid "DumbMonit status banner: the status page cannot be fetched (%s). No banner is shown."
+msgstr "DumbMonit-Statusbanner: Die Statusseite kann nicht abgerufen werden (%s). Es wird kein Banner angezeigt."
+
+msgid "DumbMonit status"
+msgstr "DumbMonit-Status"
+
+msgid "The status of your DumbMonit page, with the settings of the banner."
+msgstr "Der Status Ihrer DumbMonit-Seite, mit den Einstellungen des Banners."
+
+msgid "This widget uses the settings in Settings › DumbMonit banner."
+msgstr "Dieses Widget verwendet die Einstellungen unter Einstellungen › DumbMonit-Banner."

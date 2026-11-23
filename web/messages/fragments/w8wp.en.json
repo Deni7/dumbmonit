@@ -1,0 +1,7 @@
+{
+	"w8wp_discovery_label": "Show in the list of public pages",
+	"w8wp_discovery_on": "Website plugins, such as the WordPress banner, can find this page in the server's list of public pages.",
+	"w8wp_discovery_off": "Not in the list of public pages. The page stays readable at its address.",
+	"w8wp_discovery_unpublished": "Only published pages appear in the list of public pages.",
+	"w8wp_discovery_private": "A private page never appears in the list of public pages."
+}

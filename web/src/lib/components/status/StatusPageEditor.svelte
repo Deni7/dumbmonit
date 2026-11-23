@@ -53,6 +53,7 @@
 	import SeoSection from './SeoSection.svelte';
 	import StructureSection from './StructureSection.svelte';
 	import TranslationsSection from './TranslationsSection.svelte';
+	import DiscoveryToggle from './DiscoveryToggle.svelte';
 	import { ACCENTS, accentClass } from './words';
 	import { slugify } from './share';
 	import { formFingerprint } from './form-state';
@@ -101,6 +102,7 @@
 	let showCalendar = $state(initial?.show_calendar ?? false);
 	let showLatency = $state(initial?.show_latency ?? false);
 	let hideBranding = $state(initial?.hide_branding ?? false);
+	let listed = $state(initial?.listed ?? true);
 	let footerText = $state(initial?.footer_text ?? '');
 	let homepageUrl = $state(initial?.homepage_url ?? '');
 	// Email subscriptions: a switch; the emails go through the email server of
@@ -260,6 +262,7 @@
 			showCalendar,
 			showLatency,
 			hideBranding,
+			listed,
 			footerText,
 			homepageUrl,
 			subscribeEmail,
@@ -369,6 +372,7 @@
 				show_calendar: showCalendar,
 				show_latency: showLatency,
 				hide_branding: hideBranding,
+				listed,
 				footer_text: footerText.trim(),
 				homepage_url: homepageUrl.trim(),
 				subscribe_email: subscribeEmail,
@@ -516,6 +520,7 @@
 							/>
 						</Field>
 					{/if}
+					<DiscoveryToggle bind:listed {published} open={accessMode === 'public'} {idPrefix} disabled={saving} />
 				</fieldset>
 			</Disclosure>
 
