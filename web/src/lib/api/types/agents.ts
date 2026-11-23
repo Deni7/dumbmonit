@@ -502,7 +502,11 @@ export type AgentUpdateStatus =
 	| 'unsupported'
 	| 'no_binary'
 	/** The shipped build has no signature and unsigned builds are not accepted. */
-	| 'unsigned';
+	| 'unsigned'
+	/** Windows agent before 0.20.2: it cannot replace its own binary, reinstall it once. */
+	| 'reinstall'
+	/** Agent before 0.20.1: it does not know the current signing key and unsigned builds are not accepted. */
+	| 'unknown_key';
 /** One rollout wave: how it picks agents among those the previous waves left. */
 export type AgentUpdateWave =
 	| { by: 'count'; value: number }

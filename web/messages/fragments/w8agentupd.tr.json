@@ -1,0 +1,7 @@
+{
+	"settings_agentupdates_status_reinstall": "Yeniden kurulum gerekli",
+	"settings_agentupdates_hint_reinstall": "Bu Windows ajanı sürümü kendi ikili dosyasını değiştiremez: kurulum komutunu makinede bir kez yeniden çalıştırın, sonraki sürümler kendini günceller.",
+	"settings_agentupdates_status_unknown_key": "Bilinmeyen imzalama anahtarı",
+	"settings_agentupdates_hint_unknown_key": "Bu ajan geçerli imzalama anahtarından eski olduğu için güncellemeyi doğrulayamıyor: güncellenene kadar İmzasız derlemeleri kabul et (geliştirme) seçeneğini açın ya da kurulum komutunu yeniden çalıştırın.",
+	"settings_agentupdates_reinstall_command": "Kurulum komutunu al"
+}

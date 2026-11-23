@@ -1,0 +1,7 @@
+{
+	"settings_agentupdates_status_reinstall": "Reinstalação necessária",
+	"settings_agentupdates_hint_reinstall": "Esta versão do agente Windows não consegue substituir o próprio binário: execute o comando de instalação na máquina mais uma vez; as versões seguintes se atualizam sozinhas.",
+	"settings_agentupdates_status_unknown_key": "Chave de assinatura desconhecida",
+	"settings_agentupdates_hint_unknown_key": "Este agente é anterior à chave de assinatura atual e não consegue verificar a atualização: ative Aceitar builds não assinados (desenvolvimento) até ele se atualizar, ou execute o comando de instalação novamente.",
+	"settings_agentupdates_reinstall_command": "Obter o comando de instalação"
+}

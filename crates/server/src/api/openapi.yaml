@@ -14458,7 +14458,7 @@ components:
               wave: { type: [integer, "null"], description: "Rank, from 1, of the agent's wave; null without waves or when it is in none." }
               status:
                 type: string
-                enum: [up_to_date, pending, updating, failed, refused, disabled, manual, waiting_window, waiting_canary, waiting_wave, paused, halted, newer, legacy, container, read_only, disabled_locally, unsupported, no_binary, unsigned]
+                enum: [up_to_date, pending, updating, failed, refused, disabled, manual, waiting_window, waiting_canary, waiting_wave, paused, halted, newer, legacy, container, read_only, disabled_locally, unsupported, no_binary, unsigned, reinstall, unknown_key]
               reason: { type: [string, "null"] }
               last:
                 type: [object, "null"]

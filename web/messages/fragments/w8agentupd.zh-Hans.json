@@ -1,0 +1,7 @@
+{
+	"settings_agentupdates_status_reinstall": "需要重新安装",
+	"settings_agentupdates_hint_reinstall": "此版本的 Windows 代理无法替换自身的二进制文件：请在该机器上再运行一次安装命令，之后的版本会自行更新。",
+	"settings_agentupdates_status_unknown_key": "未知的签名密钥",
+	"settings_agentupdates_hint_unknown_key": "此代理早于当前的签名密钥，无法验证更新：请在它完成更新前开启“接受未签名的构建（开发用）”，或重新运行安装命令。",
+	"settings_agentupdates_reinstall_command": "获取安装命令"
+}

@@ -71,11 +71,23 @@ async fn push_machine(
     secret: Option<&str>,
     self_update: Value,
 ) -> Reply {
+    // 0.20.1 : la première version qui connaît la clé de publication actuelle.
+    push_version(fleet, machine, "0.20.1", secret, self_update).await
+}
+
+/// Le même lot, d'un agent de version `version`.
+async fn push_version(
+    fleet: &Fleet,
+    machine: &str,
+    version: &str,
+    secret: Option<&str>,
+    self_update: Value,
+) -> Reply {
     let mut identity = json!({
         "hostname": machine,
         "os": "linux",
         "arch": "x86_64",
-        "agent_version": "0.0.1",
+        "agent_version": version,
         "machine_id": format!("id-{machine}"),
         "binding_supported": true,
     });
@@ -467,4 +479,61 @@ async fn a_later_wave_waits_and_a_failure_halts_the_rest_until_resumed() {
     assert!(reply.body["rollout"]["halted"].is_null(), "{}", reply.body);
     let go = push_machine(&fleet, follow, Some(&follow_secret), other).await;
     assert!(go.body.get("agent_update").is_some(), "{}", go.body);
+}
+
+#[tokio::test]
+async fn an_agent_before_the_current_key_gets_the_build_unsigned_only_when_allowed() {
+    // Agents 0.15.0 à 0.20.0 : seule la première clé, qui n'a jamais rien signé.
+    let fleet = fleet().await;
+    let (secret, target) = enrolled(&fleet).await;
+    let old = "0".repeat(64);
+    let reply = push_version(&fleet, "nas", "0.15.0", Some(&secret), running(&old)).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert!(reply.body.get("agent_update").is_none(), "rien sans le réglage : {}", reply.body);
+    let view = fleet.app.get("/api/agent/updates", Some(&fleet.admin)).await;
+    assert_eq!(agent_status(&view, target)["status"], "unknown_key");
+
+    let allow = json!({ "allow_unsigned": true });
+    let reply = fleet.app.put("/api/agent/updates", allow, Some(&fleet.admin)).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    let reply = push_version(&fleet, "nas", "0.15.0", Some(&secret), running(&old)).await;
+    let offer = &reply.body["agent_update"];
+    assert_eq!(offer["sha256"], fleet.sha256, "{}", reply.body);
+    assert!(offer.get("signature").is_none(), "offre sans signature : {}", reply.body);
+    assert_eq!(offer["allow_unsigned"], true);
+
+    // Un agent qui connaît la clé reçoit toujours la signature.
+    let reply = push(&fleet, Some(&secret), running(&old)).await;
+    assert!(reply.body["agent_update"]["signature"].is_string(), "{}", reply.body);
+}
+
+#[tokio::test]
+async fn an_old_windows_agent_is_asked_for_a_reinstall_and_offered_nothing() {
+    // Jusqu'à 0.20.1, l'agent Windows échoue toujours à synchroniser sa copie.
+    let fleet = fleet().await;
+    let exe = fleet._agents.path().join("dumbmonit-agent-windows-x86_64.exe");
+    std::fs::write(&exe, b"un faux agent Windows").unwrap();
+    std::fs::write(exe.with_extension("exe.sig"), [7u8; 64]).unwrap();
+    let (secret, target) = enrolled(&fleet).await;
+    let windows = json!({ "sha256": "0".repeat(64), "platform": "windows-x86_64",
+                          "ability": "ready", "signing_keys": true });
+    let allow = json!({ "allow_unsigned": true });
+    let reply = fleet.app.put("/api/agent/updates", allow, Some(&fleet.admin)).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    // « Update now » n'y change rien : l'agent échouerait au même endroit.
+    let now = format!("/api/agent/updates/{target}/now");
+    fleet.app.post(&now, json!({}), Some(&fleet.admin)).await;
+
+    for version in ["0.14.3", "0.15.0", "0.20.1"] {
+        let reply = push_version(&fleet, "nas", version, Some(&secret), windows.clone()).await;
+        assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+        assert!(reply.body.get("agent_update").is_none(), "{version} : {}", reply.body);
+        let view = fleet.app.get("/api/agent/updates", Some(&fleet.admin)).await;
+        assert_eq!(agent_status(&view, target)["status"], "reinstall", "{version}");
+    }
+    // Avec le correctif, l'offre revient.
+    let reply = push_version(&fleet, "nas", "0.20.2", Some(&secret), windows).await;
+    let offer = &reply.body["agent_update"];
+    assert_eq!(offer["file"], "dumbmonit-agent-windows-x86_64.exe", "{}", reply.body);
+    assert!(offer["signature"].is_string(), "{}", reply.body);
 }

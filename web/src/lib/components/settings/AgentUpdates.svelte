@@ -200,7 +200,9 @@
 		disabled_locally: 'ghost',
 		unsupported: 'ghost',
 		no_binary: 'ghost',
-		unsigned: 'warning'
+		unsigned: 'warning',
+		reinstall: 'warning',
+		unknown_key: 'advisory'
 	};
 	const LABEL: Record<AgentUpdateStatus, () => string> = {
 		up_to_date: m.settings_agentupdates_status_up_to_date,
@@ -222,7 +224,9 @@
 		disabled_locally: m.settings_agentupdates_status_disabled_locally,
 		unsupported: m.settings_agentupdates_status_unsupported,
 		no_binary: m.settings_agentupdates_status_no_binary,
-		unsigned: m.settings_agentupdates_status_unsigned
+		unsigned: m.settings_agentupdates_status_unsigned,
+		reinstall: m.settings_agentupdates_status_reinstall,
+		unknown_key: m.settings_agentupdates_status_unknown_key
 	};
 	const HINT: Record<AgentUpdateStatus, () => string> = {
 		up_to_date: m.settings_agentupdates_hint_up_to_date,
@@ -244,7 +248,9 @@
 		disabled_locally: m.settings_agentupdates_hint_disabled_locally,
 		unsupported: m.settings_agentupdates_hint_unsupported,
 		no_binary: m.settings_agentupdates_hint_no_binary,
-		unsigned: m.settings_agentupdates_hint_unsigned
+		unsigned: m.settings_agentupdates_hint_unsigned,
+		reinstall: m.settings_agentupdates_hint_reinstall,
+		unknown_key: m.settings_agentupdates_hint_unknown_key
 	};
 	const OUTCOME = {
 		succeeded: m.settings_agentupdates_outcome_succeeded,
@@ -252,7 +258,7 @@
 		rolled_back: m.settings_agentupdates_outcome_rolled_back,
 		refused: m.settings_agentupdates_outcome_refused
 	};
-	const NO_MANUAL: AgentUpdateStatus[] = ['legacy', 'container', 'read_only', 'disabled_locally', 'unsupported', 'no_binary', 'up_to_date', 'unsigned'];
+	const NO_MANUAL: AgentUpdateStatus[] = ['legacy', 'container', 'read_only', 'disabled_locally', 'unsupported', 'no_binary', 'up_to_date', 'unsigned', 'reinstall', 'unknown_key'];
 
 	function enabledValue(agent: AgentUpdateAgent): string {
 		return agent.enabled === null ? 'follow' : agent.enabled ? 'on' : 'off';
@@ -457,6 +463,14 @@
 										<Plate tone={TONE[agent.status]} label={LABEL[agent.status]()} />
 									</div>
 									{#if agent.status !== 'up_to_date'}<p class="max-w-prose text-sm text-ink-2">{HINT[agent.status]()}</p>{/if}
+									{#if agent.status === 'reinstall' || agent.status === 'unknown_key'}
+										<div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+											{#if agent.status === 'reinstall'}
+												<Button variant="secondary" size="sm" href="/targets/new?kind=agent">{m.settings_agentupdates_reinstall_command()}</Button>
+											{/if}
+											<DocLink page="devices/agent/#automatic-updates-old-agents" />
+										</div>
+									{/if}
 									{#if agent.reason}<p class="max-w-prose text-sm text-ink-2">{agent.reason}</p>{/if}
 									{#if agent.last}
 										<p class="text-sm text-ink-2">
