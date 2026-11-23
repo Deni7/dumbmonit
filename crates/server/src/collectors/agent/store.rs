@@ -2,8 +2,8 @@
 
 use anyhow::{Context, Result};
 use dumbmonit_proto::{
-    AgentIdentity, Credential, GatewayCheck, GatewayState, MAX_SERVER_LINK_TEXT, ServerLink,
-    TargetId,
+    AgentIdentity, Credential, GatewayCheck, GatewayState, MAX_SERVER_LINK_TEXT, RelaySetting,
+    ServerLink, TargetId,
 };
 use sqlx::{Row, SqlitePool};
 

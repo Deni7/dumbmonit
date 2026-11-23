@@ -2,8 +2,6 @@
 
 use std::collections::BTreeMap;
 
-use dumbmonit_proto::RelaySetting;
-
 use super::*;
 
 struct TestDb {
