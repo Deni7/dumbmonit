@@ -153,8 +153,9 @@
 			{/snippet}
 		</EmptyState>
 	{:else}
-		<div class="flex justify-end">
-			<UpdatedAgo updatedAt={alertsStore.updatedAt} onrefresh={() => Promise.all([alertsStore.refresh(), fleetStore.refresh()]).then(() => {})} />
+		<!-- Height kept: the text appearing does not shift anything. -->
+		<div class="flex min-h-5 justify-end">
+			<UpdatedAgo updatedAt={alertsStore.updatedAt} />
 		</div>
 		<div class="grid grid-cols-2 gap-3 lg:grid-cols-3">
 			{#each kpis as kpi, i (kpi.id)}
