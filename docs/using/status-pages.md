@@ -29,6 +29,7 @@ links forward here.
 | **Daily calendar** | Off by default. Adds a 90-day calendar under the services: one small cell per day, all services combined. See [The 90-day calendar](#the-90-day-calendar). |
 | **Response times** | Off by default. Adds a small response-time graph (24 h / 7 days) to each service that has latency data. See [Response times](#response-times). |
 | **Published** | Off = draft: the page, its badges and its logo answer "not found" to visitors until you switch it on. |
+| **Show in the list of public pages** | On by default. A published page that anyone may read appears in the server's list of public pages (`GET /api/public/status`), where website plugins such as the [WordPress banner](../integrations/website-banner.md#wordpress) offer it. Switch it off to keep the page out of that list; it stays readable at its address. A draft or [private page](#private) is never listed. |
 
 Then tick the monitors to show. For each one, set the **label** visitors will
 read (it defaults to the monitor name — you may prefer "Website" to
@@ -614,6 +615,8 @@ pages.
 - `GET /api/public/status/<address>/incidents` — resolved announcements older
   than the 30 days of the document, newest first, paged with the `next` cursor
   passed back as `?before=`.
+- `GET /api/public/status` — the list of public pages (address, title, link,
+  languages) that leave **Show in the list of public pages** on.
 - `GET /api/public/status/<address>` — the JSON document the page is built
   from, if you want to build your own: the page's title, description and look,
   the overall state, each service's `key`, `label`, `state`, uptime

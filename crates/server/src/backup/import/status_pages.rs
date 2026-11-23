@@ -172,6 +172,21 @@ pub(super) async fn restore_status_pages(
             }
         }
 
+        // Annuaire public : absent (ancienne sauvegarde), la page garde son réglage.
+        if let Some(listed) = page.listed {
+            let changed =
+                sqlx::query("UPDATE status_pages SET listed = ? WHERE id = ? AND listed != ?")
+                    .bind(i64::from(listed))
+                    .bind(id)
+                    .bind(i64::from(listed))
+                    .execute(&mut **tx)
+                    .await
+                    .context("présence de la page de statut dans l'annuaire")?;
+            if changed.rows_affected() > 0 && outcome == RestoreOutcome::Skipped {
+                outcome = RestoreOutcome::Updated;
+            }
+        }
+
         // Langues : revalidées contre les neuf de l'interface.
         if let Some(lang) = page.default_lang.as_deref()
             && (lang.is_empty() || crate::db::status_lang::SUPPORTED.contains(&lang))

@@ -60,6 +60,9 @@ pub struct StatusPage {
     pub hide_branding: bool,
     /// Abonnement par courriel ouvert aux visiteurs (migration 0246).
     pub subscribe_email: bool,
+    /// Figure dans l'annuaire public `GET /api/public/status` (migration 0303),
+    /// si la page est aussi publiée et publique.
+    pub listed: bool,
 }
 
 impl StatusPage {
@@ -137,7 +140,7 @@ macro_rules! select_page {
             "SELECT id, slug, title, description, published, theme, show_uptime_days, ",
             "created_at, updated_at, accent, scenes, scene_rotation, simple, show_calendar, show_latency, footer_text, homepage_url, ",
             "logo_type, subscribe_channel_id, link_origin, domain, seo, access_mode, ",
-            "(access_password_hash IS NOT NULL) AS has_password, hide_branding, subscribe_email ",
+            "(access_password_hash IS NOT NULL) AS has_password, hide_branding, subscribe_email, listed ",
             "FROM status_pages ",
             $tail
         )
@@ -170,6 +173,8 @@ pub struct StatusPageInput {
     pub seo: crate::status_seo::Seo,
     pub hide_branding: bool,
     pub subscribe_email: bool,
+    /// Figure dans l'annuaire public (migration 0303).
+    pub listed: bool,
     /// Groupes cochés, dans l'ordre ; `None` : inchangés.
     pub groups: Option<Vec<String>>,
     /// Noms publics des membres de groupes ; `None` : inchangés.
@@ -268,8 +273,9 @@ pub async fn create_page(pool: &SqlitePool, input: &StatusPageInput) -> Result<i
     let (id,): (i64,) = sqlx::query_as(
         "INSERT INTO status_pages (slug, title, description, published, theme, show_uptime_days,
              accent, scenes, scene_rotation, simple, show_calendar, show_latency, footer_text, homepage_url,
-             subscribe_channel_id, link_origin, domain, seo, hide_branding, subscribe_email)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             subscribe_channel_id, link_origin, domain, seo, hide_branding, subscribe_email,
+             listed)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          RETURNING id",
     )
     .bind(&input.slug)
@@ -292,6 +298,7 @@ pub async fn create_page(pool: &SqlitePool, input: &StatusPageInput) -> Result<i
     .bind(input.seo.to_json())
     .bind(i64::from(input.hide_branding))
     .bind(i64::from(input.subscribe_email))
+    .bind(i64::from(input.listed))
     .fetch_one(pool)
     .await
     .context("création de la page de statut")?;
@@ -367,7 +374,7 @@ pub async fn update_page(pool: &SqlitePool, id: i64, input: &StatusPageInput) ->
              show_uptime_days = ?, accent = ?, scenes = ?, scene_rotation = ?, simple = ?,
              show_calendar = ?, show_latency = ?,
              footer_text = ?, homepage_url = ?, subscribe_channel_id = ?, link_origin = ?,
-             domain = ?, seo = ?, hide_branding = ?, subscribe_email = ?,
+             domain = ?, seo = ?, hide_branding = ?, subscribe_email = ?, listed = ?,
              updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
          WHERE id = ?",
     )
@@ -391,6 +398,7 @@ pub async fn update_page(pool: &SqlitePool, id: i64, input: &StatusPageInput) ->
     .bind(input.seo.to_json())
     .bind(i64::from(input.hide_branding))
     .bind(i64::from(input.subscribe_email))
+    .bind(i64::from(input.listed))
     .bind(id)
     .execute(pool)
     .await

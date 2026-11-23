@@ -1,0 +1,7 @@
+{
+	"w8wp_discovery_label": "在公开页面列表中显示",
+	"w8wp_discovery_on": "网站插件（例如 WordPress 横幅）可以在服务器的公开页面列表中找到此页面。",
+	"w8wp_discovery_off": "不在公开页面列表中，但仍可通过其地址访问。",
+	"w8wp_discovery_unpublished": "只有已发布的页面才会出现在公开页面列表中。",
+	"w8wp_discovery_private": "私有页面永远不会出现在公开页面列表中。"
+}

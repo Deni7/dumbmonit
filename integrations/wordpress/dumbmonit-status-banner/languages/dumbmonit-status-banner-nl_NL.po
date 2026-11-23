@@ -1,0 +1,185 @@
+# Dutch translation of DumbMonit Status Banner.
+msgid ""
+msgstr ""
+"Project-Id-Version: DumbMonit Status Banner 2.0.0\n"
+"Language: nl_NL\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Domain: dumbmonit-status-banner\n"
+
+msgid "All systems operational"
+msgstr "Alle systemen werken"
+
+msgid "Maintenance in progress"
+msgstr "Onderhoud bezig"
+
+msgid "Incident in progress"
+msgstr "Lopende storing"
+
+#, php-format
+msgid "%d service is down"
+msgid_plural "%d services are down"
+msgstr[0] "%d dienst ligt eruit"
+msgstr[1] "%d diensten liggen eruit"
+
+#, php-format
+msgid "Affected: %s"
+msgstr "Getroffen: %s"
+
+msgid "Details"
+msgstr "Details"
+
+msgid "Dismiss"
+msgstr "Sluiten"
+
+msgid "DumbMonit status banner"
+msgstr "DumbMonit-statusbanner"
+
+msgid "DumbMonit banner"
+msgstr "DumbMonit-banner"
+
+msgid "Status page"
+msgstr "Statuspagina"
+
+msgid "DumbMonit address"
+msgstr "DumbMonit-adres"
+
+msgid "Your DumbMonit server, for example https://monit.example.com. A private (LAN) address works."
+msgstr "Je DumbMonit-server, bijvoorbeeld https://monit.example.com. Een privéadres (LAN) werkt ook."
+
+msgid "Find status pages"
+msgstr "Statuspagina’s zoeken"
+
+msgid "Page address"
+msgstr "Pagina-adres"
+
+msgid "Pick a page found on the server, or type its address: the part after /s/ in its link."
+msgstr "Kies een pagina die op de server is gevonden, of typ het adres: het deel na /s/ in de link."
+
+msgid "Choose a page"
+msgstr "Kies een pagina"
+
+msgid "Searching…"
+msgstr "Zoeken…"
+
+msgid "Pick one of the pages found."
+msgstr "Kies een van de gevonden pagina’s."
+
+msgid "No listed public page was found on this server."
+msgstr "Er is geen vermelde openbare pagina gevonden op deze server."
+
+msgid "This server does not list its pages (it may be older than this plugin). Type the page address instead."
+msgstr "Deze server toont geen lijst van zijn pagina’s (misschien is hij ouder dan deze plug-in). Typ in plaats daarvan het pagina-adres."
+
+#, php-format
+msgid "The server could not be reached: %s"
+msgstr "De server is niet bereikbaar: %s"
+
+msgid "The search failed. Try again."
+msgstr "Het zoeken is mislukt. Probeer het opnieuw."
+
+msgid "The server did not answer with a DumbMonit document."
+msgstr "De server antwoordde niet met een DumbMonit-document."
+
+msgid "Services"
+msgstr "Diensten"
+
+msgid "Only the ticked services count; none ticked means all of them."
+msgstr "Alleen de aangevinkte diensten tellen; is er niets aangevinkt, dan tellen ze allemaal."
+
+msgid "Save a reachable page first to choose its services."
+msgstr "Sla eerst een bereikbare pagina op om de diensten te kiezen."
+
+msgid "Display"
+msgstr "Weergave"
+
+msgid "Placement"
+msgstr "Plaats"
+
+msgid "Bar at the top of every page"
+msgstr "Balk boven aan elke pagina"
+
+msgid "Bar at the bottom of every page"
+msgstr "Balk onder aan elke pagina"
+
+msgid "Only where the [dumbmonit_status] shortcode or the widget is placed"
+msgstr "Alleen waar de shortcode [dumbmonit_status] of de widget staat"
+
+msgid "When to show"
+msgstr "Wanneer tonen"
+
+msgid "Only when something is wrong"
+msgstr "Alleen als er iets mis is"
+
+msgid "Always"
+msgstr "Altijd"
+
+msgid "Options"
+msgstr "Opties"
+
+msgid "Name the affected services"
+msgstr "Getroffen diensten noemen"
+
+msgid "Link to the status page"
+msgstr "Link naar de statuspagina"
+
+msgid "Visitors can dismiss the banner"
+msgstr "Bezoekers kunnen de banner sluiten"
+
+msgid "Cache duration"
+msgstr "Cacheduur"
+
+msgid "Seconds before DumbMonit is asked again, 15 to 3600."
+msgstr "Seconden voordat DumbMonit opnieuw wordt gevraagd, 15 tot 3600."
+
+msgid "Colours"
+msgstr "Kleuren"
+
+msgid "Follow the status: green, amber, red or blue"
+msgstr "De status volgen: groen, oranje, rood of blauw"
+
+msgid "Custom colours"
+msgstr "Eigen kleuren"
+
+msgid "Background, light mode"
+msgstr "Achtergrond, lichte modus"
+
+msgid "Text, light mode"
+msgstr "Tekst, lichte modus"
+
+msgid "Background, dark mode"
+msgstr "Achtergrond, donkere modus"
+
+msgid "Text, dark mode"
+msgstr "Tekst, donkere modus"
+
+msgid "Texts"
+msgstr "Teksten"
+
+msgid "Leave a field empty to use the default text, translated for each visitor. {count} is replaced by the number of services down."
+msgstr "Laat een veld leeg om de standaardtekst te gebruiken, vertaald voor elke bezoeker. {count} wordt vervangen door het aantal diensten dat eruit ligt."
+
+msgid "Invalid DumbMonit address: expected http:// or https:// followed by the server name. It was not saved."
+msgstr "Ongeldig DumbMonit-adres: verwacht wordt http:// of https:// gevolgd door de servernaam. Het is niet opgeslagen."
+
+msgid "Invalid page address: 2 to 40 lowercase letters, digits or hyphens. It was not saved."
+msgstr "Ongeldig pagina-adres: 2 tot 40 kleine letters, cijfers of koppeltekens. Het is niet opgeslagen."
+
+#, php-format
+msgid "Saved, but the status page could not be fetched: %s"
+msgstr "Opgeslagen, maar de statuspagina kon niet worden opgehaald: %s"
+
+#, php-format
+msgid "DumbMonit status banner: the status page cannot be fetched (%s). No banner is shown."
+msgstr "DumbMonit-statusbanner: de statuspagina kan niet worden opgehaald (%s). Er wordt geen banner getoond."
+
+msgid "DumbMonit status"
+msgstr "DumbMonit-status"
+
+msgid "The status of your DumbMonit page, with the settings of the banner."
+msgstr "De status van je DumbMonit-pagina, met de instellingen van de banner."
+
+msgid "This widget uses the settings in Settings › DumbMonit banner."
+msgstr "Deze widget gebruikt de instellingen onder Instellingen › DumbMonit-banner."

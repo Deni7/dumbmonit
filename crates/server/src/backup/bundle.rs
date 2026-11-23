@@ -824,6 +824,10 @@ pub struct BundleStatusPage {
     /// rétablies ; celles que le fichier ne cite pas restent.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub translations: Vec<crate::db::status_lang::Translation>,
+    /// Présence dans l'annuaire public (migration 0303). Absente d'une ancienne
+    /// sauvegarde : la page garde son réglage (`true` sur une page créée).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub listed: Option<bool>,
 }
 
 /// Nom public d'une surveillance arrivée par un groupe coché.
