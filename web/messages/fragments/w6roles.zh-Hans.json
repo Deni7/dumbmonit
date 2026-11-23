@@ -1,0 +1,62 @@
+{
+	"w6roles_audit_created": "自定义角色已创建",
+	"w6roles_audit_deleted": "自定义角色已删除",
+	"w6roles_audit_updated": "自定义角色已更改",
+	"w6roles_editor_cancel": "取消",
+	"w6roles_editor_create": "创建角色",
+	"w6roles_editor_description": "描述",
+	"w6roles_editor_edit_title": "编辑 {name}",
+	"w6roles_editor_err_name": "请为角色命名。",
+	"w6roles_editor_implied": "始终包含",
+	"w6roles_editor_name": "名称",
+	"w6roles_editor_new_title": "新角色",
+	"w6roles_editor_permissions": "权限",
+	"w6roles_editor_save": "保存角色",
+	"w6roles_editor_save_error": "无法保存角色",
+	"w6roles_perm_alerts_help": "确认、忽略和静默告警，接手值班，添加变更标记并运行修复操作，与操作员相同。",
+	"w6roles_perm_alerts_label": "处理告警",
+	"w6roles_perm_maintenance_help": "安排、编辑和移除维护窗口。",
+	"w6roles_perm_maintenance_label": "管理维护",
+	"w6roles_perm_monitors_help": "创建、编辑、导入和删除监控项、监控模板、告警规则和 SLO。设备凭据可以填写，但永远无法读回。",
+	"w6roles_perm_monitors_label": "管理监控项",
+	"w6roles_perm_notifications_help": "编辑通知渠道、通知策略和消息模板。邮件服务器仍由管理员负责。",
+	"w6roles_perm_notifications_label": "管理通知",
+	"w6roles_perm_reports_help": "阅读定时报告并下载其 PDF。",
+	"w6roles_perm_reports_label": "查看报告",
+	"w6roles_perm_status_pages_help": "编辑状态页并发布事件。页面密码和订阅者仍由管理员负责。",
+	"w6roles_perm_status_pages_label": "管理状态页",
+	"w6roles_perm_view_help": "读取监控项、告警、指标，以及查看者可读的其他一切内容。",
+	"w6roles_perm_view_label": "查看",
+	"w6roles_section_add": "添加角色",
+	"w6roles_section_admin_only": "账户、角色、团队、API 令牌、单点登录、备份和实例设置仍由管理员负责：任何权限都无法打开它们。",
+	"w6roles_section_delete": "删除",
+	"w6roles_section_delete_confirm": "确定永久删除？",
+	"w6roles_section_delete_error": "无法删除角色",
+	"w6roles_section_description": "为账户授予选定的权限，而无需将其设为管理员。自定义角色会替换所分配账户的内置角色。",
+	"w6roles_section_edit": "编辑",
+	"w6roles_section_empty_body": "内置角色可满足大多数需求。当某人需要（例如）编辑监控项而不触及账户时，再创建一个。",
+	"w6roles_section_empty_title": "尚无自定义角色",
+	"w6roles_section_in_use": "删除前请先为其账户分配其他角色。",
+	"w6roles_section_load_error": "无法加载自定义角色",
+	"w6roles_section_read_only": "只读",
+	"w6roles_section_search_kw": "自定义角色 权限 授权 委派 访问",
+	"w6roles_section_title": "自定义角色",
+	"w6roles_section_users_count": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} 个账户",
+				"countPlural=other": "{count} 个账户"
+			}
+		}
+	],
+	"w6roles_users_custom_group": "自定义角色",
+	"w6roles_users_custom_help": "自定义角色会替换内置角色：账户将恰好获得该角色的权限。",
+	"w6roles_users_custom_title": "自定义角色"
+}

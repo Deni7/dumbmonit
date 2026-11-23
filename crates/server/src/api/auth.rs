@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::auth::client_ip::ClientIp;
 use crate::auth::middleware::{Authenticated, CurrentSession, current_session_details};
+use crate::auth::permissions::Permission;
 use crate::auth::rate_limit::Key;
 use crate::auth::session::{SignIn, UserAgent, Via};
 use crate::auth::teams::TeamAccess;
@@ -39,11 +40,28 @@ pub struct UserView {
     pub last_login_at: Option<String>,
     /// Adresse électronique facultative, jamais un moyen de connexion.
     pub email: Option<String>,
+    /// Rôle personnalisé du compte (son `role` est alors `viewer`).
+    pub custom_role: Option<CustomRoleRef>,
+    /// Ce que le compte peut faire, dans les termes du catalogue
+    /// (`GET /api/roles/permissions`) : l'interface masque le reste.
+    pub permissions: Vec<Permission>,
+}
+
+/// Le rôle personnalisé d'un compte, désigné.
+#[derive(Debug, Clone, Serialize)]
+pub struct CustomRoleRef {
+    pub id: i64,
+    pub name: String,
 }
 
 impl From<User> for UserView {
     fn from(user: User) -> Self {
+        let permissions = crate::auth::permissions::effective(&user);
+        let custom_role =
+            user.custom_role.as_ref().map(|r| CustomRoleRef { id: r.id, name: r.name.clone() });
         Self {
+            custom_role,
+            permissions,
             auth: user.auth_method(),
             totp_enabled: user.totp_enabled,
             id: user.id,

@@ -1191,8 +1191,8 @@ pub fn sections() -> BTreeMap<&'static str, &'static str> {
         ("auth_policy", "Authentication policy: two-factor required for admins and operators."),
         (
             "accounts",
-            "Reset link and invitation settings, pending invitations, and each account's \
-             personal notification choices.",
+            "Reset link and invitation settings, pending invitations, each account's \
+             personal notification choices, and custom roles with who has them.",
         ),
         ("agent_tokens", "Agent enrolment tokens, as hashes: installed agents keep working."),
         ("api_tokens", "API tokens, as hashes: existing tokens keep working."),

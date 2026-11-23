@@ -245,7 +245,7 @@
 	const activeFilters = $derived(countActiveFilters({ segment, kind, site, tags: tagFilter, sorted }));
 	let filtersOpen = $state(false);
 	/** Reordering hit-tests rows top to bottom: offered in the compact layout only, on the unfiltered rack order. */
-	const canReorder = $derived(auth.isAdmin && !filtered && !sorted && view === 'compact');
+	const canReorder = $derived(auth.can('monitors.manage') && !filtered && !sorted && view === 'compact');
 	// Disabled devices leave the rack proper for a collapsible section at the bottom.
 	const split = $derived(splitDisabled(targets, stateOf));
 	const activeVisible = $derived(new Set([...visible].filter((id) => split.active.has(id))));
@@ -597,7 +597,7 @@
 	const selectedTargets = $derived(effectiveTargets.filter((t) => selected.has(t.id) && shownSet.has(t.id)));
 	const allShownSelected = $derived(shownIds.length > 0 && shownIds.every((id) => selected.has(id)));
 	const selection = $derived<RowSelection | null>(
-		auth.isAdmin && selecting
+		auth.can('monitors.manage') && selecting
 			? {
 					selected,
 					toggle: (id) => {
@@ -949,13 +949,13 @@
 	</EmptyState>
 {:else}
 	<p class="sr-only" aria-live="polite">{m.devices_targets_shown({ shown: totalRows, total: targets.length })}</p>
-	{#if filtered || (sorted && auth.isAdmin)}
+	{#if filtered || (sorted && auth.can('monitors.manage'))}
 		<!-- One quiet line: what the filters leave, and why dragging is off while sorted. -->
 		<p class="mb-2 flex flex-wrap items-center gap-x-3 text-[0.8125rem] text-ink-2">
 			{#if filtered}
 				<span class="tnum">{m.devices_targets_shown({ shown: totalRows, total: targets.length })}</span>
 			{/if}
-			{#if sorted && auth.isAdmin}
+			{#if sorted && auth.can('monitors.manage')}
 				<span class="text-ink-3">{m.devices_list_sort_no_reorder()}</span>
 			{/if}
 			<button type="button" class="inline-flex min-h-10 items-center text-ink-2 underline hover:text-ink" onclick={clearFilters}>{m.devices_targets_clear_filters()}</button>
@@ -1041,7 +1041,7 @@
 						worst={worstState(section.rows)}
 						{collapsed}
 						ontoggle={() => toggleFolder(section.key)}
-						canManage={auth.isAdmin && !filtered && section.key !== ''}
+						canManage={auth.can('monitors.manage') && !filtered && section.key !== ''}
 						busy={moving}
 						onrename={(next) => renameFolder(section.key, next)}
 						ondelete={() => deleteFolder(section.key)}

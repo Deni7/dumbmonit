@@ -327,6 +327,7 @@ mod tests {
             saml_subject: None,
             saml_issuer: None,
             email: email.then(|| "jane@example.org".to_string()),
+            custom_role: None,
         }
     }
 

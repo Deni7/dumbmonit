@@ -654,10 +654,11 @@ pub async fn create(
 }
 
 pub async fn update(
+    Identity(who): Identity,
     TeamAccess(access): TeamAccess,
     State(state): State<AppState>,
     Path(id): Path<TargetId>,
-    Json(WithChannels { target: payload, channels }): Json<WithChannels>,
+    Json(WithChannels { target: mut payload, channels }): Json<WithChannels>,
 ) -> ApiResult<Json<TargetView>> {
     let keep_profile = payload.profile_id.is_none();
     let keep_relay = payload.via_agent.is_none();
@@ -668,6 +669,10 @@ pub async fn update(
     let new_cve_scan = payload.cve_scan;
     let new_note = clean_note(payload.note.as_ref())?;
     let before = load(&state, id).await?;
+    // Qui n'administre pas a lu des options masquées : il les renvoie telles quelles.
+    if !who.is_admin() {
+        super::targets_redaction::restore(&mut payload, &before);
+    }
     let current_client =
         clients::target_client(&state.pool, id).await?.ok_or_else(|| not_found(id))?;
     let client = wanted_client.unwrap_or(current_client);

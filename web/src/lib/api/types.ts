@@ -1285,6 +1285,60 @@ export interface User {
 	email?: string | null;
 	/** What the account may reach, when the server tells (`/api/auth/me`). */
 	access?: AccessInfo;
+	/** Custom role of the account; its `role` is then `viewer`. */
+	custom_role?: CustomRoleRef | null;
+	/** What the account may do, in the terms of the permission catalog. */
+	permissions?: Permission[];
+}
+
+/**
+ * A permission of the server's fixed catalog (`GET /api/roles/permissions`).
+ * The known names are listed; a newer server may send others, shown by their label.
+ */
+export type Permission =
+	| 'view'
+	| 'alerts.operate'
+	| 'monitors.manage'
+	| 'notifications.manage'
+	| 'status_pages.manage'
+	| 'maintenance.manage'
+	| 'reports.view'
+	| (string & {});
+
+/** The custom role of an account, by id and name. */
+export interface CustomRoleRef {
+	id: number;
+	name: string;
+}
+
+/** One entry of the permission catalog. */
+export interface PermissionInfo {
+	id: Permission;
+	/** English name, for a permission the interface does not translate. */
+	label: string;
+	description: string;
+	/** Always part of a custom role (`view`). */
+	implied: boolean;
+	/** API routes the permission opens, beyond what a viewer reads (`*` = one segment). */
+	routes: { method: string; path: string }[];
+}
+
+/** A custom role, as returned by `/api/roles`. */
+export interface CustomRole {
+	id: number;
+	name: string;
+	description: string;
+	permissions: Permission[];
+	/** Accounts that have the role; a role in use cannot be deleted. */
+	users: number;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface CustomRoleInput {
+	name: string;
+	description?: string;
+	permissions: Permission[];
 }
 
 /** Team rights: `read` < `operate` < `manage`. */
@@ -1469,6 +1523,8 @@ export interface CreateUserPayload {
 	username: string;
 	display_name?: string;
 	role: Role;
+	/** A custom role; `role` must then be `viewer`. */
+	custom_role_id?: number;
 	/** Optional only while single sign-on is enabled. */
 	password?: string;
 	/** Optional contact address; blank means none. */
@@ -1477,7 +1533,10 @@ export interface CreateUserPayload {
 
 export interface UpdateUserPayload {
 	display_name?: string;
+	/** A built-in role; it removes the custom role. */
 	role?: Role;
+	/** Gives a custom role (the built-in role becomes `viewer`). */
+	custom_role_id?: number;
 	disabled?: boolean;
 	/** Resets the password and closes the account's sessions. */
 	password?: string;

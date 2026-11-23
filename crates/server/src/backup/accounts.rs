@@ -2,6 +2,11 @@
 //! clé `auth.recovery`), invitations ouvertes, et notifications personnelles
 //! de chaque compte (migration 0295).
 //!
+//! S'y ajoutent les rôles personnalisés (migration 0297), par leur nom, et
+//! leurs attributions, par identifiant de compte : un rôle est restauré avant
+//! les comptes, et un compte créé par la restauration reçoit le sien ; un
+//! compte qui existait déjà n'est jamais modifié.
+//!
 //! Une invitation part avec l'empreinte de son lien : le lien déjà envoyé
 //! fonctionne encore après restauration, jusqu'à son échéance. Ses équipes
 //! sont désignées par leur nom, un compte par son identifiant. Les liens de
@@ -18,6 +23,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::{Row, Sqlite, SqlitePool, Transaction};
 
+use crate::auth::custom_roles::{self, RoleInput};
+use crate::auth::permissions::Permission;
 use crate::auth::recovery::{self, RecoverySettings};
 use crate::auth::users::Role;
 use crate::backup::import::{RestoreOutcome, SectionReport};
@@ -32,12 +39,39 @@ pub struct BundleAccounts {
     pub invitations: Vec<BundleInvitation>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub notification_prefs: Vec<BundleNotificationPrefs>,
+    /// Rôles personnalisés (migration 0297).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub roles: Vec<BundleCustomRole>,
+    /// Qui a quel rôle personnalisé.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub role_assignments: Vec<BundleRoleAssignment>,
 }
 
 impl BundleAccounts {
     pub fn is_empty(&self) -> bool {
-        self.recovery.is_none() && self.invitations.is_empty() && self.notification_prefs.is_empty()
+        self.recovery.is_none()
+            && self.invitations.is_empty()
+            && self.notification_prefs.is_empty()
+            && self.roles.is_empty()
+            && self.role_assignments.is_empty()
     }
+}
+
+/// Un rôle personnalisé ; ses permissions par leur nom.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct BundleCustomRole {
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub permissions: Vec<String>,
+}
+
+/// Le rôle personnalisé d'un compte, l'un et l'autre par leur nom.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct BundleRoleAssignment {
+    pub user: String,
+    pub role: String,
 }
 
 /// Une invitation ouverte ; son lien par son identifiant et l'empreinte de son
@@ -114,10 +148,38 @@ pub async fn collect(pool: &SqlitePool) -> Result<BundleAccounts> {
         })
         .collect::<Result<_, _>>()?;
 
+    let roles: Vec<BundleCustomRole> = custom_roles::list(pool)
+        .await?
+        .into_iter()
+        .map(|role| BundleCustomRole {
+            name: role.name,
+            description: role.description,
+            permissions: role.permissions.iter().map(|p| p.as_str().to_string()).collect(),
+        })
+        .collect();
+    let role_assignments: Vec<BundleRoleAssignment> = sqlx::query(
+        "SELECT u.username AS username, r.name AS role_name
+         FROM users u JOIN custom_roles r ON r.id = u.custom_role_id
+         WHERE u.role = 'viewer' ORDER BY u.id",
+    )
+    .fetch_all(pool)
+    .await
+    .context("attributions des rôles personnalisés")?
+    .iter()
+    .map(|row| {
+        Ok(BundleRoleAssignment {
+            user: row.try_get("username")?,
+            role: row.try_get("role_name")?,
+        })
+    })
+    .collect::<Result<_>>()?;
+
     Ok(BundleAccounts {
         recovery: crate::auth::settings::get::<Value>(pool, recovery::SETTINGS_KEY).await?,
         invitations,
         notification_prefs,
+        roles,
+        role_assignments,
     })
 }
 
@@ -135,6 +197,111 @@ pub async fn restore(
         restore_invitations(tx, bundle).await?,
         restore_prefs(tx, bundle).await?,
     ])
+}
+
+/// Rôles personnalisés : créés, ou remplacés par ceux du lot quand ils
+/// diffèrent. Avant les comptes, qui les citent ([`assigned_role`]). Une
+/// permission inconnue de cette version (lot plus récent) est laissée de côté.
+pub async fn restore_roles(
+    tx: &mut Transaction<'_, Sqlite>,
+    bundle: &BundleAccounts,
+) -> Result<SectionReport> {
+    let mut report = SectionReport::new("custom_roles");
+    for role in &bundle.roles {
+        let (known, unknown): (Vec<String>, Vec<String>) = role
+            .permissions
+            .iter()
+            .cloned()
+            .partition(|name| Permission::parse(name.trim()).is_some());
+        if !unknown.is_empty() {
+            let unknown = unknown.join(", ");
+            let note = format!("role \"{}\": unknown permissions left out ({unknown})", role.name);
+            report.notes.push(note);
+        }
+        let input = RoleInput {
+            name: role.name.clone(),
+            description: role.description.clone(),
+            permissions: known,
+        };
+        let checked = match input.check() {
+            Ok(checked) => checked,
+            Err(why) => {
+                report.skipped += 1;
+                report.notes.push(format!("role \"{}\" is unreadable: {why}", role.name));
+                continue;
+            }
+        };
+        let stored_permissions = custom_roles::stored(&checked.permissions);
+        let existing = sqlx::query(
+            "SELECT id, description, permissions FROM custom_roles WHERE name = ? COLLATE NOCASE",
+        )
+        .bind(&checked.name)
+        .fetch_optional(&mut **tx)
+        .await
+        .context("recherche d'un rôle personnalisé")?;
+        let outcome = match existing {
+            Some(row) => {
+                let description: String = row.try_get("description")?;
+                let permissions: String = row.try_get("permissions")?;
+                let same = description == checked.description
+                    && crate::auth::permissions::parse_stored(&permissions) == checked.permissions;
+                if same {
+                    RestoreOutcome::Skipped
+                } else {
+                    sqlx::query(
+                        "UPDATE custom_roles SET description = ?, permissions = ?,
+                                updated_at = strftime('%Y-%m-%d %H:%M:%S', 'now')
+                         WHERE id = ?",
+                    )
+                    .bind(&checked.description)
+                    .bind(&stored_permissions)
+                    .bind(row.try_get::<i64, _>("id")?)
+                    .execute(&mut **tx)
+                    .await
+                    .context("mise à jour d'un rôle personnalisé")?;
+                    RestoreOutcome::Updated
+                }
+            }
+            None => {
+                sqlx::query(
+                    "INSERT INTO custom_roles (name, description, permissions) VALUES (?, ?, ?)",
+                )
+                .bind(&checked.name)
+                .bind(&checked.description)
+                .bind(&stored_permissions)
+                .execute(&mut **tx)
+                .await
+                .context("restauration d'un rôle personnalisé")?;
+                RestoreOutcome::Created
+            }
+        };
+        report.count(outcome);
+    }
+    Ok(report)
+}
+
+/// Le rôle personnalisé que le lot donne au compte `username`, s'il en a un et
+/// s'il existe ici, pour un compte créé par la restauration avec le rôle livré
+/// `role` (seul `viewer` en prend un).
+pub async fn assigned_role(
+    tx: &mut Transaction<'_, Sqlite>,
+    bundle: &BundleAccounts,
+    username: &str,
+    role: &str,
+) -> Result<Option<i64>> {
+    if role != "viewer" {
+        return Ok(None);
+    }
+    let Some(assignment) =
+        bundle.role_assignments.iter().find(|a| a.user.eq_ignore_ascii_case(username))
+    else {
+        return Ok(None);
+    };
+    sqlx::query_scalar::<_, i64>("SELECT id FROM custom_roles WHERE name = ? COLLATE NOCASE")
+        .bind(assignment.role.trim())
+        .fetch_optional(&mut **tx)
+        .await
+        .context("recherche du rôle personnalisé d'un compte")
 }
 
 /// Réglages des liens : remplacés par ceux du lot.

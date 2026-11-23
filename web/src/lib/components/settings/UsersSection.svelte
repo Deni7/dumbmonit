@@ -4,7 +4,8 @@
 	 *
 	 * Three roles: admin (everything), operator (handles alerts — ack, ignore,
 	 * snooze — but changes no configuration) and viewer (read only), plus wall
-	 * display (signs in straight to the wall, reaches nothing else). The server keeps
+	 * display (signs in straight to the wall, reaches nothing else). A custom
+	 * role (Custom roles, below) can replace the built-in one. The server keeps
 	 * at least one active admin; the disabled controls here just reflect that
 	 * rule so nobody discovers it through an error.
 	 *
@@ -33,6 +34,9 @@
 	import ResetLinkButton from '#lib/components/account/ResetLinkButton.svelte';
 	import ResetLinkNotice from '#lib/components/account/ResetLinkNotice.svelte';
 	import type { AccountLink } from '#lib/api/accounts.js';
+	import type { CustomRole } from '#lib/api/types.js';
+	import { listCustomRoles } from '#lib/api/roles.js';
+	import { choiceOf, isCustomChoice, rolePayload, type RoleChoice } from './roles/roleChoice.js';
 
 	let users = $state<User[]>([]);
 	let loading = $state(true);
@@ -52,10 +56,22 @@
 		}
 	}
 
+	/** Custom roles offered in the role picker; none if they cannot be read. */
+	let customRoles = $state<CustomRole[]>([]);
+	async function loadRoles(signal?: AbortSignal) {
+		try {
+			const list = await listCustomRoles(signal);
+			customRoles = Array.isArray(list) ? list : [];
+		} catch {
+			customRoles = [];
+		}
+	}
+
 	$effect(() => {
 		const controller = new AbortController();
 		void load(controller.signal);
 		void loadPolicy(controller.signal);
+		void loadRoles(controller.signal);
 		return () => controller.abort();
 	});
 
@@ -136,7 +152,13 @@
 	};
 	const ROLE_TONES: Record<Role, 'signal' | 'info' | 'ghost'> = { admin: 'signal', operator: 'info', viewer: 'ghost', wall: 'ghost' };
 
-	let draft = $state({ username: '', display_name: '', email: '', role: 'viewer' as Role, password: '' });
+	function roleHelp(choice: RoleChoice): string | undefined {
+		if (choice === 'wall') return m.settings_users_role_wall_help();
+		if (isCustomChoice(choice)) return m.w6roles_users_custom_help();
+		return undefined;
+	}
+
+	let draft = $state({ username: '', display_name: '', email: '', role: 'viewer' as RoleChoice, password: '' });
 	let draftErrors = $state<{ username?: string; password?: string; email?: string }>({});
 	let creating = $state(false);
 	let createError = $state<unknown>(null);
@@ -171,7 +193,7 @@
 
 		creating = true;
 		try {
-			const payload: CreateUserPayload = { username, role: draft.role };
+			const payload: CreateUserPayload = { username, ...rolePayload(draft.role) };
 			if (draft.display_name.trim()) payload.display_name = draft.display_name.trim();
 			if (draft.email.trim()) payload.email = draft.email.trim();
 			if (password) payload.password = password;
@@ -205,7 +227,7 @@
 	}
 
 	let editingId = $state<number | null>(null);
-	let edit = $state({ display_name: '', email: '', role: 'viewer' as Role, password: '' });
+	let edit = $state({ display_name: '', email: '', role: 'viewer' as RoleChoice, password: '' });
 	let editError = $state<unknown>(null);
 	let editPasswordError = $state<string | null>(null);
 	let editEmailError = $state<string | null>(null);
@@ -217,7 +239,7 @@
 
 	function openEdit(user: User) {
 		editingId = user.id;
-		edit = { display_name: user.display_name, email: user.email ?? '', role: user.role, password: '' };
+		edit = { display_name: user.display_name, email: user.email ?? '', role: choiceOf(user), password: '' };
 		editError = null;
 		editPasswordError = null;
 		editEmailError = null;
@@ -235,7 +257,7 @@
 			const updated = await updateUser(user.id, {
 				display_name: edit.display_name.trim(),
 				email: edit.email.trim(),
-				role: edit.role,
+				...rolePayload(edit.role),
 				...(edit.password ? { password: edit.password } : {})
 			});
 			users = users.map((u) => (u.id === updated.id ? updated : u));
@@ -314,6 +336,20 @@
 	}
 </script>
 
+{#snippet roleOptions()}
+	<option value="viewer">{m.settings_users_role_viewer_option()}</option>
+	<option value="operator">{m.settings_users_role_operator_option()}</option>
+	<option value="admin">{m.settings_users_role_admin_option()}</option>
+	<option value="wall">{m.settings_users_role_wall_option()}</option>
+	{#if customRoles.length > 0}
+		<optgroup label={m.w6roles_users_custom_group()}>
+			{#each customRoles as role (role.id)}
+				<option value={`custom:${role.id}`}>{role.name}</option>
+			{/each}
+		</optgroup>
+	{/if}
+{/snippet}
+
 <Panel id="users" title={m.settings_users_title()} description={m.settings_users_description()} padded={false}>
 	{#snippet aside()}
 		{#if !loading && !error && !adding}
@@ -361,12 +397,9 @@
 							oninput={() => (draftErrors = { ...draftErrors, email: undefined })}
 						/>
 					</Field>
-					<Field label={m.settings_users_role()} for="new-role" help={draft.role === 'wall' ? m.settings_users_role_wall_help() : undefined}>
+					<Field label={m.settings_users_role()} for="new-role" help={roleHelp(draft.role)}>
 						<select id="new-role" class="input min-h-10" bind:value={draft.role} disabled={creating}>
-							<option value="viewer">{m.settings_users_role_viewer_option()}</option>
-							<option value="operator">{m.settings_users_role_operator_option()}</option>
-							<option value="admin">{m.settings_users_role_admin_option()}</option>
-							<option value="wall">{m.settings_users_role_wall_option()}</option>
+							{@render roleOptions()}
 						</select>
 					</Field>
 					<Field
@@ -503,7 +536,11 @@
 									{#if user.display_name.trim()}
 										<span class="text-sm text-ink-2">{user.username}</span>
 									{/if}
-									<Plate tone={ROLE_TONES[user.role] ?? 'ghost'} bare label={ROLE_LABELS[user.role]?.() ?? user.role} />
+									{#if user.custom_role}
+										<Plate tone="info" bare label={user.custom_role.name} title={m.w6roles_users_custom_title()} />
+									{:else}
+										<Plate tone={ROLE_TONES[user.role] ?? 'ghost'} bare label={ROLE_LABELS[user.role]?.() ?? user.role} />
+									{/if}
 									<Plate
 										tone="info"
 										bare
@@ -582,13 +619,10 @@
 								<Field
 									label={m.settings_users_role()}
 									for={`edit-role-${user.id}`}
-									help={lastAdmin ? m.settings_users_role_last_admin_help() : edit.role === 'wall' ? m.settings_users_role_wall_help() : undefined}
+									help={lastAdmin ? m.settings_users_role_last_admin_help() : roleHelp(edit.role)}
 								>
 									<select id={`edit-role-${user.id}`} class="input min-h-10" bind:value={edit.role} disabled={saving || lastAdmin} title={lastAdmin ? m.settings_users_promote_first() : undefined}>
-										<option value="viewer">{m.settings_users_role_viewer_option()}</option>
-										<option value="operator">{m.settings_users_role_operator_option()}</option>
-										<option value="admin">{m.settings_users_role_admin_option()}</option>
-										<option value="wall">{m.settings_users_role_wall_option()}</option>
+										{@render roleOptions()}
 									</select>
 								</Field>
 								<Field

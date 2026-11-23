@@ -104,7 +104,7 @@
 		description={m.alerts_silences_empty_description()}
 	>
 		{#snippet action()}
-			{#if auth.canOperate}
+			{#if auth.canSilence}
 				<Button variant="primary" onclick={onschedule}>{m.alerts_silences_schedule()}</Button>
 			{/if}
 		{/snippet}

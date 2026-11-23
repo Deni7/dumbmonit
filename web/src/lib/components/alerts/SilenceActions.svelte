@@ -29,7 +29,7 @@
 	]);
 </script>
 
-{#if auth.canOperate}
+{#if auth.canSilence}
 	<div class="flex flex-wrap items-center gap-1.5">
 		{#if silence.active_now && silence.schedule.kind === 'once'}
 			<Button size="sm" variant="secondary" loading={busyId === silence.id} disabled={busyId !== null} onclick={() => onend?.(silence)}>

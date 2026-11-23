@@ -78,6 +78,7 @@ mod redfish;
 mod relay;
 mod remediation;
 mod reports;
+mod roles;
 mod saml;
 mod scim;
 mod security;
@@ -97,6 +98,7 @@ mod target_rules;
 pub(crate) mod targets;
 mod targets_bulk;
 mod targets_import;
+mod targets_redaction;
 mod teams;
 mod threats;
 mod tokens;
@@ -204,6 +206,8 @@ pub fn router_with_hubs(
         .route("/auth/scim/token", post(scim::create_token).delete(scim::delete_token))
         .route("/users", get(users::list).post(users::create))
         .route("/users/{id}", put(users::update).delete(users::delete))
+        // Rôles personnalisés et catalogue des permissions (`roles.rs`).
+        .merge(roles::routes())
         // Liens de réinitialisation, réglages des liens de compte, invitations et
         // notifications personnelles (`recovery.rs`, `invitations.rs`,
         // `my_notifications.rs`).

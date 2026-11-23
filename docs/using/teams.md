@@ -30,7 +30,9 @@ Folder names:
   each folder.
 - The **global role caps the result**: a *viewer* gets *read* at most, an
   *operator* gets *manage* at most. An *admin* sees and does everything and is
-  never restricted.
+  never restricted. A [custom role](settings.md#custom-roles) caps at
+  *manage* with *Manage monitors*, at *operate* with *Handle alerts* or
+  *Manage maintenance*, at *read* otherwise.
 - An account in **no team** sees everything, as before. Choose **Accounts
   without a team see nothing** to reverse this.
 

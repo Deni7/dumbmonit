@@ -1,0 +1,62 @@
+{
+	"w6roles_audit_created": "Função personalizada criada",
+	"w6roles_audit_deleted": "Função personalizada excluída",
+	"w6roles_audit_updated": "Função personalizada alterada",
+	"w6roles_editor_cancel": "Cancelar",
+	"w6roles_editor_create": "Criar função",
+	"w6roles_editor_description": "Descrição",
+	"w6roles_editor_edit_title": "Editar {name}",
+	"w6roles_editor_err_name": "Dê um nome à função.",
+	"w6roles_editor_implied": "sempre incluída",
+	"w6roles_editor_name": "Nome",
+	"w6roles_editor_new_title": "Nova função",
+	"w6roles_editor_permissions": "Permissões",
+	"w6roles_editor_save": "Salvar função",
+	"w6roles_editor_save_error": "Não foi possível salvar a função",
+	"w6roles_perm_alerts_help": "Reconhecer, ignorar e silenciar alertas, assumir plantões, adicionar marcadores de mudança e executar ações de correção, como um operador.",
+	"w6roles_perm_alerts_label": "Tratar alertas",
+	"w6roles_perm_maintenance_help": "Agendar, editar e remover janelas de manutenção.",
+	"w6roles_perm_maintenance_label": "Gerenciar manutenções",
+	"w6roles_perm_monitors_help": "Criar, editar, importar e excluir monitores, modelos de monitor, regras de alerta e SLOs. As credenciais dos dispositivos podem ser digitadas, nunca lidas de volta.",
+	"w6roles_perm_monitors_label": "Gerenciar monitores",
+	"w6roles_perm_notifications_help": "Editar os canais de notificação, a política de notificação e os modelos de mensagem. O servidor de e-mail fica com os administradores.",
+	"w6roles_perm_notifications_label": "Gerenciar notificações",
+	"w6roles_perm_reports_help": "Ler os relatórios agendados e baixar o PDF deles.",
+	"w6roles_perm_reports_label": "Ver relatórios",
+	"w6roles_perm_status_pages_help": "Editar as páginas de status e publicar incidentes. As senhas das páginas e os assinantes ficam com os administradores.",
+	"w6roles_perm_status_pages_label": "Gerenciar páginas de status",
+	"w6roles_perm_view_help": "Ler monitores, alertas, métricas e tudo o mais que um leitor lê.",
+	"w6roles_perm_view_label": "Visualizar",
+	"w6roles_section_add": "Adicionar função",
+	"w6roles_section_admin_only": "Contas, funções, equipes, tokens de API, login único, backups e configurações da instância ficam com os administradores: nenhuma permissão dá acesso a eles.",
+	"w6roles_section_delete": "Excluir",
+	"w6roles_section_delete_confirm": "Excluir de vez?",
+	"w6roles_section_delete_error": "Não foi possível excluir a função",
+	"w6roles_section_description": "Dê a uma conta direitos escolhidos sem torná-la administradora. Uma função personalizada substitui a função predefinida das contas que a têm.",
+	"w6roles_section_edit": "Editar",
+	"w6roles_section_empty_body": "As funções predefinidas atendem à maioria dos casos. Crie uma quando alguém precisar, por exemplo, editar monitores sem mexer nas contas.",
+	"w6roles_section_empty_title": "Nenhuma função personalizada ainda",
+	"w6roles_section_in_use": "Dê outra função às contas dela antes de excluí-la.",
+	"w6roles_section_load_error": "Não foi possível carregar as funções personalizadas",
+	"w6roles_section_read_only": "Somente leitura",
+	"w6roles_section_search_kw": "função personalizada permissões direitos delegar acesso",
+	"w6roles_section_title": "Funções personalizadas",
+	"w6roles_section_users_count": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} conta",
+				"countPlural=other": "{count} contas"
+			}
+		}
+	],
+	"w6roles_users_custom_group": "Funções personalizadas",
+	"w6roles_users_custom_help": "Uma função personalizada substitui a função predefinida: a conta recebe exatamente as permissões dessa função.",
+	"w6roles_users_custom_title": "Função personalizada"
+}

@@ -53,9 +53,9 @@
 	let uptimerobotImport = $state<ImportServices | null>(null);
 	let gatusImport = $state<ImportServices | null>(null);
 	let healthchecksImport = $state<ImportServices | null>(null);
-	/** Ways to bring monitors over, listed last in the picker. Administrators only. */
+	/** Ways to bring monitors over, listed last in the picker. For those who manage monitors. */
 	const imports = $derived<ImportChoice[]>(
-		auth.isAdmin
+		auth.can('monitors.manage')
 			? [
 					{ id: 'kuma', label: m.devices_kuma_open(), summary: m.deviceform_picker_import_kuma_summary(), icon: Upload, onrun: () => kumaImport?.show() },
 					{ id: 'uptimerobot', label: m.devices_svc_uptimerobot_open(), summary: m.deviceform_picker_import_uptimerobot_summary(), icon: Upload, onrun: () => uptimerobotImport?.show() },
@@ -413,7 +413,7 @@
 </PageHeader>
 
 <!-- Opened from the "Import" category of the picker. -->
-{#if auth.isAdmin}
+{#if auth.can('monitors.manage')}
 	<ImportKuma bind:this={kumaImport} trigger={false} />
 	<ImportServices bind:this={uptimerobotImport} provider="uptimerobot" />
 	<ImportServices bind:this={gatusImport} provider="gatus" />

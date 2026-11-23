@@ -1,0 +1,62 @@
+{
+	"w6roles_audit_created": "Rol personalizado creado",
+	"w6roles_audit_deleted": "Rol personalizado eliminado",
+	"w6roles_audit_updated": "Rol personalizado modificado",
+	"w6roles_editor_cancel": "Cancelar",
+	"w6roles_editor_create": "Crear rol",
+	"w6roles_editor_description": "Descripción",
+	"w6roles_editor_edit_title": "Editar {name}",
+	"w6roles_editor_err_name": "Ponle un nombre al rol.",
+	"w6roles_editor_implied": "siempre incluido",
+	"w6roles_editor_name": "Nombre",
+	"w6roles_editor_new_title": "Nuevo rol",
+	"w6roles_editor_permissions": "Permisos",
+	"w6roles_editor_save": "Guardar rol",
+	"w6roles_editor_save_error": "No se pudo guardar el rol",
+	"w6roles_perm_alerts_help": "Reconocer, ignorar y silenciar alertas, tomar guardias, añadir marcadores de cambio y lanzar acciones de remediación, como un operador.",
+	"w6roles_perm_alerts_label": "Gestionar alertas",
+	"w6roles_perm_maintenance_help": "Programar, editar y eliminar ventanas de mantenimiento.",
+	"w6roles_perm_maintenance_label": "Administrar mantenimientos",
+	"w6roles_perm_monitors_help": "Crear, editar, importar y eliminar monitores, plantillas de monitor, reglas de alerta y SLO. Las credenciales de los equipos se pueden introducir, nunca volver a leer.",
+	"w6roles_perm_monitors_label": "Administrar monitores",
+	"w6roles_perm_notifications_help": "Editar los canales de notificación, la política de notificación y las plantillas de mensaje. El servidor de correo queda para los administradores.",
+	"w6roles_perm_notifications_label": "Administrar notificaciones",
+	"w6roles_perm_reports_help": "Leer los informes programados y descargar su PDF.",
+	"w6roles_perm_reports_label": "Ver informes",
+	"w6roles_perm_status_pages_help": "Editar las páginas de estado y publicar incidentes. Las contraseñas de las páginas y los suscriptores quedan para los administradores.",
+	"w6roles_perm_status_pages_label": "Administrar páginas de estado",
+	"w6roles_perm_view_help": "Leer monitores, alertas, métricas y todo lo demás que lee un lector.",
+	"w6roles_perm_view_label": "Ver",
+	"w6roles_section_add": "Añadir rol",
+	"w6roles_section_admin_only": "Las cuentas, los roles, los equipos, los tokens de API, el inicio de sesión único, las copias de seguridad y los ajustes de la instancia quedan para los administradores: ningún permiso da acceso a ellos.",
+	"w6roles_section_delete": "Eliminar",
+	"w6roles_section_delete_confirm": "¿Eliminar definitivamente?",
+	"w6roles_section_delete_error": "No se pudo eliminar el rol",
+	"w6roles_section_description": "Da a una cuenta derechos concretos sin convertirla en administradora. Un rol personalizado sustituye al rol predefinido de las cuentas que lo tienen.",
+	"w6roles_section_edit": "Editar",
+	"w6roles_section_empty_body": "Los roles predefinidos cubren casi todo. Crea uno cuando alguien deba, por ejemplo, editar monitores sin tocar las cuentas.",
+	"w6roles_section_empty_title": "Aún no hay roles personalizados",
+	"w6roles_section_in_use": "Da otro rol a sus cuentas antes de eliminarlo.",
+	"w6roles_section_load_error": "No se pudieron cargar los roles personalizados",
+	"w6roles_section_read_only": "Solo lectura",
+	"w6roles_section_search_kw": "rol personalizado permisos derechos delegar acceso",
+	"w6roles_section_title": "Roles personalizados",
+	"w6roles_section_users_count": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} cuenta",
+				"countPlural=other": "{count} cuentas"
+			}
+		}
+	],
+	"w6roles_users_custom_group": "Roles personalizados",
+	"w6roles_users_custom_help": "Un rol personalizado sustituye al rol predefinido: la cuenta recibe exactamente los permisos de ese rol.",
+	"w6roles_users_custom_title": "Rol personalizado"
+}

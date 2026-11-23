@@ -203,7 +203,7 @@
 
 <Panel id="notifications-channels" title={m.notifications_channels_title()} description={m.notifications_channels_description()} padded={false}>
 	{#snippet aside()}
-		{#if !auth.isAdmin}
+		{#if !auth.can('notifications.manage')}
 			<Plate tone="ghost" label={auth.readOnlyLabel} />
 		{:else if !loading && !error && form === null && allChannels.length > 0}
 			<ClickSpark>
@@ -239,7 +239,7 @@
 			{/if}
 
 			{#if allChannels.length === 0}
-				{#if !auth.isAdmin}
+				{#if !auth.can('notifications.manage')}
 					<EmptyState icon={BellRing} title={m.notifications_channels_empty_title()} description={m.notifications_channels_empty_viewer()} />
 				{:else if form === null}
 					<EmptyState
@@ -302,7 +302,7 @@
 										<ChannelErrorDetail raw={channel.last_error} title={m.notifications_channels_last_error_title()} announce={false} class="mt-2" />
 									{/if}
 								</div>
-								{#if auth.isAdmin}
+								{#if auth.can('notifications.manage')}
 									<div class="flex flex-wrap items-center gap-1.5">
 										<ClientAssign kind="channel" id={channel.id} />
 										{#key `${channel.id}-${toggleNonce}`}

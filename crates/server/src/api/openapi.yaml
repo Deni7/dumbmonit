@@ -79,6 +79,14 @@ info:
     everything. Every other write is admin only, and an operator can never
     manage accounts or roles.
 
+    An admin may also define **custom roles** (`/api/roles`): a set of
+    permissions from a fixed catalog (`GET /api/roles/permissions`), given to
+    an account whose built-in role stays `viewer`. Such an account reads like
+    a viewer and reaches, in addition, the operations marked
+    `x-permissions` with one of its permissions; any other write answers
+    `403`. Accounts, roles, teams, tokens, single sign-on, backups and
+    instance settings are never in the catalog.
+
     A fourth role, **`wall`**, is a wall display: it signs in to show the
     wall (`/wall`) and nothing else. It reaches only what the wall reads —
     the operations marked `x-wall: true`:
@@ -2029,6 +2037,114 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
 
+  /api/roles:
+    get:
+      operationId: listCustomRoles
+      tags: [Accounts]
+      summary: Custom roles
+      description: Administrator session only. `users` counts the accounts that have the role.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "200":
+          description: Custom roles, by name.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CustomRole" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      operationId: createCustomRole
+      tags: [Accounts]
+      summary: Create a custom role
+      description: >-
+        Administrator session only. `permissions` are names from
+        `GET /api/roles/permissions`; `view` is always added. Managing accounts,
+        roles, teams, tokens, single sign-on, backups and instance settings
+        cannot be delegated.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CustomRoleInput" }
+      responses:
+        "201":
+          description: Role created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CustomRole" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/roles/permissions:
+    get:
+      operationId: listPermissions
+      tags: [Accounts]
+      summary: The permission catalog
+      description: >-
+        Administrator session only. The fixed set of permissions a custom role
+        can hold, with the API routes each one opens (beyond what a viewer
+        reads). Operations opened by a permission carry `x-permissions` in this
+        specification.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "200":
+          description: The catalog, in display order.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PermissionInfo" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/roles/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    put:
+      operationId: updateCustomRole
+      tags: [Accounts]
+      summary: Replace a custom role
+      description: Administrator session only. Applies at once to every account that has the role.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CustomRoleInput" }
+      responses:
+        "200":
+          description: The role.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CustomRole" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      operationId: deleteCustomRole
+      tags: [Accounts]
+      summary: Delete a custom role
+      description: Administrator session only. Refused (409) while an account still has the role.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "204": { description: Role deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
   /api/teams:
     get:
       operationId: listTeams
@@ -3257,6 +3373,7 @@ paths:
       summary: Add a device
       description: Profile detection starts in the background for SNMP.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -3299,6 +3416,7 @@ paths:
         already monitored are skipped and reported. With `dry_run=true`
         nothing is created and rows come back with status `ok`. Admin only.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       parameters:
         - name: dry_run
           in: query
@@ -3341,6 +3459,7 @@ paths:
         and the probe's message. SNMP only (other kinds are a `400`), and not
         available through a relay.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -3373,6 +3492,7 @@ paths:
         imported. With `dry_run=true` nothing is created and rows come back
         with status `ok`. Admin only.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       parameters:
         - name: dry_run
           in: query
@@ -3431,6 +3551,7 @@ paths:
         the same file agree on the numbers given to `rows`. Uptime Kuma 2 on
         MariaDB cannot be read. Admin only.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       parameters:
         - name: dry_run
           in: query
@@ -3481,6 +3602,7 @@ paths:
         Same preview / `rows` contract as `/api/targets/import/kuma`, at most 2000
         monitors. Admin only.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       parameters:
         - name: dry_run
           in: query
@@ -3534,6 +3656,7 @@ paths:
         and alert settings are never imported. Same preview / `rows` contract as
         `/api/targets/import/kuma`. Admin only.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       parameters:
         - name: dry_run
           in: query
@@ -3586,6 +3709,7 @@ paths:
         address redirected. Same preview / `rows` contract as
         `/api/targets/import/kuma`. Admin only.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       parameters:
         - name: dry_run
           in: query
@@ -3636,6 +3760,7 @@ paths:
         deleted. Until then, `PUT` (other than pausing) and `DELETE` answer `409`.
         Admin only.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       responses:
         "204": { description: Released. }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -3673,6 +3798,7 @@ paths:
         rank — `/targets` only ever compares rank between devices of the same
         state tier and folder.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -3700,6 +3826,7 @@ paths:
         pages that ticked the folder follow the new name in the same
         transaction.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -3735,6 +3862,7 @@ paths:
         nothing, or an interval, folder name, tag or channel that is invalid
         for every device, is refused as a whole (400).
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -3789,6 +3917,7 @@ paths:
         password (`https://user:pass@host`) and, of a scenario, everything but
         each step's name, method and URL. An agent cannot be a template.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -3836,6 +3965,7 @@ paths:
       tags: [Devices]
       summary: Rename a monitor template
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -3862,6 +3992,7 @@ paths:
       summary: Delete a monitor template
       description: Devices created from it are not affected.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       responses:
         "204": { description: Template deleted. }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -3901,6 +4032,7 @@ paths:
         relay (`null` goes back to direct probing). `enabled: false` clears the
         device's alerts without notifying.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -3923,6 +4055,7 @@ paths:
       summary: Delete a device
       description: Clears its alerts without notifying and deletes its time series (best effort).
       x-token-scope: write
+      x-permissions: [monitors.manage]
       responses:
         "204": { description: Device deleted. }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -3961,6 +4094,7 @@ paths:
         Through its relay agent when the device has one (`409` when a probe is
         already in flight, `400 Timed out: relay agent …` when it does not answer).
       x-token-scope: write
+      x-permissions: [monitors.manage]
       responses:
         "200":
           description: What was measured.
@@ -3981,6 +4115,7 @@ paths:
       tags: [Devices]
       summary: Re-run profile detection
       x-token-scope: write
+      x-permissions: [monitors.manage]
       responses:
         "200":
           description: The detected profile, or `null`.
@@ -4225,6 +4360,7 @@ paths:
         Marks every not-yet-cleared `resolved` transition as dismissed: they
         leave the default history view, the rows stay in the database.
       x-token-scope: write
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       responses:
         "200":
@@ -4251,6 +4387,7 @@ paths:
         needs attention. The row stays in the database, only hidden from the
         default history view.
       x-token-scope: write
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       responses:
         "204": { description: Entry cleared. }
@@ -4281,6 +4418,7 @@ paths:
         neither means 4 hours, at most 30 days). `{"until": null}` lifts the
         acknowledgement. The resolution is still notified. Audited.
       x-token-scope: write
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       requestBody:
         required: false
@@ -4302,6 +4440,7 @@ paths:
       tags: [Alerts]
       summary: Lift an acknowledgement
       x-token-scope: write
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       responses:
         "200":
@@ -4331,6 +4470,7 @@ paths:
         a new alert, notified as usual. Its resolution is recorded in the
         history as "dismissed by …". Audited.
       x-token-scope: write
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       responses:
         "200":
@@ -4347,6 +4487,7 @@ paths:
       summary: Restore a dismissed alert
       description: Undo a dismissal while the alert is still active. Audited.
       x-token-scope: write
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       responses:
         "200":
@@ -4380,6 +4521,7 @@ paths:
       tags: [Rules]
       summary: Create an alert rule
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -4416,6 +4558,7 @@ paths:
         pattern, forecast, drift and error budget rules cannot be replayed:
         the answer is then `replayable: false` with the reason.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -4442,6 +4585,7 @@ paths:
       summary: Update an alert rule
       description: A built-in rule keeps its query.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -4463,6 +4607,7 @@ paths:
       summary: Delete an alert rule
       description: Built-in rules cannot be deleted — disable them instead.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       responses:
         "204": { description: Rule deleted. }
         "400": { $ref: "#/components/responses/BadRequest" }
@@ -4478,6 +4623,7 @@ paths:
       tags: [Rules]
       summary: Enable or disable an alert rule
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -4505,6 +4651,7 @@ paths:
         enabled state a rule ships with. Per-device overrides are kept. A rule created here
         has no defaults and answers 409.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       responses:
         "200":
           description: The rule, back to its defaults.
@@ -4571,6 +4718,7 @@ paths:
       summary: Create or replace an override for one device
       description: Each field is optional; `null` means "as the rule". An empty override is removed.
       x-token-scope: write
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       requestBody:
         required: true
@@ -4592,6 +4740,7 @@ paths:
       tags: [Rules]
       summary: Remove an override
       x-token-scope: write
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       responses:
         "204": { description: Override removed. }
@@ -4621,6 +4770,7 @@ paths:
       tags: [Silences]
       summary: Create a maintenance window
       x-token-scope: write
+      x-permissions: [alerts.operate, maintenance.manage]
       x-roles: [admin, operator]
       requestBody:
         required: true
@@ -4690,6 +4840,7 @@ paths:
         Replaces the name, comment, scope and schedule. To end a window now, send
         a one-off schedule whose end is the current time.
       x-token-scope: write
+      x-permissions: [alerts.operate, maintenance.manage]
       x-roles: [admin, operator]
       requestBody:
         required: true
@@ -4711,6 +4862,7 @@ paths:
       tags: [Silences]
       summary: Delete a maintenance window
       x-token-scope: write
+      x-permissions: [alerts.operate, maintenance.manage]
       x-roles: [admin, operator]
       responses:
         "204": { description: Window deleted. }
@@ -4758,6 +4910,7 @@ paths:
       tags: [Notifications]
       summary: Create a notification channel
       x-token-scope: write
+      x-permissions: [notifications.manage]
       requestBody:
         required: true
         content:
@@ -4794,6 +4947,7 @@ paths:
         In `policy`, omitting `matcher` keeps the routing filter and
         `"matcher": null` clears it.
       x-token-scope: write
+      x-permissions: [notifications.manage]
       requestBody:
         required: true
         content:
@@ -4814,6 +4968,7 @@ paths:
       tags: [Notifications]
       summary: Delete a notification channel
       x-token-scope: write
+      x-permissions: [notifications.manage]
       responses:
         "204": { description: Channel deleted. }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -4828,6 +4983,7 @@ paths:
       tags: [Notifications]
       summary: Send a test message through a channel
       x-token-scope: write
+      x-permissions: [notifications.manage]
       responses:
         "200":
           description: Whether the message left.
@@ -4852,6 +5008,7 @@ paths:
         (unknown variable, unclosed braces), or when the type takes no message template.
         Changes nothing.
       x-token-scope: write
+      x-permissions: [notifications.manage]
       requestBody:
         required: true
         content:
@@ -5037,6 +5194,7 @@ paths:
       summary: Update the global notification policy
       description: 'Every field is optional; an omitted field keeps its value. `"escalate_channel": null` switches escalation off.'
       x-token-scope: write
+      x-permissions: [notifications.manage]
       requestBody:
         required: true
         content:
@@ -5059,6 +5217,7 @@ paths:
       summary: Which devices a channel routing filter selects
       description: Read-only, but a `POST` because the filter is a JSON body; needs the `write` scope like every `POST`.
       x-token-scope: write
+      x-permissions: [notifications.manage]
       requestBody:
         required: true
         content:
@@ -5102,6 +5261,7 @@ paths:
       tags: [Status pages]
       summary: Create a status page
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       requestBody:
         required: true
         content:
@@ -5145,6 +5305,7 @@ paths:
         `subscribe_channel_id`, `subscribe_email`, `domain` and `hide_branding`, which keep their
         stored value when omitted.
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       requestBody:
         required: true
         content:
@@ -5167,6 +5328,7 @@ paths:
       summary: Delete a status page
       description: The public URL stops answering.
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       responses:
         "204": { description: Page deleted. }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -5182,6 +5344,7 @@ paths:
       summary: Replace the devices shown on a page
       description: The full ordered list (200 at most). An empty label takes the device's name.
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       requestBody:
         required: true
         content:
@@ -5252,7 +5415,7 @@ paths:
         and groups (`labels`, from the written name to its translation). An empty
         field keeps the written text. Incident messages are not translated.
       x-token-scope: write
-      x-roles: [admin, operator]
+      x-permissions: [status_pages.manage]
       requestBody:
         required: true
         content:
@@ -5331,6 +5494,7 @@ paths:
       summary: Upload the page's logo
       description: PNG, JPEG or WebP, recognised by content, 256 KiB at most.
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       requestBody:
         required: true
         content:
@@ -5347,6 +5511,7 @@ paths:
       tags: [Status pages]
       summary: Remove the page's logo
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       responses:
         "204": { description: Logo removed. }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -5466,6 +5631,7 @@ paths:
         Administrators only, even for reading: the response lists the
         recipients' addresses.
       x-token-scope: read
+      x-permissions: [reports.view]
       responses:
         "200":
           description: Report schedules.
@@ -5508,6 +5674,7 @@ paths:
       tags: [Reports]
       summary: One periodic email report
       x-token-scope: read
+      x-permissions: [reports.view]
       responses:
         "200":
           description: The schedule.
@@ -5611,6 +5778,7 @@ paths:
         same period (the calendar month before the last send) from the
         recorded history. `404` before the first send, `400` for a digest.
       x-token-scope: read
+      x-permissions: [reports.view]
       parameters:
         - name: disposition
           in: query
@@ -5808,6 +5976,7 @@ paths:
       summary: Open an incident or announce a maintenance
       description: "`body` becomes the first update."
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       requestBody:
         required: true
         content:
@@ -5833,6 +6002,7 @@ paths:
       summary: Update an incident
       description: An omitted field keeps its value.
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       requestBody:
         required: true
         content:
@@ -5853,6 +6023,7 @@ paths:
       tags: [Incidents]
       summary: Delete an incident
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       responses:
         "204": { description: Incident deleted. }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -5883,6 +6054,7 @@ paths:
       tags: [Incidents]
       summary: Post an update and move the incident to its status
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       requestBody:
         required: true
         content:
@@ -5927,6 +6099,7 @@ paths:
         published and cleared when it goes back to draft. The text is plain
         text, shown by paragraphs. Maintenance windows have no post-mortem.
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       requestBody:
         required: true
         content:
@@ -5947,6 +6120,7 @@ paths:
       tags: [Incidents]
       summary: Delete the post-mortem of an incident
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       responses:
         "204": { description: Post-mortem deleted. }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -5978,6 +6152,7 @@ paths:
       tags: [SLOs]
       summary: Create a service level objective
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -6016,6 +6191,7 @@ paths:
       tags: [SLOs]
       summary: Replace a service level objective
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -6037,6 +6213,7 @@ paths:
       tags: [SLOs]
       summary: Delete a service level objective
       x-token-scope: write
+      x-permissions: [monitors.manage]
       responses:
         "204": { description: SLO deleted. }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -6095,6 +6272,7 @@ paths:
         team-restricted account may only target monitors it can handle (never the
         whole instance).
       x-token-scope: write
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       x-codeSamples:
         - lang: Shell
@@ -6136,8 +6314,9 @@ paths:
       operationId: updateAnnotation
       tags: [Annotations]
       summary: Change a marker
-      description: Only the fields sent change; `until: null` removes the window.
+      description: "Only the fields sent change; `until: null` removes the window."
       x-token-scope: write
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       requestBody:
         required: true
@@ -6159,6 +6338,7 @@ paths:
       tags: [Annotations]
       summary: Delete a marker
       x-token-scope: write
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       responses:
         "204": { description: Marker deleted. }
@@ -11947,6 +12127,7 @@ paths:
         instead. At most 30 runs per minute for the whole instance. Audited.
       security: [{ cookieAuth: [] }]
       x-token-scope: none
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       requestBody:
         required: false
@@ -12354,6 +12535,7 @@ paths:
       tags: [On-call]
       summary: Add a replacement, someone taking the shift of someone else for a while
       x-token-scope: write
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       requestBody:
         required: true
@@ -12380,6 +12562,7 @@ paths:
       tags: [On-call]
       summary: Remove a replacement
       x-token-scope: write
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       responses:
         "204": { description: Replacement removed. }
@@ -13355,6 +13538,19 @@ components:
         created_at: { type: string }
         last_login_at: { type: [string, "null"] }
         email: { type: [string, "null"], description: Optional contact address; never used to sign in. }
+        custom_role:
+          description: Custom role of the account; its `role` is then `viewer`.
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [id, name]
+              properties:
+                id: { type: integer, format: int64 }
+                name: { type: string }
+        permissions:
+          type: array
+          description: What the account may do, in the terms of the permission catalog.
+          items: { $ref: "#/components/schemas/Permission" }
     AuthStatus:
       type: object
       required: [configured, authenticated, oidc, demo]
@@ -13850,6 +14046,7 @@ components:
         username: { type: string }
         display_name: { type: string }
         role: { $ref: "#/components/schemas/Role" }
+        custom_role_id: { type: integer, format: int64, description: "A custom role; `role` must then be `viewer`." }
         password: { type: string, writeOnly: true }
         email: { type: string, maxLength: 254, description: Optional; blank means none. }
     UserUpdate:
@@ -13858,8 +14055,56 @@ components:
         display_name: { type: string }
         email: { type: string, maxLength: 254, description: Blank clears it. }
         role: { $ref: "#/components/schemas/Role" }
+        custom_role_id:
+          type: integer
+          format: int64
+          description: Give a custom role (the built-in role becomes `viewer`). Sending `role` alone removes it.
         disabled: { type: boolean }
         password: { type: string, writeOnly: true }
+
+    # ----------------------------------------------------------- rôles personnalisés
+    Permission:
+      type: string
+      description: A permission of the catalog (`GET /api/roles/permissions`); new names may appear.
+      examples: [view, alerts.operate, monitors.manage, notifications.manage, status_pages.manage, maintenance.manage, reports.view]
+    PermissionInfo:
+      type: object
+      required: [id, label, description, implied, routes]
+      properties:
+        id: { $ref: "#/components/schemas/Permission" }
+        label: { type: string, description: English name. }
+        description: { type: string, description: English description. }
+        implied: { type: boolean, description: Always part of a custom role (`view`). }
+        routes:
+          type: array
+          items:
+            type: object
+            required: [method, path]
+            properties:
+              method: { type: string }
+              path: { type: string, description: "Path template, `*` matches one segment." }
+    CustomRole:
+      type: object
+      required: [id, name, description, permissions, users, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        description: { type: string }
+        permissions:
+          type: array
+          items: { $ref: "#/components/schemas/Permission" }
+        users: { type: integer, description: Accounts that have the role. }
+        created_at: { type: string }
+        updated_at: { type: string }
+    CustomRoleInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 64, description: Not the name of a built-in role. }
+        description: { type: string, maxLength: 500 }
+        permissions:
+          type: array
+          items: { $ref: "#/components/schemas/Permission" }
 
     # ----------------------------------------------------------- jetons
     TokenScope:
