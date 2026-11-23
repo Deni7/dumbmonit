@@ -23,7 +23,7 @@
 		type InvitationSent
 	} from '#lib/api/accounts.js';
 	import { formatDateTime } from '#lib/format.js';
-	import { Button, Confirm, CopyBlock, ErrorNotice, Field, Panel, Plate, Skeleton, Toggle } from '#lib/ui/index.js';
+	import { Button, Chip, Confirm, CopyBlock, ErrorNotice, Field, Panel, Plate, Skeleton, Toggle } from '#lib/ui/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 
 	let invitations = $state<Invitation[]>([]);
@@ -191,11 +191,11 @@
 		{/if}
 	{/snippet}
 
-	<div class="px-5 py-4">
+	<div class="px-4 py-3 sm:px-5 sm:py-4">
 		{#if loadError}
 			<ErrorNotice error={loadError} title={m.w6accounts_invites_load_error()} onretry={() => void load()} />
 		{:else if loading}
-			<Skeleton class="h-16 w-full" rows={2} />
+			<div class="grid gap-2"><Skeleton class="h-16 w-full" rows={2} /></div>
 		{:else}
 			{#if adding}
 				<form class="rise-in mb-4 rounded-[var(--radius-card)] border border-line-strong bg-surface-2/40 p-4" onsubmit={submitAdd} novalidate aria-label={m.w6accounts_invites_form_aria()}>
@@ -228,15 +228,9 @@
 							<legend class="mb-1.5 text-sm font-semibold text-ink">{m.w6accounts_invites_teams()}</legend>
 							<div class="flex flex-wrap gap-2">
 								{#each teams as team (team.id)}
-									<button
-										type="button"
-										class={`min-h-10 rounded-lg border px-3 py-1.5 text-sm font-medium transition ${draft.teams.includes(team.id) ? 'border-signal bg-signal-soft text-signal-ink' : 'border-line-strong bg-surface text-ink-2 hover:text-ink'}`}
-										aria-pressed={draft.teams.includes(team.id)}
-										disabled={creating}
-										onclick={() => toggleTeam(team.id)}
-									>
-										{team.name}
-									</button>
+									<Chip pressed={draft.teams.includes(team.id)} disabled={creating} onclick={() => toggleTeam(team.id)}>
+										<span class="max-w-[14rem] truncate" title={team.name}>{team.name}</span>
+									</Chip>
 								{/each}
 							</div>
 						</fieldset>

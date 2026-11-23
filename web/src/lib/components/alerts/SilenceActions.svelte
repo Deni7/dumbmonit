@@ -47,6 +47,7 @@
 							<Button
 								size="sm"
 								variant="ghost"
+								role="menuitem"
 								class="!justify-start"
 								onclick={() => {
 									close();

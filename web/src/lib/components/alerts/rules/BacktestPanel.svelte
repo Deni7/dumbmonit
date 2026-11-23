@@ -151,7 +151,7 @@
 					{#each shownSeries as series (series.series_key)}
 						<li class="grid gap-2 rounded-[var(--radius-plate)] border border-line bg-canvas px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-4">
 							<div class="min-w-0">
-								<p class="truncate text-sm font-semibold text-ink">{series.target_name}</p>
+								<p class="truncate text-sm font-semibold text-ink" title={series.target_name}>{series.target_name}</p>
 								<p class="truncate font-mono text-[0.75rem] text-ink-3" title={series.series_key}>{series.series_key}</p>
 								<p class="mt-1 text-[0.8125rem] text-ink-2">
 									{m.w5alerting_backtest_series_periods({ count: series.periods.length, duration: formatDuration(series.firing_secs) })}
@@ -190,7 +190,7 @@
 					</div>
 				{/if}
 			{/if}
-			<p class="text-[0.75rem] text-ink-3">{m.w5alerting_backtest_scope_note()}</p>
+			<p class="text-[0.75rem] text-ink-2">{m.w5alerting_backtest_scope_note()}</p>
 		{/if}
 	</div>
 </section>

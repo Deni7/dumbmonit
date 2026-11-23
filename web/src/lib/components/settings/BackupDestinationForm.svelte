@@ -191,7 +191,7 @@
 					<input id="offsite-endpoint" type="url" class="input" bind:value={endpoint} autocomplete="off" spellcheck="false" placeholder="https://s3.eu-central-003.backblazeb2.com" disabled={saving} />
 				</Field>
 				<Field label={m.w5backups_s3_bucket()} for="offsite-bucket" required error={errors.bucket || null}>
-					<input id="offsite-bucket" type="text" class="input" bind:value={bucket} autocomplete="off" spellcheck="false" disabled={saving} oninput={() => clear('bucket')} />
+					<input id="offsite-bucket" type="text" class="input" bind:value={bucket} autocomplete="off" spellcheck="false" disabled={saving} aria-invalid={errors.bucket ? 'true' : undefined} oninput={() => clear('bucket')} />
 				</Field>
 				<Field label={m.w5backups_s3_region()} for="offsite-region" help={m.w5backups_s3_region_help()}>
 					<input id="offsite-region" type="text" class="input" bind:value={region} autocomplete="off" spellcheck="false" placeholder="us-east-1" disabled={saving} />
@@ -200,7 +200,7 @@
 					<input id="offsite-prefix" type="text" class="input" bind:value={prefix} autocomplete="off" spellcheck="false" placeholder="dumbmonit/home" disabled={saving} />
 				</Field>
 				<Field label={m.w5backups_s3_access_key()} for="offsite-access-key" required error={errors.accessKey || null}>
-					<input id="offsite-access-key" type="text" class="input font-mono" bind:value={accessKey} autocomplete="off" spellcheck="false" disabled={saving} oninput={() => clear('accessKey')} />
+					<input id="offsite-access-key" type="text" class="input font-mono" bind:value={accessKey} autocomplete="off" spellcheck="false" disabled={saving} aria-invalid={errors.accessKey ? 'true' : undefined} oninput={() => clear('accessKey')} />
 				</Field>
 				<Field label={m.w5backups_s3_secret_key()} for="offsite-secret-key" required={!hasSaved} help={savedHint} error={errors.secretKey || null}>
 					<PasswordInput id="offsite-secret-key" bind:value={secretKey} autocomplete="off" placeholder={savedHint} disabled={saving} invalid={!!errors.secretKey} oninput={() => clear('secretKey')} />
@@ -213,7 +213,7 @@
 			<fieldset class="grid gap-4 border-t border-line pt-5 sm:grid-cols-2">
 				<legend class="sr-only">{m.w5backups_kind_webdav()}</legend>
 				<Field label={m.w5backups_webdav_url()} for="offsite-url" required help={m.w5backups_webdav_url_help()} error={errors.url || null} class="sm:col-span-2">
-					<input id="offsite-url" type="url" class="input" bind:value={url} autocomplete="off" spellcheck="false" placeholder="https://cloud.example.com/remote.php/dav/files/me/Backups" disabled={saving} oninput={() => clear('url')} />
+					<input id="offsite-url" type="url" class="input" bind:value={url} autocomplete="off" spellcheck="false" placeholder="https://cloud.example.com/remote.php/dav/files/me/Backups" disabled={saving} aria-invalid={errors.url ? 'true' : undefined} oninput={() => clear('url')} />
 				</Field>
 				<Field label={m.w5backups_username()} for="offsite-username">
 					<input id="offsite-username" type="text" class="input" bind:value={username} autocomplete="off" spellcheck="false" disabled={saving} />
@@ -226,13 +226,13 @@
 			<fieldset class="grid gap-4 border-t border-line pt-5 sm:grid-cols-[1fr_8rem]">
 				<legend class="sr-only">{m.w5backups_kind_sftp()}</legend>
 				<Field label={m.w5backups_sftp_host()} for="offsite-host" required error={errors.host || null}>
-					<input id="offsite-host" type="text" class="input" bind:value={host} autocomplete="off" spellcheck="false" placeholder="nas.home.lan" disabled={saving} oninput={() => clear('host')} />
+					<input id="offsite-host" type="text" class="input" bind:value={host} autocomplete="off" spellcheck="false" placeholder="nas.home.lan" disabled={saving} aria-invalid={errors.host ? 'true' : undefined} oninput={() => clear('host')} />
 				</Field>
 				<Field label={m.w5backups_sftp_port()} for="offsite-port" error={errors.port || null}>
-					<input id="offsite-port" type="number" min="1" max="65535" step="1" class="input tnum" bind:value={port} disabled={saving} oninput={() => clear('port')} />
+					<input id="offsite-port" type="number" min="1" max="65535" step="1" class="input tnum" bind:value={port} disabled={saving} aria-invalid={errors.port ? 'true' : undefined} oninput={() => clear('port')} />
 				</Field>
 				<Field label={m.w5backups_username()} for="offsite-sftp-user" required error={errors.username || null} class="sm:col-span-2">
-					<input id="offsite-sftp-user" type="text" class="input" bind:value={username} autocomplete="off" spellcheck="false" disabled={saving} oninput={() => clear('username')} />
+					<input id="offsite-sftp-user" type="text" class="input" bind:value={username} autocomplete="off" spellcheck="false" disabled={saving} aria-invalid={errors.username ? 'true' : undefined} oninput={() => clear('username')} />
 				</Field>
 				<Field label={m.w5backups_sftp_directory()} for="offsite-directory" help={m.w5backups_sftp_directory_help()} class="sm:col-span-2">
 					<input id="offsite-directory" type="text" class="input font-mono" bind:value={directory} autocomplete="off" spellcheck="false" placeholder="/volume1/backups/dumbmonit" disabled={saving} />
@@ -255,7 +255,7 @@
 
 		<div class="grid gap-4 border-t border-line pt-5 sm:grid-cols-2">
 			<Field label={m.w5backups_form_keep()} for="offsite-keep" help={m.w5backups_form_keep_help()} error={errors.keep || null}>
-				<input id="offsite-keep" type="number" min="1" max="365" step="1" class="input tnum max-w-[8rem]" bind:value={keep} disabled={saving} oninput={() => clear('keep')} />
+				<input id="offsite-keep" type="number" min="1" max="365" step="1" class="input tnum max-w-[8rem]" bind:value={keep} disabled={saving} aria-invalid={errors.keep ? 'true' : undefined} oninput={() => clear('keep')} />
 			</Field>
 			<Field label={m.w5backups_form_enabled()} for="offsite-enabled" inline>
 				<Toggle id="offsite-enabled" bind:checked={enabled} disabled={saving} label={m.w5backups_form_enabled()} />
@@ -264,7 +264,7 @@
 				<Field label={m.w5backups_form_include_key()} for="offsite-include-key" inline>
 					<Toggle id="offsite-include-key" bind:checked={includeKey} disabled={saving} label={m.w5backups_form_include_key()} />
 				</Field>
-				<p class={`text-[0.8125rem] ${includeKey ? 'text-warning' : 'text-ink-2'}`}>{m.w5backups_form_include_key_warning()}</p>
+				<p class={`text-[0.8125rem] ${includeKey ? 'font-medium text-warning-ink' : 'text-ink-2'}`}>{m.w5backups_form_include_key_warning()}</p>
 			</div>
 		</div>
 

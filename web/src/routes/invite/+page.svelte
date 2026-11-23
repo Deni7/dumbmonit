@@ -154,7 +154,10 @@
 <AccountGate mood={phase === 'invalid' ? 'dizzy' : 'happy'}>
 	{#if phase === 'checking'}
 		<h1 id="gate-title" class="display mt-6 text-[1.75rem] text-ink sm:text-3xl">{m.w6accounts_invite_title()}</h1>
-		<Skeleton class="mt-6 h-10 w-full" rows={4} />
+		<div role="status">
+			<p class="sr-only">{m.w6design_gate_checking()}</p>
+			<Skeleton class="mt-6 h-10 w-full" rows={4} />
+		</div>
 	{:else if phase === 'invalid'}
 		<h1 id="gate-title" class="display mt-6 text-[1.75rem] text-ink sm:text-3xl">{m.w6accounts_invite_invalid_title()}</h1>
 		<p class="mt-2 text-sm text-ink-2">{m.w6accounts_invite_invalid_detail()}</p>

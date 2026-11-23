@@ -105,12 +105,12 @@
 			<div class="rounded-[var(--radius-plate)] border border-line bg-surface px-4 py-3">
 				<dt class="text-[0.8125rem] text-ink-2">{m.w5alerting_noise_mtta_label()}</dt>
 				<dd class="tnum text-xl font-semibold text-ink">{delay(report.overall.mtta_secs)}</dd>
-				<dd class="text-[0.75rem] text-ink-3">{m.w5alerting_noise_acknowledged({ count: report.overall.acknowledged })}</dd>
+				<dd class="text-[0.75rem] text-ink-2">{m.w5alerting_noise_acknowledged({ count: report.overall.acknowledged })}</dd>
 			</div>
 			<div class="rounded-[var(--radius-plate)] border border-line bg-surface px-4 py-3">
 				<dt class="text-[0.8125rem] text-ink-2">{m.w5alerting_noise_mttr_label()}</dt>
 				<dd class="tnum text-xl font-semibold text-ink">{delay(report.overall.mttr_secs)}</dd>
-				<dd class="text-[0.75rem] text-ink-3">{m.w5alerting_noise_resolved({ count: report.overall.resolved })}</dd>
+				<dd class="text-[0.75rem] text-ink-2">{m.w5alerting_noise_resolved({ count: report.overall.resolved })}</dd>
 			</div>
 		</dl>
 		{#if report.truncated}
@@ -122,11 +122,11 @@
 				{#each report.rules as rule (rule.rule_uid)}
 					<li class="grid gap-1.5 border-b border-line pb-3 last:border-b-0 last:pb-0">
 						<div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-							<p class="min-w-0 truncate text-sm font-semibold text-ink">{rule.rule_name}</p>
+							<p class="min-w-0 truncate text-sm font-semibold text-ink" title={rule.rule_name}>{rule.rule_name}</p>
 							<p class="tnum flex flex-wrap gap-x-3 text-sm text-ink">
-									<span>{m.w5alerting_noise_row_notifications({ count: rule.notifications })}</span>
-									<span class="text-ink-2">{m.w5alerting_noise_row_fired({ count: rule.fired })}</span>
-								</p>
+								<span>{m.w5alerting_noise_row_notifications({ count: rule.notifications })}</span>
+								<span class="text-ink-2">{m.w5alerting_noise_row_fired({ count: rule.fired })}</span>
+							</p>
 						</div>
 						<!-- Share of notifications, against the noisiest rule. The figure is written just above. -->
 						<div class="h-1.5 w-full overflow-hidden rounded-full bg-canvas-deep" aria-hidden="true">
@@ -169,7 +169,7 @@
 					{#each report.teams as team (team.team_id)}
 						<li class="grid gap-1 border-b border-line pb-3 last:border-b-0 last:pb-0">
 							<div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-								<p class="min-w-0 truncate text-sm font-semibold text-ink">{team.team_name}</p>
+								<p class="min-w-0 truncate text-sm font-semibold text-ink" title={team.team_name}>{team.team_name}</p>
 								<p class="tnum flex flex-wrap gap-x-3 text-sm text-ink">
 									<span>{m.w5alerting_noise_row_notifications({ count: team.notifications })}</span>
 									<span class="text-ink-2">{m.w5alerting_noise_row_fired({ count: team.fired })}</span>

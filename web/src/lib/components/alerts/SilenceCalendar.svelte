@@ -115,7 +115,7 @@
 		active: { tone: 'signal', icon: Play, classes: 'border-signal/40 bg-signal-soft text-signal-ink' },
 		upcoming: { tone: 'info', icon: CalendarClock, classes: 'border-info/30 bg-info-soft text-info-ink' },
 		recurring: { tone: 'advisory', icon: Repeat, classes: 'border-advisory/35 bg-advisory-soft text-advisory-ink' },
-		past: { tone: 'muted', icon: History, classes: 'border-line bg-surface-2 text-ink-3' }
+		past: { tone: 'muted', icon: History, classes: 'border-line bg-surface-2 text-ink-2' }
 	};
 	const kindLabel = (kind: ChipKind) =>
 		kind === 'active' ? m.w5calendar_kind_active() : kind === 'upcoming' ? m.w5calendar_kind_upcoming() : kind === 'recurring' ? m.w5calendar_kind_recurring() : m.w5calendar_kind_past();
@@ -177,12 +177,13 @@
 	{@const Icon = meta.icon}
 	<button
 		type="button"
-		class={`flex w-full min-w-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-left text-[0.75rem] leading-tight focus-visible:outline-2 focus-visible:outline-signal ${meta.classes} ${selectedId === segment.occurrence.silence_id && selectedDay === segment.day ? 'ring-2 ring-signal' : ''} ${segment.occurrence.enabled ? '' : 'opacity-60'}`}
+		class={`flex w-full min-w-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-left text-[0.75rem] leading-tight focus-visible:outline-2 focus-visible:outline-signal ${compact ? '' : 'max-sm:min-h-10'} ${meta.classes} ${selectedId === segment.occurrence.silence_id && selectedDay === segment.day ? 'ring-2 ring-signal' : ''} ${segment.occurrence.enabled ? '' : 'opacity-60'}`}
 		onclick={() => pickOccurrence(segment)}
 	>
 		<Icon class="size-3 shrink-0" aria-hidden="true" />
 		<span class="sr-only">{kindLabel(kind)}: </span>
 		<span class="truncate font-semibold">{segment.occurrence.name}</span>
+		{#if !segment.occurrence.enabled}<span class="sr-only"> {m.w5calendar_disabled()}</span>{/if}
 		{#if !compact}<span class="tnum shrink-0 text-ink-2">{timeOf(segment.startMinute)}</span>{/if}
 	</button>
 {/snippet}
@@ -303,7 +304,7 @@
 						<div class="min-w-0 flex-1">
 							<div class="flex flex-wrap items-center gap-2">
 								<Plate tone={KIND[kind].tone} label={kindLabel(kind)} size="sm" />
-								<span class="truncate font-semibold text-ink">{segment.occurrence.name}</span>
+								<span class="min-w-0 truncate font-semibold text-ink" title={segment.occurrence.name}>{segment.occurrence.name}</span>
 								{#if !segment.occurrence.enabled}<Plate tone="ghost" label={m.w5calendar_disabled()} size="sm" />{/if}
 							</div>
 							<p class="mt-0.5 text-[0.8125rem] text-ink-2 tnum">

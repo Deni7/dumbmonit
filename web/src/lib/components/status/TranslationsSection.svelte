@@ -8,7 +8,7 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { getStatusPageLanguages, putStatusPageLanguages, type StatusPageTranslation } from '#lib/api/index.js';
 	import { locales } from '#lib/paraglide/runtime.js';
-	import { Button, ErrorNotice, Field } from '#lib/ui/index.js';
+	import { Button, ErrorNotice, Field, Plate } from '#lib/ui/index.js';
 	import { X } from 'lucide-svelte';
 
 	interface Props {
@@ -29,6 +29,8 @@
 	let saving = $state(false);
 	let saved = $state(false);
 	let error = $state<unknown>(null);
+	/** Which request failed: `loading` is already false when the notice shows, so it cannot tell. */
+	let failedOn = $state<'load' | 'save'>('load');
 
 	function nativeName(locale: string): string {
 		try {
@@ -51,7 +53,9 @@
 				error = null;
 			})
 			.catch((cause) => {
-				if (!controller.signal.aborted) error = cause;
+				if (controller.signal.aborted) return;
+				error = cause;
+				failedOn = 'load';
 			})
 			.finally(() => {
 				if (!controller.signal.aborted) loading = false;
@@ -97,6 +101,7 @@
 			saved = true;
 		} catch (cause) {
 			error = cause;
+			failedOn = 'save';
 		} finally {
 			saving = false;
 		}
@@ -107,10 +112,11 @@
 	<p class="text-[0.8125rem] text-ink-2">{m.w5calendar_langs_intro()}</p>
 
 	{#if error}
-		<ErrorNotice {error} title={loading ? m.w5calendar_langs_error_load() : m.w5calendar_langs_error_save()} />
+		<ErrorNotice {error} title={failedOn === 'load' ? m.w5calendar_langs_error_load() : m.w5calendar_langs_error_save()} />
 	{/if}
 
-	<fieldset class="grid gap-4" disabled={disabled || saving || loading}>
+	<!-- Held shut after a failed read: saving the empty form would wipe the stored translations. -->
+	<fieldset class="grid gap-4" disabled={disabled || saving || loading || (error !== null && failedOn === 'load')}>
 		<legend class="sr-only">{m.w5calendar_langs_section()}</legend>
 		<Field label={m.w5calendar_langs_default_label()} for="{idPrefix}-lang-default" help={m.w5calendar_langs_default_help()}>
 			<select id="{idPrefix}-lang-default" class="input" bind:value={defaultLang} onchange={() => (saved = false)}>
@@ -172,9 +178,9 @@
 			</div>
 		{/if}
 
-		<div class="flex flex-wrap items-center gap-3">
+		<div class="flex flex-wrap items-center gap-3" aria-live="polite">
 			<Button variant="primary" loading={saving} onclick={save}>{m.w5calendar_langs_save()}</Button>
-			{#if saved}<span class="text-[0.8125rem] text-ink-2" role="status">{m.w5calendar_langs_saved()}</span>{/if}
+			{#if saved}<Plate tone="signal" draw label={m.w5calendar_langs_saved()} />{/if}
 		</div>
 	</fieldset>
 </div>
