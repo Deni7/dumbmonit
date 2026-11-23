@@ -104,6 +104,13 @@ async fn require_read(State(state): State<AppState>, request: Request, next: Nex
     }
     match auth_middleware::current_session(&state.pool, request.headers()).await {
         Ok(Some((_, user))) => {
+            // Un écran mural ne lit que ce que montre le mur : pas les séries brutes.
+            if user.role.is_wall() {
+                return AuthError::Forbidden(
+                    "A wall display account cannot read raw metrics.".into(),
+                )
+                .into_response();
+            }
             if let Err(response) =
                 refuse_scoped(&state, &auth_middleware::Principal::User(user)).await
             {
