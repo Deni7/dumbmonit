@@ -105,7 +105,7 @@ server_urls:
   - https://a:8080/
   - https://b:8080
   - url: https://c:8080
-tls_url: https://agents-c:9443/
+    tls_url: https://agents-c:9443/
 ";
     let file: FileConfig = dumbmonit_collectors::yaml::from_str(yaml).expect("yaml");
     let config = Config::merge(file, env(&[])).expect("configuration");

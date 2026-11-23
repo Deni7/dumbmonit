@@ -212,7 +212,7 @@ fn performance_counters_are_read_from_the_file_in_both_forms() {
 perf_counters:
   - '\Processor(_Total)\% Processor Time'
   - path: '\Memory\Available MBytes'
-name: memory_available_mb
+    name: memory_available_mb
   - path: '\Paging File(_Total)\% Usage'
 mdaemon: true
 "#;

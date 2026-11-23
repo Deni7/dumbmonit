@@ -36,18 +36,18 @@ wireguard_peer_names:
   "zonmO992nrIL4FgJ3B/wccmu/SBkoX2kDhSYr8KpgRU=": laptop
 restic_repos:
   - name: nas
-repository: sftp:backup@192.0.2.10:/srv/restic
-password_file: /etc/dumbmonit/restic-nas.pass
-host: web-01
+    repository: sftp:backup@192.0.2.10:/srv/restic
+    password_file: /etc/dumbmonit/restic-nas.pass
+    host: web-01
   - repository: "rest:https://user:s3cret@backup.example.net/repo"
-password_command: pass show restic
-env:
-  RESTIC_REST_USERNAME: user
+    password_command: pass show restic
+    env:
+      RESTIC_REST_USERNAME: user
 borg_repos:
   - name: offsite
-repository: ssh://borg@192.0.2.20/./repo
-password_file: /etc/dumbmonit/borg.pass
-glob_archives: "web-01-*"
+    repository: ssh://borg@192.0.2.20/./repo
+    password_file: /etc/dumbmonit/borg.pass
+    glob_archives: "web-01-*"
 backup_repos_interval_secs: 900
 "#;
     let file: FileConfig = dumbmonit_collectors::yaml::from_str(yaml).expect("yaml");

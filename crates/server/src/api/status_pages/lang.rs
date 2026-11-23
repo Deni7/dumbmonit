@@ -22,7 +22,7 @@ use crate::state::AppState;
 const MAX_LABELS: usize = 400;
 
 /// La langue de l'interface correspondant à une étiquette (`fr-CA`, `pt_BR`,
-/// `zh-CN`…), parmi les neuf prises en charge.
+/// `zh-CN`…), parmi celles de l'interface.
 pub fn canonical(tag: &str) -> Option<&'static str> {
     let tag = tag.trim().replace('_', "-").to_ascii_lowercase();
     if tag.is_empty() || tag == "*" {
@@ -42,7 +42,7 @@ pub fn canonical(tag: &str) -> Option<&'static str> {
 }
 
 /// Choisit la langue d'un visiteur : `?lang=` d'abord, puis `Accept-Language`
-/// par poids décroissant. `None` : aucune des neuf, la page retombe sur sa
+/// par poids décroissant. `None` : aucune des nôtres, la page retombe sur sa
 /// langue par défaut.
 pub fn pick_language(query: Option<&str>, accept: Option<&str>) -> Option<&'static str> {
     if let Some(found) = query.and_then(canonical) {
@@ -244,20 +244,21 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn les_etiquettes_se_ramenent_aux_neuf_langues() {
+    fn les_etiquettes_se_ramenent_aux_langues_de_l_interface() {
         assert_eq!(canonical("fr-CA"), Some("fr"));
         assert_eq!(canonical("pt_BR"), Some("pt-BR"));
         assert_eq!(canonical("pt-PT"), Some("pt"));
         assert_eq!(canonical("zh-CN"), Some("zh-Hans"));
         assert_eq!(canonical("zh-Hans"), Some("zh-Hans"));
-        assert_eq!(canonical("ja"), None);
+        assert_eq!(canonical("ja-JP"), Some("ja"));
+        assert_eq!(canonical("xx"), None);
         assert_eq!(canonical("*"), None);
     }
 
     #[test]
     fn accept_language_suit_les_poids_et_saute_les_inconnues() {
-        assert_eq!(pick_language(None, Some("ja, de;q=0.8, fr;q=0.9")), Some("fr"));
-        assert_eq!(pick_language(None, Some("ja, ko;q=0.5")), None);
+        assert_eq!(pick_language(None, Some("xx, de;q=0.8, fr;q=0.9")), Some("fr"));
+        assert_eq!(pick_language(None, Some("xx, yy;q=0.5")), None);
         assert_eq!(pick_language(None, Some("fr;q=0, es;q=0.1")), Some("es"));
         assert_eq!(pick_language(None, None), None);
     }
@@ -308,7 +309,7 @@ mod tests {
         assert!(validate(bad).is_err());
         let twice = Languages { default_lang: String::new(), translations: vec![t("fr"), t("fr")] };
         assert!(validate(twice).is_err());
-        let unknown = Languages { default_lang: String::new(), translations: vec![t("ja")] };
+        let unknown = Languages { default_lang: String::new(), translations: vec![t("xx")] };
         assert!(validate(unknown).is_err());
         let ok = Languages { default_lang: "fr".into(), translations: vec![t("de"), t("pt-BR")] };
         assert_eq!(validate(ok).ok().map(|l| l.translations.len()), Some(2));

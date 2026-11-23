@@ -370,8 +370,9 @@ async fn an_invitation_creates_the_account_with_its_role_and_teams() {
     assert_eq!(me.body["email"], "Ada@example.org");
     assert_eq!(me.body["display_name"], "Ada L.");
     let teams = lab.app.get("/api/teams", Some(&lab.admin)).await;
-    let members = teams.body[0]["members"].as_array().unwrap();
-    assert!(members.iter().any(|m| m["username"] == "ada"), "{members:?}");
+    let members = teams.body["teams"][0]["members"].as_array().unwrap_or_else(|| panic!("{} {}", teams.status, teams.body));
+    let ada = me.body["id"].as_i64();
+    assert!(members.iter().any(|m| m["user_id"].as_i64() == ada), "{members:?}");
 
     let (status, _) = lab.public(INVITE_ACCEPT, accept).await;
     assert_eq!(status, StatusCode::NOT_FOUND, "used once");

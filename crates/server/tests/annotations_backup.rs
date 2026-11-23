@@ -84,9 +84,11 @@ async fn a_marker_whose_monitors_are_gone_is_left_out() {
     let (source, cipher, _dir) = instance().await;
     let api = target(&source, "API", "10.0.0.2").await;
     add(&source, "API only", "2026-11-20T10:05:00Z", Scope::Monitors { targets: vec![api] }).await;
-    let exported = collect(&source, &cipher, ExportOptions::default()).await.expect("export");
+    let mut exported = collect(&source, &cipher, ExportOptions::default()).await.expect("export");
+    // Un lot où ce moniteur manque (retiré à la main, ou d'une version qui ne
+    // l'emportait pas) : le repère qui ne vise que lui est écarté et signalé.
+    exported.targets.clear();
 
-    // L'instance neuve n'a pas ce moniteur : le repère est écarté et signalé.
     let (target_pool, cipher, _other) = instance().await;
     let report = restore(&target_pool, &cipher, &exported, true).await.expect("restauration");
     let section = report.sections.iter().find(|s| s.section == "annotations").expect("section");

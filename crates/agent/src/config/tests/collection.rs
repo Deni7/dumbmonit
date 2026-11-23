@@ -141,7 +141,7 @@ fn libvirt_reads_the_system_uri_by_default_and_both_sources() {
     assert_eq!(config.libvirt.uri, "qemu:///system");
 
     let yaml = "libvirt_bin: /usr/bin/virsh\nlibvirt_uri: qemu+ssh://kvm/system\n\
-                libvirt_interval_secs: 30\n";
+                    libvirt_interval_secs: 30\n";
     let file = FileConfig {
         server_url: Some("https://s:8080".into()),
         token: Some("dmon_abc".into()),
@@ -182,7 +182,7 @@ fn hardware_collection_is_on_by_default_and_reads_the_file() {
     assert_eq!(config.zfs, ZfsConfig::default());
 
     let yaml = "sensors: false\nsmart_bin: /usr/local/sbin/smartctl\n\
-                smart_interval_secs: 900\nzfs_bin: /sbin/zpool\nzfs_interval_secs: 60\n";
+                    smart_interval_secs: 900\nzfs_bin: /sbin/zpool\nzfs_interval_secs: 60\n";
     let file = FileConfig {
         server_url: Some("https://s:8080".into()),
         token: Some("dmon_abc".into()),

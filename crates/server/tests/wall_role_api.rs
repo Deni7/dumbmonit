@@ -165,13 +165,19 @@ async fn every_other_route_is_refused_to_a_wall_display() {
             // Sous le garde de session : le refus du mur, et lui seul. Les
             // autres (SCIM, MCP, Prometheus, OTLP) veulent un jeton : le
             // cookie n'y ouvre rien.
-            let session_guarded =
-                path.starts_with("/api/") && !path.starts_with("/api/scim") && path != "/api/mcp";
+            // Éteints par défaut (SCIM, OTLP), ils ne sont même pas montés : 404.
+            let session_guarded = path.starts_with("/api/")
+                && !path.starts_with("/api/scim")
+                && !path.starts_with("/api/otlp")
+                && path != "/api/mcp";
             let refused = if session_guarded {
                 reply.status == StatusCode::FORBIDDEN
                     && reply.body["error"].as_str().is_some_and(|e| e.contains("wall display"))
             } else {
-                matches!(reply.status, StatusCode::FORBIDDEN | StatusCode::UNAUTHORIZED)
+                matches!(
+                    reply.status,
+                    StatusCode::FORBIDDEN | StatusCode::UNAUTHORIZED | StatusCode::NOT_FOUND
+                )
             };
             if !refused {
                 problems.push(format!("{verb} {uri} : {} {}", reply.status, reply.body));
