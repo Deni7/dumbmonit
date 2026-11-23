@@ -74,9 +74,9 @@ on the same origin as your admin interface, under the same
 
 The page's fixed texts ("All systems operational", headings, buttons) follow the
 visitor's language: their saved choice, then their browser language, among the
-nine interface languages. A **Language** picker at the bottom of the page lets
+fourteen interface languages. A **Language** picker at the bottom of the page lets
 them change it; only the chosen language is downloaded. When the browser speaks
-none of the nine, the page uses its **Default language**.
+none of the fourteen, the page uses its **Default language**.
 
 The texts you wrote can be translated too. In the page editor, **Translations**
 (available once the page is saved) lets you pick a language and override the

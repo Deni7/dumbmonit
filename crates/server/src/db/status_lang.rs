@@ -9,7 +9,8 @@ use sqlx::{Row, SqlitePool};
 
 /// Les langues de l'interface, les seules acceptées (un test du front vérifie
 /// que la liste suit `project.inlang/settings.json`).
-pub const SUPPORTED: [&str; 9] = ["en", "de", "es", "fr", "it", "pt", "pt-BR", "ru", "zh-Hans"];
+pub const SUPPORTED: [&str; 14] =
+    ["en", "de", "es", "fr", "it", "pt", "pt-BR", "ru", "zh-Hans", "ja", "ko", "nl", "pl", "tr"];
 
 /// Les textes d'une page dans une langue ; un champ vide garde le texte écrit.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 
-const LOCALES = ['en', 'de', 'es', 'fr', 'it', 'pt', 'pt-BR', 'ru', 'zh-Hans'];
+const LOCALES = ['en', 'de', 'es', 'fr', 'it', 'pt', 'pt-BR', 'ru', 'zh-Hans', 'ja', 'ko', 'nl', 'pl', 'tr'];
 const source = readFileSync(new URL('../src/lib/components/settings/auditActions.ts', import.meta.url), 'utf8');
 
 /** `messages/en.json`, plus the fragments not merged yet. */
