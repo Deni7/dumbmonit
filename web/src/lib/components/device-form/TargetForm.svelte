@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { withBase } from '#lib/paths.js';
 	import { m } from '#lib/paraglide/messages.js';
 	/**
 	 * The device form, shared by "Add a device" and "Edit".
@@ -11,7 +10,7 @@
 	 * from `target` and the pages re-mount it (`{#key}`) when the subject changes.
 	 */
 	import { untrack } from 'svelte';
-	import { CheckCircle2, ChevronDown, PlugZap, XCircle } from 'lucide-svelte';
+	import { ChevronDown, PlugZap } from 'lucide-svelte';
 	import {
 		createTarget,
 		deleteRuleOverride,
@@ -47,6 +46,10 @@
 	import { sameChannels, templateSeed } from './template-seed';
 	import type { MonitorTemplate } from '#lib/api/monitorTemplates.js';
 	import RequirementNotice from './RequirementNotice.svelte';
+	import NameAddressFields from './NameAddressFields.svelte';
+	import IntervalField from './IntervalField.svelte';
+	import ReachFields from './ReachFields.svelte';
+	import TestResult from './TestResult.svelte';
 	import MonitoredRules from './MonitoredRules.svelte';
 	import { overrideActions, pendingChanges } from './monitored-rules';
 	import { draftChanged, prefillDraft, secretPolicy, type SavedCredential } from './credential-edit';
@@ -60,10 +63,16 @@
 		type CredentialErrors
 	} from './credentials';
 	import { DEFAULT_INTERVAL, INTERVALS, SNMP_KIND, suggestName } from './kinds';
-	import { INTERVAL_UNITS, MIN_INTERVAL_SECS, intervalProblem, intervalSeconds, splitInterval, type IntervalUnit } from './interval';
+	import {
+		MIN_INTERVAL_SECS,
+		intervalProblem,
+		intervalSeconds,
+		splitInterval,
+		type IntervalUnit
+	} from './interval';
 	import { withoutSecretTags } from './discovery-prefill';
 	import { useDirtyTracker } from '#lib/settings/unsaved.svelte.js';
-	import { firstReason, identitySummary, testBlocker } from './test-connection';
+	import { firstReason, testBlocker } from './test-connection';
 	import { seedFromPrefill, type Prefill } from './discovery-prefill';
 
 	interface Props {
@@ -159,17 +168,6 @@
 					? m.w1monitors_form_interval_err_invalid()
 					: null
 	);
-	const unitLabel = (unit: IntervalUnit) =>
-		({ s: m.w1monitors_form_unit_seconds(), m: m.w1monitors_form_unit_minutes(), h: m.w1monitors_form_unit_hours(), d: m.w1monitors_form_unit_days() })[unit];
-	function chooseInterval(choice: string) {
-		// Opening "Custom" starts from the preset just left, so the number means something.
-		if (choice === CUSTOM_INTERVAL && intervalChoice !== CUSTOM_INTERVAL && intervalSecs !== null) {
-			const split = splitInterval(intervalSecs);
-			customValue = String(split.value);
-			customUnit = split.unit;
-		}
-		intervalChoice = choice;
-	}
 	/** Free text for the team, shown on the monitor's page. */
 	let note = $state(untrack(() => base?.note ?? ''));
 	let parentId = $state<number | null>(untrack(() => base?.parent_id ?? null));
@@ -404,29 +402,11 @@
 			.catch(() => (relays = []));
 		return () => controller.abort();
 	});
-	const relayCandidates = $derived(relays);
 	// --- Several locations -----------------------------------------------------
 	const canMultisite = $derived(isMultisiteKind(collector.kind));
 	const multisiteAgentsKey = (ids: number[]) => [...ids].sort((a, b) => a - b).join(',');
 	const msTotal = $derived((msServer ? 1 : 0) + msAgents.length);
 	const msTooFew = $derived(msOn && msTotal < 2);
-	/** An unknown agent id (deleted since) stays listed so it can be unticked. */
-	const msUnknownAgents = $derived(msAgents.filter((id) => !relays.some((r) => r.id === id)));
-	const msNotReady = $derived(msOn && relays.some((r) => msAgents.includes(r.id) && !r.relay));
-	function toggleMsAgent(id: number, on: boolean) {
-		msAgents = on ? [...msAgents.filter((x) => x !== id), id] : msAgents.filter((x) => x !== id);
-	}
-	// The quorum cannot exceed the number of locations left.
-	$effect(() => {
-		if (msQuorum !== null && msQuorum > Math.max(msTotal, 1)) msQuorum = null;
-	});
-	/** The chosen relay, when it has not declared `relay: true`: probes would wait forever. */
-	const relayNotReady = $derived(
-		viaAgent !== null && relays.some((r) => r.id === viaAgent && !r.relay)
-	);
-	function relayLabel(relay: RelayAgent): string {
-		return relay.site ? m.deviceform_form_relay_site({ name: relay.name, site: relay.site }) : relay.name;
-	}
 
 	function buildPayload(): TargetPayload {
 		const payload: TargetPayload = {
@@ -616,48 +596,7 @@
 	{#if agentOption}
 		<AgentLink {collector} option={agentOption} {targets} value={tags[agentOption.key] ?? ''} guessed={agentGuessed} onchange={chooseAgent} />
 	{/if}
-	<div class="grid gap-4 sm:grid-cols-2">
-		<Field label={m.deviceform_form_name_label()} for="target-name" required error={shown('name', nameError)} help={m.deviceform_form_name_help()}>
-			<input
-				id="target-name"
-				class="input"
-				type="text"
-				autocomplete="off"
-				bind:value={name}
-				placeholder={suggestName(address) || m.deviceform_form_name_placeholder()}
-				aria-invalid={shown('name', nameError) ? 'true' : undefined}
-				onblur={() => touch('name')}
-			/>
-		</Field>
-
-		<Field label={m.deviceform_form_address_label()} for="target-address" required error={shown('address', addressError)} help={addressHelp}>
-			<div class="relative">
-				<input
-					id="target-address"
-					class={`input font-mono text-[0.8125rem] ${collector.default_port > 0 ? 'pr-16' : ''}`}
-					type="text"
-					autocomplete="off"
-					spellcheck="false"
-					bind:value={address}
-					placeholder={collector.address_hint || m.deviceform_form_address_placeholder()}
-					aria-invalid={shown('address', addressError) ? 'true' : undefined}
-					onblur={() => {
-						touch('address');
-						// Naming a switch is not a prerequisite to watching it.
-						if (!name.trim()) name = suggestName(address);
-					}}
-				/>
-				{#if collector.default_port > 0 && !/:\d+$/.test(address.trim())}
-					<span
-						class="tnum pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 font-mono text-[0.8125rem] text-ink-3"
-						aria-hidden="true"
-					>
-						:{collector.default_port}
-					</span>
-				{/if}
-			</div>
-		</Field>
-	</div>
+	<NameAddressFields {collector} bind:name bind:address {nameError} {addressError} {addressHelp} {shown} {touch} />
 
 	{#if !(views.length <= 1 && credential.fields.length === 0)}
 		<CredentialFields
@@ -708,33 +647,7 @@
 			{/if}
 
 			<div class="grid gap-4 sm:grid-cols-2">
-				<Field label={m.deviceform_form_interval_label()} for="target-interval" help={m.deviceform_form_interval_help()} error={intervalChoice === CUSTOM_INTERVAL ? intervalError : null}>
-					<select id="target-interval" class="input tnum" value={intervalChoice} onchange={(e) => chooseInterval(e.currentTarget.value)}>
-						{#each INTERVALS as option (option.value)}
-							<option value={String(option.value)}>{option.label}</option>
-						{/each}
-						<option value={CUSTOM_INTERVAL}>{m.w1monitors_form_interval_custom()}</option>
-					</select>
-					{#if intervalChoice === CUSTOM_INTERVAL}
-						<div class="mt-2 flex items-center gap-2">
-							<input
-								class="input tnum !w-28"
-								type="number"
-								inputmode="numeric"
-								min="1"
-								step="1"
-								bind:value={customValue}
-								aria-label={m.w1monitors_form_interval_value_aria()}
-								aria-invalid={intervalError ? 'true' : undefined}
-							/>
-							<select class="input !w-auto" bind:value={customUnit} aria-label={m.w1monitors_form_interval_unit_aria()}>
-								{#each INTERVAL_UNITS as unit (unit)}
-									<option value={unit}>{unitLabel(unit)}</option>
-								{/each}
-							</select>
-						</div>
-					{/if}
-				</Field>
+				<IntervalField bind:intervalChoice bind:customValue bind:customUnit {intervalSecs} {intervalError} {CUSTOM_INTERVAL} />
 
 				{#if showClient}
 					<Field label={m.deviceform_form_client_label()} for="target-client" help={target ? m.deviceform_form_client_help_edit() : m.deviceform_form_client_help()}>
@@ -785,88 +698,7 @@
 					</select>
 				</Field>
 
-				{#if canRelay && !(canMultisite && msOn) && (relayCandidates.length > 0 || viaAgent !== null)}
-					<Field
-						label={m.deviceform_form_relay_label()}
-						for="target-relay"
-						help={relayNotReady ? m.deviceform_form_relay_not_ready() : undefined}
-					>
-						<select id="target-relay" class="input" bind:value={viaAgent}>
-							<option value={null}>{m.deviceform_form_relay_direct()}</option>
-							{#each relayCandidates as relay (relay.id)}
-								<option value={relay.id}>{relay.relay ? relayLabel(relay) : m.deviceform_form_relay_off({ label: relayLabel(relay) })}</option>
-							{/each}
-							{#if viaAgent !== null && !relayCandidates.some((r) => r.id === viaAgent)}
-								<option value={viaAgent}>{m.deviceform_form_relay_agent_n({ id: viaAgent })}</option>
-							{/if}
-						</select>
-					</Field>
-				{:else if canRelay && relaysRead && !editing}
-					<!-- No relay yet: say once that a device on another network is reachable too. -->
-					<p class="text-[0.8125rem] leading-relaxed text-ink-2 sm:col-span-2">
-						<a href={withBase('/targets/new?kind=agent&via=relay')} class="font-semibold text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink">{m.deviceform_form_remote_link()}</a>
-					</p>
-				{/if}
-
-				{#if canMultisite && (relayCandidates.length > 0 || msOn)}
-					<div class="grid gap-3 sm:col-span-2">
-						<Field
-							label={m.deviceform_multisite_label()}
-							for="target-multisite"
-							inline
-							help={viaAgent !== null && !msOn ? m.deviceform_multisite_exclusive() : undefined}
-						>
-							<Toggle
-								id="target-multisite"
-								bind:checked={msOn}
-								disabled={viaAgent !== null && !msOn}
-								label={m.deviceform_multisite_label()}
-								onchange={(on) => {
-									if (on) viaAgent = null;
-								}}
-							/>
-						</Field>
-						{#if msOn}
-							<fieldset class="grid gap-1 rounded-[var(--radius-card)] border border-line p-3">
-								<legend class="px-1 text-sm font-semibold text-ink">{m.deviceform_multisite_locations()}</legend>
-								<label class="flex min-h-10 items-center gap-3 text-sm text-ink">
-									<input type="checkbox" class="size-4 accent-[var(--color-signal)]" bind:checked={msServer} />
-									{m.deviceform_multisite_server()}
-								</label>
-								{#each relayCandidates as relay (relay.id)}
-									<label class="flex min-h-10 items-center gap-3 text-sm text-ink">
-										<input
-											type="checkbox"
-											class="size-4 accent-[var(--color-signal)]"
-											checked={msAgents.includes(relay.id)}
-											onchange={(e) => toggleMsAgent(relay.id, e.currentTarget.checked)}
-										/>
-										<span class="min-w-0 break-words">{relay.relay ? relayLabel(relay) : m.deviceform_form_relay_off({ label: relayLabel(relay) })}</span>
-									</label>
-								{/each}
-								{#each msUnknownAgents as id (id)}
-									<label class="flex min-h-10 items-center gap-3 text-sm text-ink">
-										<input type="checkbox" class="size-4 accent-[var(--color-signal)]" checked onchange={(e) => toggleMsAgent(id, e.currentTarget.checked)} />
-										{m.deviceform_form_relay_agent_n({ id })}
-									</label>
-								{/each}
-								{#if msTooFew}
-									<p class="text-[0.8125rem] text-warning" role="alert">{m.deviceform_multisite_too_few()}</p>
-								{:else if msNotReady}
-									<p class="text-[0.8125rem] text-ink-2">{m.deviceform_multisite_not_ready()}</p>
-								{/if}
-							</fieldset>
-							<Field label={m.deviceform_multisite_quorum_label()} for="target-quorum" help={m.deviceform_multisite_quorum_help()}>
-								<select id="target-quorum" class="input" bind:value={msQuorum}>
-									<option value={null}>{m.deviceform_multisite_quorum_majority()}</option>
-									{#each Array.from({ length: Math.max(msTotal, 1) }, (_, i) => i + 1) as n (n)}
-										<option value={n}>{m.deviceform_multisite_quorum_n({ n, total: msTotal })}</option>
-									{/each}
-								</select>
-							</Field>
-						{/if}
-					</div>
-				{/if}
+				<ReachFields {collector} {canRelay} {canMultisite} {relays} {relaysRead} {editing} bind:viaAgent bind:msOn bind:msServer bind:msAgents bind:msQuorum />
 			</div>
 
 			<TagsEditor tags={freeTags} reserved={optionKeys} onchange={setFreeTags} />
@@ -943,29 +775,6 @@
 		<p id="target-test-why" class="text-[0.8125rem] text-ink-2">{blockerText}</p>
 	{/if}
 	{#if canTest}
-		<div aria-live="polite" class="grid gap-1">
-			{#if testReport?.ok}
-				{@const identity = identitySummary(testReport.sysname, testReport.sysdescr)}
-				<p class="flex items-start gap-2 text-sm font-medium text-ink">
-					<CheckCircle2 class="mt-0.5 size-4 shrink-0 text-signal-ink" aria-hidden="true" />
-					<span>
-						{identity ? m.deviceform_test_ok_identity({ identity }) : m.deviceform_test_ok()}
-					</span>
-				</p>
-				{#if testReport.profile_id}
-					<p class="pl-6 text-[0.8125rem] text-ink-2">{m.deviceform_test_profile({ profile: testReport.profile_id })}</p>
-				{/if}
-			{:else if testReport}
-				<p class="flex items-start gap-2 text-sm font-medium text-warning-ink">
-					<XCircle class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-					<span>{m.deviceform_test_failed({ error: testReport.error ?? '' })}</span>
-				</p>
-				<p class="pl-6 text-[0.8125rem] text-ink-2">
-					{testReport.unreachable ? m.deviceform_test_hint_down() : m.deviceform_test_hint_config()}
-				</p>
-			{:else if testError}
-				<ErrorNotice error={testError} title={m.deviceform_test_error()} />
-			{/if}
-		</div>
+		<TestResult report={testReport} error={testError} />
 	{/if}
 </form>
