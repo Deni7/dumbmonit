@@ -460,6 +460,9 @@ pub const SCOPED_ROUTES: &[(&str, &str, RouteRule)] = &[
     ("GET", "/alerts", RouteRule::Open),
     ("GET", "/alerts/history", RouteRule::Open),
     ("GET", "/alerts/noise", RouteRule::Open),
+    // Tableaux de bord de la vue d'ensemble : moniteurs, séries et historique
+    // filtrés par le gestionnaire.
+    ("GET", "/overview/widgets", RouteRule::Open),
     ("GET", "/alerts/rules", RouteRule::Open),
     ("GET", "/alerts/silences", RouteRule::Open),
     ("POST", "/alerts/silences", RouteRule::Open),
