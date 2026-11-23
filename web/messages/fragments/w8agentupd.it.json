@@ -1,0 +1,7 @@
+{
+	"settings_agentupdates_status_reinstall": "Reinstallazione necessaria",
+	"settings_agentupdates_hint_reinstall": "Questa versione dell'agente Windows non può sostituire il proprio binario: riesegui una volta il comando di installazione sulla macchina, le versioni successive si aggiornano da sole.",
+	"settings_agentupdates_status_unknown_key": "Chiave di firma sconosciuta",
+	"settings_agentupdates_hint_unknown_key": "Questo agente è precedente alla chiave di firma attuale e non può verificare l'aggiornamento: attiva Accetta build non firmate (sviluppo) finché non si è aggiornato, oppure riesegui il comando di installazione.",
+	"settings_agentupdates_reinstall_command": "Ottieni il comando di installazione"
+}

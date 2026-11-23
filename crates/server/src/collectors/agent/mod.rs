@@ -29,6 +29,7 @@ pub mod policy;
 mod receive;
 pub mod rollout;
 pub mod selfupdate;
+pub mod selfupdate_compat;
 pub mod sentinel;
 mod store;
 mod token;

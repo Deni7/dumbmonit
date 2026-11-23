@@ -600,8 +600,17 @@ fn stage(path: &Path, bytes: &[u8]) -> Result<()> {
 fn copy_synced(from: &Path, to: &Path) -> Result<()> {
     std::fs::copy(from, to)
         .with_context(|| format!("copying {} to {}", from.display(), to.display()))?;
-    std::fs::File::open(to).and_then(|file| file.sync_all()).context("syncing the copy")?;
+    open_for_sync(to).and_then(|file| file.sync_all()).context("syncing the copy")?;
     Ok(())
+}
+
+/// Ouvre un fichier existant pour le synchroniser sur disque. Windows :
+/// `FlushFileBuffers` exige un accès en écriture — par un descripteur en
+/// lecture seule, il répond « Accès refusé » (os error 5), ce qui faisait
+/// échouer toute mise à jour jusqu'à 0.20.1. Unix : `fsync` se contente d'un
+/// descripteur en lecture, qui ne dépend pas des droits d'écriture du fichier.
+fn open_for_sync(path: &Path) -> std::io::Result<std::fs::File> {
+    std::fs::OpenOptions::new().read(true).write(cfg!(windows)).open(path)
 }
 
 /// Lance le nouveau binaire une fois (`--version`) : un binaire qui ne démarre

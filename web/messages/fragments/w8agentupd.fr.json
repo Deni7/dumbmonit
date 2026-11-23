@@ -1,0 +1,7 @@
+{
+	"settings_agentupdates_status_reinstall": "Réinstallation nécessaire",
+	"settings_agentupdates_hint_reinstall": "Cette version de l'agent Windows ne peut pas remplacer son propre binaire : relancez une fois la commande d'installation sur la machine, les versions suivantes se mettent à jour seules.",
+	"settings_agentupdates_status_unknown_key": "Clé de signature inconnue",
+	"settings_agentupdates_hint_unknown_key": "Cet agent est antérieur à la clé de signature actuelle et ne peut pas vérifier la mise à jour : activez Accepter les builds non signés (développement) le temps qu'il se mette à jour, ou relancez la commande d'installation.",
+	"settings_agentupdates_reinstall_command": "Obtenir la commande d'installation"
+}
