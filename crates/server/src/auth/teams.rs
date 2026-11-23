@@ -539,12 +539,17 @@ fn method_matches(wanted: &str, method: &Method) -> bool {
     wanted == "*" || wanted == method.as_str() || (wanted == "GET" && *method == Method::HEAD)
 }
 
+/// Vrai si `method path` figure dans `routes` (méthode, gabarit), chemin pris
+/// avec ou sans `/api` et sans `/` final, `GET` valant aussi pour `HEAD`.
+/// Partagé par les listes blanches de rôle (mur, permissions).
+pub fn route_listed(routes: &[(&str, &str)], method: &Method, path: &str) -> bool {
+    let path = strip(path);
+    routes.iter().any(|(m, pattern)| method_matches(m, method) && path_matches(pattern, path))
+}
+
 /// Vrai si l'écriture fait partie de ce que `manage` ouvre à un opérateur.
 pub fn is_manage_route(method: &Method, path: &str) -> bool {
-    let path = strip(path);
-    MANAGE_TARGET_ROUTES
-        .iter()
-        .any(|(m, pattern)| method_matches(m, method) && path_matches(pattern, path))
+    route_listed(MANAGE_TARGET_ROUTES, method, path)
 }
 
 /// `/targets/{id}` ou `/targets/{id}/…` : l'identifiant, s'il est numérique.

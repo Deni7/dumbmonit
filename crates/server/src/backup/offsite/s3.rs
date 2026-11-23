@@ -14,7 +14,7 @@ use reqwest::header::{AUTHORIZATION, CONTENT_LENGTH};
 use reqwest::{Method, Url};
 
 use super::sigv4::{self, EMPTY_SHA256};
-use super::transfer::{self, Failure, SHORT_TIMEOUT, TRANSFER_TIMEOUT};
+use super::transfer::{self, Failure, MAX_LISTING_BYTES, SHORT_TIMEOUT, TRANSFER_TIMEOUT};
 use super::{S3Settings, check_name};
 
 /// Plus gros objet qu'un seul `PUT` accepte.
@@ -193,7 +193,7 @@ impl Client {
             let response = self
                 .send(Method::GET, None, query, EMPTY_SHA256, None, SHORT_TIMEOUT, what)
                 .await?;
-            let body = response.text().await.map_err(|error| Failure::request(what, &error))?;
+            let body = transfer::read_listing(response, what, MAX_LISTING_BYTES).await?;
             let page = parse_list(&body, &prefix)?;
             names.extend(page.names);
             match page.next {

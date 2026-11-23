@@ -23,6 +23,10 @@ pub const SHORT_TIMEOUT: Duration = Duration::from_secs(60);
 const CHUNK: usize = 64 * 1024;
 /// Octets d'une réponse d'erreur gardés pour le message.
 const ERROR_BODY_BYTES: usize = 4096;
+/// Taille maximale d'une liste de fichiers (S3, WebDAV) : des dizaines de
+/// milliers de noms. Au-delà, ce n'est plus une liste de sauvegardes, et le
+/// serveur ne doit pas la garder entière en mémoire.
+pub const MAX_LISTING_BYTES: usize = 16 * 1024 * 1024;
 
 /// Un échec de transfert, dit pour un administrateur.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -129,6 +133,32 @@ pub async fn read_snippet(mut response: reqwest::Response) -> String {
     }
     body.truncate(ERROR_BODY_BYTES);
     String::from_utf8_lossy(&body).into_owned()
+}
+
+/// Le corps d'une liste de fichiers, lu par morceaux et refusé au-delà de
+/// `max` octets.
+pub async fn read_listing(
+    mut response: reqwest::Response,
+    what: &str,
+    max: usize,
+) -> Result<String, Failure> {
+    if response.content_length().is_some_and(|length| length > max as u64) {
+        return Err(too_long(what, max));
+    }
+    let mut body: Vec<u8> = Vec::new();
+    loop {
+        let chunk = response.chunk().await.map_err(|error| Failure::request(what, &error))?;
+        let Some(chunk) = chunk else { break };
+        if body.len() + chunk.len() > max {
+            return Err(too_long(what, max));
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(String::from_utf8_lossy(&body).into_owned())
+}
+
+fn too_long(what: &str, max: usize) -> Failure {
+    Failure::fatal(format!("{what}: the answer is larger than {} MiB", max / (1024 * 1024)))
 }
 
 /// Ramène un texte à une ligne d'au plus `max` caractères.
@@ -239,6 +269,16 @@ mod tests {
     fn error_text_is_kept_short_and_on_one_line() {
         assert_eq!(one_line("  a\n\tb  c ", 10), "a b c");
         assert_eq!(one_line("abcdef", 3), "abc…");
+    }
+
+    #[tokio::test]
+    async fn a_listing_is_read_up_to_its_ceiling() {
+        let reply = |body: Vec<u8>| reqwest::Response::from(axum::http::Response::new(body));
+        let read = read_listing(reply(b"<a/>".to_vec()), "listing", 16).await.unwrap();
+        assert_eq!(read, "<a/>");
+        let refused = read_listing(reply(vec![b'x'; 17]), "listing", 16).await.unwrap_err();
+        assert!(refused.message.starts_with("listing: the answer is larger"), "{refused}");
+        assert!(!refused.retry);
     }
 
     #[tokio::test]
