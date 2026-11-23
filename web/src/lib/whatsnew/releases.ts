@@ -21,7 +21,7 @@ export interface Release {
 
 export const RELEASES: Release[] = [
 	{
-		version: '0.20.0-dev.2',
+		version: '0.20.1',
 		date: '2026-11-23',
 		highlights: [
 			{
@@ -47,7 +47,7 @@ export const RELEASES: Release[] = [
 		]
 	},
 	{
-		version: '0.20.0-dev.1',
+		version: '0.20.0',
 		date: '2026-11-22',
 		highlights: [
 			{

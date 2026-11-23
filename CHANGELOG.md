@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## 0.20.0-dev.2 — 2026-11-23 (pre-release on dev)
+## 0.20.1 — 2026-11-23
 
 ### Added
 
@@ -71,7 +71,7 @@ All notable changes to this project are documented here. The format follows
 - Large source files split into modules; a few hot paths made cheaper (backtest, annotations,
   message templates).
 
-## 0.20.0-dev.1 — 2026-11-22 (pre-release on dev)
+## 0.20.0 — 2026-11-22
 
 ### Added
 
