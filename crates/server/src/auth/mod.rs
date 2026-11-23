@@ -1,10 +1,12 @@
 //! Authentification de l'instance.
 //!
-//! Des comptes, trois rôles (`admin`, `operator`, `viewer`), une session par navigateur, et une
+//! Des comptes, trois rôles (`admin`, `operator`, `viewer`) et un rôle d'écran mural
+//! (`wall`, le mode mur seul), une session par navigateur, et une
 //! connexion déléguée à un fournisseur OpenID Connect quand une équipe en a un. Il
-//! n'y a volontairement ni inscription libre, ni récupération par courriel, ni
-//! permission fine — chaque écran de configuration en plus dégraderait la
-//! promesse du produit.
+//! n'y a volontairement ni inscription libre ni permission fine. Un mot de passe
+//! oublié se remet par un lien envoyé par courriel ([`recovery`]), et un compte
+//! se crée aussi sur invitation ([`invitations`]) : deux liens à usage unique,
+//! jamais un moyen de se connecter à eux seuls.
 //!
 //! Deux principes gouvernent ce module :
 //!
@@ -16,18 +18,24 @@
 //!   son écran de création, et refuser l'accès avant qu'un compte existe ne
 //!   protégerait rien.
 
+pub mod account_mail;
 pub mod audit;
 pub mod client_ip;
 pub mod clients;
 pub mod cookie;
 pub mod cors;
+pub mod custom_roles;
+pub mod invitations;
 pub mod ldap;
+pub mod link_token;
 pub mod middleware;
 pub mod oidc;
 pub mod passkeys;
 pub mod password;
+pub mod permissions;
 pub mod policy;
 pub mod rate_limit;
+pub mod recovery;
 pub mod saml;
 pub mod scim;
 pub mod session;
@@ -38,6 +46,7 @@ pub mod token;
 pub mod totp;
 pub mod totp_login;
 pub mod users;
+pub mod wall;
 pub mod webauthn;
 
 /// Réinitialise l'instance : plus aucun compte, plus aucune session.

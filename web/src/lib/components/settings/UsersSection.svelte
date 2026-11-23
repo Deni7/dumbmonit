@@ -3,7 +3,9 @@
 	 * Settings → Users: the accounts that can sign in, and their role.
 	 *
 	 * Three roles: admin (everything), operator (handles alerts — ack, ignore,
-	 * snooze — but changes no configuration) and viewer (read only). The server keeps
+	 * snooze — but changes no configuration) and viewer (read only), plus wall
+	 * display (signs in straight to the wall, reaches nothing else). A custom
+	 * role (Custom roles, below) can replace the built-in one. The server keeps
 	 * at least one active admin; the disabled controls here just reflect that
 	 * rule so nobody discovers it through an error.
 	 *
@@ -29,6 +31,12 @@
 	import { getAuthPolicy, saveAuthPolicy, signOutUser } from '#lib/api/sessions.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { USER_SORTS, filterUsers, sortUsers, type UserSort } from '#lib/components/settings/usersList.js';
+	import ResetLinkButton from '#lib/components/account/ResetLinkButton.svelte';
+	import ResetLinkNotice from '#lib/components/account/ResetLinkNotice.svelte';
+	import type { AccountLink } from '#lib/api/accounts.js';
+	import type { CustomRole } from '#lib/api/types.js';
+	import { listCustomRoles } from '#lib/api/roles.js';
+	import { choiceOf, isCustomChoice, rolePayload, type RoleChoice } from './roles/roleChoice.js';
 
 	let users = $state<User[]>([]);
 	let loading = $state(true);
@@ -48,10 +56,22 @@
 		}
 	}
 
+	/** Custom roles offered in the role picker; none if they cannot be read. */
+	let customRoles = $state<CustomRole[]>([]);
+	async function loadRoles(signal?: AbortSignal) {
+		try {
+			const list = await listCustomRoles(signal);
+			customRoles = Array.isArray(list) ? list : [];
+		} catch {
+			customRoles = [];
+		}
+	}
+
 	$effect(() => {
 		const controller = new AbortController();
 		void load(controller.signal);
 		void loadPolicy(controller.signal);
+		void loadRoles(controller.signal);
 		return () => controller.abort();
 	});
 
@@ -99,9 +119,9 @@
 		}
 	}
 
-	/** Staff accounts the policy would hold at enrolment (local password, no second factor). */
+	/** Staff accounts the policy would hold at enrolment (local password, no second factor). Viewers and wall displays are never held. */
 	const staffWithout2fa = $derived(
-		users.filter((u) => u.role !== 'viewer' && !u.disabled && !u.totp_enabled && u.auth === 'password').length
+		users.filter((u) => (u.role === 'admin' || u.role === 'operator') && !u.disabled && !u.totp_enabled && u.auth === 'password').length
 	);
 
 	const activeAdmins = $derived(users.filter((u) => u.role === 'admin' && !u.disabled).length);
@@ -127,10 +147,18 @@
 	const ROLE_LABELS: Record<Role, () => string> = {
 		admin: () => m.settings_users_role_admin(),
 		operator: () => m.settings_users_role_operator(),
-		viewer: () => m.settings_users_role_viewer()
+		viewer: () => m.settings_users_role_viewer(),
+		wall: () => m.settings_users_role_wall()
 	};
+	const ROLE_TONES: Record<Role, 'signal' | 'info' | 'ghost'> = { admin: 'signal', operator: 'info', viewer: 'ghost', wall: 'ghost' };
 
-	let draft = $state({ username: '', display_name: '', email: '', role: 'viewer' as Role, password: '' });
+	function roleHelp(choice: RoleChoice): string | undefined {
+		if (choice === 'wall') return m.settings_users_role_wall_help();
+		if (isCustomChoice(choice)) return m.w6roles_users_custom_help();
+		return undefined;
+	}
+
+	let draft = $state({ username: '', display_name: '', email: '', role: 'viewer' as RoleChoice, password: '' });
 	let draftErrors = $state<{ username?: string; password?: string; email?: string }>({});
 	let creating = $state(false);
 	let createError = $state<unknown>(null);
@@ -165,7 +193,7 @@
 
 		creating = true;
 		try {
-			const payload: CreateUserPayload = { username, role: draft.role };
+			const payload: CreateUserPayload = { username, ...rolePayload(draft.role) };
 			if (draft.display_name.trim()) payload.display_name = draft.display_name.trim();
 			if (draft.email.trim()) payload.email = draft.email.trim();
 			if (password) payload.password = password;
@@ -199,17 +227,19 @@
 	}
 
 	let editingId = $state<number | null>(null);
-	let edit = $state({ display_name: '', email: '', role: 'viewer' as Role, password: '' });
+	let edit = $state({ display_name: '', email: '', role: 'viewer' as RoleChoice, password: '' });
 	let editError = $state<unknown>(null);
 	let editPasswordError = $state<string | null>(null);
 	let editEmailError = $state<string | null>(null);
 	let saving = $state(false);
 	/** Password reset shown once, like on creation. */
 	let resetShown = $state<{ user: User; password: string } | null>(null);
+	/** Reset link just created from a row: sent, or shown once to copy. */
+	let linkShown = $state<{ user: User; link: AccountLink } | null>(null);
 
 	function openEdit(user: User) {
 		editingId = user.id;
-		edit = { display_name: user.display_name, email: user.email ?? '', role: user.role, password: '' };
+		edit = { display_name: user.display_name, email: user.email ?? '', role: choiceOf(user), password: '' };
 		editError = null;
 		editPasswordError = null;
 		editEmailError = null;
@@ -227,7 +257,7 @@
 			const updated = await updateUser(user.id, {
 				display_name: edit.display_name.trim(),
 				email: edit.email.trim(),
-				role: edit.role,
+				...rolePayload(edit.role),
 				...(edit.password ? { password: edit.password } : {})
 			});
 			users = users.map((u) => (u.id === updated.id ? updated : u));
@@ -306,6 +336,20 @@
 	}
 </script>
 
+{#snippet roleOptions()}
+	<option value="viewer">{m.settings_users_role_viewer_option()}</option>
+	<option value="operator">{m.settings_users_role_operator_option()}</option>
+	<option value="admin">{m.settings_users_role_admin_option()}</option>
+	<option value="wall">{m.settings_users_role_wall_option()}</option>
+	{#if customRoles.length > 0}
+		<optgroup label={m.w6roles_users_custom_group()}>
+			{#each customRoles as role (role.id)}
+				<option value={`custom:${role.id}`}>{role.name}</option>
+			{/each}
+		</optgroup>
+	{/if}
+{/snippet}
+
 <Panel id="users" title={m.settings_users_title()} description={m.settings_users_description()} padded={false}>
 	{#snippet aside()}
 		{#if !loading && !error && !adding}
@@ -353,11 +397,9 @@
 							oninput={() => (draftErrors = { ...draftErrors, email: undefined })}
 						/>
 					</Field>
-					<Field label={m.settings_users_role()} for="new-role">
-						<select id="new-role" class="input" bind:value={draft.role} disabled={creating}>
-							<option value="viewer">{m.settings_users_role_viewer_option()}</option>
-							<option value="operator">{m.settings_users_role_operator_option()}</option>
-							<option value="admin">{m.settings_users_role_admin_option()}</option>
+					<Field label={m.settings_users_role()} for="new-role" help={roleHelp(draft.role)}>
+						<select id="new-role" class="input min-h-10" bind:value={draft.role} disabled={creating}>
+							{@render roleOptions()}
 						</select>
 					</Field>
 					<Field
@@ -411,6 +453,9 @@
 						<CopyBlock value={created.password} label={m.settings_users_copy_password()} secret />
 					</div>
 				</div>
+			{/if}
+			{#if linkShown}
+				<ResetLinkNotice user={linkShown.user} link={linkShown.link} ondone={() => (linkShown = null)} />
 			{/if}
 			{#if resetShown}
 				<div class="rise-in mb-4 rounded-[var(--radius-card)] border border-advisory/40 bg-surface p-4">
@@ -491,7 +536,11 @@
 									{#if user.display_name.trim()}
 										<span class="text-sm text-ink-2">{user.username}</span>
 									{/if}
-									<Plate tone={user.role === 'admin' ? 'signal' : user.role === 'operator' ? 'info' : 'ghost'} bare label={ROLE_LABELS[user.role]?.() ?? user.role} />
+									{#if user.custom_role}
+										<Plate tone="info" bare label={user.custom_role.name} title={m.w6roles_users_custom_title()} />
+									{:else}
+										<Plate tone={ROLE_TONES[user.role] ?? 'ghost'} bare label={ROLE_LABELS[user.role]?.() ?? user.role} />
+									{/if}
 									<Plate
 										tone="info"
 										bare
@@ -527,6 +576,14 @@
 											<Confirm confirmLabel={m.settings_users_sign_out_confirm()} variant="secondary" loading={busy} onconfirm={() => signOutEverywhere(user)}>{m.settings_users_sign_out()}</Confirm>
 										</span>
 									{/if}
+									{#if user.auth === 'password' && user.role !== 'wall' && !user.disabled && !me}
+										<ResetLinkButton
+											{user}
+											disabled={busy}
+											onlink={(owner, link) => (linkShown = { user: owner, link })}
+											onerror={(cause) => (rowError = { id: user.id, cause })}
+										/>
+									{/if}
 									{#if user.totp_enabled && !me}
 										<span title={m.settings_users_reset2fa_title()}>
 											<Confirm confirmLabel={m.settings_users_reset2fa_confirm()} variant="secondary" loading={busy} onconfirm={() => resetTotp(user)}>{m.settings_users_reset2fa()}</Confirm>
@@ -559,11 +616,13 @@
 										oninput={() => (editEmailError = null)}
 									/>
 								</Field>
-								<Field label={m.settings_users_role()} for={`edit-role-${user.id}`} help={lastAdmin ? m.settings_users_role_last_admin_help() : undefined}>
-									<select id={`edit-role-${user.id}`} class="input" bind:value={edit.role} disabled={saving || lastAdmin} title={lastAdmin ? m.settings_users_promote_first() : undefined}>
-										<option value="viewer">{m.settings_users_role_viewer_option()}</option>
-										<option value="operator">{m.settings_users_role_operator_option()}</option>
-										<option value="admin">{m.settings_users_role_admin_option()}</option>
+								<Field
+									label={m.settings_users_role()}
+									for={`edit-role-${user.id}`}
+									help={lastAdmin ? m.settings_users_role_last_admin_help() : roleHelp(edit.role)}
+								>
+									<select id={`edit-role-${user.id}`} class="input min-h-10" bind:value={edit.role} disabled={saving || lastAdmin} title={lastAdmin ? m.settings_users_promote_first() : undefined}>
+										{@render roleOptions()}
 									</select>
 								</Field>
 								<Field

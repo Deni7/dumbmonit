@@ -9,12 +9,18 @@ mod agent_sentinel;
 mod agent_tls;
 mod agent_updates;
 mod alert_actions;
+mod alert_backtest;
+mod alert_noise;
 pub(crate) mod alerts;
+mod annotations;
 mod auth;
 mod backends;
 mod backup;
+mod backup_destinations;
 mod blacklist;
+mod channel_templates;
 mod channels;
+mod chat_actions;
 pub(crate) mod clients;
 mod collectors;
 mod cves;
@@ -30,6 +36,7 @@ mod ical;
 mod ingest;
 mod instance;
 mod integrations;
+mod invitations;
 mod kuma_db;
 mod kuma_import;
 mod label_monitors;
@@ -41,7 +48,9 @@ mod mail_server;
 mod mcp;
 mod metrics;
 mod monitor_imports;
+mod monitor_templates;
 mod music;
+mod my_notifications;
 mod netconfig;
 mod netinventory;
 mod notify_policy;
@@ -64,16 +73,19 @@ mod prometheus;
 mod proxies;
 mod proxmox;
 mod push;
+mod recovery;
 mod redfish;
 mod relay;
 mod remediation;
 mod reports;
+mod roles;
 mod saml;
 mod scim;
 mod security;
 mod self_monitoring;
 mod seo_files;
 mod sessions;
+mod silence_calendar;
 mod skipped_features;
 mod slos;
 pub(crate) mod spa;
@@ -84,7 +96,9 @@ mod summary;
 mod synology;
 mod target_rules;
 pub(crate) mod targets;
+mod targets_bulk;
 mod targets_import;
+mod targets_redaction;
 mod teams;
 mod threats;
 mod tokens;
@@ -192,6 +206,14 @@ pub fn router_with_hubs(
         .route("/auth/scim/token", post(scim::create_token).delete(scim::delete_token))
         .route("/users", get(users::list).post(users::create))
         .route("/users/{id}", put(users::update).delete(users::delete))
+        // Rôles personnalisés et catalogue des permissions (`roles.rs`).
+        .merge(roles::routes())
+        // Liens de réinitialisation, réglages des liens de compte, invitations et
+        // notifications personnelles (`recovery.rs`, `invitations.rs`,
+        // `my_notifications.rs`).
+        .merge(recovery::routes())
+        .merge(invitations::routes())
+        .merge(my_notifications::routes())
         .route("/collectors", get(collectors::list))
         // Compteurs plats pour Homepage / tableaux de bord tiers (`summary.rs`).
         .route("/summary", get(summary::get))
@@ -216,6 +238,10 @@ pub fn router_with_hubs(
         .route("/targets/test", post(targets::test_connection))
         .route("/targets/reorder", post(targets::reorder))
         .route("/targets/folders/rename", post(targets::rename_folder))
+        // Modification groupée (`targets_bulk.rs`) et modèles de moniteur
+        // (`monitor_templates.rs`).
+        .merge(targets_bulk::routes())
+        .merge(monitor_templates::routes())
         .route("/targets/import", post(targets_import::import))
         .route(
             "/targets/import/kuma",
@@ -246,20 +272,24 @@ pub fn router_with_hubs(
         .route("/alerts/history", get(alerts::history))
         .route("/alerts/history/dismiss-resolved", post(alerts::dismiss_resolved_history))
         .route("/alerts/history/{id}/dismiss", post(alerts::dismiss_history_entry))
+        .route("/alerts/noise", get(alert_noise::noise))
         .route("/alerts/{fingerprint}/ack", post(alerts::ack_alert).delete(alerts::unack_alert))
         .route(
             "/alerts/{fingerprint}/dismiss",
             post(alerts::dismiss_alert).delete(alerts::undismiss_alert),
         )
         .route("/alerts/rules", get(alerts::list_rules).post(alerts::create_rule))
+        .route("/alerts/rules/backtest", post(alert_backtest::backtest))
         .route("/alerts/rules/{id}", put(alerts::update_rule).delete(alerts::delete_rule))
         .route("/alerts/rules/{id}/enable", post(alerts::set_rule_enabled))
         .route("/alerts/rules/{id}/reset", post(alerts::reset_rule))
         .route("/alerts/silences", get(alerts::list_silences).post(alerts::create_silence))
+        .route("/alerts/silences/occurrences", get(silence_calendar::occurrences))
         .route("/alerts/silences/{id}", put(alerts::update_silence).delete(alerts::delete_silence))
         .route("/notify/channels", get(channels::list).post(channels::create))
         .route("/notify/channels/{id}", put(channels::update).delete(channels::delete))
         .route("/notify/channels/{id}/test", post(channels::test))
+        .route("/notify/template-preview", post(channel_templates::preview))
         .route("/notify/kinds", get(channels::kinds))
         .route("/agent/tokens", get(ingest::list_tokens).post(ingest::create_token))
         .route("/agent/tokens/{id}", delete(ingest::revoke_token))
@@ -320,6 +350,8 @@ pub fn router_with_hubs(
         .merge(status_pages::routes())
         // Objectifs de niveau de service et budgets d'erreur (`slos.rs`).
         .merge(slos::routes())
+        // Repères de changement posés sur les graphiques (`annotations.rs`).
+        .merge(annotations::routes())
         // Jeton du calendrier iCal privé des maintenances (`ical.rs`).
         .merge(ical::routes())
         // Calendrier des sauvegardes et travaux d'un Proxmox Backup Server (`pbs.rs`).
@@ -422,6 +454,10 @@ pub fn router_with_hubs(
         .route("/auth/setup", post(auth::setup))
         .route("/auth/login", post(auth::login))
         .route("/auth/login/totp", post(totp::login_step))
+        // Mot de passe oublié et invitations : le lien envoyé est l'autorisation,
+        // à usage unique (`recovery.rs`, `invitations.rs`).
+        .merge(recovery::public_routes())
+        .merge(invitations::public_routes())
         // Connexion par clé d'accès (WebAuthn), publique comme `login`.
         .merge(passkeys::public_routes())
         .route("/auth/oidc/start", get(oidc::start))
@@ -451,6 +487,11 @@ pub fn router_with_hubs(
         // les sert derrière un certificat client : ici, c'est l'ancien canal,
         // refusé quand l'administrateur exige mTLS.
         .merge(agent_routes(&state))
+        // Canal des agents par WebSocket (Cloudflare Tunnel, mandataire inverse
+        // qui termine TLS) : rien n'y est authentifié par la session ni par le
+        // jeton — c'est la session TLS de l'agent, à l'intérieur, qui l'est
+        // (`agent_tls::websocket`). Aucun cookie lu, aucune origine acceptée.
+        .route("/agent/ws", get(crate::agent_tls::websocket::upgrade))
         // Pages de statut publiques : lecture seule, sans session, par conception.
         .merge(status_pages::public_routes())
         // Calendriers iCal des maintenances : par page, ou privé avec jeton (`ical.rs`).
@@ -458,6 +499,9 @@ pub fn router_with_hubs(
         // Liens d'action des notifications : le jeton signé est l'autorisation
         // (`alert_actions.rs`).
         .merge(alert_actions::public_routes())
+        // Boutons interactifs de Slack et Telegram : la signature de la
+        // plateforme, puis le jeton signé du bouton (`chat_actions.rs`).
+        .merge(chat_actions::public_routes())
         // Calendrier iCal d'astreinte d'une personne : l'URL secrète est
         // l'autorisation, une application de calendrier n'a pas de session.
         .merge(oncall::public_routes())

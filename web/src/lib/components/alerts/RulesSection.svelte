@@ -14,8 +14,6 @@
 		AlertRule,
 		AlertHistoryEntry,
 		AlertRulePayload,
-		RuleOperator,
-		AlertSeverity,
 		Channel,
 		Target,
 		CollectorInfo
@@ -24,7 +22,14 @@
 	import { page } from '$app/state';
 	import { tick, untrack } from 'svelte';
 	import { alertsStore } from '#lib/stores/alerts.svelte.js';
-	import { Button, Confirm, Field, Panel, Plate, Toggle, EmptyState, reducedMotion } from '#lib/ui/index.js';
+	import {
+		Button,
+		Confirm,
+		Plate,
+		Toggle,
+		EmptyState,
+		reducedMotion
+	} from '#lib/ui/index.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import { withoutOnCall } from '#lib/components/oncall/gate.js';
 	import { instanceStore } from '#lib/stores/instance.svelte.js';
@@ -38,6 +43,7 @@
 	import { ruleKinds } from './rules-filter';
 	import Segmented from '#lib/components/devices/Segmented.svelte';
 	import RuleEditor from './rules/RuleEditor.svelte';
+	import NewRuleForm from './rules/NewRuleForm.svelte';
 	import { anomalySummary, payloadFrom } from './rules/options';
 
 	interface Props {
@@ -64,9 +70,6 @@
 		ondelete,
 		oncreate
 	}: Props = $props();
-
-	const OPERATORS: RuleOperator[] = ['>', '>=', '<', '<='];
-	const SEVERITIES: AlertSeverity[] = ['info', 'warning', 'critical'];
 
 	// --- Rows: overlay of saved rules until the page refreshes ---------------
 
@@ -250,6 +253,12 @@
 			const kind = groupKindOf(rule);
 			openGroups = new Set(openGroups).add(kind);
 			markedId = rule.id;
+			// From the noise report: `&edit=1` opens the editor, `&backtest=1` also runs the history test.
+			const params = page.url.searchParams;
+			if (auth.can('monitors.manage') && (params.get('edit') === '1' || params.get('backtest') === '1')) {
+				editingId = rule.id;
+				backtestId = params.get('backtest') === '1' ? rule.id : null;
+			}
 		});
 		void tick().then(() => {
 			document.getElementById(`rule-row-${rule.id}`)?.scrollIntoView({ block: 'center', behavior: reducedMotion() ? 'auto' : 'smooth' });
@@ -294,6 +303,8 @@
 	}
 
 	let editingId = $state<number | null>(null);
+	/** The rule whose editor opens straight on its history test (link from the noise report). */
+	let backtestId = $state<number | null>(null);
 	let shownQueryIds = $state<Set<number>>(new Set());
 	let savedId = $state<number | null>(null);
 	let savedTimer: ReturnType<typeof setTimeout> | null = null;
@@ -308,6 +319,7 @@
 	function onSaved(rule: AlertRule) {
 		saved = new Map(saved).set(rule.id, rule);
 		editingId = null;
+		backtestId = null;
 		savedId = rule.id;
 		if (savedTimer) clearTimeout(savedTimer);
 		savedTimer = setTimeout(() => (savedId = null), 4000);
@@ -414,70 +426,10 @@
 	// --- New rule ------------------------------------------------------------
 
 	let creating = $state(false);
-	let saving = $state(false);
-	let formError = $state<string | null>(null);
-
-	let name = $state('');
-	let query = $state('');
-	let operator = $state<RuleOperator>('>');
-	let threshold = $state('');
-	let forSecs = $state('300');
-	let severity = $state<AlertSeverity>('warning');
-
-	function reset() {
-		name = '';
-		query = '';
-		operator = '>';
-		threshold = '';
-		forSecs = '300';
-		severity = 'warning';
-		formError = null;
-	}
-
-	async function submit(event: SubmitEvent) {
-		event.preventDefault();
-		formError = null;
-		if (!name.trim()) {
-			formError = m.alerts_rules_error_name();
-			return;
-		}
-		if (!query.trim()) {
-			formError = m.alerts_rules_error_query();
-			return;
-		}
-		const thresholdValue = Number(threshold);
-		if (!Number.isFinite(thresholdValue)) {
-			formError = m.alerts_rules_error_threshold();
-			return;
-		}
-		const forValue = Number(forSecs);
-		if (!Number.isInteger(forValue) || forValue < 0) {
-			formError = m.alerts_rules_error_hold();
-			return;
-		}
-		saving = true;
-		try {
-			await oncreate({
-				name: name.trim(),
-				query: query.trim(),
-				kind: 'threshold',
-				operator,
-				threshold: thresholdValue,
-				for_secs: forValue,
-				severity
-			});
-			reset();
-			creating = false;
-		} catch (cause) {
-			formError = cause instanceof Error ? cause.message : m.alerts_rules_error_create();
-		} finally {
-			saving = false;
-		}
-	}
 </script>
 
 <div class="mb-4 flex justify-end">
-	{#if !auth.isAdmin}
+	{#if !auth.can('monitors.manage')}
 		<Plate tone="ghost" label={auth.readOnlyLabel} />
 	{:else if !creating}
 		<Button variant="secondary" size="sm" onclick={() => (creating = true)}>{m.alerts_rules_new()}</Button>
@@ -486,76 +438,7 @@
 
 {#if creating}
 	<div class="mb-4">
-		<Panel title={m.alerts_rules_new()} description={m.alerts_rules_new_description()}>
-			<form class="grid gap-4" onsubmit={submit}>
-				<Field label={m.alerts_form_name()} for="rule-name" required>
-					<input id="rule-name" class="input" bind:value={name} placeholder={m.alerts_rules_name_placeholder()} />
-				</Field>
-				<Field
-					label={m.alerts_rules_query()}
-					for="rule-query"
-					required
-					help={m.alerts_rules_query_help()}
-				>
-					<input
-						id="rule-query"
-						class="input font-mono text-[0.8125rem]"
-						bind:value={query}
-						placeholder="dumbmonit_cpu_usage_percent"
-						autocomplete="off"
-						spellcheck="false"
-					/>
-				</Field>
-				<div class="grid gap-4 sm:grid-cols-3">
-					<Field label={m.alerts_rules_operator()} for="rule-op">
-						<select id="rule-op" class="input" bind:value={operator}>
-							{#each OPERATORS as op (op)}
-								<option value={op}>{op}</option>
-							{/each}
-						</select>
-					</Field>
-					<Field label={m.alerts_rules_threshold()} for="rule-threshold" required>
-						<input
-							id="rule-threshold"
-							type="number"
-							step="any"
-							class="input"
-							bind:value={threshold}
-							placeholder="90"
-						/>
-					</Field>
-					<Field label={m.alerts_history_severity()} for="rule-severity">
-						<select id="rule-severity" class="input" bind:value={severity}>
-							{#each SEVERITIES as sev (sev)}
-								<option value={sev}>{severityWord(sev)}</option>
-							{/each}
-						</select>
-					</Field>
-				</div>
-				<Field label={m.alerts_rules_hold_for()} for="rule-for" help={m.alerts_rules_hold_for_help()}>
-					<input id="rule-for" type="number" min="0" class="input" bind:value={forSecs} />
-				</Field>
-
-				{#if formError}
-					<p class="text-[0.8125rem] font-medium text-warning-ink" role="alert">{formError}</p>
-				{/if}
-
-				<div class="flex flex-wrap items-center gap-2">
-					<Button type="submit" variant="primary" loading={saving}>{m.alerts_rules_create()}</Button>
-					<Button
-						type="button"
-						variant="ghost"
-						disabled={saving}
-						onclick={() => {
-							creating = false;
-							reset();
-						}}
-					>
-						{m.alerts_form_cancel()}
-					</Button>
-				</div>
-			</form>
-		</Panel>
+		<NewRuleForm {oncreate} ondone={() => (creating = false)} />
 	</div>
 {/if}
 
@@ -633,7 +516,7 @@
 				{/if}
 			</div>
 
-			{#if auth.isAdmin}
+			{#if auth.can('monitors.manage')}
 				<div class="flex shrink-0 flex-wrap items-center gap-3">
 					{#if !editing}
 						<Button variant="ghost" size="sm" onclick={() => (editingId = rule.id)} aria-label={m.alerts_rules_edit_aria({ name: rule.name })}>
@@ -681,7 +564,14 @@
 		</div>
 
 		{#if editing}
-			<RuleEditor {rule} channels={pickableChannels} {channelsError} onsaved={onSaved} oncancel={() => (editingId = null)} />
+			<RuleEditor
+				{rule}
+				channels={pickableChannels}
+				{channelsError}
+				onsaved={onSaved}
+				oncancel={() => ((editingId = null), (backtestId = null))}
+				autoBacktest={backtestId === rule.id}
+			/>
 		{/if}
 	</div>
 {/snippet}
@@ -691,7 +581,7 @@
 		icon={SlidersHorizontal}
 		title={m.alerts_rules_empty_title()}
 		description={m.alerts_rules_empty_description()}
-		primary={auth.isAdmin && !creating ? { label: m.alerts_rules_new(), onclick: () => (creating = true) } : undefined}
+		primary={auth.can('monitors.manage') && !creating ? { label: m.alerts_rules_new(), onclick: () => (creating = true) } : undefined}
 	/>
 {:else}
 	<div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center">

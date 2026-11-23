@@ -58,6 +58,7 @@
 	import { Button, Skeleton, calmMotion } from '#lib/ui/index.js';
 	import WallBand, { type BandFigure } from '#lib/components/wall/WallBand.svelte';
 	import WallOutdoor from '#lib/components/wall/WallOutdoor.svelte';
+	import WallSignOut from '#lib/components/wall/WallSignOut.svelte';
 	import { OUTDOOR_REFRESH_MS, OUTDOOR_RETRY_MS } from '#lib/components/wall/outdoor.js';
 	import WallDevices from '#lib/components/wall/WallDevices.svelte';
 	import WallProblems from '#lib/components/wall/WallProblems.svelte';
@@ -147,11 +148,14 @@
 		};
 	});
 
+	// A wall-display account has nowhere else to go: Exit becomes Sign out, and
+	// Escape (a remote's Back key, a stray keyboard) does nothing.
+	const wallAccount = $derived(auth.isWall);
 	function exit() {
 		void goto('/');
 	}
 	function onKeydown(event: KeyboardEvent) {
-		if (event.key === 'Escape') {
+		if (event.key === 'Escape' && !wallAccount) {
 			event.preventDefault();
 			exit();
 			return;
@@ -788,11 +792,16 @@
 					<Maximize class="size-4" aria-hidden="true" />
 				{/if}
 			</Button>
-			<Button variant="ghost" size="sm" onclick={exit} aria-label={m.wall_exit_aria()} class="min-h-10">
-				<X class="size-4" aria-hidden="true" />
-				{m.wall_exit()}
-				<kbd class="ml-1 rounded-md border border-line-strong bg-surface-2 px-1.5 text-[0.6875rem] text-ink-3 max-sm:hidden">esc</kbd>
-			</Button>
+			{#if wallAccount}
+				<!-- A wall-display account has nowhere else to go: signing out replaces Exit. -->
+				<WallSignOut />
+			{:else}
+				<Button variant="ghost" size="sm" onclick={exit} aria-label={m.wall_exit_aria()} class="min-h-10">
+					<X class="size-4" aria-hidden="true" />
+					{m.wall_exit()}
+					<kbd class="ml-1 rounded-md border border-line-strong bg-surface-2 px-1.5 text-[0.6875rem] text-ink-3 max-sm:hidden">esc</kbd>
+				</Button>
+			{/if}
 		</div>
 	</div>
 </div>

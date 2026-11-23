@@ -1124,8 +1124,49 @@ now. Each rule has:
   threshold, hold (`for`), severity, reminder (`repeat every`) and escalation
   (`escalate after`). The query of a built-in rule is shown but not editable;
   the query of your own rules is. Baseline rules show their detection
-  parameters read-only;
+  parameters read-only. **Test on history** replays the edited values on
+  stored measurements before you save (see
+  [Testing a rule on history](#test-on-history));
 - **Delete**, for your own rules only.
+
+## Testing a rule on history {#test-on-history}
+
+Before saving a change, the editor's **Test on history** replays the rule as
+the form stands (saved or not) on the measurements already stored: the last
+day, 7 or 30 days. It runs the query at the engine's evaluation step (every
+30 seconds by default) through the same threshold, clear threshold and hold
+logic as the live engine, then says what the rule would have done:
+
+- how many times it would have fired, and the notifications that means
+  (firing, reminders, escalation and resolution, with the reminder and
+  escalation delays of the form);
+- how many short breaches the hold duration absorbed;
+- for each series that fired, its monitor, a small timeline of the values with
+  the threshold and a mark for every firing period, and the periods in words
+  (start, end, peak value).
+
+Per-monitor overrides apply, and monitors that are removed, disabled or
+outside the rule's selector are left out, as in the engine. The count is the
+rule's alone: maintenance windows, dependencies, acknowledgements and the
+channels' own settings (quiet hours, cooldown, flapping hold) are not
+replayed, and neither are the repeated announcements of event rules (a website
+change found again).
+
+The test stays quick on large instances, and says so when a limit applied:
+
+- past 10,000 steps the step is widened: with the default 30-second
+  evaluation, 7 days are replayed every 1.5 minutes and 30 days every
+  4.5 minutes, so a very short hold duration is approximate;
+- past 100 series, only the 100 most often over the threshold are replayed;
+- the metrics read gives up after 20 seconds: try a shorter window.
+
+Anomaly, log pattern, forecast, drift and error budget rules cannot be replayed:
+they depend on learned baselines, log lines or values computed at evaluation
+time. The panel says so instead of a result.
+
+Through the API: `POST /api/alerts/rules/backtest` with
+`{ "rule": <rule body>, "rule_id": 12, "days": 7 }` (admins and `write`
+tokens; nothing is written).
 
 ## Per-monitor overrides {#per-device-overrides}
 

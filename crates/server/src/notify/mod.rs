@@ -17,10 +17,13 @@ pub mod gateway;
 pub mod guard;
 pub mod http;
 pub mod incident;
+pub mod interactive;
 pub mod mail_server;
 pub mod message;
+pub mod message_template;
 pub mod messaging;
 pub mod oncall;
+pub mod personal;
 pub mod policy_store;
 pub mod push;
 pub mod secret;
@@ -134,6 +137,9 @@ pub fn build(
     http: &reqwest::Client,
     config: &ChannelConfig,
 ) -> Result<Arc<dyn Notifier>, NotifyError> {
+    // Un gabarit de message fautif est refusé à l'enregistrement, avec le reste
+    // de la configuration, plutôt que de partir de travers au premier incident.
+    message_template::MessageTemplates::from_settings(&config.settings)?;
     let http = client_for(http, config);
     let notifier: Arc<dyn Notifier> = match config.kind.as_str() {
         "discord" => Arc::new(services::Discord::new(http.clone(), config)?),
@@ -239,7 +245,8 @@ pub async fn deliver(
         }
     };
 
-    let message = with_actions_for(&config.kind, notifier.as_ref(), message);
+    let templated = message_template::apply(config, message);
+    let message = with_actions_for(&config.kind, notifier.as_ref(), &templated);
     match notifier.send(&message).await {
         Ok(()) => {
             debug!(channel = %config.name, kind = %config.kind, "notification sent");
@@ -269,6 +276,19 @@ pub async fn deliver_stored(
     config: &ChannelConfig,
     message: &Message,
 ) -> DeliveryReport {
+    // Boutons Telegram à rappel : leurs jetons sont rangés avant l'envoi, le
+    // bouton n'en porte qu'une référence courte.
+    let mut prepared = None;
+    if config.kind == "telegram" && interactive::enabled(config) && !message.actions.is_empty() {
+        let mut copy = message.clone();
+        let now = chrono::Utc::now();
+        let stored = interactive::telegram::remember(store.pool, &mut copy, now).await;
+        match stored {
+            Ok(()) => prepared = Some(copy),
+            Err(error) => warn!(channel = %config.name, ?error, "interactive buttons not stored"),
+        }
+    }
+    let message = prepared.as_ref().unwrap_or(message);
     if config.kind != webpush::KIND {
         return deliver(http, config, message).await;
     }
@@ -281,7 +301,8 @@ pub async fn deliver_stored(
     if sending_disabled() {
         return report(Some(DISABLED_MESSAGE.to_string()), false);
     }
-    match webpush::deliver(store, config, message).await {
+    let message = message_template::apply(config, message);
+    match webpush::deliver(store, config, &message).await {
         Ok(outcome) => {
             debug!(channel = %config.name, delivered = outcome.delivered, "push notification sent");
             report(None, false)
@@ -374,7 +395,9 @@ pub async fn test_channel(
     if sending_disabled() {
         return Ok(());
     }
-    notifier.send(&message::test_message_linked(&config.name, public_url)).await
+    // Le gabarit du canal s'applique aussi au test : c'est ce qu'on veut voir.
+    let message = message::test_message_linked(&config.name, public_url);
+    notifier.send(&message_template::apply(config, &message)).await
 }
 
 #[cfg(test)]

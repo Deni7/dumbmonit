@@ -8,10 +8,19 @@ const key = `sha256//${'K'.repeat(43)}=`;
 const direct = `curl -sSL https://monit.example.com/install.sh | sh -s -- --token=dmon_x --url=https://monit.example.com --sha256=linux-x86_64:${'b'.repeat(64)} --tls-url=https://monit.example.com:8443 --ca-pin=${pin}`;
 const relayed = `curl -sSL -k --pinnedpubkey ${key} https://192.168.10.5:8443/install.sh | sh -s -- --token=dmon_x --url=https://192.168.10.5:8443 --pinned-key=${key} --tls-url=https://192.168.10.5:8443 --ca-pin=${pin}`;
 
+const proxied = `${direct} --transport=websocket`;
+
 test('the addresses come from the install command', () => {
-	assert.deepEqual(installOptions(direct), { base: 'https://monit.example.com', tlsUrl: 'https://monit.example.com:8443', caPin: pin, serverPin: null });
-	assert.deepEqual(installOptions(relayed), { base: 'https://192.168.10.5:8443', tlsUrl: 'https://192.168.10.5:8443', caPin: pin, serverPin: key });
-	assert.deepEqual(installOptions('curl x | sh'), { base: '', tlsUrl: null, caPin: null, serverPin: null });
+	assert.deepEqual(installOptions(direct), { base: 'https://monit.example.com', tlsUrl: 'https://monit.example.com:8443', caPin: pin, serverPin: null, transport: null });
+	assert.deepEqual(installOptions(relayed), { base: 'https://192.168.10.5:8443', tlsUrl: 'https://192.168.10.5:8443', caPin: pin, serverPin: key, transport: null });
+	assert.deepEqual(installOptions('curl x | sh'), { base: '', tlsUrl: null, caPin: null, serverPin: null, transport: null });
+	assert.equal(installOptions(proxied).transport, 'websocket');
+});
+
+test('behind Cloudflare Tunnel or a proxy, Docker takes the WebSocket transport too', () => {
+	assert.match(dockerRun(installOptions(proxied), 'dmon_x', null), /-e DUMBMONIT_AGENT_TRANSPORT=websocket /);
+	assert.match(dockerCompose(installOptions(proxied), 'dmon_x', null), /DUMBMONIT_AGENT_TRANSPORT: "websocket"/);
+	assert.doesNotMatch(dockerRun(installOptions(direct), 'dmon_x', null), /TRANSPORT/);
 });
 
 test('the Docker command carries the same channel and pin, through the relay too', () => {

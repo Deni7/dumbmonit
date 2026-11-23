@@ -439,8 +439,9 @@ async fn add_one(
         cve_scan: None,
         client_id: None,
     };
+    let body = super::targets_bulk::WithChannels { target: payload, channels: None };
     let created =
-        targets::create(TeamAccess(access.clone()), State(state.clone()), Json(payload)).await;
+        targets::create(TeamAccess(access.clone()), State(state.clone()), Json(body)).await;
     match created {
         Ok((_, Json(view))) => {
             existing.insert(address);

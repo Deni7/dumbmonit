@@ -39,6 +39,8 @@
 	import Discovery from '#lib/components/device-form/Discovery.svelte';
 	import DiscoveryInventory from '#lib/components/device-form/DiscoveryInventory.svelte';
 	import AddBySite from '#lib/components/device-form/AddBySite.svelte';
+	import TemplatePicker from '#lib/components/device-form/TemplatePicker.svelte';
+	import { getMonitorTemplate, type MonitorTemplate } from '#lib/api/monitorTemplates.js';
 	import ReviewNotice from '#lib/components/device-form/ReviewNotice.svelte';
 	import { NO_DEFAULTS, defaultsParams, type SiteDefaults } from '#lib/components/device-form/add-by-site.js';
 	import SetupNotice from '#lib/components/device-form/SetupNotice.svelte';
@@ -51,9 +53,9 @@
 	let uptimerobotImport = $state<ImportServices | null>(null);
 	let gatusImport = $state<ImportServices | null>(null);
 	let healthchecksImport = $state<ImportServices | null>(null);
-	/** Ways to bring monitors over, listed last in the picker. Administrators only. */
+	/** Ways to bring monitors over, listed last in the picker. For those who manage monitors. */
 	const imports = $derived<ImportChoice[]>(
-		auth.isAdmin
+		auth.can('monitors.manage')
 			? [
 					{ id: 'kuma', label: m.devices_kuma_open(), summary: m.deviceform_picker_import_kuma_summary(), icon: Upload, onrun: () => kumaImport?.show() },
 					{ id: 'uptimerobot', label: m.devices_svc_uptimerobot_open(), summary: m.deviceform_picker_import_uptimerobot_summary(), icon: Upload, onrun: () => uptimerobotImport?.show() },
@@ -133,6 +135,35 @@
 			});
 		return () => controller.abort();
 	});
+	/** `?template=<id>`: the monitor template whose settings seed the form, like a copy. */
+	const templateId = $derived(idParam('template'));
+	let templateSource = $state<MonitorTemplate | null>(null);
+	let templateRead = $state(false);
+	$effect(() => {
+		const wanted = templateId;
+		templateSource = null;
+		templateRead = wanted === null;
+		if (wanted === null) return;
+		const controller = new AbortController();
+		getMonitorTemplate(wanted, controller.signal)
+			.then((found) => (templateSource = found))
+			.catch(() => {})
+			.finally(() => {
+				if (!controller.signal.aborted) templateRead = true;
+			});
+		return () => controller.abort();
+	});
+	/** "From a template": the template's kind form, seeded from it. */
+	function useTemplate(template: MonitorTemplate) {
+		void navigate(
+			(p) => {
+				for (const key of ['scan', 'guide', 'mode', 'via', 'duplicate']) p.delete(key);
+				p.set('kind', template.kind);
+				p.set('template', String(template.id));
+			},
+			{ push: true, scroll: true }
+		);
+	}
 	/** `?scan=1` opens the network scan: the first-run guide and the command palette link to it. */
 	const scanning = $derived(!requestedKind && params.get('scan') === '1');
 	const snmp = $derived(collectors.find((c) => c.kind === SNMP_KIND) ?? null);
@@ -196,6 +227,7 @@
 				p.delete('scan');
 				p.delete('guide');
 				p.delete('mode');
+				p.delete('template');
 				p.set('kind', kind);
 				if (via) p.set('via', via);
 				else p.delete('via');
@@ -228,7 +260,7 @@
 	function toPicker() {
 		lastChoice = selectedId ?? (scanning ? 'scan' : null);
 		if (depth > 0) history.go(-depth);
-		else void navigate((p) => ['kind', 'via', 'mode', 'scan', 'guide', 'location', 'folder'].forEach((key) => p.delete(key)), { push: false });
+		else void navigate((p) => ['kind', 'via', 'mode', 'scan', 'guide', 'location', 'folder', 'template'].forEach((key) => p.delete(key)), { push: false });
 	}
 
 	function openGuide() {
@@ -381,7 +413,7 @@
 </PageHeader>
 
 <!-- Opened from the "Import" category of the picker. -->
-{#if auth.isAdmin}
+{#if auth.can('monitors.manage')}
 	<ImportKuma bind:this={kumaImport} trigger={false} />
 	<ImportServices bind:this={uptimerobotImport} provider="uptimerobot" />
 	<ImportServices bind:this={gatusImport} provider="gatus" />
@@ -419,6 +451,7 @@
 		{:else}
 			<ReviewNotice />
 			<AddBySite {collectors} bind:site bind:defaults={siteDefaults} onkind={(kind, d) => select(kind, null, d)} onadded={(t) => (targets = [...targets, t])} />
+			<TemplatePicker {collectors} onuse={useTemplate} />
 			{#if requestedKind}
 				<p class="mb-4 rounded-lg border border-advisory/35 bg-advisory-soft px-3.5 py-2.5 text-sm text-ink">
 					{m.deviceform_new_unknown_kind({ kind: requestedKind })}
@@ -548,12 +581,13 @@
 									{m.deviceform_new_prefilled()}
 								</p>
 							{/if}
-							{#if !duplicateRead}
+							{#if !duplicateRead || !templateRead}
 								<Skeleton class="h-40 w-full" />
 							{:else}
 							<TargetForm
 								collector={selected}
 								duplicateOf={duplicateSource && duplicateSource.kind === selected.kind ? duplicateSource : undefined}
+								template={templateSource && templateSource.kind === selected.kind ? templateSource : undefined}
 								{prefill}
 								viaAgentDefault={idParam('via_agent')}
 								locationDefault={idParam('location')}

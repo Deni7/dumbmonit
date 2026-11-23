@@ -32,6 +32,12 @@ param(
     # Fingerprint (SHA-256) of the server's certificate authority: the agent then only talks to
     # that server, over TLS 1.3 with its own client certificate, never in clear.
     [string]$CaPin,
+    # How the agent reaches its encrypted channel: auto (default: the agent port, then the server
+    # URL if that port is unreachable), direct (the agent port only) or websocket (through the
+    # server URL: Cloudflare Tunnel, a reverse proxy that terminates TLS, a corporate proxy). The
+    # agent's own TLS session, with its client certificate, goes inside a WebSocket.
+    [ValidateSet('auto', 'direct', 'websocket')]
+    [string]$Transport,
     [int]$Interval = 0,
     [string[]]$Services = @(),
     [hashtable]$Tags = @{},
@@ -463,6 +469,7 @@ $lignes.Add("token: $Token")
 if ($PinnedKey) { $lignes.Add("server_pin: $PinnedKey") }
 if ($TlsUrl) { $lignes.Add("tls_url: $TlsUrl") }
 if ($CaPin)  { $lignes.Add("ca_pin: $CaPin") }
+if ($Transport) { $lignes.Add("transport: $($Transport.ToLowerInvariant())") }
 # Entre apostrophes : des identifiants peuvent contenir « : » ou « # ».
 if ($Proxy)   { $lignes.Add("proxy: '$($Proxy -replace "'", "''")'") }
 if ($NoProxy) { $lignes.Add("no_proxy: '$($NoProxy -replace "'", "''")'") }
@@ -513,7 +520,13 @@ Write-Etape "Checking the connection to $Url"
 if ($LASTEXITCODE -ne 0) {
     $etat, $cible = Test-CanalAgents
     $port = $cible.Port
-    if ($etat -eq 'refused') {
+    if ($Transport -eq 'websocket') {
+        Write-Host @"
+The agent goes through $Url/api/agent/ws (WebSocket). The tunnel or reverse proxy in front
+of DumbMonit must forward WebSockets to it (Upgrade and Connection headers, no buffering):
+see "Agents behind a proxy" in the documentation.
+"@ -ForegroundColor Red
+    } elseif ($etat -eq 'refused') {
         Write-Host @"
 The encrypted agent channel $($cible.Host):$port refuses the connection: port $port is
 not published or not open on the server.

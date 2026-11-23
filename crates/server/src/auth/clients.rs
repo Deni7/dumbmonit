@@ -98,7 +98,7 @@ pub async fn restrict(pool: &SqlitePool, user: &User, teams: Access) -> Result<A
     let clients = memberships(pool, user.id).await?;
     let scope = match teams {
         Access::All => Scope {
-            ceiling: Level::ceiling(user.role),
+            ceiling: crate::auth::permissions::team_ceiling(user),
             grants: vec![Grant { folder: ALL_FOLDERS.to_string(), level: Level::Operate }],
             teams: Vec::new(),
             clients: Some(clients),

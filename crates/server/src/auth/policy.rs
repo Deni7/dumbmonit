@@ -10,6 +10,11 @@
 //! (LDAP) — c'est le fournisseur d'identité qui porte la MFA — et par une clé
 //! d'accès, qui vaut à elle seule possession et vérification de l'utilisateur.
 //! Un compte sans mot de passe local ne peut d'ailleurs pas enrôler de TOTP.
+//!
+//! Jamais visés : les lecteurs, et les écrans muraux (rôle `wall`). Un écran
+//! fixé au mur n'a personne pour taper un code, et son compte ne joint que
+//! ce que lit le mur (`wall::WALL_ROUTES`) ; l'enrôlement lui est d'ailleurs
+//! fermé.
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -45,11 +50,12 @@ pub async fn save(pool: &SqlitePool, policy: &Policy) -> Result<()> {
 }
 
 /// Vrai si la politique *pourrait* viser ce compte dans cette session : rôle
-/// admin ou opérateur, mot de passe local, pas de second facteur, session
-/// ouverte par mot de passe (ou d'avant que la façon soit retenue). Pur, pour
+/// admin ou opérateur (ou rôle personnalisé qui écrit), mot de passe local,
+/// pas de second facteur, session ouverte par mot de passe (ou d'avant que la
+/// façon soit retenue). Pur, pour
 /// que le garde ne lise le réglage que dans ce cas-là, qui est rare.
 pub fn may_apply(user: &User, via: Option<Via>) -> bool {
-    user.role.can_operate()
+    (user.role.can_operate() || crate::auth::permissions::writes_anything(user))
         && !user.totp_enabled
         && user.password_hash.is_some()
         && via.is_none_or(|via| !via.exempt_from_totp_policy())
@@ -102,6 +108,7 @@ mod tests {
             saml_subject: None,
             saml_issuer: None,
             email: None,
+            custom_role: None,
         }
     }
 
@@ -110,6 +117,8 @@ mod tests {
         assert!(may_apply(&user(Role::Admin, false, true), Some(Via::Password)));
         assert!(may_apply(&user(Role::Operator, false, true), None));
         assert!(!may_apply(&user(Role::Viewer, false, true), Some(Via::Password)));
+        assert!(!may_apply(&user(Role::Wall, false, true), Some(Via::Password)));
+        assert!(!may_apply(&user(Role::Wall, false, true), None));
         assert!(!may_apply(&user(Role::Admin, true, true), Some(Via::Password)));
         // Sans mot de passe local (SSO, annuaire) : rien à enrôler ici.
         assert!(!may_apply(&user(Role::Admin, false, false), None));

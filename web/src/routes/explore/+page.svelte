@@ -14,8 +14,9 @@
 	import { RANGE_SECONDS, stepFor } from '#lib/explore/range.js';
 	import { alertsStore } from '#lib/stores/alerts.svelte.js';
 	import { Button, EmptyState, ErrorNotice, Field, PageHeader, Panel, Skeleton } from '#lib/ui/index.js';
-	import Chart, { type Serie } from '#lib/components/Chart.svelte';
+	import Chart, { type ChartEvent, type Serie } from '#lib/components/Chart.svelte';
 	import QueryInput from '#lib/components/explore/QueryInput.svelte';
+	import AnnotationsPanel from '#lib/components/annotations/AnnotationsPanel.svelte';
 
 	let catalog = $state<CatalogMetric[] | null>(null);
 	let truncated = $state(false);
@@ -29,6 +30,9 @@
 	let latest = $state<{ label: string; value: string }[]>([]);
 	let running = $state(false);
 	let runError = $state<unknown>(null);
+	/** The window of the last run, in seconds, and the change markers drawn over it. */
+	let ran = $state<{ from: number; to: number } | null>(null);
+	let markerEvents = $state.raw<ChartEvent[]>([]);
 
 	const RANGE_LABEL: Record<number, () => string> = {
 		900: () => m.dash_range_15m(),
@@ -85,6 +89,7 @@
 		running = true;
 		runError = null;
 		const end = Math.floor(Date.now() / 1000);
+		ran = { from: end - range, to: end };
 		try {
 			const rows: MetricSeries[] = await queryRange({ query: query.trim(), start: (end - range) * 1000, end: end * 1000, step: stepFor(range) });
 			series = rows.slice(0, 20).map((row) => ({
@@ -193,7 +198,8 @@
 			<EmptyState title={m.explore_empty_title()} description={m.explore_empty_description()} />
 		{:else}
 			<Panel title={m.explore_result()}>
-				<Chart {series} height={280} />
+				{#if ran}<AnnotationsPanel from={ran.from} to={ran.to} bind:events={markerEvents} />{/if}
+				<Chart {series} height={280} events={markerEvents} />
 				<table class="mt-4 w-full text-sm">
 					<caption class="sr-only">{m.explore_latest()}</caption>
 					<thead>

@@ -44,6 +44,7 @@ pub struct ConfigView {
     admin_groups: Vec<String>,
     operator_groups: Vec<String>,
     viewer_groups: Vec<String>,
+    wall_groups: Vec<String>,
     timeout_seconds: u64,
 }
 
@@ -71,6 +72,7 @@ fn view(state: &AppState, resolved: ldap::Resolved) -> ConfigView {
         admin_groups: config.admin_groups,
         operator_groups: config.operator_groups,
         viewer_groups: config.viewer_groups,
+        wall_groups: config.wall_groups,
         timeout_seconds: config.timeout_seconds,
     }
 }
@@ -111,6 +113,7 @@ pub struct ConfigPayload {
     admin_groups: Vec<String>,
     operator_groups: Vec<String>,
     viewer_groups: Vec<String>,
+    wall_groups: Vec<String>,
     timeout_seconds: u64,
 }
 
@@ -145,6 +148,7 @@ impl ConfigPayload {
             admin_groups: self.admin_groups,
             operator_groups: self.operator_groups,
             viewer_groups: self.viewer_groups,
+            wall_groups: self.wall_groups,
             timeout_seconds: self.timeout_seconds,
         }
         .normalized()

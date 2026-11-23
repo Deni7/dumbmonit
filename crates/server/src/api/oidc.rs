@@ -256,6 +256,7 @@ pub struct ConfigView {
     auto_create_defaulted: bool,
     admin_groups: Vec<String>,
     operator_groups: Vec<String>,
+    wall_groups: Vec<String>,
     groups_claim: String,
     public_url: String,
     redirect_uri: String,
@@ -277,6 +278,7 @@ fn view(state: &AppState, resolved: oidc::Resolved, origin: &str) -> ConfigView 
         auto_create_defaulted: resolved.auto_create_defaulted,
         admin_groups: config.admin_groups,
         operator_groups: config.operator_groups,
+        wall_groups: config.wall_groups,
         groups_claim: config.groups_claim,
         public_url: config.public_url,
     }
@@ -311,6 +313,8 @@ pub struct ConfigPayload {
     #[serde(default)]
     operator_groups: Vec<String>,
     #[serde(default)]
+    wall_groups: Vec<String>,
+    #[serde(default)]
     groups_claim: String,
     #[serde(default)]
     public_url: String,
@@ -344,6 +348,7 @@ pub async fn put_config(
         auto_create: payload.auto_create,
         admin_groups: payload.admin_groups,
         operator_groups: payload.operator_groups,
+        wall_groups: payload.wall_groups,
         groups_claim: payload.groups_claim,
         public_url: payload.public_url,
     }

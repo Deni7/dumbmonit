@@ -35,7 +35,8 @@
 		attr_name: '',
 		attr_groups: '',
 		admin_groups: '',
-		operator_groups: ''
+		operator_groups: '',
+		wall_groups: ''
 	});
 	let errors = $state<{ idp_sso_url?: string; idp_entity_id?: string; certificates?: string }>({});
 	const tracker = useDirtyTracker(() => form);
@@ -60,7 +61,8 @@
 			attr_name: next.attr_name,
 			attr_groups: next.attr_groups,
 			admin_groups: csv(next.admin_groups),
-			operator_groups: csv(next.operator_groups)
+			operator_groups: csv(next.operator_groups),
+			wall_groups: csv(next.wall_groups ?? [])
 		};
 		tracker.markClean();
 	}
@@ -163,7 +165,8 @@
 					attr_name: form.attr_name.trim(),
 					attr_groups: form.attr_groups.trim(),
 					admin_groups: split(form.admin_groups),
-					operator_groups: split(form.operator_groups)
+					operator_groups: split(form.operator_groups),
+					wall_groups: split(form.wall_groups)
 				})
 			);
 			saved = true;
@@ -274,6 +277,9 @@
 					</Field>
 					<Field label={m.settings_saml_operator_groups()} for="saml-operator-groups" class="sm:col-span-2">
 						<input id="saml-operator-groups" type="text" class="input" bind:value={form.operator_groups} placeholder="noc, on-call" autocomplete="off" disabled={saving} />
+					</Field>
+					<Field label={m.settings_saml_wall_groups()} for="saml-wall-groups" help={m.settings_saml_wall_groups_help()} class="sm:col-span-2">
+						<input id="saml-wall-groups" type="text" class="input" bind:value={form.wall_groups} placeholder="lobby-screens" autocomplete="off" disabled={saving} />
 					</Field>
 					<div class="sm:col-span-2">
 						<Field label={m.settings_saml_auto_create()} for="saml-auto-create" inline help={m.settings_saml_auto_create_help()}>

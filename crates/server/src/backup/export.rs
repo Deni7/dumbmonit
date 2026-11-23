@@ -22,6 +22,7 @@ use sqlx::{Row, SqlitePool};
 
 use crate::api::topology_edits;
 use crate::backup::bundle::*;
+use crate::backup::monitor_templates;
 use crate::crypto::Cipher;
 
 /// Ce que l'opérateur choisit d'emporter.
@@ -119,8 +120,14 @@ pub async fn collect(pool: &SqlitePool, cipher: &Cipher, options: ExportOptions)
             .await?
             .map(|(logo_type, bytes)| BundleReportLogo { logo_type, data: BASE64.encode(bytes) }),
         slos: slos(pool, &refs).await?,
+        annotations: crate::backup::annotations::collect(pool, &refs).await?,
         auth_policy: crate::auth::settings::get::<Value>(pool, crate::auth::policy::SETTINGS_KEY)
             .await?,
+        monitor_templates: monitor_templates::collect_templates(pool, &channel_names).await?,
+        target_channels: monitor_templates::collect_target_channels(pool, &refs, &channel_names)
+            .await?,
+        backup_destinations: crate::backup::offsite::bundle::collect(pool, cipher).await?,
+        accounts: crate::backup::accounts::collect(pool).await?,
     })
 }
 
@@ -928,6 +935,9 @@ async fn status_pages(
                 slack: row.try_get::<i64, _>("subscribe_slack")? != 0,
             }),
             hide_branding: Some(row.try_get::<i64, _>("hide_branding")? != 0),
+            default_lang: Some(crate::db::status_lang::default_lang(pool, id).await?)
+                .filter(|lang| !lang.is_empty()),
+            translations: crate::db::status_lang::list(pool, id).await?,
         });
     }
     Ok(out)
@@ -1176,8 +1186,14 @@ pub fn sections() -> BTreeMap<&'static str, &'static str> {
         ("status_pages", "Public status pages and the services they list."),
         ("incidents", "Incidents and maintenance announcements, with their post-mortems."),
         ("slos", "Service level objectives: target, window and the monitors they cover."),
+        ("annotations", "Change markers drawn on the charts, with the monitors they apply to."),
         ("users", "Accounts, their role, email address and SSO link."),
         ("auth_policy", "Authentication policy: two-factor required for admins and operators."),
+        (
+            "accounts",
+            "Reset link and invitation settings, pending invitations, each account's \
+             personal notification choices, and custom roles with who has them.",
+        ),
         ("agent_tokens", "Agent enrolment tokens, as hashes: installed agents keep working."),
         ("api_tokens", "API tokens, as hashes: existing tokens keep working."),
         ("push_monitors", "Heartbeat tokens, so the URLs your cron jobs call stay the same."),
@@ -1203,6 +1219,7 @@ pub fn sections() -> BTreeMap<&'static str, &'static str> {
         ),
         ("instance", "Instance name, language, time zone and setup state."),
         ("backup_schedule", "The schedule of the local backups, when you changed it."),
+        ("backup_destinations", "Off-site backup destinations and their credentials."),
         ("clients", "MSP clients, their members, branding, and what belongs to each."),
         (
             "netscan_schedules",

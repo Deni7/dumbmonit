@@ -29,7 +29,10 @@ foothold on the monitored network.
 - **Least privilege.** The container runs as an unprivileged user with no
   capability, a read-only root file system and `no-new-privileges`. Three roles
   (viewer, operator, admin) restrict what a user may change
-  (`crates/server/src/auth/users.rs`; test `operator_role_api.rs`).
+  (`crates/server/src/auth/users.rs`; test `operator_role_api.rs`). Custom
+  roles add permissions from a fixed catalog to a viewer, route by route and
+  default-deny; account, token, SSO and backup administration is never in it
+  (`crates/server/src/auth/permissions.rs`; test `custom_role_api.rs`).
 - **Secure by default.** On a fresh instance only the health, setup, login and
   auth status routes answer until the first admin exists (test
   `api_open_security_api.rs`).

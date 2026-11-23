@@ -265,6 +265,7 @@ Everything `GET /metrics` exposes. Values are read when you scrape; the
 | `dumbmonit_api_tokens_expiring` | gauge | API tokens, not revoked, that expire within seven days. |
 | `dumbmonit_backup_last_success_timestamp_seconds` | gauge | Unix time of the last successful scheduled local backup. Absent until one has been tried. Alert on `time() - …`. |
 | `dumbmonit_backup_last_run_ok` | gauge | 1 when the last scheduled local backup succeeded, 0 when it failed. Absent until one has been tried. |
+| `dumbmonit_backup_offsite_last_success_timestamp_seconds{destination}` | gauge | Unix time of the last successful upload to each off-site backup destination (`destination` = its name). Absent for a destination that never succeeded. |
 | `dumbmonit_database_up` | gauge | 1 when SQLite answers — the same check as `/api/health`. |
 | `dumbmonit_database_bytes` | gauge | Size of `dumbmonit.db` and its write-ahead log. Does not include `/data/vm`. |
 | `dumbmonit_victoriametrics_up` | gauge | 1 when VictoriaMetrics answers — the same check as `/api/health`. 0 while the embedded child is restarting. |

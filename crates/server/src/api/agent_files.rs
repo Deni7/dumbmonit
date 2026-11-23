@@ -329,6 +329,19 @@ mod tests {
         assert!(INSTALL_PS1.contains("$lignes.Add(\"relay: true\")"));
     }
 
+    /// Derrière Cloudflare Tunnel ou un mandataire : les deux scripts prennent
+    /// le transport de la commande (`--transport=websocket`, `-Transport
+    /// websocket`), le vérifient et l'écrivent dans agent.yaml.
+    #[test]
+    fn the_scripts_take_the_transport_of_the_command() {
+        assert!(INSTALL_SH.contains("--transport=*) TRANSPORT="));
+        assert!(INSTALL_SH.contains("\"\"|auto|direct|websocket) ;;"));
+        assert!(INSTALL_SH.contains("echo \"transport: $TRANSPORT\""));
+        assert!(INSTALL_PS1.contains("[ValidateSet('auto', 'direct', 'websocket')]"));
+        assert!(INSTALL_PS1.contains("[string]$Transport"));
+        assert!(INSTALL_PS1.contains("$lignes.Add(\"transport: "));
+    }
+
     /// Un relais ouvre le port de sa passerelle sur son pare-feu, au seul
     /// sous-réseau local, et la désinstallation le referme.
     #[test]

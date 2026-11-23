@@ -253,10 +253,22 @@ impl Notifier for Smtp {
     }
 
     async fn send(&self, message: &Message) -> Result<(), NotifyError> {
+        use lettre::message::MultiPart;
+
+        // Un gabarit de message écrit en HTML part en deux versions : le texte
+        // brut (déjà dans `text`) et le HTML rendu.
+        let html = message
+            .context
+            .rendered
+            .as_ref()
+            .filter(|rendered| rendered.format == super::message_template::TextFormat::Html)
+            .map(|rendered| rendered.body.clone());
         let mut builder = lettre::Message::builder()
             .from(self.mailbox()?)
-            .subject(format!("[DumbMonit] {}", message.title))
-            .header(ContentType::TEXT_PLAIN);
+            .subject(format!("[DumbMonit] {}", message.title));
+        if html.is_none() {
+            builder = builder.header(ContentType::TEXT_PLAIN);
+        }
 
         for recipient in &self.to {
             builder = builder.to(recipient.parse().map_err(|_| {
@@ -264,9 +276,14 @@ impl Notifier for Smtp {
             })?);
         }
 
-        let email = builder
-            .body(message.text.clone())
-            .map_err(|error| NotifyError::Config(error.to_string()))?;
+        let email = match html {
+            Some(html) => {
+                let parts = MultiPart::alternative_plain_html(message.text.clone(), html);
+                builder.multipart(parts)
+            }
+            None => builder.body(message.text.clone()),
+        }
+        .map_err(|error| NotifyError::Config(error.to_string()))?;
 
         super::guard::vet_host(&self.host, self.port).await?;
         self.transport.send(email).await.map_err(|error| {

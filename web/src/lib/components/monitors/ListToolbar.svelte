@@ -76,7 +76,7 @@
 	<span class="flex-1" aria-hidden="true"></span>
 	<div class="flex items-center gap-2">
 		<ViewSwitcher value={view} onchange={onviewchange} />
-		{#if auth.isAdmin}
+		{#if auth.can('monitors.manage')}
 			<Menu label={m.devices_targets_create_folder()} align="right">
 				{#snippet trigger({ toggle, open })}
 					<Button

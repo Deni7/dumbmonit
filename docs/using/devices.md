@@ -47,12 +47,30 @@ One toolbar holds everything:
 - **Compact** / **Tiles**;
 - **Create folder** (administrators): a name field opens under the toolbar;
 - **Select** (administrators), which turns on a checkbox per monitor and a
-  floating bar at the bottom with the bulk actions (enable, disable, silence for
-  1 hour to 7 days, move to a folder, delete, and under **More** location, relay and CVE check); **Done**
-  or Escape leaves the mode;
+  floating bar at the bottom with the bulk actions (**Edit**, enable, disable,
+  silence for 1 hour to 7 days, move to a folder, delete, and under **More**
+  location, relay and CVE check); **Done** or Escape leaves the mode;
 - **⋯** (more actions): the topology **Map**, **Import websites (CSV)** and
   **Import from Uptime Kuma**;
 - **Add a monitor**, the primary action.
+
+**Edit** changes the whole selection in one go: the check interval, the
+notification channels (**Replace with**, **Add** or **Remove** the ticked
+ones), free tags (add one as `key=value`, or tick the tags of the selection to
+remove them) and the folder. Only what you change is applied; the rest of each
+monitor stays as it is. Every monitor is checked as if it were edited on its
+own: one managed by Docker labels or a configuration file is left out, and so
+is one your teams do not let you manage. The others are saved together. When
+some are left out, the list names them with the reason and keeps them selected.
+A setting of a monitor's type (a port, a path) is not a tag: it is changed in
+the monitor's own form. The same edit is available to scripts as
+`PATCH /api/targets/bulk`.
+
+With thousands of monitors, the compact list only draws the lines near the
+screen and fills the rest with empty space as you scroll, so it stays fast.
+Folders, nested sub-monitors, selection and the `j` / `k` keys work as usual.
+While a line is being dragged (or picked up with Space) every line is drawn,
+so the drop can land anywhere.
 
 Each line ends with a **⋯** menu (shown on hover or focus, always on a phone):
 **Probe now**, **Enable** / **Disable** (administrators) and **Copy address**. A
@@ -71,6 +89,7 @@ monitor is behind the gear. Actions:
 | Snooze (bell icon) | A small menu: **Snooze 1 h**, or **Snooze until…** for a custom end. A one-off maintenance window on this monitor; the menu lifts it again. |
 | Logs | Opens the log search filtered on this monitor. |
 | Duplicate | Opens the add form filled in from this monitor, its name ending in "(copy)". Secrets (credentials, secret-looking options, HTTP headers) are never copied: type them again. Not offered for agents or monitors managed by Docker labels. |
+| Save as template | Administrators. Keeps the type, its settings and free tags, the check interval and the notification channels under a name of your choice. Never the address or a secret: credentials, secret-looking options and HTTP headers are left out, and of an HTTP scenario only each step's name, method and URL remain. Not offered for agents or monitors managed by Docker labels. |
 | Settings (gear) | Opens the same form as when adding, prefilled. Leaving the credential empty keeps the stored one. For an agent it also holds the relay mode, log collection, the services to watch on its machine and re-enrolment. |
 | More (⋯), Delete | Asks "Delete for good?" inline for five seconds, then deletes the monitor. Its series stay in VictoriaMetrics until retention expires. |
 
@@ -124,6 +143,18 @@ setup wizard's *Add your first monitors* step offers the same choice.
 See [Add your first monitor](../install/first-device.md) for the form and the
 [monitor types](../devices/index.md) for what each type needs. When editing, the
 form opens **More options** by itself if the monitor already uses one.
+
+**From a template**, above the monitor types, lists the saved templates:
+choosing one opens its type's form filled in from it, as **Duplicate** does,
+with the name, the address and the credential left for you to type.
+Administrators rename (pencil) or delete (bin) templates there. Deleting a
+template does not touch the monitors created from it. Templates are part of the
+[backup](../install/backup.md).
+
+**Notification channels** (in the form, once a channel exists) pick where this
+monitor's alerts go. An alert whose rule sends to every channel goes to the
+ticked channels only; a rule that names its own channels keeps them. Nothing
+ticked is the default: every channel the rules choose.
 
 The check interval is a preset (30 s to 15 min) or **Custom…**: a whole number
 and a unit (seconds to days), from 10 seconds to 7 days. Leaving the form with

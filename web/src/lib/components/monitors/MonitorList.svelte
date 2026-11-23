@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { startPolling } from '#lib/poll.js';
-	import { kindLabel } from '#lib/kind-label.js';
 	import { m } from '#lib/paraglide/messages.js';
 	/**
 	 * Monitors › List — the first tab of /targets (the other tabs are the map, the logs and security).
@@ -22,9 +20,6 @@
 	import { page } from '$app/state';
 	import { goto } from '#lib/navigation.js';
 	import {
-		createSilence,
-		deleteTarget,
-		listCollectors,
 		probeTarget,
 		reorderTargets,
 		renameTargetFolder,
@@ -34,13 +29,9 @@
 	} from '#lib/api/index.js';
 	import { displayState } from '#lib/format.js';
 	import { tagChip } from '#lib/tag-chip.js';
-	import { quickSilencePayload } from '#lib/components/alerts/helpers.js';
 	import type { RowActionHandlers } from '#lib/components/devices/RowActions.svelte';
-	import { loadSparklines } from '#lib/metrics.js';
-	import { loadRiver, DAY_SECONDS, type RiverCell } from '#lib/components/enterprise/fleet.js';
-	import { getSecuritySummary } from '#lib/api/security.js';
-	import type { SecurityGrade } from '#lib/api/index.js';
-	import type { Serie } from '#lib/components/Chart.svelte';
+	import type {  } from '#lib/api/index.js';
+	import type {  } from '#lib/components/Chart.svelte';
 	import { countAlertsByTarget } from '#lib/alerts-attention.js';
 	import { alertsStore } from '#lib/stores/alerts.svelte.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
@@ -64,12 +55,10 @@
 	import {
 		SORT_KEYS,
 		availabilityOf,
-		cveScanChanges,
 		freeTags,
 		loadListQuery,
 		saveListQuery,
 		parseListQuery,
-		runBulk,
 		serializeListQuery,
 		sortTargets,
 		splitDisabled,
@@ -86,16 +75,16 @@
 		worstState
 	} from '#lib/components/devices/folders.js';
 	import { ChevronRight, PowerOff } from 'lucide-svelte';
-	import { setCveScanTargets } from '#lib/api/cves.js';
-	import { assignLocation, listLocations } from '#lib/api/locations.js';
-	import { listRelays } from '#lib/api/relay.js';
-	import { locationForSite } from '#lib/components/devices/relay/relay-site.js';
-	import type { MapLocation, RelayAgent } from '#lib/api/types.js';
+	import { listLocations } from '#lib/api/locations.js';
+	import type { MapLocation } from '#lib/api/types.js';
 	import ListToolbar from './ListToolbar.svelte';
 	import ListFilters from './ListFilters.svelte';
 	import ListBulkBar from './ListBulkBar.svelte';
 	import ListEmpty from './ListEmpty.svelte';
+	import BulkSection from './BulkSection.svelte';
+	import { ListDecor } from './decor.svelte.js';
 	import { ListReorder } from './reorder.svelte.js';
+	import type {  } from '#lib/api/targetsBulk.js';
 	import {
 		countActiveFilters,
 		countSegments,
@@ -114,14 +103,13 @@
 	const probes = $derived(alertsStore.probes);
 	/** One pass over the shared alert list, not a request per monitor. */
 	const alertCounts = $derived(countAlertsByTarget(alertsStore.alerts));
-	let sparklines = $state<Map<TargetId, Serie[]>>(new Map());
-	/** Last 24 hours per monitor, one cell per hour: the table's bars. */
-	let river = $state<Map<TargetId, RiverCell[]>>(new Map());
-	/** Security badges: empty while the score is off in Settings, or for unrated kinds. */
-	let security = $state<Map<TargetId, { grade: SecurityGrade | null; score: number | null }>>(new Map());
-	let kindLabels = $state<Map<string, string>>(new Map());
+	const decor = new ListDecor(() => targets, () => view);
+	const sparklines = $derived(decor.sparklines);
+	const river = $derived(decor.river);
+	const security = $derived(decor.security);
+	const kindLabels = $derived(decor.kindLabels);
 	/** Option keys per device type: what is not an option of its type is a free tag. */
-	let optionKeys = $state<Map<string, Set<string>>>(new Map());
+	const optionKeys = $derived(decor.optionKeys);
 	const NO_KEYS: ReadonlySet<string> = new Set();
 	const optionKeysOf = (kind: string) => optionKeys.get(kind) ?? NO_KEYS;
 	const firstLoad = $derived(alertsStore.loading && targets.length === 0);
@@ -242,7 +230,7 @@
 	const activeFilters = $derived(countActiveFilters({ segment, kind, site, tags: tagFilter, sorted }));
 	let filtersOpen = $state(false);
 	/** Reordering hit-tests rows top to bottom: offered in the compact layout only, on the unfiltered rack order. */
-	const canReorder = $derived(auth.isAdmin && !filtered && !sorted && view === 'compact');
+	const canReorder = $derived(auth.can('monitors.manage') && !filtered && !sorted && view === 'compact');
 	// Disabled devices leave the rack proper for a collapsible section at the bottom.
 	const split = $derived(splitDisabled(targets, stateOf));
 	const activeVisible = $derived(new Set([...visible].filter((id) => split.active.has(id))));
@@ -572,9 +560,6 @@
 		selecting = false;
 		selected = new Set();
 	}
-	let bulkBusy = $state(false);
-	let bulkReport = $state<{ failed: { name: string; error: unknown }[]; total: number } | null>(null);
-
 	/**
 	 * Ids on screen in an unfolded list, inside open parents: what "select all"
 	 * and the bulk actions can reach. A parent shown only as the context of a
@@ -589,12 +574,8 @@
 		if (disabledExpanded) for (const row of shownDisabledRows) if (!row.context) ids.push(row.target.id);
 		return ids;
 	});
-	const shownSet = $derived(new Set(shownIds));
-	/** Selected devices still on screen: a filter change quietly drops the others from the actions. */
-	const selectedTargets = $derived(effectiveTargets.filter((t) => selected.has(t.id) && shownSet.has(t.id)));
-	const allShownSelected = $derived(shownIds.length > 0 && shownIds.every((id) => selected.has(id)));
 	const selection = $derived<RowSelection | null>(
-		auth.isAdmin && selecting
+		auth.can('monitors.manage') && selecting
 			? {
 					selected,
 					toggle: (id) => {
@@ -604,180 +585,6 @@
 			: null
 	);
 	const folderChoices = $derived([...new Set([...knownFolders(targets), ...pendingEmptyFolders])]);
-
-	function toggleAllShown() {
-		const next = new Set(selected);
-		if (allShownSelected) for (const id of shownIds) next.delete(id);
-		else for (const id of shownIds) next.add(id);
-		selected = next;
-	}
-
-	async function bulk(subjects: Target[], action: (target: Target) => Promise<unknown>) {
-		if (bulkBusy || subjects.length === 0) return;
-		bulkBusy = true;
-		bulkReport = null;
-		try {
-			const outcome = await runBulk(subjects, action);
-			await alertsStore.refresh();
-			// What went through leaves the selection; what failed stays for a retry.
-			selected = new Set(outcome.failed.map((f) => f.id));
-			if (outcome.failed.length > 0) {
-				bulkReport = {
-					failed: outcome.failed.map((f) => ({ name: f.name, error: f.error })),
-					total: subjects.length
-				};
-			}
-		} finally {
-			bulkBusy = false;
-		}
-	}
-
-	const bulkSetEnabled = (enabled: boolean) =>
-		bulk(
-			selectedTargets.filter((t) => t.enabled !== enabled),
-			(t) => updateTarget(t.id, targetToPayload(t, { enabled }))
-		);
-	const bulkMove = (group: string) =>
-		bulk(
-			selectedTargets.filter((t) => (t.group_name || '') !== group),
-			(t) => updateTarget(t.id, targetToPayload(t, { group_name: group }))
-		);
-	const bulkDelete = () => bulk(selectedTargets, (t) => deleteTarget(t.id));
-
-	/** Durations offered by "Silence": a one-off window from now, per monitor of the selection. */
-	const silenceChoices = $derived([
-		{ secs: 3600, label: m.w1monitors_list_silence_1h() },
-		{ secs: 8 * 3600, label: m.w1monitors_list_silence_8h() },
-		{ secs: 24 * 3600, label: m.w1monitors_list_silence_1d() },
-		{ secs: 7 * 24 * 3600, label: m.w1monitors_list_silence_7d() }
-	]);
-	async function bulkSilence(secs: number, label: string) {
-		const picked = selectedTargets;
-		if (bulkBusy || picked.length === 0) return;
-		const ends = new Date(Date.now() + secs * 1000);
-		// The same window the monitor's own "Snooze" creates, one per monitor.
-		await bulk(picked, (t) => createSilence({ ...quickSilencePayload(t, ends), name: m.devices_silence_name({ name: t.name }) }));
-		if (bulkReport === null) {
-			rowToast = { key: ++rowToastKey, message: m.w1monitors_list_silence_done({ duration: label }) };
-			// Leaves the selection mode so the toast is not hidden behind the bar.
-			stopSelecting();
-		}
-	}
-
-	// CVE check in bulk: one request for the whole selection. Turning it off is
-	// armed first (second click in the menu, see `ListBulkBar`); the result comes
-	// back as a toast with Undo, and the selection mode is left so the toast is
-	// not hidden behind the action bar.
-	let cveToast = $state<{ key: number; message: string; undo: { ids: TargetId[]; enabled: boolean } | null } | null>(null);
-	let cveToastKey = 0;
-	const cveUndo = $derived(cveToast?.undo ?? null);
-
-	async function bulkCve(enabled: boolean) {
-		const picked = selectedTargets;
-		if (bulkBusy || picked.length === 0) return;
-		const ids = cveScanChanges(picked, enabled);
-		if (ids.length === 0) {
-			cveToast = { key: ++cveToastKey, message: m.devices_list_bulk_cve_none(), undo: null };
-			return;
-		}
-		bulkBusy = true;
-		bulkReport = null;
-		try {
-			const { updated } = await setCveScanTargets(ids, enabled);
-			await alertsStore.refresh();
-			cveToast = {
-				key: ++cveToastKey,
-				message: (enabled ? m.devices_list_bulk_cve_done_on : m.devices_list_bulk_cve_done_off)({ count: updated }),
-				undo: updated > 0 ? { ids, enabled: !enabled } : null
-			};
-			stopSelecting();
-		} catch (error) {
-			bulkReport = { failed: picked.map((t) => ({ name: t.name, error })), total: picked.length };
-		} finally {
-			bulkBusy = false;
-		}
-	}
-
-	async function undoCve(undo: { ids: TargetId[]; enabled: boolean }) {
-		try {
-			await setCveScanTargets(undo.ids, undo.enabled);
-			await alertsStore.refresh();
-		} catch (error) {
-			actionError = error;
-		}
-	}
-
-	// Locations of the world map, offered in bulk once selecting starts.
-	let bulkLocations = $state<MapLocation[]>([]);
-	$effect(() => {
-		if (!selecting) return;
-		const controller = new AbortController();
-		listLocations(controller.signal)
-			.then((found) => (bulkLocations = found.locations))
-			.catch(() => (bulkLocations = []));
-		return () => controller.abort();
-	});
-	// Relay agents, offered as "Reached through" in bulk.
-	let bulkRelays = $state<RelayAgent[]>([]);
-	$effect(() => {
-		if (!selecting) return;
-		const controller = new AbortController();
-		listRelays(controller.signal)
-			.then((list) => (bulkRelays = list.filter((r) => r.relay || r.relayed > 0)))
-			.catch(() => (bulkRelays = []));
-		return () => controller.abort();
-	});
-	/** Agents push their own metrics: they are never reached through a relay. */
-	const relayable = (t: Target) => t.kind !== 'agent' && t.kind !== 'agent_service';
-	/** Monitors of the selection left out of "Reached through", said out loud. */
-	let relaySkipped = $state(0);
-	/** After a move to a relay whose site is a location: offer to place them there. */
-	let relayPlace = $state<{ location: MapLocation; ids: TargetId[] } | null>(null);
-
-	async function bulkRelay(agent: RelayAgent | null) {
-		const viaAgent = agent ? agent.id : null;
-		const subjects = selectedTargets.filter((t) => relayable(t) && t.id !== viaAgent);
-		relaySkipped = selectedTargets.length - subjects.length;
-		relayPlace = null;
-		const moving = subjects.filter((t) => t.via_agent !== viaAgent);
-		await bulk(moving, (t) => updateTarget(t.id, targetToPayload(t, { via_agent: viaAgent })));
-		const location = locationForSite(bulkLocations, agent?.site);
-		if (location && subjects.length > 0) relayPlace = { location, ids: subjects.map((t) => t.id) };
-	}
-
-	async function placeRelayed(): Promise<boolean> {
-		if (!relayPlace || bulkBusy) return false;
-		const { location, ids } = relayPlace;
-		bulkBusy = true;
-		try {
-			await assignLocation(location.id, ids);
-			await alertsStore.refresh();
-			relayPlace = null;
-			return true;
-		} catch (error) {
-			bulkReport = { failed: [{ name: location.name, error }], total: ids.length };
-			return false;
-		} finally {
-			bulkBusy = false;
-		}
-	}
-
-	/** One request for the whole selection: the server places them all at once. */
-	async function bulkPlace(location: number | null) {
-		const subjects = selectedTargets;
-		if (bulkBusy || subjects.length === 0) return;
-		bulkBusy = true;
-		bulkReport = null;
-		try {
-			await assignLocation(location, subjects.map((t) => t.id));
-			await alertsStore.refresh();
-			selected = new Set();
-		} catch (error) {
-			bulkReport = { failed: subjects.map((t) => ({ name: t.name, error })), total: subjects.length };
-		} finally {
-			bulkBusy = false;
-		}
-	}
 
 	async function persistOrder(order: TargetId[]) {
 		const prev = new Map(positionOverride);
@@ -808,70 +615,9 @@
 	});
 	$effect(() => reorder.listen());
 
-	async function load(signal?: AbortSignal) {
-		// Decoration on top of the list the shared store already holds: a
-		// failure here must not take the rack down with it.
-		const next = await loadSparklines(24 * 3600, signal).catch(() => null);
-		if (next) sparklines = next;
-		return next !== null;
-	}
-
-	/** The table's 24 hourly segments: one aggregated query for the whole fleet. */
-	async function loadBars(signal?: AbortSignal) {
-		// The monitors tell a device's silent hour (down) from an empty one; read
-		// untracked, so that each refresh of the store does not restart the timer.
-		const monitors = untrack(() => targets);
-		const cells = await loadRiver(DAY_SECONDS, signal, 24, monitors).catch(() => null);
-		if (cells) river = cells;
-		return cells !== null;
-	}
-
-	async function loadSecurity(signal?: AbortSignal) {
-		// Decoration too: no badge rather than an error when it cannot be read.
-		const summary = await getSecuritySummary(signal).catch(() => null);
-		if (!summary) return false;
-		security = new Map(
-			summary.enabled ? summary.devices.map((d) => [d.target_id, { grade: d.grade, score: d.score }]) : []
-		);
-	}
-
-	async function loadKinds(signal?: AbortSignal) {
-		try {
-			const collectors = await listCollectors(signal);
-			kindLabels = new Map(collectors.map((c) => [c.kind, kindLabel(c.kind, c.label)]));
-			optionKeys = new Map(collectors.map((c) => [c.kind, new Set(c.options.map((o) => o.key))]));
-		} catch {
-			// The raw kind is a fine label until the server describes it.
-		}
-	}
-
-	$effect(() => {
-		const controller = new AbortController();
-		void loadKinds(controller.signal);
-		// Scores move slowly (recomputed every 15 min server-side).
-		const stopSecurity = startPolling(loadSecurity, 120_000);
-		return () => {
-			controller.abort();
-			stopSecurity();
-		};
-	});
-
-	// The "Last 24 h" bars are drawn by the compact table (the default): they
-	// were once fetched with the sparklines below, which only the tiles load,
-	// so the table never received any. One `min by (target)` query, refreshed
-	// every minute (a slot is an hour).
-	$effect(() => {
-		if (view !== 'compact') return;
-		return startPolling(loadBars, 60_000);
-	});
-
-	// Sparklines are drawn by the tiles only: the compact list (the default)
-	// never shows them, so it does not pay for a range query over every
-	// device's series every 30 s — several megabytes with a few hundred devices.
-	$effect(() => {
-		if (view !== 'tiles') return;
-		return startPolling(load, 30_000);
-	});
+	$effect(() => decor.listenStatic());
+	$effect(() => decor.listenBars());
+	$effect(() => decor.listenSparklines());
 </script>
 
 <ReviewNotice />
@@ -933,76 +679,32 @@
 	</EmptyState>
 {:else}
 	<p class="sr-only" aria-live="polite">{m.devices_targets_shown({ shown: totalRows, total: targets.length })}</p>
-	{#if filtered || (sorted && auth.isAdmin)}
+	{#if filtered || (sorted && auth.can('monitors.manage'))}
 		<!-- One quiet line: what the filters leave, and why dragging is off while sorted. -->
 		<p class="mb-2 flex flex-wrap items-center gap-x-3 text-[0.8125rem] text-ink-2">
 			{#if filtered}
 				<span class="tnum">{m.devices_targets_shown({ shown: totalRows, total: targets.length })}</span>
 			{/if}
-			{#if sorted && auth.isAdmin}
+			{#if sorted && auth.can('monitors.manage')}
 				<span class="text-ink-3">{m.devices_list_sort_no_reorder()}</span>
 			{/if}
 			<button type="button" class="inline-flex min-h-10 items-center text-ink-2 underline hover:text-ink" onclick={clearFilters}>{m.devices_targets_clear_filters()}</button>
 		</p>
 	{/if}
-	{#if selection}
-		<ListBulkBar
-			count={selectedTargets.length}
-			selection={selectedTargets.length === 0 ? 'none' : allShownSelected ? 'all' : 'some'}
-			empty={shownIds.length === 0}
-			busy={bulkBusy}
-			{silenceChoices}
-			{folderChoices}
-			locations={bulkLocations}
-			relays={bulkRelays}
-			onselectall={(on) => {
-				if (on !== allShownSelected) toggleAllShown();
-			}}
-			onexit={stopSelecting}
-			onsetenabled={(enabled) => void bulkSetEnabled(enabled)}
-			onsilence={(secs, label) => void bulkSilence(secs, label)}
-			onmove={(folder) => void bulkMove(folder)}
-			onplace={(location) => void bulkPlace(location)}
-			onrelay={(agent) => void bulkRelay(agent)}
-			oncve={(enabled) => void bulkCve(enabled)}
-			ondelete={bulkDelete}
-		/>
-	{/if}
-	{#if relaySkipped > 0 || relayPlace}
-		<div class="mb-3 flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface px-3 py-2 text-sm text-ink-2" role="status">
-			{#if relaySkipped > 0}
-				<p>{m.devices_list_bulk_relay_skipped({ count: relaySkipped })}</p>
-			{/if}
-			{#if relayPlace}
-				<p>{m.devices_list_bulk_relay_place({ count: relayPlace.ids.length, location: relayPlace.location.name })}</p>
-				<Button size="sm" variant="secondary" loading={bulkBusy} onclick={() => placeRelayed()}>{m.devices_list_bulk_relay_place_apply()}</Button>
-			{/if}
-			<Button size="sm" variant="ghost" onclick={() => { relaySkipped = 0; relayPlace = null; }}>{m.devices_list_bulk_dismiss()}</Button>
-		</div>
-	{/if}
+	<BulkSection
+		targets={effectiveTargets}
+		{shownIds}
+		{folderChoices}
+		{optionKeysOf}
+		bind:selecting
+		bind:selected
+		onnotify={(message) => (rowToast = { key: ++rowToastKey, message })}
+		onerror={(cause) => (actionError = cause)}
+	/>
 	{#if rowToast}
 		{#key rowToast.key}
 			<Toast message={rowToast.message} onclose={() => (rowToast = null)} durationMs={6000} />
 		{/key}
-	{/if}
-	{#if cveToast}
-		{#key cveToast.key}
-			<Toast
-				message={cveToast.message}
-				actionLabel={cveUndo ? m.devices_list_bulk_cve_undo() : undefined}
-				onaction={cveUndo ? () => void undoCve(cveUndo) : undefined}
-				onclose={() => (cveToast = null)}
-				durationMs={8000}
-			/>
-		{/key}
-	{/if}
-	{#if bulkReport}
-		<div class="mb-3">
-			<ErrorNotice error={bulkReport.failed[0].error} title={m.devices_list_bulk_partial_title({ failed: bulkReport.failed.length, total: bulkReport.total })}>
-				<p class="text-sm text-ink-2">{m.devices_list_bulk_partial_names({ names: bulkReport.failed.map((f) => f.name).join(', ') })}</p>
-				<Button size="sm" variant="ghost" class="mt-1" onclick={() => (bulkReport = null)}>{m.devices_list_bulk_dismiss()}</Button>
-			</ErrorNotice>
-		</div>
 	{/if}
 	{#if view === 'compact'}
 		<!-- The column names, once over every folder, on the grid of the rows. -->
@@ -1022,7 +724,7 @@
 						worst={worstState(section.rows)}
 						{collapsed}
 						ontoggle={() => toggleFolder(section.key)}
-						canManage={auth.isAdmin && !filtered && section.key !== ''}
+						canManage={auth.can('monitors.manage') && !filtered && section.key !== ''}
 						busy={moving}
 						onrename={(next) => renameFolder(section.key, next)}
 						ondelete={() => deleteFolder(section.key)}

@@ -172,6 +172,29 @@ pub(super) async fn restore_status_pages(
             }
         }
 
+        // Langues : revalidées contre les neuf de l'interface.
+        if let Some(lang) = page.default_lang.as_deref()
+            && (lang.is_empty() || crate::db::status_lang::SUPPORTED.contains(&lang))
+            && crate::db::status_lang::restore(&mut **tx, id, lang).await?
+            && outcome == RestoreOutcome::Skipped
+        {
+            outcome = RestoreOutcome::Updated;
+        }
+        for translation in &page.translations {
+            if !crate::db::status_lang::SUPPORTED.contains(&translation.lang.as_str()) {
+                report.notes.push(format!(
+                    "Status page \"{}\": the language {} is not supported, its texts were skipped.",
+                    page.slug, translation.lang
+                ));
+                continue;
+            }
+            if crate::db::status_lang::upsert(&mut **tx, id, translation).await?
+                && outcome == RestoreOutcome::Skipped
+            {
+                outcome = RestoreOutcome::Updated;
+            }
+        }
+
         // Accès : revalidé contre le jeu fermé. Absent (page publique, ou ancienne
         // sauvegarde), la page garde son accès.
         if let Some(mode) = page.access_mode.as_deref()

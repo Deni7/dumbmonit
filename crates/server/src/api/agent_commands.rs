@@ -287,10 +287,21 @@ pub struct AgentHostView {
     pub gateway_tunnels: usize,
     /// Dernier essai de sa passerelle par le relais lui-même.
     pub gateway_check: Option<dumbmonit_proto::GatewayCheck>,
+    /// Passerelle telle que le relais l'a vraiment ouverte (adresse liée, ou
+    /// cause de l'échec).
+    pub gateway_state: Option<dumbmonit_proto::GatewayState>,
+    /// Ce qui l'empêche d'accepter le site, hors relais muet (la page le dit
+    /// déjà) : fermée, relais trop ancien, port impossible à ouvrir, boucle
+    /// locale, pas de canal chiffré.
+    pub gateway_problem: Option<agent::gateway::GatewayProblem>,
     /// Serveur que l'agent emploie quand il en connaît plusieurs
     /// (`server_urls`) : primaire ou secours, depuis quand. `None` : une
     /// seule adresse.
     pub server_link: Option<dumbmonit_proto::ServerLink>,
+    /// Vrai si son dernier lot chiffré est arrivé par la WebSocket de
+    /// l'interface (`GET /api/agent/ws`) plutôt qu'en direct sur le port des
+    /// agents : constaté par le serveur.
+    pub via_websocket: bool,
 }
 
 impl AgentHostView {
@@ -301,6 +312,10 @@ impl AgentHostView {
             gateway_host: info.relay_gateway_host.clone(),
             gateway_tunnels: tunnels,
             gateway_check: info.relay_gateway_check.clone(),
+            gateway_problem: (info.relay || info.relay_wanted)
+                .then(|| agent::gateway::problem(&info, false))
+                .flatten(),
+            gateway_state: info.relay_gateway_state.clone(),
             commands_supported: info.commands_supported(),
             binding: info.binding_state(),
             hostname: info.hostname,
@@ -321,6 +336,7 @@ impl AgentHostView {
             rebind_until: info.rebind_until,
             last_seen_at: info.last_seen_at,
             server_link: info.server_link,
+            via_websocket: info.via_websocket,
         }
     }
 }

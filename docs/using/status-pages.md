@@ -70,6 +70,27 @@ There is deliberately no custom CSS or HTML: a status page is public and lives
 on the same origin as your admin interface, under the same
 [content security policy](../reference/api.md).
 
+### Languages {#languages}
+
+The page's fixed texts ("All systems operational", headings, buttons) follow the
+visitor's language: their saved choice, then their browser language, among the
+fourteen interface languages. A **Language** picker at the bottom of the page lets
+them change it; only the chosen language is downloaded. When the browser speaks
+none of the fourteen, the page uses its **Default language**.
+
+The texts you wrote can be translated too. In the page editor, **Translations**
+(available once the page is saved) lets you pick a language and override the
+title, description, footer text and the names of services and groups. A field
+left empty keeps the text as written. Visitors get the translation matching their
+interface language (`?lang=` on `GET /api/public/status/{slug}`, else the
+`Accept-Language` header, else the page's default language). Translations are
+saved on their own with `PUT /api/status-pages/{id}/languages` and travel in the
+backup.
+
+**Incident and maintenance messages are shown exactly as written; they are never
+translated.** Write them in the language your audience reads, or post one per
+language.
+
 ## 2. What visitors see
 
 - A banner with the one-second answer, read from the services: **All systems

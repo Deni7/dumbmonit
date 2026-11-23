@@ -197,6 +197,7 @@ async fn maintenance(pool: &SqlitePool, config: &AlertingConfig, now: DateTime<U
 
     let expired = db::alerts::purge_expired_silences(pool, now).await?;
     let escalations = crate::oncall::runner::maintenance(pool, now).await?;
+    crate::annotations::store::purge(pool, now).await?;
 
     // Le registre des notifications ne sert qu'aux fenêtres glissantes du pipeline
     // (plafond horaire, battement, délai minimal) : au-delà, il ne vaut rien.
@@ -391,6 +392,9 @@ pub async fn evaluate_once(
     for group in &mut outcome.groups {
         group.client_id = group.target_id.and_then(|id| target_clients.get(&id).copied());
     }
+    // Canaux propres à un moniteur : ce que sa règle envoie partout ne part
+    // que vers eux (voir `db::target_channels`).
+    db::target_channels::narrow_groups(pool, &mut outcome.groups).await?;
 
     report.alerts_tracked = outcome.alerts.len();
     for alert in &outcome.alerts {
@@ -459,6 +463,17 @@ pub async fn evaluate_once(
     )
     .await;
 
+    // Notifications personnelles : ce que chaque compte a choisi de recevoir
+    // lui-même, par courriel ou Web Push (`notify::personal`).
+    let personal = notify::personal::dispatch::Ctx {
+        pool,
+        cipher,
+        http,
+        public_url: public_url.as_deref(),
+        max_per_hour: global.max_per_hour,
+    };
+    notify::personal::dispatch::dispatch(&personal, &outcome.groups, now).await;
+
     // Astreintes : les escalades en cours avancent (étape suivante, arrêt à
     // l'acquittement), les relèves sont annoncées. Une erreur ici ne doit pas
     // empêcher le cycle d'enregistrer ce qui précède.
@@ -486,6 +501,11 @@ pub async fn evaluate_once(
         }
     }
     db::alerts::record_history(pool, &history, &plan.announced).await?;
+    // Rapport de bruit : chaque notification routée compte pour l'épisode en
+    // cours de son empreinte. Au mieux : le cycle n'en dépend pas.
+    if let Err(error) = db::alert_insights::count_notifications(pool, &plan.announced).await {
+        warn!(?error, "notifications not counted for the noise report");
+    }
     // Relais d'escalade pris en charge : datés à part, pour qu'ils ne partent
     // qu'une fois par épisode (voir `group::decide`).
     let relayed: Vec<String> = outcome

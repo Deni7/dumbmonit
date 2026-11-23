@@ -1066,6 +1066,22 @@
 	"deviceform_channelcheck_dns_title": "无法解析 {host}",
 	"deviceform_channelcheck_error": "无法检查代理通道",
 	"deviceform_channelcheck_firewall": "然后在服务器防火墙上开放 TCP 端口 {port}（firewalld、ufw 或 Windows）：",
+	"deviceform_channelcheck_gateway_bind_body": "中继报告：{error}。请在中继上释放端口 {port}，或在 {relay} 页面的“中继”面板中选择其他网关端口。查看中继上占用该端口的程序：",
+	"deviceform_channelcheck_gateway_bind_title": "{relay} 无法打开端口 {port}",
+	"deviceform_channelcheck_gateway_closed_body": "站点的机器通过中继的网关连接，而此中继的网关已关闭。在 {relay} 的页面中，于“中继”面板开启“{setting}”并保存：中继会在几秒内打开它。",
+	"deviceform_channelcheck_gateway_closed_title": "{relay} 的网关已关闭",
+	"deviceform_channelcheck_gateway_copy_listen": "复制该行",
+	"deviceform_channelcheck_gateway_copy_owner": "复制命令",
+	"deviceform_channelcheck_gateway_loopback_body": "{relay} 的 agent.yaml 将网关绑定到回环地址，站点的其他机器都无法访问。请在中继上将 gateway_listen 行替换为下面这一行（或删除它），然后重启代理：",
+	"deviceform_channelcheck_gateway_loopback_title": "{relay} 仅在 {address} 上监听",
+	"deviceform_channelcheck_gateway_no_tunnel_body": "其网关正在监听，但 {relay} 只能通过 Web 端口连接此服务器，因此无法转发站点的代理。请确认 {relay} 能访问服务器的加密代理端口（已在 Docker 中发布并在防火墙中开放）：中继会自动切换过去。",
+	"deviceform_channelcheck_gateway_no_tunnel_title": "{relay} 未使用加密的代理通道",
+	"deviceform_channelcheck_gateway_offline_body": "{relay} 已有一段时间没有上报，因此既无法打开网关，也无法转发流量。请确认其代理正在运行并能连接到此服务器；此检查会自动继续。",
+	"deviceform_channelcheck_gateway_offline_title": "{relay} 未连接",
+	"deviceform_channelcheck_gateway_open_relay": "打开 {relay} 的页面",
+	"deviceform_channelcheck_gateway_tested_by": "由 {relay} 自身在 {address} 测试，{when}。此测试不会经过站点机器与中继之间的防火墙。",
+	"deviceform_channelcheck_gateway_too_old_body": "中继从代理 {min} 起才能打开网关。请更新 {relay} 上的代理（在其页面上，或重新运行其安装命令）；之后此检查会自动继续。",
+	"deviceform_channelcheck_gateway_too_old_title": "{relay} 运行的代理 {version} 不支持网关",
 	"deviceform_channelcheck_hairpin": "检查由服务器自身发起：在不支持回环（hairpin）的 NAT 后面，即使外部机器能正常连接，检查也可能失败。",
 	"deviceform_channelcheck_ok": "加密代理通道可通过 {address} 访问（TLS 1.3）。",
 	"deviceform_channelcheck_refused_body": "服务器无法通过 {address} 访问自己的代理通道：连接被拒绝。代理也会同样失败。",
@@ -1082,6 +1098,12 @@
 	"deviceform_channelcheck_timeout_title": "端口 {port} 无响应",
 	"deviceform_channelcheck_tls_body": "{address} 上响应的不是 DumbMonit 代理通道。请确认端口 {port} 指向 DumbMonit 容器。",
 	"deviceform_channelcheck_tls_title": "端口 {port} 有响应，但不是代理通道",
+	"deviceform_channelcheck_use_direct": "使用代理端口",
+	"deviceform_channelcheck_use_websocket": "使用 Web 地址（WebSocket）",
+	"deviceform_channelcheck_websocket_body": "此地址经过隧道或反向代理服务器。它必须将 WebSocket 转发到 DumbMonit（Upgrade 和 Connection 标头，不缓冲响应，较长的读取超时）：请参阅文档中的“位于代理服务器后的代理”。",
+	"deviceform_channelcheck_websocket_hint": "如果无法开放此端口（Cloudflare Tunnel、反向代理、企业防火墙），代理可以改走 Web 地址：其加密通道将在 WebSocket 中传输，仍为端到端加密。",
+	"deviceform_channelcheck_websocket_ok": "代理通过界面地址 {address} 连接：其加密通道（TLS 1.3，客户端证书）在 WebSocket 中传输。无需开放其他端口。",
+	"deviceform_channelcheck_websocket_title": "代理 WebSocket 在 {address} 无响应",
 	"deviceform_checksums_summary": "二进制文件校验和 (SHA-256) — 安装程序会据此校验下载内容",
 	"deviceform_cred_auth_label": "认证方式",
 	"deviceform_cred_choice_none": "无",
@@ -1658,6 +1680,9 @@
 	"devices_agent_binding": "绑定",
 	"devices_agent_bound": "已绑定",
 	"devices_agent_bound_detail": "此代理持有自己的密钥。其他机器无法以其名义推送测量数据，也无法获取其容器命令。",
+	"devices_agent_channel": "通道",
+	"devices_agent_channel_websocket": "经 Web 地址的 WebSocket",
+	"devices_agent_channel_websocket_detail": "它最近一批加密数据经由 Web 地址的 WebSocket（Cloudflare Tunnel、反向代理）到达，而非直接连到代理端口。其中的 TLS 会话相同，仍为端到端。",
 	"devices_agent_err_rebind": "无法开启重新注册窗口",
 	"devices_agent_help_intro": "当代理没有上报时，请在这台机器上运行以下命令。",
 	"devices_agent_help_logs": "最新日志",
@@ -3639,6 +3664,7 @@
 	"devicesb_relay_panel_devices_one": "1 个监控项",
 	"devicesb_relay_panel_devices_other": "{count} 个监控项",
 	"devicesb_relay_panel_gateway": "本站点代理的网关",
+	"devicesb_relay_panel_gateway_bind_failed": "无法在 {address} 上监听：{error}",
 	"devicesb_relay_panel_gateway_check_failed": "无法通过 {address} 访问：{error}",
 	"devicesb_relay_panel_gateway_check_ok": "可通过 {address} 访问（由中继自行测试）",
 	"devicesb_relay_panel_gateway_closed": "已关闭",
@@ -3646,10 +3672,13 @@
 	"devicesb_relay_panel_gateway_host": "站点看到的地址",
 	"devicesb_relay_panel_gateway_host_help": "IP 或本地名称，会写入安装命令。",
 	"devicesb_relay_panel_gateway_listening": "正在监听端口 {port}",
+	"devicesb_relay_panel_gateway_loopback": "仅在 {address} 上监听：站点的机器无法访问。请在中继的 agent.yaml 中使用 {line}。",
+	"devicesb_relay_panel_gateway_no_tunnel": "中继尚未使用加密的代理通道：网关无法转发站点的代理。",
 	"devicesb_relay_panel_gateway_opening": "中继连接后即打开",
 	"devicesb_relay_panel_gateway_port": "端口",
 	"devicesb_relay_panel_gateway_port_invalid": "1 到 65535。",
 	"devicesb_relay_panel_gateway_state": "网关",
+	"devicesb_relay_panel_gateway_too_old": "代理 {version} 版本过旧，无法打开网关：请更新。",
 	"devicesb_relay_panel_gateway_tunnels": [
 		{
 			"declarations": [
@@ -7247,6 +7276,8 @@
 	"settings_ldap_user_filter_help": "{placeholder} 会被替换为输入的用户名，并经过转义，无法改变过滤器。",
 	"settings_ldap_username_attribute": "用户名属性",
 	"settings_ldap_viewer_groups": "查看者组",
+	"settings_ldap_wall_groups": "墙面显示屏组",
+	"settings_ldap_wall_groups_help": "不属于其他任何已列出组的成员成为墙面显示屏：只能看到墙屏模式。",
 	"settings_logs_action_error": "操作失败。",
 	"settings_logs_days_available": "磁盘上的天数",
 	"settings_logs_description": "DumbMonit 自身的日志：保存在磁盘上，可导出，并转发到您的日志服务器。",
@@ -7797,6 +7828,8 @@
 	"settings_saml_sp_heading": "提供给您的身份提供商",
 	"settings_saml_sp_help": "大多数提供商接受元数据 URL；否则请手动填写 Entity ID 和 ACS URL。",
 	"settings_saml_title": "SAML 登录",
+	"settings_saml_wall_groups": "墙面显示屏组",
+	"settings_saml_wall_groups_help": "以逗号分隔。不属于任何管理员组或操作员组的成员成为墙面显示屏：只能看到墙屏模式。",
 	"settings_scim_action_error": "SCIM 更改失败",
 	"settings_scim_base_url": "SCIM 基础 URL",
 	"settings_scim_base_url_help": "在提供商处将其填为租户或连接器 URL，并将下方令牌作为密钥。",
@@ -8049,6 +8082,8 @@
 	"settings_sso_title": "单点登录",
 	"settings_sso_turn_off": "关闭单点登录？",
 	"settings_sso_use_env": "改用环境变量的值？",
+	"settings_sso_wall_groups": "墙面显示屏群组",
+	"settings_sso_wall_groups_help": "以逗号分隔。既非管理员也非操作员的成员成为墙面显示屏：只能看到墙屏模式。若只填写此列表，它仅决定墙面显示屏角色。",
 	"settings_tab_account": "我的账户",
 	"settings_tab_monitoring": "监控",
 	"settings_tab_notifications": "通知",
@@ -8242,6 +8277,9 @@
 	"settings_users_role_operator_option": "操作员——处理告警，不能配置",
 	"settings_users_role_viewer": "查看者",
 	"settings_users_role_viewer_option": "查看者——只读",
+	"settings_users_role_wall": "墙面显示屏",
+	"settings_users_role_wall_help": "用于挂在墙上的屏幕：登录后直接进入墙屏模式，无法打开其他任何页面、设置或数据。只要它在显示墙屏，就会保持登录；停用该账户、重置其密码或为其分配其他角色即可让它退出登录。",
+	"settings_users_role_wall_option": "墙面显示屏——仅显示墙屏",
 	"settings_users_save": "保存更改",
 	"settings_users_save_error": "无法保存用户",
 	"settings_users_search_label": "搜索用户",
@@ -9635,6 +9673,9 @@
 	"w2ops_audit_action_logs_destination_updated": "日志目的地已修改",
 	"w2ops_audit_action_logs_exported": "日志已导出",
 	"w2ops_audit_action_logs_settings": "日志设置已更改",
+	"w2ops_audit_action_monitor_template_created": "已创建监控模板",
+	"w2ops_audit_action_monitor_template_deleted": "已删除监控模板",
+	"w2ops_audit_action_monitor_template_renamed": "已重命名监控模板",
 	"w2ops_audit_action_netconfig_downloaded": "设备配置已下载",
 	"w2ops_audit_action_netconfig_host_key_accepted": "设备 SSH 主机密钥已接受",
 	"w2ops_audit_action_netconfig_revealed": "已显示设备配置中的密钥",
@@ -9683,6 +9724,7 @@
 	"w2ops_audit_action_spotify_connected": "Spotify 已连接",
 	"w2ops_audit_action_spotify_disconnected": "Spotify 已断开",
 	"w2ops_audit_action_storage_settings": "存储设置已更改",
+	"w2ops_audit_action_targets_bulk_update": "已批量编辑监控",
 	"w2ops_audit_action_team_created": "团队已创建",
 	"w2ops_audit_action_team_deleted": "团队已删除",
 	"w2ops_audit_action_team_settings": "团队设置已更改",
@@ -9737,6 +9779,774 @@
 	"w3audit_action_totp_recovery_regenerated": "恢复码已更换",
 	"w3audit_action_user_signed_out": "账户已在所有设备退出",
 	"w3tech_alerts_detail_slo": "SLO",
+	"w5alerting_backtest_absorbed": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "持续时间过滤掉了 {count} 次短暂越限。"
+			}
+		}
+	],
+	"w5alerting_backtest_coarsened": "为保证测试速度，按每 {step} 而非每 {interval} 评估一次：较短的持续时间只是近似值。",
+	"w5alerting_backtest_error": "无法运行测试。",
+	"w5alerting_backtest_fired": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "会触发 {count} 次。"
+			}
+		}
+	],
+	"w5alerting_backtest_help": "用已存储的测量数据重放这些设置（无论是否已保存），方式与告警引擎的评估完全相同。",
+	"w5alerting_backtest_never_fired": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "最近 {count} 天内不会触发。"
+			}
+		}
+	],
+	"w5alerting_backtest_not_anomaly": "异常规则无法用历史数据测试：它们把每个值与逐周学习得到的基线进行比较。",
+	"w5alerting_backtest_not_drift": "漂移规则无法用历史数据测试：每次评估都要把数值与过去几周进行比较。",
+	"w5alerting_backtest_not_forecast": "预测规则无法用历史数据测试：每次评估都要外推多天的测量数据。",
+	"w5alerting_backtest_not_log_pattern": "日志模式规则无法用历史数据测试：它们统计的是日志行，而不是已存储的测量数据。",
+	"w5alerting_backtest_not_slo_burn": "错误预算规则无法用历史数据测试：它们由 SLO 计算得出，而不是来自已存储的查询。",
+	"w5alerting_backtest_notifications": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "即 {count} 条通知。"
+			}
+		}
+	],
+	"w5alerting_backtest_period": "{start} 至 {end}，峰值 {peak}",
+	"w5alerting_backtest_period_more": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "以及另外 {count} 个时段"
+			}
+		}
+	],
+	"w5alerting_backtest_period_open": "自 {start} 起，至结束时仍在触发，峰值 {peak}",
+	"w5alerting_backtest_quiet": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "另有 {count} 条序列从未越过阈值。"
+			}
+		}
+	],
+	"w5alerting_backtest_run": "用历史数据测试",
+	"w5alerting_backtest_scope_note": "只统计规则本身：不考虑维护窗口、依赖关系、确认和通知渠道设置。",
+	"w5alerting_backtest_series_notifications": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 条通知"
+			}
+		}
+	],
+	"w5alerting_backtest_series_periods": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "触发 {count} 次，共 {duration}"
+			}
+		}
+	],
+	"w5alerting_backtest_show_all": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "显示全部 {count} 条序列"
+			}
+		}
+	],
+	"w5alerting_backtest_show_less": "收起",
+	"w5alerting_backtest_spark_label": "{name} 上测得的数值",
+	"w5alerting_backtest_title": "用历史数据测试",
+	"w5alerting_backtest_truncated": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "共 {count} 条序列，只重放了最常越过阈值的 100 条。"
+			}
+		}
+	],
+	"w5alerting_backtest_window": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "最近 {count} 天"
+			}
+		}
+	],
+	"w5alerting_backtest_window_label": "历史时间范围",
+	"w5alerting_noise_acknowledged": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "基于 {count} 条已确认告警"
+			}
+		}
+	],
+	"w5alerting_noise_edit_rule": "编辑规则",
+	"w5alerting_noise_empty": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "最近 {count} 天内没有触发任何告警。"
+			}
+		}
+	],
+	"w5alerting_noise_empty_help": "目前无需调整。",
+	"w5alerting_noise_error": "无法加载噪声报告。",
+	"w5alerting_noise_fired_label": "已触发告警",
+	"w5alerting_noise_flap_changes": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "状态变化 {count} 次"
+			}
+		}
+	],
+	"w5alerting_noise_flap_on": "{device} 上的 {rule}",
+	"w5alerting_noise_flapping_help": "该时段内至少触发 3 次的告警：设置恢复阈值或延长持续时间通常能让它们安静下来。",
+	"w5alerting_noise_flapping_title": "反复抖动的告警",
+	"w5alerting_noise_intro": "根据告警历史，查看哪些规则告警过多，以及告警得到响应的速度。",
+	"w5alerting_noise_mtta": "确认用时：{delay}",
+	"w5alerting_noise_mtta_label": "平均确认时间",
+	"w5alerting_noise_mttr": "解决用时：{delay}",
+	"w5alerting_noise_mttr_label": "平均解决时间",
+	"w5alerting_noise_no_delay": "暂无数据",
+	"w5alerting_noise_notifications_label": "已发送通知",
+	"w5alerting_noise_resolved": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "基于 {count} 条已解决告警"
+			}
+		}
+	],
+	"w5alerting_noise_row_fired": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "触发 {count} 次"
+			}
+		}
+	],
+	"w5alerting_noise_row_notifications": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 条通知"
+			}
+		}
+	],
+	"w5alerting_noise_rules_help": "按已发送的通知数排序，包括提醒和恢复通知。",
+	"w5alerting_noise_rules_title": "最嘈杂的规则",
+	"w5alerting_noise_tab": "噪声",
+	"w5alerting_noise_teams_title": "按团队",
+	"w5alerting_noise_test_rule": "用历史数据测试",
+	"w5alerting_noise_truncated": "该时段告警非常多：报告只涵盖最近的 100,000 条告警。",
+	"w5alerting_noise_window": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 天"
+			}
+		}
+	],
+	"w5alerting_noise_window_label": "时间范围",
+	"w5annot_alert_after_change": "变更之后：{title}",
+	"w5annot_audit_action_created": "已添加变更标记",
+	"w5annot_audit_action_deleted": "已删除变更标记",
+	"w5annot_audit_action_updated": "已编辑变更标记",
+	"w5annot_chart_open_link": "打开链接",
+	"w5annot_form_cancel": "取消",
+	"w5annot_form_error": "无法添加标记",
+	"w5annot_form_heading": "添加变更标记",
+	"w5annot_form_link": "链接（可选）",
+	"w5annot_form_link_help": "流水线运行、工单或变更日志。以 http:// 或 https:// 开头。",
+	"w5annot_form_link_invalid": "请输入以 http:// 或 https:// 开头的网址。",
+	"w5annot_form_save": "添加标记",
+	"w5annot_form_scope": "适用于",
+	"w5annot_form_scope_all": "所有监控项",
+	"w5annot_form_scope_this": "仅此监控项",
+	"w5annot_form_text": "详情（可选）",
+	"w5annot_form_title": "标题",
+	"w5annot_form_title_placeholder": "部署 v2.4.1",
+	"w5annot_form_title_required": "请为标记填写标题。",
+	"w5annot_form_until": "截止时间（可选）",
+	"w5annot_form_until_help": "适用于持续了一段时间的变更，例如耗时 10 分钟的部署。",
+	"w5annot_form_until_invalid": "结束时间必须是晚于开始时间的有效时间。",
+	"w5annot_form_when": "时间",
+	"w5annot_form_when_invalid": "请选择有效的时间。",
+	"w5annot_list_delete": "删除",
+	"w5annot_list_delete_confirm": "删除此标记？",
+	"w5annot_list_link": "打开链接",
+	"w5annot_list_meta": "{source} · {author} · {scope}",
+	"w5annot_list_meta_anon": "{source} · {scope}",
+	"w5annot_list_window": "{start} 至 {end}",
+	"w5annot_panel_add": "添加标记",
+	"w5annot_panel_empty": "此时间段内没有变更标记。可以手动添加，也可以让流水线自动发布。",
+	"w5annot_panel_list_label": "此时间段内的变更标记，最新的在前",
+	"w5annot_panel_title": "变更标记",
+	"w5annot_panel_toggle": "在图表上显示变更标记",
+	"w5annot_panel_toggle_short": "显示在图表上",
+	"w5annot_scope_folder": "文件夹 {folder}",
+	"w5annot_scope_global": "所有监控项",
+	"w5annot_scope_monitors": "所选监控项",
+	"w5annot_scope_tags": "标签 {tags}",
+	"w5annot_source_api": "API",
+	"w5annot_source_ci": "CI",
+	"w5annot_source_ui": "手动",
+	"w5backups_action_error": "操作未完成",
+	"w5backups_add": "添加目标",
+	"w5backups_audit_destination_created": "已添加异地备份目标",
+	"w5backups_audit_destination_deleted": "已删除异地备份目标",
+	"w5backups_audit_destination_tested": "已测试异地备份目标",
+	"w5backups_audit_destination_updated": "已修改异地备份目标",
+	"w5backups_delete": "删除",
+	"w5backups_delete_confirm": "删除？已上传的副本会保留。",
+	"w5backups_edit": "编辑",
+	"w5backups_edit_label": "编辑 {name}",
+	"w5backups_empty": "还没有目标。添加一个 S3 存储桶、WebDAV 文件夹或 SFTP 服务器，把副本保存在这台机器之外。",
+	"w5backups_form_cancel": "取消",
+	"w5backups_form_edit_title": "编辑 {name}",
+	"w5backups_form_enabled": "每次备份后上传",
+	"w5backups_form_include_key": "同时上传加密密钥（secret.key）",
+	"w5backups_form_include_key_warning": "能读取该目标的人将可以解密所有已保存的凭据。若不上传密钥，请自行妥善保管 secret.key，否则那里的副本无法连同凭据一起恢复。",
+	"w5backups_form_keep": "在那里保留的副本数",
+	"w5backups_form_keep_help": "超过此数量时，删除该目标中较旧的副本。那里的其他文件绝不会被改动。",
+	"w5backups_form_keep_invalid": "请输入 1 到 365 之间的数字。",
+	"w5backups_form_kind": "类型",
+	"w5backups_form_name": "名称",
+	"w5backups_form_name_required": "请为目标命名。",
+	"w5backups_form_new_title": "新的异地目标",
+	"w5backups_form_port_invalid": "请输入 1 到 65535 之间的端口。",
+	"w5backups_form_required": "必填。",
+	"w5backups_form_save": "保存目标",
+	"w5backups_form_save_error": "无法保存目标",
+	"w5backups_form_secret_saved": "已保存。留空即保留。",
+	"w5backups_form_secrets_replace": "在此输入的密码或密钥会替换已保存的；两者都留空则保留。",
+	"w5backups_hostkey_changed": "此服务器出示的主机密钥与您确认的不同，因此没有发送任何内容。如果服务器已重装，请确认新密钥；否则可能有人在冒充它。",
+	"w5backups_hostkey_trust": "确认此密钥",
+	"w5backups_hostkey_trust_confirm": "替换已确认的密钥？",
+	"w5backups_hostkey_unknown": "此服务器的主机密钥尚未确认，因此没有发送任何内容。请核对下面的指纹确实是该服务器的（在服务器上运行 ssh-keygen -lf），然后确认。",
+	"w5backups_intro": "每次本地备份后，同一文件会上传到这些目标。上传失败绝不会影响本地副本。",
+	"w5backups_kind_s3": "S3 兼容",
+	"w5backups_kind_sftp": "SFTP",
+	"w5backups_kind_webdav": "WebDAV",
+	"w5backups_last_failed": "上传失败",
+	"w5backups_last_ok": "已上传",
+	"w5backups_never": "尚未上传任何内容：下一次本地备份将会上传。",
+	"w5backups_password": "密码",
+	"w5backups_paused": "已暂停",
+	"w5backups_read_error": "无法读取异地目标",
+	"w5backups_s3_access_key": "访问密钥 ID",
+	"w5backups_s3_bucket": "存储桶",
+	"w5backups_s3_endpoint": "端点",
+	"w5backups_s3_endpoint_help": "AWS 请留空。MinIO、Backblaze B2、Wasabi 或 Cloudflare R2 请填写服务商提供的服务器地址。",
+	"w5backups_s3_path_style": "路径式请求",
+	"w5backups_s3_path_style_help": "MinIO、大多数自托管服务器以及以 IP 地址给出的端点都需要此项。",
+	"w5backups_s3_prefix": "存储桶中的文件夹",
+	"w5backups_s3_prefix_help": "可选。每个 DumbMonit 实例使用一个文件夹：旧副本会在其中清理。",
+	"w5backups_s3_region": "区域",
+	"w5backups_s3_region_help": "留空即 us-east-1。Cloudflare R2 使用 auto。",
+	"w5backups_s3_secret_key": "秘密访问密钥",
+	"w5backups_section_destinations": "异地备份目标及其凭据。",
+	"w5backups_sftp_auth_help": "请输入密码、私钥或两者。",
+	"w5backups_sftp_directory": "远程文件夹",
+	"w5backups_sftp_directory_help": "留空即该账户的主目录。文件夹必须已存在。",
+	"w5backups_sftp_host": "主机",
+	"w5backups_sftp_host_key": "主机密钥指纹",
+	"w5backups_sftp_host_key_help": "可选：ssh-keygen -lf 输出的 SHA256:…。留空时，测试会显示服务器的指纹供您确认。",
+	"w5backups_sftp_key_passphrase": "密钥口令",
+	"w5backups_sftp_port": "端口",
+	"w5backups_sftp_private_key": "私钥",
+	"w5backups_sftp_private_key_help": "Ed25519 或 ECDSA，OpenSSH 格式。RSA 密钥会被拒绝。",
+	"w5backups_summary_failed": "上次上传失败",
+	"w5backups_summary_none": "未设置",
+	"w5backups_test": "测试",
+	"w5backups_test_failed": "测试失败",
+	"w5backups_test_label": "测试 {name}",
+	"w5backups_test_ok": "测试通过",
+	"w5backups_title": "异地副本",
+	"w5backups_uploading": "正在上传…",
+	"w5backups_username": "用户名",
+	"w5backups_webdav_password_help": "在 Nextcloud 上请使用应用密码。",
+	"w5backups_webdav_url": "文件夹地址",
+	"w5backups_webdav_url_help": "文件夹必须已存在。Nextcloud：https://cloud.example.com/remote.php/dav/files/me/Backups。",
+	"w5backups_with_key": "含 secret.key",
+	"w5calendar_agenda_create": "在当天安排维护窗口",
+	"w5calendar_agenda_empty": "当天没有维护。",
+	"w5calendar_agenda_title": "{date}的维护",
+	"w5calendar_chip_time": "{start} – {end}",
+	"w5calendar_continues_after": "持续到第二天",
+	"w5calendar_continues_before": "从前一天持续而来",
+	"w5calendar_day_label_busy": "{date}，当天有 {count} 个。选择以查看。",
+	"w5calendar_day_label_empty": "{date}，没有维护。选择即可安排一个。",
+	"w5calendar_disabled": "已停用",
+	"w5calendar_error_load": "无法加载日历。",
+	"w5calendar_grid_label": "维护日历",
+	"w5calendar_kind_active": "进行中",
+	"w5calendar_kind_past": "已结束",
+	"w5calendar_kind_recurring": "周期性",
+	"w5calendar_kind_upcoming": "即将开始",
+	"w5calendar_langs_add": "添加",
+	"w5calendar_langs_add_label": "添加语言",
+	"w5calendar_langs_add_placeholder": "选择语言",
+	"w5calendar_langs_default_help": "用于浏览器语言不在界面语言之列的访客。",
+	"w5calendar_langs_default_label": "默认语言",
+	"w5calendar_langs_empty": "尚无翻译。",
+	"w5calendar_langs_error_load": "无法加载翻译。",
+	"w5calendar_langs_error_save": "无法保存翻译。",
+	"w5calendar_langs_field_description": "描述",
+	"w5calendar_langs_field_footer": "页脚",
+	"w5calendar_langs_field_title": "标题",
+	"w5calendar_langs_intro": "您撰写的文本可以用其他语言显示。如果您翻译了访客的浏览器语言，他们就会看到该语言；留空的字段保留原文。事件消息按原文显示，不会被翻译。",
+	"w5calendar_langs_names_heading": "服务和分组名称",
+	"w5calendar_langs_remove": "移除{language}",
+	"w5calendar_langs_save": "保存翻译",
+	"w5calendar_langs_saved": "翻译已保存。",
+	"w5calendar_langs_section": "翻译",
+	"w5calendar_langs_tabs_label": "已翻译的语言",
+	"w5calendar_legend_label": "图例",
+	"w5calendar_more": "另有 {count} 个",
+	"w5calendar_nav_next": "下一页",
+	"w5calendar_nav_previous": "上一页",
+	"w5calendar_nav_today": "今天",
+	"w5calendar_public_language": "语言",
+	"w5calendar_view_label": "维护视图",
+	"w5calendar_view_list": "列表",
+	"w5calendar_view_month": "月",
+	"w5calendar_view_week": "周",
+	"w5chat_interactive_after_save_slack": "保存渠道后即可获得要粘贴到 Slack 应用中的地址。",
+	"w5chat_interactive_after_save_telegram": "保存渠道后，DumbMonit 会将自己注册为机器人的 Webhook。",
+	"w5chat_interactive_no_public_url": "交互按钮需要实例的 https 公开 URL（通知策略）。在此之前，消息仍保留链接。",
+	"w5chat_interactive_slack_url_help": "在 Slack 应用中打开 Interactivity & Shortcuts，启用后将此地址粘贴为 Request URL。",
+	"w5chat_interactive_slack_url_label": "交互请求 URL",
+	"w5chat_interactive_telegram_url_help": "保存渠道时，DumbMonit 已将此地址注册为机器人的 Webhook。",
+	"w5chat_interactive_telegram_url_label": "机器人 Webhook",
+	"w5chat_template_body_label": "消息",
+	"w5chat_template_format_html": "电子邮件：正文为 HTML，主题为纯文本。变量值会被转义。",
+	"w5chat_template_format_plain": "纯文本：变量值原样插入。",
+	"w5chat_template_format_slack": "Slack 格式：*粗体*、_斜体_ 和链接。变量值会被转义，设备名称无法添加格式。",
+	"w5chat_template_format_telegram": "Telegram MarkdownV2：*粗体*、_斜体_、[文字](地址)。若要表示字符本身，请在 ( ) [ ] * _ ~ | > 前加反斜杠；句点、连字符和变量值会自动转义。",
+	"w5chat_template_heading": "消息模板",
+	"w5chat_template_insert_aria": "插入 {name}",
+	"w5chat_template_intro": "改写此渠道消息的标题和正文。留空某个字段即可保留原有文本。",
+	"w5chat_template_preview": "示例告警预览",
+	"w5chat_template_preview_loading": "正在更新预览…",
+	"w5chat_template_preview_note": "即服务收到的内容，尚未应用格式。",
+	"w5chat_template_reset": "恢复默认",
+	"w5chat_template_state_custom": "自定义",
+	"w5chat_template_state_default": "默认",
+	"w5chat_template_title_label": "标题",
+	"w5chat_template_variables": "变量",
+	"w5chat_template_variables_help": "在光标处插入变量。也可以使用设备的任意标签，例如 tags.room。",
+	"w5monitors_bulkedit_apply": "应用更改",
+	"w5monitors_bulkedit_cancel": "取消",
+	"w5monitors_bulkedit_channel_off": "已停用",
+	"w5monitors_bulkedit_channels_add": "添加",
+	"w5monitors_bulkedit_channels_help_keep": "每个监控保留各自的渠道。",
+	"w5monitors_bulkedit_channels_help_set": "不勾选任何项：恢复为告警规则选择的渠道。",
+	"w5monitors_bulkedit_channels_keep": "保持",
+	"w5monitors_bulkedit_channels_label": "通知渠道",
+	"w5monitors_bulkedit_channels_none": "还没有通知渠道。请先在设置中添加一个，再回到这里。",
+	"w5monitors_bulkedit_channels_remove": "移除",
+	"w5monitors_bulkedit_channels_set": "替换为",
+	"w5monitors_bulkedit_close": "关闭",
+	"w5monitors_bulkedit_done": "已更新的监控：{count}",
+	"w5monitors_bulkedit_error": "无法应用更改",
+	"w5monitors_bulkedit_folder_label": "文件夹",
+	"w5monitors_bulkedit_folder_name": "文件夹名称",
+	"w5monitors_bulkedit_folder_new": "新建文件夹…",
+	"w5monitors_bulkedit_interval_label": "检查间隔",
+	"w5monitors_bulkedit_keep": "保持不变",
+	"w5monitors_bulkedit_lead": "已选择 {count} 个。只会应用你在这里更改的内容，其余保持不变。",
+	"w5monitors_bulkedit_nothing": "目前没有要更改的内容。",
+	"w5monitors_bulkedit_open": "编辑",
+	"w5monitors_bulkedit_tag_add_help": "输入 键=值，例如 room=rack-1。监控类型的设置项不能作为标签添加。",
+	"w5monitors_bulkedit_tag_add_label": "添加标签",
+	"w5monitors_bulkedit_tag_key_needed": "请在 = 前输入标签名称。",
+	"w5monitors_bulkedit_tag_remove_label": "移除标签",
+	"w5monitors_bulkedit_tag_removing": "移除 {key}",
+	"w5monitors_bulkedit_title": "编辑所选项",
+	"w5monitors_form_channel_n": "渠道 {id}（已删除）",
+	"w5monitors_form_channels_help_all": "不勾选任何项：告警发送到其规则选择的所有渠道。",
+	"w5monitors_form_channels_help_some": "规则发往所有渠道的告警只会发送到勾选的渠道。",
+	"w5monitors_form_channels_label": "通知渠道",
+	"w5monitors_form_template_notice": "已根据模板 {name} 预填。请填写地址，如有需要再填写凭据：模板从不保存这些信息。",
+	"w5monitors_template_add_from": "基于此模板添加监控",
+	"w5monitors_template_done": "完成",
+	"w5monitors_template_name_label": "模板名称",
+	"w5monitors_template_save": "保存模板",
+	"w5monitors_template_save_error": "无法保存模板",
+	"w5monitors_template_save_lead": "会保留类型、其设置和标签、检查间隔以及通知渠道。地址和密钥从不保留。",
+	"w5monitors_template_save_open": "另存为模板",
+	"w5monitors_template_save_title": "另存为模板",
+	"w5monitors_template_saved": "已另存为模板 {name}。",
+	"w5monitors_templates_delete": "删除 {name}",
+	"w5monitors_templates_delete_confirm": "删除此模板？",
+	"w5monitors_templates_error": "无法修改模板",
+	"w5monitors_templates_rename": "重命名 {name}",
+	"w5monitors_templates_rename_save": "保存名称",
+	"w5monitors_templates_summary": "{kind}，每 {interval}",
+	"w5monitors_templates_title": "从模板添加",
+	"w5monitors_templates_unknown_kind": "未知类型 {kind}：安装其扩展包后才能使用此模板。",
+	"w6accounts_audit_invitation_accepted": "邀请已接受",
+	"w6accounts_audit_invitation_created": "邀请已创建",
+	"w6accounts_audit_invitation_invalid_link": "尝试使用无效的邀请链接",
+	"w6accounts_audit_invitation_resent": "邀请已重新发送",
+	"w6accounts_audit_invitation_revoked": "邀请已撤销",
+	"w6accounts_audit_notifications_personal": "个人通知已更改",
+	"w6accounts_audit_recovery_settings": "重置链接与邀请设置已更改",
+	"w6accounts_audit_reset_completed": "已通过链接重置密码",
+	"w6accounts_audit_reset_ignored": "为未知或不符合条件的账户请求重置",
+	"w6accounts_audit_reset_invalid_link": "尝试使用无效的重置链接",
+	"w6accounts_audit_reset_link_created": "已创建密码重置链接",
+	"w6accounts_audit_reset_requested": "已通过邮件发送重置链接",
+	"w6accounts_audit_reset_unavailable": "在邮件重置不可用时请求重置",
+	"w6accounts_backup_section_accounts": "重置链接与邀请设置、待处理的邀请，以及每个账户的个人通知。",
+	"w6accounts_forgot_back": "返回登录",
+	"w6accounts_forgot_docs": "其他找回访问的方式",
+	"w6accounts_forgot_failed": "请求未能完成",
+	"w6accounts_forgot_intro": "输入用户名或电子邮件地址。如果你的账户可以通过邮件重置，你会收到一个用于设置新密码的链接。",
+	"w6accounts_forgot_login_help": "通过单点登录或 LDAP 登录的账户需在其身份提供方处修改密码。",
+	"w6accounts_forgot_login_label": "用户名或邮箱",
+	"w6accounts_forgot_login_required": "请输入用户名或电子邮件地址。",
+	"w6accounts_forgot_sent_detail": "如果有匹配且可通过邮件重置的账户，链接已在路上。链接仅可使用一次，且很快过期。",
+	"w6accounts_forgot_sent_none": "几分钟后仍未收到？请查看垃圾邮件文件夹，或请管理员为你重置密码。",
+	"w6accounts_forgot_sent_title": "请查看收件箱",
+	"w6accounts_forgot_submit": "给我发送链接",
+	"w6accounts_forgot_title": "重置密码",
+	"w6accounts_forgot_too_many": "来自此处的请求过多。请等待几分钟后重试。",
+	"w6accounts_invite_check_failed": "无法验证此邀请",
+	"w6accounts_invite_failed": "账户未创建",
+	"w6accounts_invite_for": "发给 {email}，有效期至 {until}。",
+	"w6accounts_invite_intro": "{inviter} 邀请你以 {role} 身份加入。",
+	"w6accounts_invite_invalid_detail": "它已过期、已被使用或已被撤销。请让邀请你的人重新发送。",
+	"w6accounts_invite_invalid_title": "此邀请已失效",
+	"w6accounts_invite_page_title": "邀请 · DumbMonit",
+	"w6accounts_invite_sso_help": "你的身份提供方必须确认地址 {email}：你的账户将用它作为用户名。",
+	"w6accounts_invite_sso_leaving": "账户已创建。正在前往你的身份提供方…",
+	"w6accounts_invite_submit": "创建我的账户",
+	"w6accounts_invite_title": "创建你的账户",
+	"w6accounts_invite_username_help": "登录时输入的名称，不能包含空格。",
+	"w6accounts_invites_add": "邀请",
+	"w6accounts_invites_copy": "{email} 的邀请：请复制链接并自行发送",
+	"w6accounts_invites_copy_link": "复制链接",
+	"w6accounts_invites_create": "创建邀请",
+	"w6accounts_invites_create_error": "邀请未创建",
+	"w6accounts_invites_days": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 天"
+			}
+		}
+	],
+	"w6accounts_invites_description": "通过邮件邀请成员并指定角色和团队，并设置重置链接与邀请的有效期。",
+	"w6accounts_invites_email_failed": "邮件未发出：{error}",
+	"w6accounts_invites_empty": "没有等待回复的邀请。",
+	"w6accounts_invites_expired": "已过期",
+	"w6accounts_invites_form_aria": "新邀请",
+	"w6accounts_invites_hours": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 小时"
+			}
+		}
+	],
+	"w6accounts_invites_invite_lifetime": "邀请有效期",
+	"w6accounts_invites_load_error": "无法加载邀请",
+	"w6accounts_invites_minutes": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 分钟"
+			}
+		}
+	],
+	"w6accounts_invites_resend": "重新发送",
+	"w6accounts_invites_reset_lifetime": "重置链接有效期",
+	"w6accounts_invites_revoke": "撤销",
+	"w6accounts_invites_revoke_confirm": "确定永久撤销？",
+	"w6accounts_invites_row_error": "邀请未更改",
+	"w6accounts_invites_row_expired": "由 {by} 邀请，已于 {when} 过期",
+	"w6accounts_invites_row_pending": "由 {by} 邀请，{when} 过期",
+	"w6accounts_invites_row_teams": "将加入：{teams}",
+	"w6accounts_invites_search_kw": "邀请 邮件 重置 链接 忘记密码",
+	"w6accounts_invites_self_service": "通过邮件\"忘记密码？\"",
+	"w6accounts_invites_self_service_no_base": "等待用于生成链接的公开 URL：请在通知策略中设置。",
+	"w6accounts_invites_self_service_no_mail": "等待邮件服务器：请在\"通知\"中配置。",
+	"w6accounts_invites_self_service_off": "已关闭：登录页面改为指向文档。",
+	"w6accounts_invites_self_service_on": "已开启：链接指向 {base}。",
+	"w6accounts_invites_send": "通过邮件发送邀请",
+	"w6accounts_invites_send_no_mail": "尚未配置邮件服务器：你会得到一个链接，需要自行复制发送。",
+	"w6accounts_invites_sent": "邀请已发送至 {email}",
+	"w6accounts_invites_settings_error": "设置未保存",
+	"w6accounts_invites_teams": "加入的团队",
+	"w6accounts_invites_title": "邀请",
+	"w6accounts_link_shown": "链接仅显示一次——请立即复制",
+	"w6accounts_mine_description": "除团队频道外，单独发送给你的告警。",
+	"w6accounts_mine_email": "通过邮件",
+	"w6accounts_mine_email_no_address": "你的账户没有电子邮件地址：请让管理员添加。",
+	"w6accounts_mine_email_no_server": "此实例尚未配置邮件服务器。",
+	"w6accounts_mine_email_to": "发送到 {email}。",
+	"w6accounts_mine_folders": "文件夹",
+	"w6accounts_mine_folders_none": "暂无文件夹。",
+	"w6accounts_mine_load_error": "无法加载你的通知设置",
+	"w6accounts_mine_push": "推送到我的设备",
+	"w6accounts_mine_push_devices": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "已订阅 {count} 台设备。"
+			}
+		}
+	],
+	"w6accounts_mine_push_none": "尚无设备：请在上方为此浏览器开启推送通知。",
+	"w6accounts_mine_quiet_help": "静音时段内只有\"警告\"级别的告警会发给你，其余留在告警列表中。时间按此浏览器的时区计算。",
+	"w6accounts_mine_resolved_help": "关闭后，你只会收到问题通知，不会收到恢复通知。",
+	"w6accounts_mine_save": "保存",
+	"w6accounts_mine_save_error": "你的通知设置未保存",
+	"w6accounts_mine_scope": "范围",
+	"w6accounts_mine_scope_all": "我能看到的全部",
+	"w6accounts_mine_scope_all_help": "你的账户能看到的所有监控项。",
+	"w6accounts_mine_scope_no_team": "你尚未加入任何团队：不会收到任何通知。",
+	"w6accounts_mine_scope_pick": "我选择的文件夹和标签",
+	"w6accounts_mine_scope_pick_help": "监控项位于这些文件夹之一（含子文件夹）或带有这些标签之一时即符合。",
+	"w6accounts_mine_scope_teams": "我所在团队的文件夹",
+	"w6accounts_mine_scope_teams_help": "{teams} 开放的文件夹。",
+	"w6accounts_mine_search_kw": "我的通知 个人 邮件 推送 静音时段",
+	"w6accounts_mine_tags": "标签",
+	"w6accounts_mine_tags_filter": "筛选标签",
+	"w6accounts_mine_tags_none": "你能看到的监控项没有标签。",
+	"w6accounts_mine_test": "给我发送测试",
+	"w6accounts_mine_test_email_failed": "邮件失败：{error}",
+	"w6accounts_mine_test_email_ok": "测试邮件已发送",
+	"w6accounts_mine_test_error": "测试未发送",
+	"w6accounts_mine_test_push_failed": "推送失败：{error}",
+	"w6accounts_mine_test_push_ok": "测试推送已送达",
+	"w6accounts_mine_title": "我的通知",
+	"w6accounts_reset_check_failed": "无法验证此链接",
+	"w6accounts_reset_done_detail": "请使用新密码登录。此账户的其他会话均已结束。",
+	"w6accounts_reset_done_title": "密码已更改",
+	"w6accounts_reset_failed": "密码未更改",
+	"w6accounts_reset_intro": "账户 {username}。此链接有效期至 {until}。",
+	"w6accounts_reset_invalid_detail": "它已过期、已被使用，或已被更新的链接取代。请在登录页面重新申请。",
+	"w6accounts_reset_invalid_title": "此链接已失效",
+	"w6accounts_reset_note": "保存后，此账户的所有会话都会退出。双因素认证保持开启。",
+	"w6accounts_reset_page_title": "重置密码 · DumbMonit",
+	"w6accounts_reset_password": "新密码",
+	"w6accounts_reset_submit": "保存新密码",
+	"w6accounts_reset_title": "设置新密码",
+	"w6accounts_reset_to_login": "前往登录",
+	"w6accounts_resetlink_button": "重置链接",
+	"w6accounts_resetlink_copy": "{username} 的重置链接：请复制后转交",
+	"w6accounts_resetlink_expires": "仅可使用一次，有效期至 {until}。",
+	"w6accounts_resetlink_sent": "{username} 的重置链接已发送至 {email}",
+	"w6accounts_resetlink_title_copy": "创建一个可复制转交的密码重置链接",
+	"w6accounts_resetlink_title_email": "向 {email} 发送密码重置链接",
+	"w6design_gate_checking": "正在检查链接…",
+	"w6roles_audit_created": "自定义角色已创建",
+	"w6roles_audit_deleted": "自定义角色已删除",
+	"w6roles_audit_updated": "自定义角色已更改",
+	"w6roles_editor_cancel": "取消",
+	"w6roles_editor_create": "创建角色",
+	"w6roles_editor_description": "描述",
+	"w6roles_editor_edit_title": "编辑 {name}",
+	"w6roles_editor_err_name": "请为角色命名。",
+	"w6roles_editor_implied": "始终包含",
+	"w6roles_editor_name": "名称",
+	"w6roles_editor_new_title": "新角色",
+	"w6roles_editor_permissions": "权限",
+	"w6roles_editor_save": "保存角色",
+	"w6roles_editor_save_error": "无法保存角色",
+	"w6roles_perm_alerts_help": "确认、忽略和静默告警，接手值班，添加变更标记并运行修复操作，与操作员相同。",
+	"w6roles_perm_alerts_label": "处理告警",
+	"w6roles_perm_maintenance_help": "安排、编辑和移除维护窗口。",
+	"w6roles_perm_maintenance_label": "管理维护",
+	"w6roles_perm_monitors_help": "创建、编辑、导入和删除监控项、监控模板、告警规则和 SLO。设备凭据可以填写，但永远无法读回。",
+	"w6roles_perm_monitors_label": "管理监控项",
+	"w6roles_perm_notifications_help": "编辑通知渠道、通知策略和消息模板。邮件服务器仍由管理员负责。",
+	"w6roles_perm_notifications_label": "管理通知",
+	"w6roles_perm_reports_help": "阅读定时报告并下载其 PDF。",
+	"w6roles_perm_reports_label": "查看报告",
+	"w6roles_perm_status_pages_help": "编辑状态页并发布事件。页面密码和订阅者仍由管理员负责。",
+	"w6roles_perm_status_pages_label": "管理状态页",
+	"w6roles_perm_view_help": "读取监控项、告警、指标，以及查看者可读的其他一切内容。",
+	"w6roles_perm_view_label": "查看",
+	"w6roles_section_add": "添加角色",
+	"w6roles_section_admin_only": "账户、角色、团队、API 令牌、单点登录、备份和实例设置仍由管理员负责：任何权限都无法打开它们。",
+	"w6roles_section_delete": "删除",
+	"w6roles_section_delete_confirm": "确定永久删除？",
+	"w6roles_section_delete_error": "无法删除角色",
+	"w6roles_section_description": "为账户授予选定的权限，而无需将其设为管理员。自定义角色会替换所分配账户的内置角色。",
+	"w6roles_section_edit": "编辑",
+	"w6roles_section_empty_body": "内置角色可满足大多数需求。当某人需要（例如）编辑监控项而不触及账户时，再创建一个。",
+	"w6roles_section_empty_title": "尚无自定义角色",
+	"w6roles_section_in_use": "删除前请先为其账户分配其他角色。",
+	"w6roles_section_load_error": "无法加载自定义角色",
+	"w6roles_section_read_only": "只读",
+	"w6roles_section_search_kw": "自定义角色 权限 授权 委派 访问",
+	"w6roles_section_title": "自定义角色",
+	"w6roles_section_users_count": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} 个账户",
+				"countPlural=other": "{count} 个账户"
+			}
+		}
+	],
+	"w6roles_users_custom_group": "自定义角色",
+	"w6roles_users_custom_help": "自定义角色会替换内置角色：账户将恰好获得该角色的权限。",
+	"w6roles_users_custom_title": "自定义角色",
 	"wall_band_problems": "问题",
 	"wall_band_problems_note": "严重告警和宕机的监控项",
 	"wall_devices_aria": "监控项",
@@ -9826,6 +10636,9 @@
 	],
 	"wall_scene_world_hint": "“巴黎”会在面板背后绘制这座城市；“无”则只显示纯色面板。",
 	"wall_scene_world_title": "面板背后的城市",
+	"wall_sign_out": "退出登录",
+	"wall_sign_out_confirm": "让此屏幕退出登录？",
+	"wall_sign_out_title": "此账户是墙面显示屏：退出登录是离开墙屏模式的唯一方式。",
 	"wall_status_empty": "暂无可监控内容",
 	"wall_status_no_critical": "没有严重问题",
 	"wall_status_ok": "一切正常",

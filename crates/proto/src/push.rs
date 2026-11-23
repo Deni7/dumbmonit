@@ -176,6 +176,11 @@ pub struct AgentIdentity {
     /// passerelle, ou binaire antérieur).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub relay_gateway_check: Option<GatewayCheck>,
+    /// Passerelle telle que le relais l'a vraiment ouverte : adresse liée, ou
+    /// pourquoi l'ouverture a échoué. Absent : pas de passerelle demandée, ou
+    /// binaire antérieur (qui ne dit que `relay_gateway`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relay_gateway_state: Option<GatewayState>,
     /// Adresse du serveur en service, quand l'agent en connaît plusieurs
     /// (`server_urls`) : primaire ou secours, et depuis quand. Absent : une
     /// seule adresse configurée, ou binaire antérieur.
@@ -230,6 +235,31 @@ pub struct GatewayCheck {
 
 /// Longueur maximale du message d'échec d'un essai de passerelle.
 pub const MAX_GATEWAY_CHECK_ERROR: usize = 300;
+
+/// Ce que le relais a vraiment ouvert pour les machines de son site, et pas
+/// seulement ce qu'on lui a demandé : une passerelle qui ne peut pas écouter
+/// (port déjà pris, droits) ou qui n'écoute que sur la boucle locale ne doit
+/// pas faire attendre l'écran d'ajout en silence.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GatewayState {
+    /// Adresse demandée, `hôte:port` : `gateway_listen` de l'agent.yaml, sinon
+    /// toutes les interfaces sur le port réglé dans l'interface.
+    pub wanted: String,
+    /// Adresse réellement liée, `hôte:port`. Absente : l'ouverture a échoué.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub listen: Option<String>,
+    /// Pourquoi l'ouverture a échoué, en anglais, tel que l'interface l'affiche.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    /// Vrai si l'adresse vient de la configuration locale (`gateway_listen`,
+    /// `DUMBMONIT_AGENT_GATEWAY_LISTEN`), qui prime sur l'interface.
+    #[serde(default)]
+    pub local: bool,
+    /// Vrai si le relais parle au serveur sur le canal chiffré : sans lui, pas
+    /// de tunnel, et la passerelle ne mène nulle part.
+    #[serde(default)]
+    pub encrypted: bool,
+}
 
 impl AgentIdentity {
     /// Clé d'identité utilisée pour retrouver la cible d'un envoi à l'autre.
@@ -495,6 +525,7 @@ mod tests {
             self_update: None,
             relay_gateway: None,
             relay_gateway_check: None,
+            relay_gateway_state: None,
             remediation: None,
             server_link: None,
         }
@@ -646,6 +677,26 @@ mod tests {
         assert_eq!(back, id);
         let older: RelaySetting = serde_json::from_str(r#"{"enabled":true}"#).unwrap();
         assert_eq!(older.gateway_host, None);
+    }
+
+    #[test]
+    fn the_gateway_state_says_what_was_bound_or_why_not() {
+        let mut id = identity();
+        assert!(serde_json::to_value(&id).unwrap().get("relay_gateway_state").is_none());
+        id.relay_gateway_state = Some(GatewayState {
+            wanted: "0.0.0.0:8443".into(),
+            listen: None,
+            error: Some("address already in use".into()),
+            local: false,
+            encrypted: true,
+        });
+        let json = serde_json::to_value(&id).unwrap();
+        assert!(json["relay_gateway_state"].get("listen").is_none());
+        let back: AgentIdentity = serde_json::from_value(json).unwrap();
+        assert_eq!(back, id);
+        // Un champ ajouté plus tard, ou retiré, ne casse pas la lecture.
+        let minimal: GatewayState = serde_json::from_str(r#"{"wanted":"0.0.0.0:8443"}"#).unwrap();
+        assert!(!minimal.local && !minimal.encrypted && minimal.listen.is_none());
     }
 
     #[test]

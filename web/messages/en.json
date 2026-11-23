@@ -1097,6 +1097,22 @@
 	"deviceform_channelcheck_dns_title": "{host} does not resolve",
 	"deviceform_channelcheck_error": "The agent channel could not be checked",
 	"deviceform_channelcheck_firewall": "Then open TCP port {port} on the server's firewall (firewalld, ufw or Windows):",
+	"deviceform_channelcheck_gateway_bind_body": "The relay reports: {error}. Free port {port} on the relay, or choose another gateway port in the Relay panel of {relay}'s page. To see which program holds the port on the relay:",
+	"deviceform_channelcheck_gateway_bind_title": "{relay} cannot open port {port}",
+	"deviceform_channelcheck_gateway_closed_body": "The site's machines go through the relay's gateway, which is off for this relay. On {relay}'s page, in the Relay panel, turn on “{setting}” and save: the relay opens it within seconds.",
+	"deviceform_channelcheck_gateway_closed_title": "{relay}'s gateway is switched off",
+	"deviceform_channelcheck_gateway_copy_listen": "Copy the line",
+	"deviceform_channelcheck_gateway_copy_owner": "Copy the commands",
+	"deviceform_channelcheck_gateway_loopback_body": "The agent.yaml of {relay} binds the gateway to the loopback, so no other machine of the site can reach it. On the relay, replace the gateway_listen line with this one (or remove it), then restart the agent:",
+	"deviceform_channelcheck_gateway_loopback_title": "{relay} listens on {address} only",
+	"deviceform_channelcheck_gateway_no_tunnel_body": "Its gateway listens, but {relay} reaches this server over the web port only, so it cannot carry the site's agents. Check that {relay} reaches the server's encrypted agent port (published in Docker and open in the firewall): the relay switches to it on its own.",
+	"deviceform_channelcheck_gateway_no_tunnel_title": "{relay} is not on the encrypted agent channel",
+	"deviceform_channelcheck_gateway_offline_body": "{relay} has not reported for a while, so it can neither open nor carry its gateway. Check that its agent is running and reaches this server; this check carries on by itself.",
+	"deviceform_channelcheck_gateway_offline_title": "{relay} is not connected",
+	"deviceform_channelcheck_gateway_open_relay": "Open {relay}'s page",
+	"deviceform_channelcheck_gateway_tested_by": "Tested by {relay} itself at {address}, {when}. This test does not cross a firewall between the site's machines and the relay.",
+	"deviceform_channelcheck_gateway_too_old_body": "A relay opens a gateway from agent {min} on. Update the agent on {relay} (from its page, or by running its install command again); this check then carries on by itself.",
+	"deviceform_channelcheck_gateway_too_old_title": "{relay} runs agent {version}, which has no gateway",
 	"deviceform_channelcheck_hairpin": "The check runs from the server itself: behind a NAT without hairpin it can fail although machines outside connect fine.",
 	"deviceform_channelcheck_ok": "Encrypted agent channel reachable at {address} (TLS 1.3).",
 	"deviceform_channelcheck_refused_body": "The server could not reach its own agent channel at {address}: the connection was refused. Agents would fail the same way.",
@@ -1113,6 +1129,12 @@
 	"deviceform_channelcheck_timeout_title": "No answer on port {port}",
 	"deviceform_channelcheck_tls_body": "Something other than the DumbMonit agent channel answers at {address}. Check that port {port} leads to the DumbMonit container.",
 	"deviceform_channelcheck_tls_title": "Port {port} answers, but not as the agent channel",
+	"deviceform_channelcheck_use_direct": "Use the agent port",
+	"deviceform_channelcheck_use_websocket": "Use the web address (WebSocket)",
+	"deviceform_channelcheck_websocket_body": "This address goes through a tunnel or a reverse proxy. It must forward WebSockets to DumbMonit (Upgrade and Connection headers, no response buffering, a long read timeout): see “Agents behind a proxy” in the documentation.",
+	"deviceform_channelcheck_websocket_hint": "If this port cannot be opened (Cloudflare Tunnel, a reverse proxy, a corporate firewall), agents can go through the web address instead: their encrypted channel then travels inside a WebSocket, still end to end.",
+	"deviceform_channelcheck_websocket_ok": "Agents connect through the web address {address}: their encrypted channel (TLS 1.3, client certificate) travels inside a WebSocket. No other port to open.",
+	"deviceform_channelcheck_websocket_title": "The agent WebSocket does not answer at {address}",
 	"deviceform_checksums_summary": "Binary checksums (SHA-256) — the installer verifies the download against these",
 	"deviceform_cred_auth_label": "Authentication",
 	"deviceform_cred_choice_none": "None",
@@ -1689,6 +1711,9 @@
 	"devices_agent_binding": "Binding",
 	"devices_agent_bound": "Bound",
 	"devices_agent_bound_detail": "This agent holds a secret of its own. No other machine can push measurements in its name, or pick up its container commands.",
+	"devices_agent_channel": "Channel",
+	"devices_agent_channel_websocket": "WebSocket via the web address",
+	"devices_agent_channel_websocket_detail": "Its last encrypted batch came through the WebSocket of the web address (Cloudflare Tunnel, reverse proxy) rather than straight to the agent port. The TLS session inside is the same, end to end.",
 	"devices_agent_err_rebind": "Could not open the re-enrolment window",
 	"devices_agent_help_intro": "Run these on the machine itself when the agent does not report.",
 	"devices_agent_help_logs": "Latest logs",
@@ -3671,6 +3696,7 @@
 	"devicesb_relay_panel_devices_one": "1 monitor",
 	"devicesb_relay_panel_devices_other": "{count} monitors",
 	"devicesb_relay_panel_gateway": "Gateway for the agents of this site",
+	"devicesb_relay_panel_gateway_bind_failed": "Cannot listen on {address}: {error}",
 	"devicesb_relay_panel_gateway_check_failed": "Not reachable at {address}: {error}",
 	"devicesb_relay_panel_gateway_check_ok": "Reachable at {address} (tested by the relay)",
 	"devicesb_relay_panel_gateway_closed": "Closed",
@@ -3678,10 +3704,13 @@
 	"devicesb_relay_panel_gateway_host": "Address seen from the site",
 	"devicesb_relay_panel_gateway_host_help": "IP or local name, written into the install commands.",
 	"devicesb_relay_panel_gateway_listening": "Listening on port {port}",
+	"devicesb_relay_panel_gateway_loopback": "Listens on {address} only: the site's machines cannot reach it. In the relay's agent.yaml, use {line}.",
+	"devicesb_relay_panel_gateway_no_tunnel": "The relay is not on the encrypted agent channel yet: the gateway cannot carry the site's agents.",
 	"devicesb_relay_panel_gateway_opening": "Opens as soon as the relay is connected",
 	"devicesb_relay_panel_gateway_port": "Port",
 	"devicesb_relay_panel_gateway_port_invalid": "From 1 to 65535.",
 	"devicesb_relay_panel_gateway_state": "Gateway",
+	"devicesb_relay_panel_gateway_too_old": "Agent {version} is too old to open a gateway: update it.",
 	"devicesb_relay_panel_gateway_tunnels": [
 		{
 			"declarations": [
@@ -7323,6 +7352,8 @@
 	"settings_ldap_user_filter_help": "{placeholder} is replaced by the typed username, escaped so it cannot change the filter.",
 	"settings_ldap_username_attribute": "Username attribute",
 	"settings_ldap_viewer_groups": "Viewer groups",
+	"settings_ldap_wall_groups": "Wall display groups",
+	"settings_ldap_wall_groups_help": "Members of no other listed group become wall displays: they only see wall mode.",
 	"settings_logs_action_error": "The action failed.",
 	"settings_logs_days_available": "Days on disk",
 	"settings_logs_description": "DumbMonit's own logs: kept on disk, exportable, and forwarded to your log server.",
@@ -7881,6 +7912,8 @@
 	"settings_saml_sp_heading": "Give these to your provider",
 	"settings_saml_sp_help": "Most providers accept the metadata URL; otherwise enter the entity ID and the ACS URL by hand.",
 	"settings_saml_title": "SAML sign-in",
+	"settings_saml_wall_groups": "Wall display groups",
+	"settings_saml_wall_groups_help": "Comma-separated. Members of no administrator or operator group become wall displays: they only see wall mode.",
 	"settings_scim_action_error": "The SCIM change failed",
 	"settings_scim_base_url": "SCIM base URL",
 	"settings_scim_base_url_help": "Enter it in your provider as the tenant or connector URL, with the token below as the secret.",
@@ -8134,6 +8167,8 @@
 	"settings_sso_title": "Single sign-on",
 	"settings_sso_turn_off": "Turn single sign-on off?",
 	"settings_sso_use_env": "Use environment values?",
+	"settings_sso_wall_groups": "Wall display groups",
+	"settings_sso_wall_groups_help": "Comma separated. Members who are neither admins nor operators become wall displays: they only see wall mode. Filled alone, this list only decides the wall display role.",
 	"settings_tab_account": "My account",
 	"settings_tab_monitoring": "Monitoring",
 	"settings_tab_notifications": "Notifications",
@@ -8328,6 +8363,9 @@
 	"settings_users_role_operator_option": "Operator — handles alerts, no configuration",
 	"settings_users_role_viewer": "Viewer",
 	"settings_users_role_viewer_option": "Viewer — read only",
+	"settings_users_role_wall": "Wall display",
+	"settings_users_role_wall_help": "For a screen on a wall: after signing in it goes straight to wall mode and cannot open any other page, setting or data. It stays signed in as long as it shows the wall; disable the account, reset its password or give it another role to sign it out.",
+	"settings_users_role_wall_option": "Wall display — shows the wall only",
 	"settings_users_save": "Save changes",
 	"settings_users_save_error": "Could not save the user",
 	"settings_users_search_label": "Search users",
@@ -9728,6 +9766,9 @@
 	"w2ops_audit_action_logs_destination_updated": "Log destination changed",
 	"w2ops_audit_action_logs_exported": "Logs exported",
 	"w2ops_audit_action_logs_settings": "Log settings changed",
+	"w2ops_audit_action_monitor_template_created": "Monitor template created",
+	"w2ops_audit_action_monitor_template_deleted": "Monitor template deleted",
+	"w2ops_audit_action_monitor_template_renamed": "Monitor template renamed",
 	"w2ops_audit_action_netconfig_downloaded": "Device configuration downloaded",
 	"w2ops_audit_action_netconfig_host_key_accepted": "Device SSH host key accepted",
 	"w2ops_audit_action_netconfig_revealed": "Device configuration secrets shown",
@@ -9776,6 +9817,7 @@
 	"w2ops_audit_action_spotify_connected": "Spotify connected",
 	"w2ops_audit_action_spotify_disconnected": "Spotify disconnected",
 	"w2ops_audit_action_storage_settings": "Storage settings changed",
+	"w2ops_audit_action_targets_bulk_update": "Monitors edited in bulk",
 	"w2ops_audit_action_team_created": "Team created",
 	"w2ops_audit_action_team_deleted": "Team deleted",
 	"w2ops_audit_action_team_settings": "Team settings changed",
@@ -9830,6 +9872,796 @@
 	"w3audit_action_totp_recovery_regenerated": "Recovery codes replaced",
 	"w3audit_action_user_signed_out": "Account signed out everywhere",
 	"w3tech_alerts_detail_slo": "SLO",
+	"w5alerting_backtest_absorbed": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "The hold duration absorbed {count} short breach.",
+				"countPlural=other": "The hold duration absorbed {count} short breaches."
+			}
+		}
+	],
+	"w5alerting_backtest_coarsened": "Evaluated every {step} instead of every {interval} to keep the test quick: short hold durations are approximate.",
+	"w5alerting_backtest_error": "The test could not run.",
+	"w5alerting_backtest_fired": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Would have fired once.",
+				"countPlural=other": "Would have fired {count} times."
+			}
+		}
+	],
+	"w5alerting_backtest_help": "Replays these settings, saved or not, on the measurements already stored, the way the alerting engine evaluates them.",
+	"w5alerting_backtest_never_fired": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Would not have fired over the last day.",
+				"countPlural=other": "Would not have fired over the last {count} days."
+			}
+		}
+	],
+	"w5alerting_backtest_not_anomaly": "Anomaly rules cannot be tested on history: they compare each value to a baseline learned week after week.",
+	"w5alerting_backtest_not_drift": "Drift rules cannot be tested on history: each evaluation compares the value to past weeks.",
+	"w5alerting_backtest_not_forecast": "Forecast rules cannot be tested on history: each evaluation extrapolates days of measurements.",
+	"w5alerting_backtest_not_log_pattern": "Log pattern rules cannot be tested on history: they count log lines, not stored measurements.",
+	"w5alerting_backtest_not_slo_burn": "Error budget rules cannot be tested on history: they are computed from the SLOs, not from a stored query.",
+	"w5alerting_backtest_notifications": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "That means {count} notification.",
+				"countPlural=other": "That means {count} notifications."
+			}
+		}
+	],
+	"w5alerting_backtest_period": "{start} to {end}, peak {peak}",
+	"w5alerting_backtest_period_more": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "and {count} more period",
+				"countPlural=other": "and {count} more periods"
+			}
+		}
+	],
+	"w5alerting_backtest_period_open": "From {start}, still firing at the end, peak {peak}",
+	"w5alerting_backtest_quiet": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} other series never crossed the threshold.",
+				"countPlural=other": "{count} other series never crossed the threshold."
+			}
+		}
+	],
+	"w5alerting_backtest_run": "Test on history",
+	"w5alerting_backtest_scope_note": "Counts the rule alone: maintenance windows, dependencies, acknowledgements and channel settings are not applied.",
+	"w5alerting_backtest_series_notifications": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} notification",
+				"countPlural=other": "{count} notifications"
+			}
+		}
+	],
+	"w5alerting_backtest_series_periods": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Fired once, {duration} in total",
+				"countPlural=other": "Fired {count} times, {duration} in total"
+			}
+		}
+	],
+	"w5alerting_backtest_show_all": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Show all {count} series",
+				"countPlural=other": "Show all {count} series"
+			}
+		}
+	],
+	"w5alerting_backtest_show_less": "Show fewer",
+	"w5alerting_backtest_spark_label": "Values measured on {name}",
+	"w5alerting_backtest_title": "Test on history",
+	"w5alerting_backtest_truncated": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Only the 100 series most often over the threshold were replayed, out of {count}.",
+				"countPlural=other": "Only the 100 series most often over the threshold were replayed, out of {count}."
+			}
+		}
+	],
+	"w5alerting_backtest_window": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Last day",
+				"countPlural=other": "Last {count} days"
+			}
+		}
+	],
+	"w5alerting_backtest_window_label": "History window",
+	"w5alerting_noise_acknowledged": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "over {count} acknowledged alert",
+				"countPlural=other": "over {count} acknowledged alerts"
+			}
+		}
+	],
+	"w5alerting_noise_edit_rule": "Edit rule",
+	"w5alerting_noise_empty": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "No alert fired over the last day.",
+				"countPlural=other": "No alert fired over the last {count} days."
+			}
+		}
+	],
+	"w5alerting_noise_empty_help": "Nothing to tune for now.",
+	"w5alerting_noise_error": "Could not load the noise report.",
+	"w5alerting_noise_fired_label": "Alerts fired",
+	"w5alerting_noise_flap_changes": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} state change",
+				"countPlural=other": "{count} state changes"
+			}
+		}
+	],
+	"w5alerting_noise_flap_on": "{rule} on {device}",
+	"w5alerting_noise_flapping_help": "Alerts that fired at least 3 times in the period: a clear threshold or a longer hold duration usually calms them.",
+	"w5alerting_noise_flapping_title": "Flapping alerts",
+	"w5alerting_noise_intro": "Which rules talk too much and how fast alerts get an answer, from the alert history.",
+	"w5alerting_noise_mtta": "To acknowledge: {delay}",
+	"w5alerting_noise_mtta_label": "Mean time to acknowledge",
+	"w5alerting_noise_mttr": "To resolve: {delay}",
+	"w5alerting_noise_mttr_label": "Mean time to resolve",
+	"w5alerting_noise_no_delay": "no data yet",
+	"w5alerting_noise_notifications_label": "Notifications sent",
+	"w5alerting_noise_resolved": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "over {count} resolved alert",
+				"countPlural=other": "over {count} resolved alerts"
+			}
+		}
+	],
+	"w5alerting_noise_row_fired": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "fired once",
+				"countPlural=other": "fired {count} times"
+			}
+		}
+	],
+	"w5alerting_noise_row_notifications": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} notification",
+				"countPlural=other": "{count} notifications"
+			}
+		}
+	],
+	"w5alerting_noise_rules_help": "Ranked by notifications sent, reminders and resolutions included.",
+	"w5alerting_noise_rules_title": "Noisiest rules",
+	"w5alerting_noise_tab": "Noise",
+	"w5alerting_noise_teams_title": "By team",
+	"w5alerting_noise_test_rule": "Test on history",
+	"w5alerting_noise_truncated": "Very busy period: the report covers the most recent 100,000 alerts.",
+	"w5alerting_noise_window": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} day",
+				"countPlural=other": "{count} days"
+			}
+		}
+	],
+	"w5alerting_noise_window_label": "Period",
+	"w5annot_alert_after_change": "After change: {title}",
+	"w5annot_audit_action_created": "Change marker added",
+	"w5annot_audit_action_deleted": "Change marker deleted",
+	"w5annot_audit_action_updated": "Change marker edited",
+	"w5annot_chart_open_link": "Open link",
+	"w5annot_form_cancel": "Cancel",
+	"w5annot_form_error": "The marker could not be added",
+	"w5annot_form_heading": "Add a change marker",
+	"w5annot_form_link": "Link (optional)",
+	"w5annot_form_link_help": "A pipeline run, ticket or changelog. Starts with http:// or https://.",
+	"w5annot_form_link_invalid": "Enter a web address starting with http:// or https://.",
+	"w5annot_form_save": "Add marker",
+	"w5annot_form_scope": "Applies to",
+	"w5annot_form_scope_all": "All monitors",
+	"w5annot_form_scope_this": "This monitor only",
+	"w5annot_form_text": "Details (optional)",
+	"w5annot_form_title": "Title",
+	"w5annot_form_title_placeholder": "Deploy v2.4.1",
+	"w5annot_form_title_required": "Give the marker a title.",
+	"w5annot_form_until": "Until (optional)",
+	"w5annot_form_until_help": "For a change that lasted a while, like a 10-minute deployment.",
+	"w5annot_form_until_invalid": "The end must be a valid time after the start.",
+	"w5annot_form_when": "When",
+	"w5annot_form_when_invalid": "Pick a valid time.",
+	"w5annot_list_delete": "Delete",
+	"w5annot_list_delete_confirm": "Delete this marker?",
+	"w5annot_list_link": "Open link",
+	"w5annot_list_meta": "{source} · {author} · {scope}",
+	"w5annot_list_meta_anon": "{source} · {scope}",
+	"w5annot_list_window": "{start} to {end}",
+	"w5annot_panel_add": "Add a marker",
+	"w5annot_panel_empty": "No change marker in this period. Add one by hand, or let your pipeline post them.",
+	"w5annot_panel_list_label": "Change markers in this period, most recent first",
+	"w5annot_panel_title": "Change markers",
+	"w5annot_panel_toggle": "Show change markers on the charts",
+	"w5annot_panel_toggle_short": "On charts",
+	"w5annot_scope_folder": "Folder {folder}",
+	"w5annot_scope_global": "All monitors",
+	"w5annot_scope_monitors": "Selected monitors",
+	"w5annot_scope_tags": "Tags {tags}",
+	"w5annot_source_api": "API",
+	"w5annot_source_ci": "CI",
+	"w5annot_source_ui": "By hand",
+	"w5backups_action_error": "The action did not go through",
+	"w5backups_add": "Add a destination",
+	"w5backups_audit_destination_created": "Off-site backup destination added",
+	"w5backups_audit_destination_deleted": "Off-site backup destination removed",
+	"w5backups_audit_destination_tested": "Off-site backup destination tested",
+	"w5backups_audit_destination_updated": "Off-site backup destination changed",
+	"w5backups_delete": "Delete",
+	"w5backups_delete_confirm": "Delete? Copies already there stay.",
+	"w5backups_edit": "Edit",
+	"w5backups_edit_label": "Edit {name}",
+	"w5backups_empty": "No destination yet. Add an S3 bucket, a WebDAV folder or an SFTP server to keep copies off this machine.",
+	"w5backups_form_cancel": "Cancel",
+	"w5backups_form_edit_title": "Edit {name}",
+	"w5backups_form_enabled": "Upload after each backup",
+	"w5backups_form_include_key": "Also upload the encryption key (secret.key)",
+	"w5backups_form_include_key_warning": "Whoever can read this destination can then decrypt every stored credential. Without the key, keep secret.key somewhere safe yourself, or the copies there cannot be restored with their credentials.",
+	"w5backups_form_keep": "Copies kept there",
+	"w5backups_form_keep_help": "Older copies at this destination are deleted beyond this number. No other file there is ever touched.",
+	"w5backups_form_keep_invalid": "Enter a number from 1 to 365.",
+	"w5backups_form_kind": "Kind",
+	"w5backups_form_name": "Name",
+	"w5backups_form_name_required": "Give the destination a name.",
+	"w5backups_form_new_title": "New off-site destination",
+	"w5backups_form_port_invalid": "Enter a port from 1 to 65535.",
+	"w5backups_form_required": "Required.",
+	"w5backups_form_save": "Save destination",
+	"w5backups_form_save_error": "The destination could not be saved",
+	"w5backups_form_secret_saved": "Saved. Leave empty to keep it.",
+	"w5backups_form_secrets_replace": "A password or key typed here replaces the saved ones; leave both empty to keep them.",
+	"w5backups_hostkey_changed": "This server presented another host key than the one you confirmed, so nothing was sent. If the server was reinstalled, confirm the new key; otherwise something may be impersonating it.",
+	"w5backups_hostkey_trust": "Confirm this key",
+	"w5backups_hostkey_trust_confirm": "Replace the confirmed key?",
+	"w5backups_hostkey_unknown": "The host key of this server is not confirmed yet, so nothing was sent. Check that the fingerprint below is the server's own (ssh-keygen -lf on the server), then confirm it.",
+	"w5backups_intro": "After each local backup, the same file is uploaded to these destinations. A failed upload never affects the local copy.",
+	"w5backups_kind_s3": "S3-compatible",
+	"w5backups_kind_sftp": "SFTP",
+	"w5backups_kind_webdav": "WebDAV",
+	"w5backups_last_failed": "Upload failed",
+	"w5backups_last_ok": "Uploaded",
+	"w5backups_never": "Nothing uploaded yet: the next local backup will be.",
+	"w5backups_password": "Password",
+	"w5backups_paused": "Paused",
+	"w5backups_read_error": "The off-site destinations could not be read",
+	"w5backups_s3_access_key": "Access key ID",
+	"w5backups_s3_bucket": "Bucket",
+	"w5backups_s3_endpoint": "Endpoint",
+	"w5backups_s3_endpoint_help": "Leave empty for AWS. For MinIO, Backblaze B2, Wasabi or Cloudflare R2, the server address given by the provider.",
+	"w5backups_s3_path_style": "Path-style requests",
+	"w5backups_s3_path_style_help": "Needed by MinIO and most self-hosted servers, and by any endpoint given as an IP address.",
+	"w5backups_s3_prefix": "Folder in the bucket",
+	"w5backups_s3_prefix_help": "Optional. Use one folder per DumbMonit instance: old copies are pruned within it.",
+	"w5backups_s3_region": "Region",
+	"w5backups_s3_region_help": "Leave empty for us-east-1. Cloudflare R2 uses auto.",
+	"w5backups_s3_secret_key": "Secret access key",
+	"w5backups_section_destinations": "Off-site backup destinations and their credentials.",
+	"w5backups_sftp_auth_help": "Enter a password, a private key, or both.",
+	"w5backups_sftp_directory": "Remote folder",
+	"w5backups_sftp_directory_help": "Leave empty for the account's home folder. The folder must exist.",
+	"w5backups_sftp_host": "Host",
+	"w5backups_sftp_host_key": "Host key fingerprint",
+	"w5backups_sftp_host_key_help": "Optional: SHA256:… as ssh-keygen -lf prints it. Left empty, the test shows the server's fingerprint for you to confirm.",
+	"w5backups_sftp_key_passphrase": "Key passphrase",
+	"w5backups_sftp_port": "Port",
+	"w5backups_sftp_private_key": "Private key",
+	"w5backups_sftp_private_key_help": "Ed25519 or ECDSA, in OpenSSH format. RSA keys are refused.",
+	"w5backups_summary_failed": "Last upload failed",
+	"w5backups_summary_none": "Not set up",
+	"w5backups_test": "Test",
+	"w5backups_test_failed": "Test failed",
+	"w5backups_test_label": "Test {name}",
+	"w5backups_test_ok": "Test passed",
+	"w5backups_title": "Off-site copies",
+	"w5backups_uploading": "Uploading…",
+	"w5backups_username": "User name",
+	"w5backups_webdav_password_help": "On Nextcloud, use an app password.",
+	"w5backups_webdav_url": "Folder address",
+	"w5backups_webdav_url_help": "The folder must exist. On Nextcloud: https://cloud.example.com/remote.php/dav/files/me/Backups.",
+	"w5backups_with_key": "With secret.key",
+	"w5calendar_agenda_create": "Schedule a window on this day",
+	"w5calendar_agenda_empty": "No maintenance this day.",
+	"w5calendar_agenda_title": "Maintenance on {date}",
+	"w5calendar_chip_time": "{start} – {end}",
+	"w5calendar_continues_after": "continues the next day",
+	"w5calendar_continues_before": "continues from the day before",
+	"w5calendar_day_label_busy": "{date}, {count} on this day. Select to see them.",
+	"w5calendar_day_label_empty": "{date}, no maintenance. Select to schedule one.",
+	"w5calendar_disabled": "Disabled",
+	"w5calendar_error_load": "Could not load the calendar.",
+	"w5calendar_grid_label": "Maintenance calendar",
+	"w5calendar_kind_active": "Active",
+	"w5calendar_kind_past": "Past",
+	"w5calendar_kind_recurring": "Recurring",
+	"w5calendar_kind_upcoming": "Upcoming",
+	"w5calendar_langs_add": "Add",
+	"w5calendar_langs_add_label": "Add a language",
+	"w5calendar_langs_add_placeholder": "Choose a language",
+	"w5calendar_langs_default_help": "Used for visitors whose browser language is not one of the interface languages.",
+	"w5calendar_langs_default_label": "Default language",
+	"w5calendar_langs_empty": "No translation yet.",
+	"w5calendar_langs_error_load": "Could not load the translations.",
+	"w5calendar_langs_error_save": "Could not save the translations.",
+	"w5calendar_langs_field_description": "Description",
+	"w5calendar_langs_field_footer": "Footer",
+	"w5calendar_langs_field_title": "Title",
+	"w5calendar_langs_intro": "The texts you wrote can be shown in other languages. Visitors see their browser language when you translated into it; anything left empty keeps the text as written. Incident messages are shown as written and are never translated.",
+	"w5calendar_langs_names_heading": "Service and group names",
+	"w5calendar_langs_remove": "Remove {language}",
+	"w5calendar_langs_save": "Save translations",
+	"w5calendar_langs_saved": "Translations saved.",
+	"w5calendar_langs_section": "Translations",
+	"w5calendar_langs_tabs_label": "Translated languages",
+	"w5calendar_legend_label": "Legend",
+	"w5calendar_more": "+{count} more",
+	"w5calendar_nav_next": "Next",
+	"w5calendar_nav_previous": "Previous",
+	"w5calendar_nav_today": "Today",
+	"w5calendar_public_language": "Language",
+	"w5calendar_view_label": "Maintenance view",
+	"w5calendar_view_list": "List",
+	"w5calendar_view_month": "Month",
+	"w5calendar_view_week": "Week",
+	"w5chat_interactive_after_save_slack": "Save the channel to get the address to paste in your Slack app.",
+	"w5chat_interactive_after_save_telegram": "Save the channel: DumbMonit then registers itself as the bot's webhook.",
+	"w5chat_interactive_no_public_url": "Interactive buttons need the instance's public URL, in https (Notification policy). Until then, messages keep their links.",
+	"w5chat_interactive_slack_url_help": "In your Slack app, open Interactivity & Shortcuts, turn it on and paste this address as the Request URL.",
+	"w5chat_interactive_slack_url_label": "Interactivity Request URL",
+	"w5chat_interactive_telegram_url_help": "DumbMonit registered this address as the bot's webhook when you saved the channel.",
+	"w5chat_interactive_telegram_url_label": "Bot webhook",
+	"w5chat_template_body_label": "Message",
+	"w5chat_template_format_html": "Email: the message is HTML, the subject plain text. Values are escaped.",
+	"w5chat_template_format_plain": "Plain text: values are inserted as they are.",
+	"w5chat_template_format_slack": "Slack formatting: *bold*, _italics_ and links. Values are escaped, so a device name cannot add formatting.",
+	"w5chat_template_format_telegram": "Telegram MarkdownV2: *bold*, _italics_, [text](address). Put a backslash before ( ) [ ] * _ ~ | > when you mean the character itself; full stops, dashes and values are escaped for you.",
+	"w5chat_template_heading": "Message template",
+	"w5chat_template_insert_aria": "Insert {name}",
+	"w5chat_template_intro": "Rewrite the title and the body of this channel's messages. Leave a field empty to keep the usual text.",
+	"w5chat_template_preview": "Preview on a sample alert",
+	"w5chat_template_preview_loading": "Updating the preview…",
+	"w5chat_template_preview_note": "As the service receives it, before it applies the formatting.",
+	"w5chat_template_reset": "Reset to default",
+	"w5chat_template_state_custom": "Custom",
+	"w5chat_template_state_default": "Default",
+	"w5chat_template_title_label": "Title",
+	"w5chat_template_variables": "Variables",
+	"w5chat_template_variables_help": "Inserts the variable where the cursor is. Any device tag works too, for example tags.room.",
+	"w5monitors_bulkedit_apply": "Apply changes",
+	"w5monitors_bulkedit_cancel": "Cancel",
+	"w5monitors_bulkedit_channel_off": "off",
+	"w5monitors_bulkedit_channels_add": "Add",
+	"w5monitors_bulkedit_channels_help_keep": "Each monitor keeps its own channels.",
+	"w5monitors_bulkedit_channels_help_set": "Nothing ticked: back to the channels the alert rules choose.",
+	"w5monitors_bulkedit_channels_keep": "Keep",
+	"w5monitors_bulkedit_channels_label": "Notification channels",
+	"w5monitors_bulkedit_channels_none": "No notification channel yet. Add one in Settings, then come back.",
+	"w5monitors_bulkedit_channels_remove": "Remove",
+	"w5monitors_bulkedit_channels_set": "Replace with",
+	"w5monitors_bulkedit_close": "Close",
+	"w5monitors_bulkedit_done": "Monitors updated: {count}",
+	"w5monitors_bulkedit_error": "The changes could not be applied",
+	"w5monitors_bulkedit_folder_label": "Folder",
+	"w5monitors_bulkedit_folder_name": "Folder name",
+	"w5monitors_bulkedit_folder_new": "New folder…",
+	"w5monitors_bulkedit_interval_label": "Check interval",
+	"w5monitors_bulkedit_keep": "Keep as is",
+	"w5monitors_bulkedit_lead": "{count} selected. Only what you change here is applied; everything else stays as it is.",
+	"w5monitors_bulkedit_nothing": "Nothing to change yet.",
+	"w5monitors_bulkedit_open": "Edit",
+	"w5monitors_bulkedit_tag_add_help": "Type key=value, for example room=rack-1. A setting of the monitor type cannot be added as a tag.",
+	"w5monitors_bulkedit_tag_add_label": "Add a tag",
+	"w5monitors_bulkedit_tag_key_needed": "Type a tag name before the =.",
+	"w5monitors_bulkedit_tag_remove_label": "Remove tags",
+	"w5monitors_bulkedit_tag_removing": "Remove {key}",
+	"w5monitors_bulkedit_title": "Edit the selection",
+	"w5monitors_form_channel_n": "Channel {id} (deleted)",
+	"w5monitors_form_channels_help_all": "Nothing ticked: alerts go to every channel their rule chooses.",
+	"w5monitors_form_channels_help_some": "Alerts that their rule sends to every channel go to the ticked ones only.",
+	"w5monitors_form_channels_label": "Notification channels",
+	"w5monitors_form_template_notice": "Prefilled from the template {name}. Type the address and, if needed, the credential: a template never keeps them.",
+	"w5monitors_template_add_from": "Add a monitor from it",
+	"w5monitors_template_done": "Done",
+	"w5monitors_template_name_label": "Template name",
+	"w5monitors_template_save": "Save template",
+	"w5monitors_template_save_error": "The template could not be saved",
+	"w5monitors_template_save_lead": "The type, its settings and tags, the check interval and the notification channels are kept. The address and the secrets never are.",
+	"w5monitors_template_save_open": "Save as template",
+	"w5monitors_template_save_title": "Save as template",
+	"w5monitors_template_saved": "Saved as the template {name}.",
+	"w5monitors_templates_delete": "Delete {name}",
+	"w5monitors_templates_delete_confirm": "Delete this template?",
+	"w5monitors_templates_error": "The templates could not be changed",
+	"w5monitors_templates_rename": "Rename {name}",
+	"w5monitors_templates_rename_save": "Save the name",
+	"w5monitors_templates_summary": "{kind}, every {interval}",
+	"w5monitors_templates_title": "From a template",
+	"w5monitors_templates_unknown_kind": "Unknown type {kind}: install its pack to use this template.",
+	"w6accounts_audit_invitation_accepted": "Invitation accepted",
+	"w6accounts_audit_invitation_created": "Invitation created",
+	"w6accounts_audit_invitation_invalid_link": "Unusable invitation link tried",
+	"w6accounts_audit_invitation_resent": "Invitation sent again",
+	"w6accounts_audit_invitation_revoked": "Invitation revoked",
+	"w6accounts_audit_notifications_personal": "Personal notifications changed",
+	"w6accounts_audit_recovery_settings": "Reset link and invitation settings changed",
+	"w6accounts_audit_reset_completed": "Password reset with a link",
+	"w6accounts_audit_reset_ignored": "Password reset asked for an unknown or ineligible account",
+	"w6accounts_audit_reset_invalid_link": "Unusable password reset link tried",
+	"w6accounts_audit_reset_link_created": "Password reset link created",
+	"w6accounts_audit_reset_requested": "Password reset link emailed",
+	"w6accounts_audit_reset_unavailable": "Password reset asked while email reset is unavailable",
+	"w6accounts_backup_section_accounts": "Reset link and invitation settings, open invitations, and each account's personal notifications.",
+	"w6accounts_forgot_back": "Back to sign-in",
+	"w6accounts_forgot_docs": "Other ways to get back in",
+	"w6accounts_forgot_failed": "The request did not go through",
+	"w6accounts_forgot_intro": "Enter your username or email address. If your account can be reset by email, you get a link to choose a new password.",
+	"w6accounts_forgot_login_help": "Accounts that sign in through single sign-on or LDAP change their password with their provider.",
+	"w6accounts_forgot_login_label": "Username or email",
+	"w6accounts_forgot_login_required": "Enter your username or email address.",
+	"w6accounts_forgot_sent_detail": "If an account matches and can be reset by email, a link is on its way. It works once and expires soon.",
+	"w6accounts_forgot_sent_none": "Nothing after a few minutes? Look in your spam folder, or ask an administrator to reset your password.",
+	"w6accounts_forgot_sent_title": "Check your inbox",
+	"w6accounts_forgot_submit": "Email me a link",
+	"w6accounts_forgot_title": "Reset your password",
+	"w6accounts_forgot_too_many": "Too many requests from here. Wait a few minutes, then try again.",
+	"w6accounts_invite_check_failed": "The invitation could not be checked",
+	"w6accounts_invite_failed": "The account was not created",
+	"w6accounts_invite_for": "For {email}, until {until}.",
+	"w6accounts_invite_intro": "{inviter} invites you to join as {role}.",
+	"w6accounts_invite_invalid_detail": "It has expired, was already used or was withdrawn. Ask the person who invited you to send it again.",
+	"w6accounts_invite_invalid_title": "This invitation no longer works",
+	"w6accounts_invite_page_title": "Invitation · DumbMonit",
+	"w6accounts_invite_sso_help": "Your provider must confirm the address {email}: your account uses it as its username.",
+	"w6accounts_invite_sso_leaving": "Account created. Taking you to your identity provider…",
+	"w6accounts_invite_submit": "Create my account",
+	"w6accounts_invite_title": "Create your account",
+	"w6accounts_invite_username_help": "What you type to sign in. No spaces.",
+	"w6accounts_invites_add": "Invite",
+	"w6accounts_invites_copy": "Invitation for {email}: copy the link and send it yourself",
+	"w6accounts_invites_copy_link": "Copy the link",
+	"w6accounts_invites_create": "Create the invitation",
+	"w6accounts_invites_create_error": "The invitation was not created",
+	"w6accounts_invites_days": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} day",
+				"countPlural=other": "{count} days"
+			}
+		}
+	],
+	"w6accounts_invites_description": "Invite people by email with a role and teams, and set how long reset links and invitations last.",
+	"w6accounts_invites_email_failed": "The email did not go out: {error}",
+	"w6accounts_invites_empty": "No invitation is waiting for an answer.",
+	"w6accounts_invites_expired": "Expired",
+	"w6accounts_invites_form_aria": "New invitation",
+	"w6accounts_invites_hours": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} hour",
+				"countPlural=other": "{count} hours"
+			}
+		}
+	],
+	"w6accounts_invites_invite_lifetime": "Invitations last",
+	"w6accounts_invites_load_error": "Invitations could not be loaded",
+	"w6accounts_invites_minutes": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} minute",
+				"countPlural=other": "{count} minutes"
+			}
+		}
+	],
+	"w6accounts_invites_resend": "Send again",
+	"w6accounts_invites_reset_lifetime": "Reset links last",
+	"w6accounts_invites_revoke": "Revoke",
+	"w6accounts_invites_revoke_confirm": "Revoke for good?",
+	"w6accounts_invites_row_error": "The invitation was not changed",
+	"w6accounts_invites_row_expired": "Invited by {by}, expired {when}",
+	"w6accounts_invites_row_pending": "Invited by {by}, expires {when}",
+	"w6accounts_invites_row_teams": "Joins: {teams}",
+	"w6accounts_invites_search_kw": "invite invitation email reset link forgot password",
+	"w6accounts_invites_self_service": "“Forgot password?” by email",
+	"w6accounts_invites_self_service_no_base": "Waiting for a public URL to build the links: set it in the notification policy.",
+	"w6accounts_invites_self_service_no_mail": "Waiting for an email server: set one up in Notifications.",
+	"w6accounts_invites_self_service_off": "Off: the sign-in screen points to the documentation instead.",
+	"w6accounts_invites_self_service_on": "On: links point to {base}.",
+	"w6accounts_invites_send": "Send the invitation by email",
+	"w6accounts_invites_send_no_mail": "No email server is set up: you get a link to copy and send yourself.",
+	"w6accounts_invites_sent": "Invitation sent to {email}",
+	"w6accounts_invites_settings_error": "The settings were not saved",
+	"w6accounts_invites_teams": "Teams to join",
+	"w6accounts_invites_title": "Invitations",
+	"w6accounts_link_shown": "Link shown once — copy it now",
+	"w6accounts_mine_description": "Alerts sent to you personally, on top of the team channels.",
+	"w6accounts_mine_email": "By email",
+	"w6accounts_mine_email_no_address": "Your account has no email address: ask an administrator to add one.",
+	"w6accounts_mine_email_no_server": "No email server is set up on this instance yet.",
+	"w6accounts_mine_email_to": "To {email}.",
+	"w6accounts_mine_folders": "Folders",
+	"w6accounts_mine_folders_none": "No folder yet.",
+	"w6accounts_mine_load_error": "Your notifications could not be loaded",
+	"w6accounts_mine_push": "On my push devices",
+	"w6accounts_mine_push_devices": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} device subscribed.",
+				"countPlural=other": "{count} devices subscribed."
+			}
+		}
+	],
+	"w6accounts_mine_push_none": "No device yet: turn on push notifications for this browser above.",
+	"w6accounts_mine_quiet_help": "During quiet hours only Warning-level alerts reach you; the rest stays in the alert list. Times follow this browser's time zone.",
+	"w6accounts_mine_resolved_help": "Off: you only hear about problems, never recoveries.",
+	"w6accounts_mine_save": "Save",
+	"w6accounts_mine_save_error": "Your notifications were not saved",
+	"w6accounts_mine_scope": "About",
+	"w6accounts_mine_scope_all": "Everything I see",
+	"w6accounts_mine_scope_all_help": "Every monitor your account can see.",
+	"w6accounts_mine_scope_no_team": "You are in no team yet: nothing would reach you.",
+	"w6accounts_mine_scope_pick": "Folders and tags I pick",
+	"w6accounts_mine_scope_pick_help": "A monitor counts when it is in one of these folders (sub-folders included) or has one of these tags.",
+	"w6accounts_mine_scope_teams": "My teams' folders",
+	"w6accounts_mine_scope_teams_help": "The folders opened by {teams}.",
+	"w6accounts_mine_search_kw": "my notifications personal email push quiet hours",
+	"w6accounts_mine_tags": "Tags",
+	"w6accounts_mine_tags_filter": "Filter tags",
+	"w6accounts_mine_tags_none": "No tag on the monitors you see.",
+	"w6accounts_mine_test": "Send me a test",
+	"w6accounts_mine_test_email_failed": "Email failed: {error}",
+	"w6accounts_mine_test_email_ok": "Test email sent",
+	"w6accounts_mine_test_error": "The test was not sent",
+	"w6accounts_mine_test_push_failed": "Push failed: {error}",
+	"w6accounts_mine_test_push_ok": "Test push delivered",
+	"w6accounts_mine_title": "My notifications",
+	"w6accounts_reset_check_failed": "The link could not be checked",
+	"w6accounts_reset_done_detail": "Sign in with your new password. Every other session of this account is now closed.",
+	"w6accounts_reset_done_title": "Password changed",
+	"w6accounts_reset_failed": "The password was not changed",
+	"w6accounts_reset_intro": "For the account {username}. This link works until {until}.",
+	"w6accounts_reset_invalid_detail": "It has expired, was already used, or a newer link replaced it. Ask for a new one from the sign-in screen.",
+	"w6accounts_reset_invalid_title": "This link no longer works",
+	"w6accounts_reset_note": "Saving signs this account out everywhere. Two-factor authentication stays on.",
+	"w6accounts_reset_page_title": "Reset password · DumbMonit",
+	"w6accounts_reset_password": "New password",
+	"w6accounts_reset_submit": "Save the new password",
+	"w6accounts_reset_title": "Choose a new password",
+	"w6accounts_reset_to_login": "Go to sign-in",
+	"w6accounts_resetlink_button": "Reset link",
+	"w6accounts_resetlink_copy": "Reset link for {username}: copy it and hand it over",
+	"w6accounts_resetlink_expires": "Works once, until {until}.",
+	"w6accounts_resetlink_sent": "Reset link for {username} sent to {email}",
+	"w6accounts_resetlink_title_copy": "Creates a password reset link to copy and hand over",
+	"w6accounts_resetlink_title_email": "Emails a password reset link to {email}",
+	"w6design_gate_checking": "Checking the link…",
+	"w6roles_audit_created": "Custom role created",
+	"w6roles_audit_deleted": "Custom role deleted",
+	"w6roles_audit_updated": "Custom role changed",
+	"w6roles_editor_cancel": "Cancel",
+	"w6roles_editor_create": "Create role",
+	"w6roles_editor_description": "Description",
+	"w6roles_editor_edit_title": "Edit {name}",
+	"w6roles_editor_err_name": "Give the role a name.",
+	"w6roles_editor_implied": "always included",
+	"w6roles_editor_name": "Name",
+	"w6roles_editor_new_title": "New role",
+	"w6roles_editor_permissions": "Permissions",
+	"w6roles_editor_save": "Save role",
+	"w6roles_editor_save_error": "The role could not be saved",
+	"w6roles_perm_alerts_help": "Acknowledge, ignore and silence alerts, take on-call shifts, add change markers and run remediation actions, as an operator does.",
+	"w6roles_perm_alerts_label": "Handle alerts",
+	"w6roles_perm_maintenance_help": "Schedule, edit and remove maintenance windows.",
+	"w6roles_perm_maintenance_label": "Manage maintenance",
+	"w6roles_perm_monitors_help": "Create, edit, import and delete monitors, monitor templates, alert rules and SLOs. Device credentials can be entered, never read back.",
+	"w6roles_perm_monitors_label": "Manage monitors",
+	"w6roles_perm_notifications_help": "Edit notification channels, the notification policy and message templates. The email server stays with administrators.",
+	"w6roles_perm_notifications_label": "Manage notifications",
+	"w6roles_perm_reports_help": "Read the scheduled reports and download their PDF.",
+	"w6roles_perm_reports_label": "View reports",
+	"w6roles_perm_status_pages_help": "Edit status pages and publish incidents. Page passwords and subscribers stay with administrators.",
+	"w6roles_perm_status_pages_label": "Manage status pages",
+	"w6roles_perm_view_help": "Read monitors, alerts, metrics and everything else a viewer reads.",
+	"w6roles_perm_view_label": "View",
+	"w6roles_section_add": "Add role",
+	"w6roles_section_admin_only": "Accounts, roles, teams, API tokens, single sign-on, backups and instance settings stay with administrators: no permission opens them.",
+	"w6roles_section_delete": "Delete",
+	"w6roles_section_delete_confirm": "Delete for good?",
+	"w6roles_section_delete_error": "The role could not be deleted",
+	"w6roles_section_description": "Give an account chosen rights without making it an admin. A custom role replaces the built-in role of the accounts that have it.",
+	"w6roles_section_edit": "Edit",
+	"w6roles_section_empty_body": "The built-in roles cover most needs. Create one when someone should, for example, edit monitors without touching accounts.",
+	"w6roles_section_empty_title": "No custom role yet",
+	"w6roles_section_in_use": "Give its accounts another role before deleting it.",
+	"w6roles_section_load_error": "Custom roles could not be loaded",
+	"w6roles_section_read_only": "Read only",
+	"w6roles_section_search_kw": "custom role permissions rights delegate access",
+	"w6roles_section_title": "Custom roles",
+	"w6roles_section_users_count": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} account",
+				"countPlural=other": "{count} accounts"
+			}
+		}
+	],
+	"w6roles_users_custom_group": "Custom roles",
+	"w6roles_users_custom_help": "A custom role replaces the built-in role: the account gets exactly the permissions of that role.",
+	"w6roles_users_custom_title": "Custom role",
 	"wall_band_problems": "Problems",
 	"wall_band_problems_note": "Critical alerts and monitors down",
 	"wall_devices_aria": "Monitors",
@@ -9920,6 +10752,9 @@
 	],
 	"wall_scene_world_hint": "Paris draws the city behind the board. None keeps a plain board.",
 	"wall_scene_world_title": "City behind the board",
+	"wall_sign_out": "Sign out",
+	"wall_sign_out_confirm": "Sign this display out?",
+	"wall_sign_out_title": "This account is a wall display: signing out is the only way to leave the wall.",
 	"wall_status_empty": "Nothing to watch yet",
 	"wall_status_no_critical": "Nothing critical",
 	"wall_status_ok": "All good",

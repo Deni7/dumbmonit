@@ -245,11 +245,28 @@ pub struct Bundle {
     /// désigné par référence comme celui des rapports SLA.
     #[serde(default)]
     pub slos: Vec<BundleSlo>,
+    /// Repères de changement (migration 0288), moniteurs désignés par référence.
+    #[serde(default)]
+    pub annotations: Vec<crate::backup::annotations::BundleAnnotation>,
     /// Politique d'authentification : second facteur exigé des administrateurs
     /// et des opérateurs (clé `auth.policy` de `settings`). Absente tant
     /// qu'elle n'a jamais été réglée.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auth_policy: Option<Value>,
+    /// Modèles de moniteur (migration 0283), leurs canaux par nom.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub monitor_templates: Vec<crate::backup::monitor_templates::BundleMonitorTemplate>,
+    /// Canaux propres aux moniteurs (migration 0282), par référence.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub target_channels: Vec<crate::backup::monitor_templates::BundleTargetChannels>,
+    /// Destinations hors site des sauvegardes locales (migration 0286), leurs
+    /// secrets en clair dans le lot, lui-même chiffré par la phrase de passe.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub backup_destinations: Vec<crate::backup::offsite::bundle::BundleBackupDestination>,
+    /// Réglages des liens de compte, invitations ouvertes, notifications
+    /// personnelles et rôles personnalisés (migrations 0294, 0295 et 0297).
+    #[serde(default, skip_serializing_if = "crate::backup::accounts::BundleAccounts::is_empty")]
+    pub accounts: crate::backup::accounts::BundleAccounts,
 }
 
 /// Serveur de courriel enregistré et son mot de passe.
@@ -294,6 +311,13 @@ impl Bundle {
             ("lun_links".to_string(), self.lun_links.len()),
             ("upgrade_notes_closed".to_string(), self.upgrade_notes_closed.len()),
             ("slos".to_string(), self.slos.len()),
+            ("monitor_templates".to_string(), self.monitor_templates.len()),
+            ("target_channels".to_string(), self.target_channels.len()),
+            ("annotations".to_string(), self.annotations.len()),
+            ("backup_destinations".to_string(), self.backup_destinations.len()),
+            ("invitations".to_string(), self.accounts.invitations.len()),
+            ("notification_prefs".to_string(), self.accounts.notification_prefs.len()),
+            ("custom_roles".to_string(), self.accounts.roles.len()),
         ])
     }
 }
@@ -792,6 +816,14 @@ pub struct BundleStatusPage {
     /// page garde son réglage (`false` sur une page créée).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hide_branding: Option<bool>,
+    /// Langue par défaut de l'interface publique (migration 0290). Absente : celle
+    /// de la page reste telle quelle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_lang: Option<String>,
+    /// Textes traduits par langue (migration 0290). Les langues présentes sont
+    /// rétablies ; celles que le fichier ne cite pas restent.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub translations: Vec<crate::db::status_lang::Translation>,
 }
 
 /// Nom public d'une surveillance arrivée par un groupe coché.

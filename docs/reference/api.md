@@ -266,7 +266,10 @@ means a session cookie, never a token.
 reads plus the alert-handling writes marked *operator* in this page (and
 `x-roles: [admin, operator]` in the OpenAPI document): acknowledge, snooze
 (maintenance windows), ignore a rule for a monitor, clear resolved history.
-Every other write is admin only and answers `403` to an operator.
+Every other write is admin only and answers `403` to an operator. An account
+with a [custom role](../using/settings.md#custom-roles) reads like a viewer
+and reaches, in addition, the operations its permissions open: they carry
+`x-permissions` in the OpenAPI document; any other write answers `403`.
 
 | Method | Route | Auth | Purpose |
 |---|---|---|---|
@@ -276,7 +279,7 @@ Every other write is admin only and answers `403` to an operator.
 | `POST` | `/api/auth/login/totp` | public | `{"pending": "…", "code": "123456"}` — the ticket from the first step and a code (or a recovery code). `204` with the session cookie. |
 | `GET` | `/api/auth/oidc/start` | public | Redirects the browser to the identity provider. |
 | `GET` | `/api/auth/oidc/callback` | public | Return from the provider (`code`, `state`): opens the session and redirects to the UI. |
-| `GET` | `/api/auth/me` | session only | The current account: `id`, `username`, `display_name`, `email` (optional, never used to sign in), `role` (`admin`, `operator`, `viewer`), `auth` (`password`, `oidc`), `disabled`, `totp_enabled`, `created_at`, `last_login_at`. |
+| `GET` | `/api/auth/me` | session only | The current account: `id`, `username`, `display_name`, `email` (optional, never used to sign in), `role` (`admin`, `operator`, `viewer`, `wall`), `custom_role` (`{"id", "name"}` or `null`; `role` is then `viewer`), `permissions` (what the account may do, in the terms of the permission catalog), `auth` (`password`, `oidc`), `disabled`, `totp_enabled`, `created_at`, `last_login_at`. |
 | `POST` | `/api/auth/logout` | session only | Ends the session and clears the cookie. |
 | `POST` | `/api/auth/password` | session only | `{"current_password": "…", "new_password": "…"}`. Signs out every other session. |
 | `GET` | `/api/auth/totp` | session only | Two-factor state of the current account: `enabled`, `pending`, `recovery_codes_left`. |
@@ -296,8 +299,13 @@ Every other write is admin only and answers `403` to an operator.
 | `DELETE` | `/api/auth/oidc/config` | admin, session only | Forgets the stored SSO settings (environment variables, if any, apply again). `204`. |
 | `POST` | `/api/auth/oidc/test` | admin, session only | Fetches the provider's discovery document and reports what it found. |
 | `GET` | `/api/users` | admin, session only | Every account, in the shape of `/api/auth/me`. |
-| `POST` | `/api/users` | admin, session only | `{"username", "display_name", "email", "role", "password"}`. `password` may be omitted only when SSO is enabled; `email` is optional (`400` when it is not an address). `201`. |
-| `PUT` | `/api/users/{id}` | admin, session only | Any of `display_name`, `email` (blank clears it), `role`, `disabled`, `password`; an omitted field keeps its value. Cannot demote or disable the last administrator. |
+| `POST` | `/api/users` | admin, session only | `{"username", "display_name", "email", "role", "custom_role_id", "password"}`. `password` may be omitted only when SSO is enabled; `email` is optional (`400` when it is not an address); `custom_role_id` gives a custom role, with `role` `viewer`. `201`. |
+| `PUT` | `/api/users/{id}` | admin, session only | Any of `display_name`, `email` (blank clears it), `role`, `custom_role_id`, `disabled`, `password`; an omitted field keeps its value. `custom_role_id` gives a custom role (the built-in role becomes `viewer`); `role` alone removes it. Cannot demote or disable the last administrator. |
+| `GET` | `/api/roles` | admin, session only | Custom roles: `id`, `name`, `description`, `permissions`, `users` (accounts that have it), `created_at`, `updated_at`. |
+| `POST` | `/api/roles` | admin, session only | `{"name", "description", "permissions": ["monitors.manage", …]}`. `view` is always added; an unknown permission or the name of a built-in role answers `400`, a name in use `409`. `201`. |
+| `PUT` | `/api/roles/{id}` | admin, session only | Same body; replaces the role, at once for every account that has it. |
+| `DELETE` | `/api/roles/{id}` | admin, session only | `204`; `409` while an account still has the role. |
+| `GET` | `/api/roles/permissions` | admin, session only | The fixed permission catalog: `id`, `label`, `description`, `implied` (`view`), and the `routes` each permission opens (`method`, `path` with `*` for one segment). |
 | `DELETE` | `/api/users/{id}` | admin, session only | `204`. Not yourself, not the last administrator. |
 | `DELETE` | `/api/users/{id}/totp` | admin, session only | Resets another account's second factor (a locked-out colleague). `204`. |
 | `DELETE` | `/api/users/{id}/sessions` | admin, session only | Signs the account out everywhere (for your own account, the session making the request stays). `{"closed": n}`. |
@@ -855,6 +863,17 @@ tokens need the `write` scope for changes. See [Email reports](../using/reports.
 | `GET` | `/api/slos/{id}` | session | One SLO, plus `members` (monitor ids covered) and `burndown` (`[unix seconds, % of the budget left]`). |
 | `PUT` | `/api/slos/{id}` | admin | Full replacement. |
 | `DELETE` | `/api/slos/{id}` | admin | `204`. |
+
+## Change markers
+
+Markers drawn on the charts. See [Change markers](../using/annotations.md).
+
+| Method | Route | Auth | Purpose |
+|---|---|---|---|
+| `GET` | `/api/annotations` | session | Markers touching `from`–`to` (RFC 3339), oldest first, 500 at most. `target` keeps those that apply to that monitor. |
+| `POST` | `/api/annotations` | operator | `{"title", "at", "until", "text", "link", "tags", "scope", "source"}`; only `title` is required. A token with the `write` scope can call it. Returns the marker. Audited. |
+| `PATCH` | `/api/annotations/{id}` | operator | Only the fields sent change; `"until": null` removes the window. Audited. |
+| `DELETE` | `/api/annotations/{id}` | operator | `204`. Audited. |
 
 ## Agent tokens and ingest
 

@@ -78,7 +78,7 @@
 	back={{ href: '/status', label: m.settings_tab_status() }}
 >
 	{#snippet actions()}
-		{#if !auth.isAdmin}
+		{#if !auth.can('status_pages.manage')}
 			<Plate tone="ghost" label={auth.readOnlyLabel} size="md" />
 		{:else if current}
 			<Plate tone={current.published ? 'signal' : 'ghost'} label={current.published ? m.status_list_published() : m.status_list_draft()} size="md" />

@@ -104,6 +104,13 @@ async fn require_read(State(state): State<AppState>, request: Request, next: Nex
     }
     match auth_middleware::current_session(&state.pool, request.headers()).await {
         Ok(Some((_, user))) => {
+            // Un écran mural ne lit que ce que montre le mur : pas les séries brutes.
+            if user.role.is_wall() {
+                return AuthError::Forbidden(
+                    "A wall display account cannot read raw metrics.".into(),
+                )
+                .into_response();
+            }
             if let Err(response) =
                 refuse_scoped(&state, &auth_middleware::Principal::User(user)).await
             {
@@ -215,6 +222,9 @@ struct Extra {
     backup_last_success: Option<i64>,
     /// Résultat de la dernière tentative.
     backup_last_ok: Option<bool>,
+    /// Dernier envoi réussi vers chaque destination hors site : (nom, horodatage
+    /// Unix). Les destinations jamais réussies n'y sont pas.
+    backup_offsite: Vec<(String, i64)>,
 }
 
 impl Extra {
@@ -285,6 +295,7 @@ async fn extra_counts(state: &AppState) -> anyhow::Result<Extra> {
                 .map(|at| at.and_utc().timestamp())
         }),
         backup_last_ok: last.map(|run| run.ok),
+        backup_offsite: crate::backup::offsite::store::last_successes(&state.pool).await?,
     })
 }
 
@@ -527,6 +538,18 @@ fn render(snapshot: &Snapshot, alerts: &AlertCounts, agents: (u64, u64), health:
             "1 when the last scheduled local backup succeeded, 0 when it failed.",
         );
         out.value(f64::from(u8::from(ok)));
+    }
+    // Une série par destination hors site qui a réussi au moins une fois ;
+    // l'étiquette est le nom donné par l'administrateur, une poignée au plus.
+    if !health.extra.backup_offsite.is_empty() {
+        out.metric(
+            "dumbmonit_backup_offsite_last_success_timestamp_seconds",
+            "gauge",
+            "Unix time of the last successful upload to each off-site backup destination.",
+        );
+        for (destination, timestamp) in &health.extra.backup_offsite {
+            out.sample(&[("destination", destination.as_str())], *timestamp as f64);
+        }
     }
 
     out.metric(
@@ -923,6 +946,7 @@ mod tests {
                     tokens_expiring: 1,
                     backup_last_success: Some(1_700_000_000),
                     backup_last_ok: Some(false),
+                    backup_offsite: vec![("nas".to_string(), 1_700_000_100)],
                 },
             },
         )
@@ -996,6 +1020,7 @@ mod tests {
             "dumbmonit_agents_stale 1",
             "dumbmonit_database_bytes 98304",
             "dumbmonit_victoriametrics_up 1",
+            "dumbmonit_backup_offsite_last_success_timestamp_seconds{destination=\"nas\"} 1700000100",
         ] {
             assert!(document.contains(expected), "absent : {expected}\n{document}");
         }
@@ -1015,7 +1040,9 @@ mod tests {
             .collect();
         for label in &labels {
             assert!(
-                matches!(*label, "version" | "phase" | "kind" | "state"),
+                // `destination` : les noms des destinations hors site, choisis
+                // par l'administrateur et en nombre borné.
+                matches!(*label, "version" | "phase" | "kind" | "state" | "destination"),
                 "étiquette inattendue « {label} »"
             );
         }

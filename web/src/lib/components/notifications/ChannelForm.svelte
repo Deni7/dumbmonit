@@ -14,6 +14,9 @@
 	import {
 		createChannel,
 		updateChannel,
+		INTERACTIVE_KEY,
+		MESSAGE_BODY_TEMPLATE_KEY,
+		MESSAGE_TITLE_TEMPLATE_KEY,
 		type AlertSeverity,
 		type Channel,
 		type ChannelMatcher,
@@ -25,6 +28,8 @@
 	import ChannelFieldInput from './ChannelFieldInput.svelte';
 	import QuietHoursEditor from './QuietHoursEditor.svelte';
 	import MatcherEditor from './MatcherEditor.svelte';
+	import MessageTemplateEditor from './MessageTemplateEditor.svelte';
+	import InteractiveCallback from './InteractiveCallback.svelte';
 	import UnsavedBadge from '#lib/components/settings/UnsavedBadge.svelte';
 	import { useDirtyTracker } from '#lib/settings/unsaved.svelte.js';
 	import { matcherIsEmpty } from '#lib/components/alerts/helpers.js';
@@ -79,6 +84,13 @@
 	let settings = $state<Record<string, Value>>(untrack(() => (presetKind || seed ? startingSettings() : {})));
 	let secrets = $state<Record<string, string>>({});
 	let clearSecrets = $state(false);
+	/** Message templates, kept outside the catalogue fields; empty = the usual message. */
+	function seedTemplate(key: string): string {
+		const raw = seed?.settings?.[key];
+		return typeof raw === 'string' ? raw : '';
+	}
+	let titleTemplate = $state(untrack(() => seedTemplate(MESSAGE_TITLE_TEMPLATE_KEY)));
+	let bodyTemplate = $state(untrack(() => seedTemplate(MESSAGE_BODY_TEMPLATE_KEY)));
 
 	// Delivery policy: what this channel accepts and when. The bulletin's ladder
 	// words map onto the API severities (Advisory = warning, Warning = critical).
@@ -128,6 +140,8 @@
 
 	const info = $derived(kinds.find((k) => k.kind === kind));
 	const settingFields = $derived(info?.settings ?? []);
+	const templateFormat = $derived(info?.template_format || '');
+	const interactiveOn = $derived((kind === 'slack' || kind === 'telegram') && settings[INTERACTIVE_KEY] === true);
 	const secretFields = $derived(info?.secrets ?? []);
 	/** Normalised for comparison: blank and absent are the same (the server's default). */
 	function destinationValue(field: KindField, value: Value | undefined): string {
@@ -254,6 +268,14 @@
 			}
 			outSettings[field.key] = toServer(field, value ?? '');
 		}
+		const templates: [string, string][] = [
+			[MESSAGE_TITLE_TEMPLATE_KEY, titleTemplate],
+			[MESSAGE_BODY_TEMPLATE_KEY, bodyTemplate]
+		];
+		for (const [key, value] of templates) {
+			if (templateFormat && value.trim() !== '') outSettings[key] = value;
+			else delete outSettings[key];
+		}
 
 		const typed: Record<string, unknown> = {};
 		for (const field of secretFields) {
@@ -313,6 +335,8 @@
 		settings,
 		typedSecrets: Object.keys(secrets).filter((key) => secrets[key] !== ''),
 		clearSecrets,
+		titleTemplate,
+		bodyTemplate,
 		minSeverity,
 		notifyResolved,
 		minInterval,
@@ -447,6 +471,10 @@
 					</fieldset>
 				{/if}
 
+				{#if interactiveOn}
+					<InteractiveCallback {kind} {channel} />
+				{/if}
+
 				{#if secretFields.length > 0}
 					<fieldset class="grid gap-4 border-t border-line pt-5">
 						<legend class="mb-1 text-sm font-semibold text-ink">{m.notifications_form_secrets()}</legend>
@@ -474,6 +502,22 @@
 							</Field>
 						{/if}
 					</fieldset>
+				{/if}
+
+				{#if templateFormat}
+					<div class="border-t border-line pt-5">
+						<MessageTemplateEditor
+							{kind}
+							format={templateFormat}
+							title={titleTemplate}
+							body={bodyTemplate}
+							disabled={saving}
+							onchange={(nextTitle, nextBody) => {
+								titleTemplate = nextTitle;
+								bodyTemplate = nextBody;
+							}}
+						/>
+					</div>
 				{/if}
 
 				<div class="border-t border-line pt-5">

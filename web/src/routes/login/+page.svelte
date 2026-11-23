@@ -22,6 +22,7 @@
 	import LanguageSelect from '#lib/components/LanguageSelect.svelte';
 	import PasswordInput from '#lib/components/settings/PasswordInput.svelte';
 	import Mascot from '#lib/components/Mascot.svelte';
+	import ForgotPassword from '#lib/components/account/ForgotPassword.svelte';
 	import { onMount } from 'svelte';
 
 	// The last name that signed in on this browser, offered again next time.
@@ -52,6 +53,8 @@
 		passwordForm?.requestSubmit();
 	}
 	let sending = $state(false);
+	// "Forgot password?" by email, when the instance can send the link.
+	let forgotOpen = $state(false);
 	// Second step: the server accepted the password and waits for a one-time
 	// code. `pending` is the short-lived token that ties the two steps together.
 	let pending = $state<string | null>(null);
@@ -293,6 +296,8 @@
 						{m.auth_login_back()}
 					</Button>
 				</form>
+			{:else if forgotOpen}
+				<ForgotPassword initial={username} onback={() => (forgotOpen = false)} />
 			{:else}
 			<h1 id="gate-title" class="display mt-6 text-[1.75rem] text-ink sm:text-3xl">{m.auth_login_title()}</h1>
 			<p class="mt-2 text-sm text-ink-2">
@@ -392,7 +397,20 @@
 						/>
 					</div>
 					<p role="status" class="text-[0.8125rem] text-warning-ink empty:hidden">{#if capsLock}{m.w2global_login_caps_lock()}{/if}</p>
-					<DocLink page="faq/#i-lost-the-password" label={m.w2global_login_forgot()} />
+					{#if auth.passwordReset}
+						<button
+							type="button"
+							class="accent-link inline-flex min-h-10 items-center justify-self-start text-[0.8125rem] font-medium text-ink-2 transition-colors hover:text-signal-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
+							onclick={() => {
+								failure = null;
+								forgotOpen = true;
+							}}
+						>
+							{m.w2global_login_forgot()}
+						</button>
+					{:else}
+						<DocLink page="faq/#i-lost-the-password" label={m.w2global_login_forgot()} />
+					{/if}
 				</Field>
 
 				{#if failure}

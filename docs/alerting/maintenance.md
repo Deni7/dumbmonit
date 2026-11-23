@@ -37,6 +37,29 @@ Each window in the list can be changed after the fact:
 *End now*, *Extend* apply to one-off windows only; a "until recovery" window
 (from *Seen, I am on it*) is lifted by the server when the monitor answers again.
 
+## Calendar
+
+Next to the list, **Month** and **Week** show the windows on a calendar. Weekly
+and monthly rules are unrolled into dated occurrences by the server (the same
+rule that decides *Active now*, daylight-saving changes included), so "the last
+Friday of the month" lands on the right day.
+
+- Each occurrence carries a word and an icon as well as a colour: *Active*,
+  *Upcoming*, *Recurring* (a rule's next occurrences) or *Past*.
+- Click an occurrence, or a day that has some, to list that day's windows
+  below the calendar with their actions: *Edit*, *Duplicate*, *End now*, *Extend*,
+  *Remove*.
+- Click an empty day to schedule a window there: the form opens with that day
+  prefilled.
+- The day buttons are one tab stop: arrow keys move by a day or a week, Page Up
+  and Page Down by a month. The week starts on the day set in
+  *Settings → Appearance*.
+- On a phone, month cells show a count and the week becomes a list of days.
+
+The calendar reads `GET /api/alerts/silences/occurrences?from=&to=` (RFC 3339,
+at most 100 days, 2000 occurrences). A window "until recovery" has no end and is
+not drawn.
+
 ## One-off window
 
 | Field | Meaning |

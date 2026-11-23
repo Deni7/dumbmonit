@@ -92,6 +92,8 @@ pub struct SamlConfig {
     pub attr_groups: String,
     pub admin_groups: Vec<String>,
     pub operator_groups: Vec<String>,
+    /// Groupes qui donnent le rôle `wall` (écran mural, le mode mur seul).
+    pub wall_groups: Vec<String>,
 }
 
 impl SamlConfig {
@@ -123,6 +125,7 @@ impl SamlConfig {
         }
         self.admin_groups = crate::auth::oidc::split_groups(&self.admin_groups);
         self.operator_groups = crate::auth::oidc::split_groups(&self.operator_groups);
+        self.wall_groups = crate::auth::oidc::split_groups(&self.wall_groups);
         self.idp_certificates = self
             .idp_certificates
             .iter()

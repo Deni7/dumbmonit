@@ -12,10 +12,10 @@
 <EmptyState
 	mascot="watch"
 	title={m.devices_targets_empty_title()}
-	description={auth.isAdmin ? m.devices_targets_empty_admin() : m.devices_targets_empty_viewer()}
+	description={auth.can('monitors.manage') ? m.devices_targets_empty_admin() : m.devices_targets_empty_viewer()}
 >
 	{#snippet action()}
-		{#if auth.isAdmin}
+		{#if auth.can('monitors.manage')}
 			{@const linkClass = 'font-semibold text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink'}
 			<ClickSpark>
 				<Button variant="primary" href="/targets/new">{m.devices_targets_add()}</Button>

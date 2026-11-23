@@ -18,6 +18,12 @@ A remote site can do without 8080: the agent port also serves the install
 script and the binaries, and the command shown for a relay uses 8443 only (see
 [Monitor a remote site](../install/remote-site.md)).
 
+The other way round, a machine that can only reach the web address (Cloudflare
+Tunnel, a reverse proxy that terminates TLS, a network where only web traffic
+goes out) can do without 8443: the agent then carries its encrypted channel
+inside a WebSocket on 8080 (or 443). See
+[Agents behind a proxy](../install/agents-behind-proxy.md).
+
 The direction is deliberate: the agent calls the server, never the other way
 round. It crosses NAT and home firewalls, and requires opening **no port** on
 the monitored machine.
@@ -433,6 +439,7 @@ Windows) in place of its other flags does the same.
 | `--pinned-key=sha256//…` | `-PinnedKey` | Public key of the server's self-signed certificate. The download of the script and of the binary is accepted from that key only, and the agent keeps it. Included in the command DumbMonit shows when the server uses its own certificate. |
 | `--tls-url=URL` | `-TlsUrl` | Address of the encrypted agent channel (default: the host of `--url`, port 8443). |
 | `--ca-pin=SHA256` | `-CaPin` | Fingerprint of the server's certificate authority: the agent then only talks to that server, never in clear. |
+| `--transport=MODE` | `-Transport` | How the agent reaches its encrypted channel: `auto` (default: the agent port, then the server URL if that port is unreachable), `direct` or `websocket` (through the server URL, behind Cloudflare Tunnel or a reverse proxy). Written to `agent.yaml` as `transport`; the command shown through a proxy carries `websocket`. See [Agents behind a proxy](../install/agents-behind-proxy.md). |
 | `--hostname=NAME` | `-HostName` | Name announced to the server (default: the machine's). |
 | `--modules=a,b` | `-Modules a,b` | Optional modules to run — see [Choosing the modules](#choosing-the-modules). Without it, every module detects itself; `none` keeps system metrics only. The install command shown by DumbMonit adds it when you tick modules. |
 | `--plakar-klosets=a,b` | | Plakar klosets to read (`@name` or a path); default: every kloset found. |
@@ -797,8 +804,15 @@ perf_counters:             # Windows: performance counters to publish
     name: cpu_total        # value of the "counter" label; the path when omitted
 max_buffered_samples: 20000
 buffer_max_mb: 256         # disk buffer for outages, in MB (0 = memory only)
+transport: auto            # encrypted channel: auto, direct (agent port) or websocket (web address)
 log_level: info
 ```
+
+`transport` (or `DUMBMONIT_AGENT_TRANSPORT`) says how the agent reaches its
+encrypted channel: `auto` (default) tries the agent port first and, after
+repeated connection failures, the WebSocket of `server_url`, then keeps the one
+that answers; `direct` and `websocket` force one. A typo stops the agent at
+startup. See [Agents behind a proxy](../install/agents-behind-proxy.md).
 
 `sensors`, `smart`, `zfs` and `libvirt` are detected, never assumed: left at
 `true` on a machine with no probe, no `smartctl`, no pool or no `virsh`, they
@@ -1040,6 +1054,10 @@ server_urls:
   in turn.
 - The machine page shows **Server: primary**, or **Backup** with the address
   in use, since when, and the last error seen on the primary.
+- An agent that goes through the WebSocket of the web address
+  (`transport: websocket`, or `auto` after a fallback) follows the server in
+  use: the WebSocket moves to the backup's address, and the primary is tried
+  through its own WebSocket, which a standby does not open.
 - Only `https://` addresses (or the loopback) are accepted.
 
 ## Outbound proxy {#outbound-proxy}
@@ -1089,6 +1107,12 @@ netsh winhttp import proxy source=ie   # or copy the Internet Explorer settings
 The agent logs the proxy it uses at startup (`outbound proxy to the server`),
 never its credentials.
 
+A proxy that only lets web traffic out, or inspects TLS, cannot carry the agent
+port: set `transport: websocket` (or keep `auto`) and the agent goes through
+the server URL instead, its TLS session inside a WebSocket that the proxy
+forwards like any HTTPS request. See
+[Agents behind a proxy](../install/agents-behind-proxy.md).
+
 ## Run the agent in Docker / on another network
 
 The agent is also published as a container image, with the same tags as the
@@ -1133,6 +1157,14 @@ a customer's network thus show up in the one DumbMonit you already have,
 without a VPN and with nothing to open on the remote side.
 
 How to set it up, step by step, is in [Monitor a remote site](../install/remote-site.md).
+
+A relay can also be a **gateway** for the agents of its site that cannot reach
+the server (TCP 8443 by default, every interface, `gateway_listen` to change
+it). The relay reports what it really opened — the bound address, or why it
+cannot listen — and its page shows it under *Relay*. The add screen shows the
+*Through &lt;relay&gt;* install command only once the gateway listens and has
+passed the relay's own test; otherwise it says why and how to fix it. See
+[Install agents behind the relay](../install/remote-site.md#5-install-agents-behind-the-relay).
 
 ## Binding: one machine, one agent
 
@@ -1297,6 +1329,8 @@ tail -f /var/log/dumbmonit-agent.log   # service log (OpenRC)
 | Symptom | Likely cause |
 |---|---|
 | Installer says "could not reach the server" | Wrong URL or token. The configuration is written: fix `agent.yaml`, then restart the service. |
+| Installer says "the encrypted agent channel … refuses the connection" | The agent port (8443) is not published or not open on the server: add `"8443:8443"` under `ports:` in `docker-compose.yml`, then `docker compose up -d`, and open the port in the firewall. See [Network ports](../install/ports.md#troubleshooting-the-agent-channel). |
+| `irm https://<relay>:8443/install.ps1` or `curl` fails with *Unable to connect* / *Failed to connect* | Installing through a relay whose gateway does not accept the machine. The relay's page says whether its gateway listens and why not; see [Install agents behind the relay](../install/remote-site.md#5-install-agents-behind-the-relay). |
 | Download fails with 404 | The server has no agent binaries (`DUMBMONIT_AGENT_DIR` empty). Use `--bin=PATH` with a binary you built. |
 | Installer stops with "checksum mismatch" | The command was copied before a server upgrade (copy a fresh one when adding a server with the agent), or the binary received is not the one the server serves: a proxy or a cache in the way, or a tampered download. |
 | Installer stops with "no expected checksum" | The command has no `--sha256` for this platform: an old command, or a macOS binary (not shipped by the server). Copy a fresh command, or pass `--sha256=<platform>-<arch>:<hex>` from the release's `.sha256`. |

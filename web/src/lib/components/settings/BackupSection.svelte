@@ -32,6 +32,7 @@
 		Skeleton,
 		Toggle, Disclosure, DocLink } from '#lib/ui/index.js';
 	import PasswordInput from './PasswordInput.svelte';
+	import BackupDestinations from './BackupDestinations.svelte';
 
 	let status = $state<BackupStatus | null>(null);
 	let loading = $state(true);
@@ -124,7 +125,9 @@
 		netconfig_host_keys: m.settings_backup_section_netconfig_host_keys,
 		netconfig_versions: m.settings_backup_section_netconfig_versions,
 		netscan_schedules: m.settings_backup_section_netscan_schedules,
-		slos: m.settings_backup_section_slos
+		slos: m.settings_backup_section_slos,
+		backup_destinations: m.w5backups_section_destinations,
+		accounts: m.w6accounts_backup_section_accounts
 	};
 	function sectionText(key: string, fallback: string): string {
 		return SECTION_TEXT[key]?.() ?? fallback;
@@ -240,6 +243,8 @@
 
 	let running = $state(false);
 	let runError = $state<unknown>(null);
+	/** Bumped after "Back up now": the off-site list reloads and follows the upload. */
+	let runs = $state(0);
 
 	async function runNow(): Promise<boolean> {
 		running = true;
@@ -247,6 +252,7 @@
 		try {
 			const schedule = await runLocalBackup();
 			if (status) status = { ...status, schedule };
+			runs += 1;
 			return true;
 		} catch (cause) {
 			runError = cause;
@@ -601,6 +607,9 @@
 					</Button>
 				</div>
 			</Disclosure>
+
+			<!-- Off-site copies of the scheduled local backups -->
+			<BackupDestinations refresh={runs} />
 		</div>
 	{/if}
 </Panel>

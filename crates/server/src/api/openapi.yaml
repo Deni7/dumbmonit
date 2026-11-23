@@ -7,7 +7,8 @@
 # Un test de dérive compare les routes déclarées dans `crates/server/src/api/**`
 # à ce fichier : toute route ajoutée au routeur doit l'être ici, avec ses méthodes
 # exactes. Seules en sont exclues, volontairement, les routes du protocole des
-# agents (`/api/ingest`, `/api/agent/commands*`, `/api/agent/relay*`), les
+# agents (`/api/ingest`, `/api/agent/commands*`, `/api/agent/relay*`, la
+# WebSocket `/api/agent/ws`), les
 # redirections du navigateur pour OpenID Connect (`/api/auth/oidc/start`,
 # `/api/auth/oidc/callback`) et SAML (`/api/auth/saml/start`, `/acs`,
 # `/complete`), et la distribution de l'agent (`/install.sh`,
@@ -78,12 +79,36 @@ info:
     everything. Every other write is admin only, and an operator can never
     manage accounts or roles.
 
+    An admin may also define **custom roles** (`/api/roles`): a set of
+    permissions from a fixed catalog (`GET /api/roles/permissions`), given to
+    an account whose built-in role stays `viewer`. Such an account reads like
+    a viewer and reaches, in addition, the operations marked
+    `x-permissions` with one of its permissions; any other write answers
+    `403`. Accounts, roles, teams, tokens, single sign-on, backups and
+    instance settings are never in the catalog.
+
+    A fourth role, **`wall`**, is a wall display: it signs in to show the
+    wall (`/wall`) and nothing else. It reaches only what the wall reads —
+    the operations marked `x-wall: true`:
+    `GET /api/auth/me`, `POST /api/auth/logout`, `GET /api/instance/settings`,
+    `GET /api/targets` (without addresses, options or credentials),
+    `GET /api/alerts`, `GET /api/alerts/rules`, `GET /api/metrics/query`,
+    `GET /api/metrics/query_range`, `GET /api/incidents`,
+    `GET /api/alerts/silences`, `GET /api/wall/weather` and the wall's
+    music (`GET /api/music/now`, `GET /api/music/spotify/token`,
+    `POST /api/music/spotify/playback`, `POST /api/music/speaker/report`,
+    `POST /api/music/speaker/play`). Everything else answers `403`, reads
+    included. Its session is renewed while the screen shows the wall, so
+    `DUMBMONIT_SESSION_DAYS` is how long it may stay idle rather than how
+    long it lasts; the two-factor policy does not apply to it; team rights
+    limit what it shows, as for any account. API tokens open nothing for it.
+
     ## Errors
 
     Every error body is JSON: `{"error": "message"}` — `400` bad request,
     `401` no valid session or token (with `WWW-Authenticate: Bearer` for a
-    token), `403` not allowed (viewer, operator outside alert handling, or
-    `read` token on a write route, missing
+    token), `403` not allowed (viewer, operator outside alert handling, wall
+    display outside the wall, or `read` token on a write route, missing
     anti-CSRF header, token on a session-only route, token used from a network
     it is not allowed from), `404` unknown id, `409` conflict, `429` rate
     limited (with `Retry-After`), `500` otherwise. An unknown path under `/api`
@@ -162,6 +187,8 @@ tags:
     description: Incidents and maintenance announcements shown on status pages.
   - name: SLOs
     description: Service level objectives, their error budget and burn rates.
+  - name: Annotations
+    description: Change markers (deployments, updates, maintenance) drawn on the charts.
   - name: Public status
     description: What a published status page exposes, without authentication.
   - name: Agents
@@ -569,6 +596,7 @@ paths:
       summary: End the current session
       security: [{ cookieAuth: [] }]
       x-token-scope: none
+      x-wall: true
       responses:
         "204": { description: Signed out; the cookie is cleared. }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -581,6 +609,7 @@ paths:
       summary: The signed-in account
       security: [{ cookieAuth: [] }]
       x-token-scope: none
+      x-wall: true
       responses:
         "200":
           description: The account.
@@ -988,7 +1017,8 @@ paths:
         `require_totp`, admins and operators who sign in with a local password and
         have no second factor get `403` with `code: "totp_setup_required"` on every
         route but `GET /api/auth/me`, `GET /api/auth/totp`, the enrolment routes and
-        logout. Single sign-on (OIDC, SAML), LDAP and passkey sessions are exempt.
+        logout. Single sign-on (OIDC, SAML), LDAP and passkey sessions are exempt,
+        and viewers and wall displays are never concerned.
       security: [{ cookieAuth: [] }]
       x-token-scope: none
       requestBody:
@@ -1005,6 +1035,279 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/auth/password-reset:
+    post:
+      operationId: requestPasswordReset
+      tags: [Accounts]
+      summary: Ask for a password reset link by email
+      description: >-
+        Public, like the sign-in. `login` is a username or an email address.
+        The answer is always `202`, after the same delay, whether an account
+        matches or not: nothing tells whether it exists. A link (`/reset?token=…`)
+        is emailed only to an active account with a local password and an email
+        address — never to an SSO, LDAP or wall-display account — when an
+        administrator left self-service on, an email server is configured and a
+        link base is known (the public URL, or the origin an administrator last
+        used). Each request counts against a per-address and a per-account
+        limit (`429`). Requires `X-Requested-With: DumbMonit`.
+      security: []
+      x-token-scope: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [login]
+              properties:
+                login: { type: string, description: Username or email address. }
+      responses:
+        "202":
+          description: Request taken; the same answer for every account.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/auth/password-reset/check:
+    post:
+      operationId: checkPasswordReset
+      tags: [Accounts]
+      summary: Read a password reset link
+      description: >-
+        Public. `404` for any link that cannot be used (unknown, expired,
+        already used, account no longer eligible), always with the same
+        message; failures count against the address (`429`).
+      security: []
+      x-token-scope: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LinkTokenRequest" }
+      responses:
+        "200":
+          description: The link is valid.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [username, expires_at]
+                properties:
+                  username: { type: string }
+                  expires_at: { type: string, description: UTC, without suffix. }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/auth/password-reset/complete:
+    post:
+      operationId: completePasswordReset
+      tags: [Accounts]
+      summary: Choose a new password with a reset link
+      description: >-
+        Public. Sets the password (12 characters at least), signs the account
+        out everywhere and uses the link up, along with any other link of the
+        account. Two-factor authentication stays on. Then sign in as usual.
+      security: []
+      x-token-scope: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string, format: password, minLength: 12 }
+      responses:
+        "204": { description: Password changed; every session of the account is closed. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/auth/invitations/check:
+    post:
+      operationId: checkInvitation
+      tags: [Accounts]
+      summary: Read an invitation link
+      description: >-
+        Public. `404` for any link that cannot be used (unknown, expired,
+        revoked, already accepted), always with the same message.
+      security: []
+      x-token-scope: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LinkTokenRequest" }
+      responses:
+        "200":
+          description: The invitation.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitationCheck" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/auth/invitations/accept:
+    post:
+      operationId: acceptInvitation
+      tags: [Accounts]
+      summary: Create an account from an invitation
+      description: >-
+        Public. Creates the account with the role, email address and teams of
+        the invitation, and closes the invitation. With a `password`, the
+        account signs in with its `username`; with `sso: true` (single sign-on
+        enabled), it has no password and its username is the invited address,
+        which the identity provider must present as verified at the first
+        sign-in. `409` when the username is taken (the invitation stays valid).
+      security: []
+      x-token-scope: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+                username: { type: string }
+                display_name: { type: string, maxLength: 120 }
+                password: { type: string, format: password, minLength: 12 }
+                sso: { type: boolean, default: false }
+      responses:
+        "201":
+          description: Account created; sign in next.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [username]
+                properties:
+                  username: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/auth/recovery:
+    get:
+      operationId: getAccountLinkSettings
+      tags: [Accounts]
+      summary: Settings of reset links and invitations
+      description: >-
+        Administrator session only. Also remembers the origin the
+        administrator uses: it is the base of the links when no public URL is
+        set.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "200":
+          description: The settings and what they make possible.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccountLinkSettingsView" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    put:
+      operationId: putAccountLinkSettings
+      tags: [Accounts]
+      summary: Change the settings of reset links and invitations
+      description: Administrator session only. An omitted field takes its default.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountLinkSettings" }
+      responses:
+        "200":
+          description: The settings now in force.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccountLinkSettingsView" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/auth/notifications:
+    get:
+      operationId: getMyNotifications
+      tags: [Accounts]
+      summary: My personal notifications
+      description: >-
+        Session only, any role but wall displays. What the signed-in account
+        receives itself, by email (to its address, through the instance email
+        server) or Web Push (its subscribed devices), on top of the channels.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "200":
+          description: The choices, and the folders, tags and teams to pick from.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MyNotificationsView" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    put:
+      operationId: putMyNotifications
+      tags: [Accounts]
+      summary: Change my personal notifications
+      description: >-
+        Session only. Replaces the choices; an omitted field takes its default.
+        `email: true` needs an email address on the account.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PersonalNotificationPrefs" }
+      responses:
+        "200":
+          description: The choices now in force.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MyNotificationsView" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/auth/notifications/test:
+    post:
+      operationId: testMyNotifications
+      tags: [Accounts]
+      summary: Send myself a test notification
+      description: Session only. Through each means saved as on; `409` when none is.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "200":
+          description: What each means gave; `null` when not tried.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  email: { $ref: "#/components/schemas/PersonalDelivery" }
+                  push: { $ref: "#/components/schemas/PersonalDelivery" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
 
   /api/auth/audit:
     get:
@@ -1352,8 +1655,8 @@ paths:
       tags: [Accounts]
       summary: Turn SCIM provisioning on or off
       description: >-
-        `default_role` is `viewer` or `operator`: SCIM never creates an
-        administrator. An absent `default_role` keeps the current one.
+        `default_role` is `viewer`, `operator` or `wall` (wall displays): SCIM
+        never creates an administrator. An absent `default_role` keeps the current one.
       security: [{ cookieAuth: [] }]
       x-token-scope: none
       requestBody:
@@ -1365,7 +1668,7 @@ paths:
               required: [enabled]
               properties:
                 enabled: { type: boolean }
-                default_role: { type: string, enum: [viewer, operator] }
+                default_role: { type: string, enum: [viewer, operator, wall] }
       responses:
         "200":
           description: The new settings.
@@ -1734,6 +2037,114 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
 
+  /api/roles:
+    get:
+      operationId: listCustomRoles
+      tags: [Accounts]
+      summary: Custom roles
+      description: Administrator session only. `users` counts the accounts that have the role.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "200":
+          description: Custom roles, by name.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CustomRole" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      operationId: createCustomRole
+      tags: [Accounts]
+      summary: Create a custom role
+      description: >-
+        Administrator session only. `permissions` are names from
+        `GET /api/roles/permissions`; `view` is always added. Managing accounts,
+        roles, teams, tokens, single sign-on, backups and instance settings
+        cannot be delegated.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CustomRoleInput" }
+      responses:
+        "201":
+          description: Role created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CustomRole" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/roles/permissions:
+    get:
+      operationId: listPermissions
+      tags: [Accounts]
+      summary: The permission catalog
+      description: >-
+        Administrator session only. The fixed set of permissions a custom role
+        can hold, with the API routes each one opens (beyond what a viewer
+        reads). Operations opened by a permission carry `x-permissions` in this
+        specification.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "200":
+          description: The catalog, in display order.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PermissionInfo" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/roles/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    put:
+      operationId: updateCustomRole
+      tags: [Accounts]
+      summary: Replace a custom role
+      description: Administrator session only. Applies at once to every account that has the role.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CustomRoleInput" }
+      responses:
+        "200":
+          description: The role.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CustomRole" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      operationId: deleteCustomRole
+      tags: [Accounts]
+      summary: Delete a custom role
+      description: Administrator session only. Refused (409) while an account still has the role.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "204": { description: Role deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
   /api/teams:
     get:
       operationId: listTeams
@@ -2091,6 +2502,145 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/SessionsClosed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/users/{id}/reset-link:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    post:
+      operationId: createPasswordResetLink
+      tags: [Accounts]
+      summary: Create a password reset link for an account
+      description: >-
+        Administrator session only. For an active account with a local
+        password (not a wall display: set its password instead). The link is
+        emailed to the account's address when `send` is true and an email
+        server is configured, and returned in every case, to hand over
+        otherwise. A new link replaces the previous one.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                send: { type: boolean, default: true }
+      responses:
+        "200":
+          description: The link, shown once.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url, expires_at, emailed]
+                properties:
+                  url: { type: string }
+                  expires_at: { type: string, description: UTC, without suffix. }
+                  emailed: { type: boolean }
+                  email_error: { type: [string, "null"] }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/users/invitations:
+    get:
+      operationId: listInvitations
+      tags: [Accounts]
+      summary: Open invitations
+      description: Administrator session only. Expired ones included (`expired`), to resend or revoke.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "200":
+          description: The invitations, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Invitation" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      operationId: createInvitation
+      tags: [Accounts]
+      summary: Invite someone by email
+      description: >-
+        Administrator session only. Any role but `wall`, and teams to join on
+        acceptance. Replaces an open invitation of the same address; `409` when
+        an account already uses it. The link is emailed when `send` is true and
+        an email server is configured, and returned in every case.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email: { type: string, format: email }
+                role: { $ref: "#/components/schemas/Role" }
+                teams: { type: array, items: { type: integer, format: int64 } }
+                send: { type: boolean, default: true }
+      responses:
+        "201":
+          description: The invitation and its link, shown once.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitationSent" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/users/invitations/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    delete:
+      operationId: revokeInvitation
+      tags: [Accounts]
+      summary: Revoke an open invitation
+      description: Administrator session only. Its link stops working at once.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      responses:
+        "204": { description: Revoked. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/users/invitations/{id}/resend:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    post:
+      operationId: resendInvitation
+      tags: [Accounts]
+      summary: Send an invitation again
+      description: >-
+        Administrator session only. A new link and a new expiry; the previous
+        link stops working.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                send: { type: boolean, default: true }
+      responses:
+        "200":
+          description: The invitation and its new link, shown once.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitationSent" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -2755,6 +3305,7 @@ paths:
       tags: [Onboarding]
       summary: Instance settings chosen in the setup wizard
       x-token-scope: read
+      x-wall: true
       responses:
         "200":
           description: Instance settings.
@@ -2796,6 +3347,7 @@ paths:
       tags: [Devices]
       summary: Every device
       x-token-scope: read
+      x-wall: true
       responses:
         "200":
           description: Devices.
@@ -2821,6 +3373,7 @@ paths:
       summary: Add a device
       description: Profile detection starts in the background for SNMP.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -2863,6 +3416,7 @@ paths:
         already monitored are skipped and reported. With `dry_run=true`
         nothing is created and rows come back with status `ok`. Admin only.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       parameters:
         - name: dry_run
           in: query
@@ -2905,6 +3459,7 @@ paths:
         and the probe's message. SNMP only (other kinds are a `400`), and not
         available through a relay.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -2937,6 +3492,7 @@ paths:
         imported. With `dry_run=true` nothing is created and rows come back
         with status `ok`. Admin only.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       parameters:
         - name: dry_run
           in: query
@@ -2995,6 +3551,7 @@ paths:
         the same file agree on the numbers given to `rows`. Uptime Kuma 2 on
         MariaDB cannot be read. Admin only.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       parameters:
         - name: dry_run
           in: query
@@ -3045,6 +3602,7 @@ paths:
         Same preview / `rows` contract as `/api/targets/import/kuma`, at most 2000
         monitors. Admin only.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       parameters:
         - name: dry_run
           in: query
@@ -3098,6 +3656,7 @@ paths:
         and alert settings are never imported. Same preview / `rows` contract as
         `/api/targets/import/kuma`. Admin only.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       parameters:
         - name: dry_run
           in: query
@@ -3150,6 +3709,7 @@ paths:
         address redirected. Same preview / `rows` contract as
         `/api/targets/import/kuma`. Admin only.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       parameters:
         - name: dry_run
           in: query
@@ -3200,6 +3760,7 @@ paths:
         deleted. Until then, `PUT` (other than pausing) and `DELETE` answer `409`.
         Admin only.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       responses:
         "204": { description: Released. }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -3237,6 +3798,7 @@ paths:
         rank — `/targets` only ever compares rank between devices of the same
         state tier and folder.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -3264,6 +3826,7 @@ paths:
         pages that ticked the folder follow the new name in the same
         transaction.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -3279,6 +3842,162 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/targets/bulk:
+    patch:
+      operationId: bulkUpdateTargets
+      tags: [Devices]
+      summary: Edit several devices at once
+      description: >-
+        Applies one change to every listed device: check interval, notification
+        channels (`set`, `add` or `remove`), free tags (`add`, `remove`; a key
+        that is an option of the device's type is refused when added and left
+        alone when removed) and folder (`""`: no folder). Fields left out stay
+        as they are. Each device is checked as a single edit would be (it must
+        exist and be visible, a team-restricted account needs `manage` on it
+        and on the destination folder, a monitor managed by Docker labels or a
+        configuration file is refused, a channel of another MSP client is
+        refused) and gets its own verdict in `results`. The devices that pass
+        are written together in one transaction. A request that changes
+        nothing, or an interval, folder name, tag or channel that is invalid
+        for every device, is refused as a whole (400).
+      x-token-scope: write
+      x-permissions: [monitors.manage]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids, patch]
+              properties:
+                ids:
+                  type: array
+                  maxItems: 20000
+                  items: { type: integer, format: int64 }
+                patch: { $ref: "#/components/schemas/TargetBulkPatch" }
+      responses:
+        "200":
+          description: One verdict per device, in the order of `ids` (a repeated id counts once).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TargetBulkReport" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/monitor-templates:
+    get:
+      operationId: listMonitorTemplates
+      tags: [Devices]
+      summary: Monitor templates
+      description: >-
+        Saved starting points for the add form: a type, its options and free
+        tags without any secret, a check interval and notification channels.
+        Never an address or a credential.
+      x-token-scope: read
+      responses:
+        "200":
+          description: Every template, by name.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MonitorTemplate" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      operationId: createMonitorTemplate
+      tags: [Devices]
+      summary: Save a device as a template
+      description: >-
+        Builds the template from what is stored for `target_id`: its type,
+        interval, notification channels and options and tags, leaving out
+        every key that names a secret, the HTTP headers, any value carrying a
+        password (`https://user:pass@host`) and, of a scenario, everything but
+        each step's name, method and URL. An agent cannot be a template.
+      x-token-scope: write
+      x-permissions: [monitors.manage]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, target_id]
+              properties:
+                name: { type: string, maxLength: 80 }
+                target_id: { type: integer, format: int64 }
+      responses:
+        "201":
+          description: The template.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MonitorTemplate" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/monitor-templates/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    get:
+      operationId: getMonitorTemplate
+      tags: [Devices]
+      summary: One monitor template
+      x-token-scope: read
+      responses:
+        "200":
+          description: The template.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MonitorTemplate" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      operationId: renameMonitorTemplate
+      tags: [Devices]
+      summary: Rename a monitor template
+      x-token-scope: write
+      x-permissions: [monitors.manage]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 80 }
+      responses:
+        "200":
+          description: The template.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MonitorTemplate" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      operationId: deleteMonitorTemplate
+      tags: [Devices]
+      summary: Delete a monitor template
+      description: Devices created from it are not affected.
+      x-token-scope: write
+      x-permissions: [monitors.manage]
+      responses:
+        "204": { description: Template deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/targets/{id}:
     parameters:
@@ -3313,6 +4032,7 @@ paths:
         relay (`null` goes back to direct probing). `enabled: false` clears the
         device's alerts without notifying.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -3335,6 +4055,7 @@ paths:
       summary: Delete a device
       description: Clears its alerts without notifying and deletes its time series (best effort).
       x-token-scope: write
+      x-permissions: [monitors.manage]
       responses:
         "204": { description: Device deleted. }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -3373,6 +4094,7 @@ paths:
         Through its relay agent when the device has one (`409` when a probe is
         already in flight, `400 Timed out: relay agent …` when it does not answer).
       x-token-scope: write
+      x-permissions: [monitors.manage]
       responses:
         "200":
           description: What was measured.
@@ -3393,6 +4115,7 @@ paths:
       tags: [Devices]
       summary: Re-run profile detection
       x-token-scope: write
+      x-permissions: [monitors.manage]
       responses:
         "200":
           description: The detected profile, or `null`.
@@ -3459,6 +4182,7 @@ paths:
       summary: Instant MetricsQL query
       description: Each series carries a single `[timestamp, "value"]` pair in `values`.
       x-token-scope: read
+      x-wall: true
       parameters:
         - name: query
           in: query
@@ -3489,6 +4213,7 @@ paths:
         between them); `step` is in seconds and is widened so that a series
         never exceeds 2,000 points.
       x-token-scope: read
+      x-wall: true
       parameters:
         - name: query
           in: query
@@ -3538,6 +4263,7 @@ paths:
         deleted or paused devices are never listed. Dismissed alerts are left
         out unless `dismissed=true`, which lists only them.
       x-token-scope: read
+      x-wall: true
       parameters:
         - name: target_id
           in: query
@@ -3594,6 +4320,37 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /api/alerts/noise:
+    get:
+      operationId: getAlertNoise
+      tags: [Alerts]
+      summary: Alert noise report
+      description: >-
+        Over the last 7, 30 or 90 days of alert history: the noisiest rules
+        (firing episodes and notifications), flapping alerts (state changes
+        per alert), and the mean time to acknowledge (MTTA) and to resolve
+        (MTTR) overall, per rule and per team. An episode is one transition to
+        `firing`; its notifications are the firing, reminders, escalations and
+        resolution the engine routed to at least one channel. Acknowledging or
+        dismissing an alert dates the episode's first reaction. Admin and
+        operator accounts only (viewers get 403); a team-restricted account
+        sees the episodes of its own devices and the rows of its own teams.
+      x-token-scope: read
+      parameters:
+        - name: days
+          in: query
+          description: Window, in days. 30 by default.
+          schema: { type: integer, enum: [7, 30, 90] }
+      responses:
+        "200":
+          description: The report.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AlertNoise" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /api/alerts/history/dismiss-resolved:
     post:
       operationId: dismissResolvedAlertHistory
@@ -3603,6 +4360,7 @@ paths:
         Marks every not-yet-cleared `resolved` transition as dismissed: they
         leave the default history view, the rows stay in the database.
       x-token-scope: write
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       responses:
         "200":
@@ -3629,6 +4387,7 @@ paths:
         needs attention. The row stays in the database, only hidden from the
         default history view.
       x-token-scope: write
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       responses:
         "204": { description: Entry cleared. }
@@ -3659,6 +4418,7 @@ paths:
         neither means 4 hours, at most 30 days). `{"until": null}` lifts the
         acknowledgement. The resolution is still notified. Audited.
       x-token-scope: write
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       requestBody:
         required: false
@@ -3680,6 +4440,7 @@ paths:
       tags: [Alerts]
       summary: Lift an acknowledgement
       x-token-scope: write
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       responses:
         "200":
@@ -3709,6 +4470,7 @@ paths:
         a new alert, notified as usual. Its resolution is recorded in the
         history as "dismissed by …". Audited.
       x-token-scope: write
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       responses:
         "200":
@@ -3725,6 +4487,7 @@ paths:
       summary: Restore a dismissed alert
       description: Undo a dismissal while the alert is still active. Audited.
       x-token-scope: write
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       responses:
         "200":
@@ -3742,6 +4505,7 @@ paths:
       tags: [Rules]
       summary: Every alert rule
       x-token-scope: read
+      x-wall: true
       responses:
         "200":
           description: Rules, with their per-device overrides.
@@ -3757,6 +4521,7 @@ paths:
       tags: [Rules]
       summary: Create an alert rule
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -3773,6 +4538,44 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
 
+  /api/alerts/rules/backtest:
+    post:
+      operationId: backtestRule
+      tags: [Rules]
+      summary: Test a rule on history
+      description: >-
+        Replays the rule as submitted (saved or not, same body as a rule
+        creation) over the last 1, 7 or 30 days of stored metrics, at the
+        engine's evaluation step, with the engine's own threshold, clear
+        threshold and hold-duration logic, and says what it would have done:
+        firing periods per series (start, end, peak value), notifications
+        (firing, reminders, escalation, resolution — before maintenance
+        windows, dependencies and channel policies), and the breaches the hold
+        duration absorbed. Nothing is written. The cost is bounded: past
+        10,000 steps the step is widened (`coarsened`), past 100 series only
+        the ones most often over the threshold are replayed (`truncated`), and
+        the metrics read gives up after 20 seconds (502). Anomaly, log
+        pattern, forecast, drift and error budget rules cannot be replayed:
+        the answer is then `replayable: false` with the reason.
+      x-token-scope: write
+      x-permissions: [monitors.manage]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RuleBacktestRequest" }
+      responses:
+        "200":
+          description: What the rule would have done.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuleBacktest" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
   /api/alerts/rules/{id}:
     parameters:
       - $ref: "#/components/parameters/Id"
@@ -3782,6 +4585,7 @@ paths:
       summary: Update an alert rule
       description: A built-in rule keeps its query.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -3803,6 +4607,7 @@ paths:
       summary: Delete an alert rule
       description: Built-in rules cannot be deleted — disable them instead.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       responses:
         "204": { description: Rule deleted. }
         "400": { $ref: "#/components/responses/BadRequest" }
@@ -3818,6 +4623,7 @@ paths:
       tags: [Rules]
       summary: Enable or disable an alert rule
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -3845,6 +4651,7 @@ paths:
         enabled state a rule ships with. Per-device overrides are kept. A rule created here
         has no defaults and answers 409.
       x-token-scope: write
+      x-permissions: [monitors.manage]
       responses:
         "200":
           description: The rule, back to its defaults.
@@ -3911,6 +4718,7 @@ paths:
       summary: Create or replace an override for one device
       description: Each field is optional; `null` means "as the rule". An empty override is removed.
       x-token-scope: write
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       requestBody:
         required: true
@@ -3932,6 +4740,7 @@ paths:
       tags: [Rules]
       summary: Remove an override
       x-token-scope: write
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       responses:
         "204": { description: Override removed. }
@@ -3945,6 +4754,7 @@ paths:
       tags: [Silences]
       summary: Every maintenance window
       x-token-scope: read
+      x-wall: true
       responses:
         "200":
           description: Windows, with `active_now`, `active_until` and `next_start_at` computed by the server.
@@ -3960,6 +4770,7 @@ paths:
       tags: [Silences]
       summary: Create a maintenance window
       x-token-scope: write
+      x-permissions: [alerts.operate, maintenance.manage]
       x-roles: [admin, operator]
       requestBody:
         required: true
@@ -3983,6 +4794,41 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /api/alerts/silences/occurrences:
+    get:
+      operationId: listSilenceOccurrences
+      tags: [Silences]
+      summary: Maintenance windows unrolled into dated occurrences
+      description: |
+        One-off windows and weekly or monthly rules expanded between `from` and `to`
+        (at most 100 days, 2000 occurrences). "Until recovery" windows have no end and
+        are not listed. Powers the maintenance calendar.
+      x-token-scope: read
+      parameters:
+        - { name: from, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date-time } }
+      responses:
+        "200":
+          description: Occurrences sorted by start.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [silence_id, name, starts_at, ends_at, state, recurring, enabled]
+                  properties:
+                    silence_id: { type: integer }
+                    name: { type: string }
+                    starts_at: { type: string, format: date-time }
+                    ends_at: { type: string, format: date-time }
+                    state: { type: string, enum: [active, upcoming, past] }
+                    recurring: { type: boolean }
+                    enabled: { type: boolean }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /api/alerts/silences/{id}:
     parameters:
       - $ref: "#/components/parameters/Id"
@@ -3994,6 +4840,7 @@ paths:
         Replaces the name, comment, scope and schedule. To end a window now, send
         a one-off schedule whose end is the current time.
       x-token-scope: write
+      x-permissions: [alerts.operate, maintenance.manage]
       x-roles: [admin, operator]
       requestBody:
         required: true
@@ -4015,6 +4862,7 @@ paths:
       tags: [Silences]
       summary: Delete a maintenance window
       x-token-scope: write
+      x-permissions: [alerts.operate, maintenance.manage]
       x-roles: [admin, operator]
       responses:
         "204": { description: Window deleted. }
@@ -4062,6 +4910,7 @@ paths:
       tags: [Notifications]
       summary: Create a notification channel
       x-token-scope: write
+      x-permissions: [notifications.manage]
       requestBody:
         required: true
         content:
@@ -4098,6 +4947,7 @@ paths:
         In `policy`, omitting `matcher` keeps the routing filter and
         `"matcher": null` clears it.
       x-token-scope: write
+      x-permissions: [notifications.manage]
       requestBody:
         required: true
         content:
@@ -4118,6 +4968,7 @@ paths:
       tags: [Notifications]
       summary: Delete a notification channel
       x-token-scope: write
+      x-permissions: [notifications.manage]
       responses:
         "204": { description: Channel deleted. }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -4132,6 +4983,7 @@ paths:
       tags: [Notifications]
       summary: Send a test message through a channel
       x-token-scope: write
+      x-permissions: [notifications.manage]
       responses:
         "200":
           description: Whether the message left.
@@ -4141,6 +4993,36 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/notify/template-preview:
+    post:
+      operationId: previewMessageTemplate
+      tags: [Notifications]
+      summary: Preview a channel's message templates on a sample alert
+      description: >-
+        Renders the title and body templates (`message_title_template`,
+        `message_body_template` in the channel settings) for a channel type, on a sample
+        disk-full alert, with the escaping of that service (`plain`, `slack_mrkdwn`, `html`,
+        `telegram_markdown_v2`). Empty templates render the defaults, which give the usual
+        message. `400` with the reason when saving the channel would refuse the templates
+        (unknown variable, unclosed braces), or when the type takes no message template.
+        Changes nothing.
+      x-token-scope: write
+      x-permissions: [notifications.manage]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TemplatePreviewRequest" }
+      responses:
+        "200":
+          description: The rendered sample.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TemplatePreview" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /api/notify/mail-server:
     get:
@@ -4312,6 +5194,7 @@ paths:
       summary: Update the global notification policy
       description: 'Every field is optional; an omitted field keeps its value. `"escalate_channel": null` switches escalation off.'
       x-token-scope: write
+      x-permissions: [notifications.manage]
       requestBody:
         required: true
         content:
@@ -4334,6 +5217,7 @@ paths:
       summary: Which devices a channel routing filter selects
       description: Read-only, but a `POST` because the filter is a JSON body; needs the `write` scope like every `POST`.
       x-token-scope: write
+      x-permissions: [notifications.manage]
       requestBody:
         required: true
         content:
@@ -4377,6 +5261,7 @@ paths:
       tags: [Status pages]
       summary: Create a status page
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       requestBody:
         required: true
         content:
@@ -4420,6 +5305,7 @@ paths:
         `subscribe_channel_id`, `subscribe_email`, `domain` and `hide_branding`, which keep their
         stored value when omitted.
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       requestBody:
         required: true
         content:
@@ -4442,6 +5328,7 @@ paths:
       summary: Delete a status page
       description: The public URL stops answering.
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       responses:
         "204": { description: Page deleted. }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -4457,6 +5344,7 @@ paths:
       summary: Replace the devices shown on a page
       description: The full ordered list (200 at most). An empty label takes the device's name.
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       requestBody:
         required: true
         content:
@@ -4497,6 +5385,49 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/PublicStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/status-pages/{id}/languages:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      operationId: getStatusPageLanguages
+      tags: [Status pages]
+      summary: Default language and translations of a status page
+      x-token-scope: read
+      responses:
+        "200":
+          description: The page's languages.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StatusPageLanguages" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      operationId: putStatusPageLanguages
+      tags: [Status pages]
+      summary: Replace the default language and the translations of a page
+      description: >-
+        Translations cover the title, description, footer and the names of services
+        and groups (`labels`, from the written name to its translation). An empty
+        field keeps the written text. Incident messages are not translated.
+      x-token-scope: write
+      x-permissions: [status_pages.manage]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StatusPageLanguages" }
+      responses:
+        "200":
+          description: The saved languages.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StatusPageLanguages" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -4563,6 +5494,7 @@ paths:
       summary: Upload the page's logo
       description: PNG, JPEG or WebP, recognised by content, 256 KiB at most.
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       requestBody:
         required: true
         content:
@@ -4579,6 +5511,7 @@ paths:
       tags: [Status pages]
       summary: Remove the page's logo
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       responses:
         "204": { description: Logo removed. }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -4698,6 +5631,7 @@ paths:
         Administrators only, even for reading: the response lists the
         recipients' addresses.
       x-token-scope: read
+      x-permissions: [reports.view]
       responses:
         "200":
           description: Report schedules.
@@ -4740,6 +5674,7 @@ paths:
       tags: [Reports]
       summary: One periodic email report
       x-token-scope: read
+      x-permissions: [reports.view]
       responses:
         "200":
           description: The schedule.
@@ -4843,6 +5778,7 @@ paths:
         same period (the calendar month before the last send) from the
         recorded history. `404` before the first send, `400` for a digest.
       x-token-scope: read
+      x-permissions: [reports.view]
       parameters:
         - name: disposition
           in: query
@@ -5023,6 +5959,7 @@ paths:
       tags: [Incidents]
       summary: Every incident and maintenance announcement, with its updates
       x-token-scope: read
+      x-wall: true
       responses:
         "200":
           description: Incidents.
@@ -5039,6 +5976,7 @@ paths:
       summary: Open an incident or announce a maintenance
       description: "`body` becomes the first update."
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       requestBody:
         required: true
         content:
@@ -5064,6 +6002,7 @@ paths:
       summary: Update an incident
       description: An omitted field keeps its value.
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       requestBody:
         required: true
         content:
@@ -5084,6 +6023,7 @@ paths:
       tags: [Incidents]
       summary: Delete an incident
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       responses:
         "204": { description: Incident deleted. }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -5114,6 +6054,7 @@ paths:
       tags: [Incidents]
       summary: Post an update and move the incident to its status
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       requestBody:
         required: true
         content:
@@ -5158,6 +6099,7 @@ paths:
         published and cleared when it goes back to draft. The text is plain
         text, shown by paragraphs. Maintenance windows have no post-mortem.
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       requestBody:
         required: true
         content:
@@ -5178,6 +6120,7 @@ paths:
       tags: [Incidents]
       summary: Delete the post-mortem of an incident
       x-token-scope: write
+      x-permissions: [status_pages.manage]
       responses:
         "204": { description: Post-mortem deleted. }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -5209,6 +6152,7 @@ paths:
       tags: [SLOs]
       summary: Create a service level objective
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -5247,6 +6191,7 @@ paths:
       tags: [SLOs]
       summary: Replace a service level objective
       x-token-scope: write
+      x-permissions: [monitors.manage]
       requestBody:
         required: true
         content:
@@ -5268,8 +6213,135 @@ paths:
       tags: [SLOs]
       summary: Delete a service level objective
       x-token-scope: write
+      x-permissions: [monitors.manage]
       responses:
         "204": { description: SLO deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # -------------------------------------------------- repères de changement
+  /api/annotations:
+    get:
+      operationId: listAnnotations
+      tags: [Annotations]
+      summary: Change markers (deployments, updates, maintenance) in a time window
+      description: >-
+        Markers whose instant or window touches `[from, to]`, oldest first (the
+        500 most recent at most). With `target`, only the markers that apply to
+        that monitor: global ones, and those naming it, its folder or one of its
+        tags. Team-restricted accounts see the global markers and those that
+        touch a monitor they can see.
+      x-token-scope: read
+      parameters:
+        - name: from
+          in: query
+          description: Start of the window, RFC 3339 (`2026-11-22T10:00:00Z`).
+          schema: { type: string }
+        - name: to
+          in: query
+          description: End of the window, RFC 3339.
+          schema: { type: string }
+        - name: target
+          in: query
+          description: Monitor id.
+          schema: { type: integer, format: int64 }
+        - name: limit
+          in: query
+          description: At most this many markers (500 by default and at most).
+          schema: { type: integer, minimum: 1, maximum: 500 }
+      responses:
+        "200":
+          description: Markers, oldest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Annotation" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: createAnnotation
+      tags: [Annotations]
+      summary: Add a change marker
+      description: >-
+        Meant for pipelines: an API token with the `write` scope can call it.
+        `at` defaults to now; `until` makes the marker a window. A
+        team-restricted account may only target monitors it can handle (never the
+        whole instance).
+      x-token-scope: write
+      x-permissions: [alerts.operate]
+      x-roles: [admin, operator]
+      x-codeSamples:
+        - lang: Shell
+          label: curl
+          source: |
+            curl -sk -X POST https://dumbmonit.example:8080/api/annotations \
+              -H "Authorization: Bearer $DUMBMONIT_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d '{"title": "Deploy v2.4.1", "source": "ci", "link": "https://ci.example/runs/42"}'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AnnotationPayload" }
+            example:
+              title: Deploy v2.4.1
+              text: Rolled out by the pipeline.
+              at: "2026-11-22T10:00:00Z"
+              until: "2026-11-22T10:10:00Z"
+              link: https://ci.example/runs/42
+              tags: [deploy]
+              scope: { kind: folder, folder: Production }
+              source: ci
+      responses:
+        "201":
+          description: The marker.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Annotation" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/annotations/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    patch:
+      operationId: updateAnnotation
+      tags: [Annotations]
+      summary: Change a marker
+      description: "Only the fields sent change; `until: null` removes the window."
+      x-token-scope: write
+      x-permissions: [alerts.operate]
+      x-roles: [admin, operator]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AnnotationUpdate" }
+      responses:
+        "200":
+          description: The marker.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Annotation" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteAnnotation
+      tags: [Annotations]
+      summary: Delete a marker
+      x-token-scope: write
+      x-permissions: [alerts.operate]
+      x-roles: [admin, operator]
+      responses:
+        "204": { description: Marker deleted. }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -5292,8 +6364,15 @@ paths:
         A page in `password` or `users` access mode answers 401 with an `access`
         field (`password` or `users`) until the visitor unlocks it; badges, RSS,
         iCal, logo and day detail of that page do the same.
+        The page's own texts (title, description, footer, service and group names)
+        come in the visitor's language when the admin translated them: `?lang=`
+        (one of the nine interface languages), else `Accept-Language`, else the
+        page's default language. `page.default_lang`, `page.lang` and
+        `page.languages` report the choice. Incident messages are never translated.
       security: []
       x-token-scope: public
+      parameters:
+        - { name: lang, in: query, required: false, schema: { type: string }, description: "Interface language, for example fr or pt-BR." }
       responses:
         "200":
           description: The page, its services and incidents.
@@ -5714,6 +6793,64 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
 
+  /api/public/chat/slack/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    post:
+      operationId: slackInteraction
+      tags: [Notifications]
+      summary: Button presses from a Slack channel with interactive buttons
+      description: |
+        The Interactivity Request URL of the channel's Slack app. Slack posts
+        `application/x-www-form-urlencoded` with a `payload` field; the request must carry a valid
+        `X-Slack-Signature` (HMAC-SHA256 of `v0:<timestamp>:<body>` with the channel's signing
+        secret) and an `X-Slack-Request-Timestamp` less than five minutes old, otherwise `403`
+        (also for a channel that is not an enabled interactive Slack channel). The button carries a
+        signed action token (24 hours, one use): the alerts are acknowledged or snoozed as
+        `slack:<username>`, recorded in the audit log, and the message is rewritten through
+        `response_url` ("Acknowledged by …"). A second press does nothing more. Always `200`
+        once the signature is valid, so that Slack does not retry.
+      security: []
+      x-token-scope: public
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                payload: { type: string, description: "The interaction, as JSON." }
+      responses:
+        "200": { description: Accepted. }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/public/chat/telegram/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    post:
+      operationId: telegramUpdate
+      tags: [Notifications]
+      summary: Webhook of a Telegram channel with interactive buttons
+      description: |
+        Set as the bot's webhook when the channel is saved with interactive buttons (the instance
+        public URL must be https). Telegram sends `X-Telegram-Bot-Api-Secret-Token`, a secret
+        derived from the instance secret, the channel and its bot token; without it, `403`. Only
+        `callback_query` updates are read: the button's short reference gives back the signed
+        action token (24 hours, one use), the alerts are acknowledged or snoozed as
+        `telegram:<username>`, recorded in the audit log, and the buttons are replaced by
+        "Acknowledged by …". A second press does nothing more. Always `200` once the secret is
+        valid, so that Telegram does not retry.
+      security: []
+      x-token-scope: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true, description: "A Telegram Update." }
+      responses:
+        "200": { description: Accepted. }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /api/public/status/{slug}/confirm:
     parameters:
       - $ref: "#/components/parameters/Slug"
@@ -6044,6 +7181,11 @@ paths:
           required: false
           schema: { type: boolean, default: false }
           description: "Commands that use the agent port only (a remote site): the install scripts and binaries are read on the agent port, pinned by the key of its certificate, next to the encrypted channel."
+        - name: transport
+          in: query
+          required: false
+          schema: { type: string, enum: [auto, websocket, direct], default: auto }
+          description: "Transport of the encrypted channel in the commands; see `transport` of the token creation."
       responses:
         "200":
           description: Install parameters.
@@ -6159,7 +7301,12 @@ paths:
         command will carry (from `base_url`), completes the TLS 1.3 handshake
         and checks that the certificate chain is its own. Through a relay
         (`relay_id`), nothing is dialled: the answer says whether the relay
-        reports that its gateway listens. Nothing secret is sent.
+        reports that its gateway listens, the outcome of the relay's own test
+        of it at the site's address, and what blocks it (`problem`). When the
+        command sends agents through the web address (`transport: websocket`,
+        behind Cloudflare Tunnel or a reverse proxy that terminates TLS), the
+        server opens the agent WebSocket at that address instead and completes
+        the same handshake inside it. Nothing secret is sent.
       security: [{ cookieAuth: [] }]
       x-token-scope: none
       requestBody:
@@ -6172,6 +7319,10 @@ paths:
                 base_url: { type: string, description: "Address machines reach the web interface at." }
                 relay_id: { type: integer }
                 relay_host: { type: [string, "null"] }
+                transport:
+                  type: string
+                  enum: [auto, websocket, direct]
+                  description: Transport the install command uses (default auto).
       responses:
         "200":
           description: What answered.
@@ -6187,7 +7338,7 @@ paths:
                   listen_port: { type: [integer, "null"], description: "Listen port inside the container." }
                   outcome:
                     type: [string, "null"]
-                    enum: [ok, dns, refused, timeout, tls, foreign, null]
+                    enum: [ok, dns, refused, timeout, tls, foreign, no_websocket, null]
                   relay:
                     type: [object, "null"]
                     properties:
@@ -6199,6 +7350,24 @@ paths:
                       self_check: { type: boolean, description: The relay tests its own gateway (up-to-date agent). }
                       reachable: { type: [boolean, "null"], description: "Outcome of the relay's last test of its gateway at this address; null: not tested there yet." }
                       check_error: { type: [string, "null"] }
+                      checked_at_ms: { type: [integer, "null"], description: "When the relay ran that test (Unix milliseconds)." }
+                      problem:
+                        type: [string, "null"]
+                        description: >-
+                          What keeps the gateway from accepting the site's machines, when known:
+                          closed from the interface, relay agent older than `min_agent_version`,
+                          relay offline, port that cannot be opened (`bind_error`), listening on
+                          the loopback only, or relay not on the encrypted channel (no tunnel).
+                        enum: [closed, too_old, offline, bind_failed, loopback, no_tunnel, null]
+                      listen: { type: [string, "null"], description: "Address the relay really bound (host:port)." }
+                      bind_error: { type: [string, "null"], description: "Why the relay could not open the port, as it reports it." }
+                      agent_version: { type: string }
+                      min_agent_version: { type: string, description: "First agent version whose relay opens a gateway." }
+                  transport:
+                    type: [string, "null"]
+                    enum: [websocket, null]
+                    description: "websocket: agents go through the web address; url, host and port are those of the agent WebSocket."
+                  websocket: { type: boolean, description: "The server accepts agents through the WebSocket of the web address (`DUMBMONIT_AGENT_WEBSOCKET`, agent port open): a command can be switched to it with `transport: websocket`." }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
@@ -8466,6 +9635,126 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/backup/destinations:
+    get:
+      operationId: listBackupDestinations
+      tags: [Backup]
+      summary: The off-site destinations of the local backups
+      description: >-
+        Administrator session only. Secrets are never returned: `has_secret` and `saved_secrets`
+        (field names only) say what is stored. `uploading` is true while an upload runs.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      x-roles: [admin]
+      responses:
+        "200":
+          description: The destinations.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BackupDestinationList" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      operationId: createBackupDestination
+      tags: [Backup]
+      summary: Add an off-site destination (S3-compatible, WebDAV or SFTP)
+      description: >-
+        Administrator session only, recorded in the audit log. After each successful local backup
+        the file is uploaded to every enabled destination, which then keeps its `keep` newest
+        copies. `secret.key` goes too only with `include_key`. An SFTP destination authenticates
+        only once its `host_key` fingerprint is confirmed.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      x-roles: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BackupDestinationRequest" }
+      responses:
+        "201":
+          description: The destination.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BackupDestination" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/backup/destinations/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    put:
+      operationId: updateBackupDestination
+      tags: [Backup]
+      summary: Change an off-site destination
+      description: >-
+        Administrator session only, recorded in the audit log. `secrets` omitted or `null` keeps
+        the stored ones, `{}` clears them; when the server or the account changes they must be
+        sent again. Changing the SFTP host or port drops the confirmed host key.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      x-roles: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BackupDestinationRequest" }
+      responses:
+        "200":
+          description: The destination.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BackupDestination" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      operationId: deleteBackupDestination
+      tags: [Backup]
+      summary: Remove an off-site destination (the copies already there stay)
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      x-roles: [admin]
+      responses:
+        "204": { description: Removed. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/backup/destinations/{id}/test:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      operationId: testBackupDestination
+      tags: [Backup]
+      summary: Write, list and delete a small test file on a destination
+      description: >-
+        Administrator session only, recorded in the audit log. For SFTP, a host key that is not
+        confirmed (or changed) is refused before authenticating, and `host_key` gives the
+        fingerprint the server presented, for the administrator to check and confirm.
+      security: [{ cookieAuth: [] }]
+      x-token-scope: none
+      x-roles: [admin]
+      responses:
+        "200":
+          description: The outcome (a failure is reported here, not as an HTTP error).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BackupDestinationTest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /api/config/plan:
     post:
       operationId: planConfig
@@ -10214,6 +11503,7 @@ paths:
         from Spotify at most every few seconds, shared by every caller), and
         the link the walls play. Walls poll it every five seconds.
       x-token-scope: read
+      x-wall: true
       responses:
         "200":
           description: Spotify playback and the shared link.
@@ -10350,6 +11640,7 @@ paths:
         API tokens are refused.
       security: [{ cookieAuth: [] }]
       x-token-scope: none
+      x-wall: true
       responses:
         "200":
           description: The access token (never cached).
@@ -10376,6 +11667,7 @@ paths:
         whether the caller may.
       security: [{ cookieAuth: [] }]
       x-token-scope: none
+      x-wall: true
       requestBody:
         required: true
         content:
@@ -10463,6 +11755,7 @@ paths:
         (`null` when it cannot be checked).
       security: [{ cookieAuth: [] }]
       x-token-scope: none
+      x-wall: true
       requestBody:
         required: true
         content:
@@ -10504,6 +11797,7 @@ paths:
         wall, "Test sound" in Settings.
       security: [{ cookieAuth: [] }]
       x-token-scope: none
+      x-wall: true
       requestBody:
         required: false
         content:
@@ -10538,6 +11832,7 @@ paths:
         Open-Meteo does not answer, `current` is null too (the wall then shows
         nothing). Cached on the server for at least ten minutes.
       x-token-scope: read
+      x-wall: true
       responses:
         "200":
           description: The setting and, when a place is chosen, the weather.
@@ -10832,6 +12127,7 @@ paths:
         instead. At most 30 runs per minute for the whole instance. Audited.
       security: [{ cookieAuth: [] }]
       x-token-scope: none
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       requestBody:
         required: false
@@ -11239,6 +12535,7 @@ paths:
       tags: [On-call]
       summary: Add a replacement, someone taking the shift of someone else for a while
       x-token-scope: write
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       requestBody:
         required: true
@@ -11265,6 +12562,7 @@ paths:
       tags: [On-call]
       summary: Remove a replacement
       x-token-scope: write
+      x-permissions: [alerts.operate]
       x-roles: [admin, operator]
       responses:
         "204": { description: Replacement removed. }
@@ -11807,7 +13105,7 @@ components:
         base_url: { type: string, description: "Tenant URL to give the identity provider: `<origin>/api/scim/v2`." }
         token_set: { type: boolean }
         token_created_at: { type: [string, "null"], description: RFC 3339 UTC. }
-        default_role: { type: string, enum: [viewer, operator] }
+        default_role: { type: string, enum: [viewer, operator, wall] }
 
     ScimResource:
       type: object
@@ -12060,11 +13358,12 @@ components:
     # ----------------------------------------------------------- comptes
     Role:
       type: string
-      enum: [admin, operator, viewer]
+      enum: [admin, operator, viewer, wall]
       description: >-
         `admin` does everything; `operator` reads everything and handles
         alerts (operations marked `x-roles: [admin, operator]`); `viewer`
-        reads.
+        reads; `wall` is a wall display that only reaches what the wall reads
+        (operations marked `x-wall: true`).
     TeamLevel:
       type: string
       enum: [read, operate, manage]
@@ -12239,6 +13538,19 @@ components:
         created_at: { type: string }
         last_login_at: { type: [string, "null"] }
         email: { type: [string, "null"], description: Optional contact address; never used to sign in. }
+        custom_role:
+          description: Custom role of the account; its `role` is then `viewer`.
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [id, name]
+              properties:
+                id: { type: integer, format: int64 }
+                name: { type: string }
+        permissions:
+          type: array
+          description: What the account may do, in the terms of the permission catalog.
+          items: { $ref: "#/components/schemas/Permission" }
     AuthStatus:
       type: object
       required: [configured, authenticated, oidc, demo]
@@ -12267,6 +13579,7 @@ components:
         passkeys: { type: boolean, description: "At least one passkey is registered: the sign-in screen offers to use one." }
         demo: { type: boolean }
         totp_setup_required: { type: boolean, description: "The instance policy holds this session at two-factor enrolment until it is done." }
+        password_reset: { type: boolean, description: '"Forgot password?" emails a reset link; otherwise the sign-in screen points to the documentation.' }
         https:
           type: object
           description: HTTPS of the web port, for the "session in clear" banner. Nothing secret.
@@ -12409,6 +13722,101 @@ components:
       type: object
       properties:
         require_totp: { type: boolean, default: false, description: Require two-factor authentication from admins and operators who sign in with a local password. }
+    LinkTokenRequest:
+      type: object
+      required: [token]
+      properties:
+        token: { type: string, description: "The `token` parameter of the link." }
+    AccountLinkSettings:
+      type: object
+      properties:
+        self_service: { type: boolean, default: true, description: '"Forgot password?" emails a reset link.' }
+        reset_minutes: { type: integer, minimum: 5, maximum: 1440, default: 30, description: Lifetime of a reset link. }
+        invite_hours: { type: integer, minimum: 1, maximum: 720, default: 168, description: Lifetime of an invitation. }
+    AccountLinkSettingsView:
+      allOf:
+        - $ref: "#/components/schemas/AccountLinkSettings"
+        - type: object
+          required: [mail_server, self_service_available]
+          properties:
+            mail_server: { type: boolean, description: The instance email server is configured. }
+            link_base: { type: [string, "null"], description: Base of the links sent. }
+            self_service_available: { type: boolean, description: '"Forgot password?" really sends a link.' }
+    InvitationCheck:
+      type: object
+      required: [email, role, suggested_username, invited_by, expires_at, sso]
+      properties:
+        email: { type: string }
+        role: { $ref: "#/components/schemas/Role" }
+        suggested_username: { type: string }
+        invited_by: { type: string }
+        expires_at: { type: string, description: UTC, without suffix. }
+        sso: { type: boolean, description: Single sign-on is enabled and can be used instead of a password. }
+    Invitation:
+      type: object
+      required: [id, email, role, teams, invited_by, created_at, expires_at, expired]
+      properties:
+        id: { type: integer, format: int64 }
+        email: { type: string }
+        role: { $ref: "#/components/schemas/Role" }
+        teams:
+          type: array
+          items:
+            type: object
+            required: [id, name]
+            properties:
+              id: { type: integer, format: int64 }
+              name: { type: string }
+        invited_by: { type: string }
+        created_at: { type: string }
+        expires_at: { type: string }
+        last_sent_at: { type: [string, "null"] }
+        expired: { type: boolean }
+    InvitationSent:
+      type: object
+      required: [invitation, url, emailed]
+      properties:
+        invitation: { $ref: "#/components/schemas/Invitation" }
+        url: { type: string, description: "`/invite?token=…`, shown once." }
+        emailed: { type: boolean }
+        email_error: { type: [string, "null"] }
+    PersonalNotificationPrefs:
+      type: object
+      properties:
+        email: { type: boolean, default: false }
+        webpush: { type: boolean, default: false }
+        min_severity: { $ref: "#/components/schemas/Severity" }
+        notify_resolved: { type: boolean, default: true }
+        scope:
+          type: string
+          enum: [all, teams, pick]
+          default: all
+          description: Everything the account sees, the folders of its teams, or the folders and tags picked.
+        folders: { type: array, items: { type: string }, maxItems: 50 }
+        tags: { type: array, items: { type: string, description: "`key=value`, or `key` alone." }, maxItems: 50 }
+        min_interval_secs: { type: integer, minimum: 0, maximum: 86400, default: 0 }
+        quiet_hours:
+          description: A weekly window in the account's time zone; only critical alerts get through.
+          oneOf:
+            - { $ref: "#/components/schemas/Schedule" }
+            - { type: "null" }
+    MyNotificationsView:
+      type: object
+      required: [prefs, mail_server, push_devices, teams, folders, tags]
+      properties:
+        prefs: { $ref: "#/components/schemas/PersonalNotificationPrefs" }
+        email: { type: [string, "null"], description: The account's address, set by an administrator. }
+        mail_server: { type: boolean }
+        push_devices: { type: integer }
+        teams: { type: array, items: { type: string } }
+        folders: { type: array, items: { type: string } }
+        tags: { type: array, items: { type: string } }
+    PersonalDelivery:
+      type: [object, "null"]
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+        error: { type: [string, "null"] }
     RecoveryCodes:
       type: object
       required: [recovery_codes]
@@ -12445,6 +13853,7 @@ components:
         attr_groups: { type: string, description: Groups attribute. Empty tries the usual names. }
         admin_groups: { type: array, items: { type: string } }
         operator_groups: { type: array, items: { type: string } }
+        wall_groups: { type: array, items: { type: string }, description: Members who are in no admin or operator group become wall displays. }
     SamlConfig:
       allOf:
         - $ref: "#/components/schemas/SamlConfigUpdate"
@@ -12483,6 +13892,12 @@ components:
           type: array
           items: { type: string }
           description: Members who are not in an admin group become operators.
+        wall_groups:
+          type: array
+          items: { type: string }
+          description: >-
+            Members who are in no admin or operator group become wall displays
+            (role `wall`). Alone, this list only decides the `wall` role.
         groups_claim: { type: string }
         public_url: { type: string }
         redirect_uri: { type: string }
@@ -12503,6 +13918,12 @@ components:
           type: array
           items: { type: string }
           description: Members who are not in an admin group become operators.
+        wall_groups:
+          type: array
+          items: { type: string }
+          description: >-
+            Members who are in no admin or operator group become wall displays
+            (role `wall`). Alone, this list only decides the `wall` role.
         groups_claim: { type: string }
         public_url: { type: string }
     OidcTestRequest:
@@ -12551,6 +13972,10 @@ components:
           type: array
           items: { type: string }
           description: Once any group list is filled, only members of a listed group can sign in.
+        wall_groups:
+          type: array
+          items: { type: string }
+          description: Members of no other listed group become wall displays (role `wall`).
         timeout_seconds: { type: integer }
     LdapConfigUpdate:
       type: object
@@ -12576,6 +14001,9 @@ components:
           type: array
           items: { type: string }
         viewer_groups:
+          type: array
+          items: { type: string }
+        wall_groups:
           type: array
           items: { type: string }
         timeout_seconds: { type: integer, minimum: 1, maximum: 30, default: 5 }
@@ -12618,6 +14046,7 @@ components:
         username: { type: string }
         display_name: { type: string }
         role: { $ref: "#/components/schemas/Role" }
+        custom_role_id: { type: integer, format: int64, description: "A custom role; `role` must then be `viewer`." }
         password: { type: string, writeOnly: true }
         email: { type: string, maxLength: 254, description: Optional; blank means none. }
     UserUpdate:
@@ -12626,8 +14055,56 @@ components:
         display_name: { type: string }
         email: { type: string, maxLength: 254, description: Blank clears it. }
         role: { $ref: "#/components/schemas/Role" }
+        custom_role_id:
+          type: integer
+          format: int64
+          description: Give a custom role (the built-in role becomes `viewer`). Sending `role` alone removes it.
         disabled: { type: boolean }
         password: { type: string, writeOnly: true }
+
+    # ----------------------------------------------------------- rôles personnalisés
+    Permission:
+      type: string
+      description: A permission of the catalog (`GET /api/roles/permissions`); new names may appear.
+      examples: [view, alerts.operate, monitors.manage, notifications.manage, status_pages.manage, maintenance.manage, reports.view]
+    PermissionInfo:
+      type: object
+      required: [id, label, description, implied, routes]
+      properties:
+        id: { $ref: "#/components/schemas/Permission" }
+        label: { type: string, description: English name. }
+        description: { type: string, description: English description. }
+        implied: { type: boolean, description: Always part of a custom role (`view`). }
+        routes:
+          type: array
+          items:
+            type: object
+            required: [method, path]
+            properties:
+              method: { type: string }
+              path: { type: string, description: "Path template, `*` matches one segment." }
+    CustomRole:
+      type: object
+      required: [id, name, description, permissions, users, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        description: { type: string }
+        permissions:
+          type: array
+          items: { $ref: "#/components/schemas/Permission" }
+        users: { type: integer, description: Accounts that have the role. }
+        created_at: { type: string }
+        updated_at: { type: string }
+    CustomRoleInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 64, description: Not the name of a built-in role. }
+        description: { type: string, maxLength: 500 }
+        permissions:
+          type: array
+          items: { $ref: "#/components/schemas/Permission" }
 
     # ----------------------------------------------------------- jetons
     TokenScope:
@@ -12779,6 +14256,10 @@ components:
             - type: "null"
             - $ref: "#/components/schemas/RelayRoute"
         open_gateway: { type: boolean, description: "The installed machine will be a relay: the commands carry `--open-gateway` / `-OpenGateway`, and the installer opens the gateway port on the local firewall, to the local subnet only." }
+        transport:
+          type: [string, "null"]
+          enum: [websocket, null]
+          description: "`websocket`: the commands carry `--transport=websocket` / `-Transport websocket`, and the agent reaches its encrypted channel through the web address (`GET /api/agent/ws`), its TLS session inside a WebSocket. `null`: nothing set; the agent tries the agent port first, then the WebSocket."
     RelayRoute:
       type: object
       required: [relay_id, relay_name, host, port, listening]
@@ -13001,6 +14482,11 @@ components:
         relay_id: { type: [integer, "null"], format: int64, description: "Install through this relay agent (a site behind a firewall): the commands point at its gateway, which the server asks the relay to open. The relay must belong to the same client." }
         relay_host: { type: [string, "null"], maxLength: 253, description: Address the site reaches the relay at (host name or IP, no scheme or port). }
         agent_port_only: { type: boolean, default: false, description: "Commands that use the agent port only (a remote site). Always on for a relay token." }
+        transport:
+          type: string
+          enum: [auto, websocket, direct]
+          default: auto
+          description: "Transport of the encrypted channel in the commands. `websocket`: through the web address (Cloudflare Tunnel, a reverse proxy that terminates TLS), the agent's TLS inside a WebSocket. `auto`: `websocket` when the browser address is served by another certificate than DumbMonit's and no dedicated agent address is set."
     CreatedAgentToken:
       allOf:
         - $ref: "#/components/schemas/AgentToken"
@@ -13014,6 +14500,10 @@ components:
               type: [string, "null"]
               enum: [own, proxy, trusted, null]
               description: Where the pin in the commands comes from; see `pin_source` of the install parameters.
+            transport:
+              type: [string, "null"]
+              enum: [websocket, null]
+              description: Transport the commands set; see `transport` of the install parameters.
     AgentAdKitCreate:
       type: object
       required: [domain]
@@ -13480,7 +14970,7 @@ components:
         setup_completed: { type: boolean }
         setup_completed_at: { type: [string, "null"], description: UTC without suffix. }
         name: { type: string, maxLength: 80, description: Empty shows "DumbMonit". }
-        language: { type: string, description: "Default interface language (`en`, `fr`, `de`, `es`, `it`, `pt`, `pt-BR`, `ru`, `zh-Hans`); empty follows the browser." }
+        language: { type: string, description: "Default interface language (`en`, `fr`, `de`, `es`, `it`, `pt`, `pt-BR`, `ru`, `zh-Hans`, `ja`, `ko`, `nl`, `pl`, `tr`); empty follows the browser." }
         timezone: { type: string, description: IANA time zone; empty means UTC. }
         accent: { type: string, pattern: '^(#[0-9a-fA-F]{6})?$', description: "Accent colour of the interface (solid buttons, focus ring) as `#rrggbb`, stored in lower case; empty is the default look. Status colours never change. Included in the backup." }
         oncall_enabled: { type: boolean, description: "On-call schedules are turned on. Off by default (`false` also when the field is missing); turned on at upgrade for an instance that already has a schedule, an escalation policy or an on-call channel. Off, the schedules, policies and channels are kept but inactive: the alerting engine no longer starts escalations through on-call channels and the interface hides the feature." }
@@ -13521,6 +15011,10 @@ components:
           additionalProperties: { type: string }
         group_name: { type: string, description: "Flat folder shown on `/targets`; empty: no folder." }
         note: { type: string, description: "Free-text note for humans (owner, location, what to do when it is down). Empty: none." }
+        channels:
+          type: array
+          description: "Notification channels of this device: an alert its rule sends to every channel goes to these only (a rule that names its own channels keeps them). Empty: every channel, as before."
+          items: { type: integer, format: int64 }
         created_at: { type: [string, "null"], description: "Creation date, UTC without suffix." }
         position: { type: integer, format: int64, description: "Manual rank, tiebreaking only within the same state and folder." }
         location_id: { type: [integer, "null"], format: int64, description: "Location assigned on the world map; null: none (the device may still sit at one through its site, see `GET /api/locations`)." }
@@ -13540,6 +15034,67 @@ components:
           type: [string, "null"]
           enum: [down, config, null]
           description: "`down`: the device did not answer; `config`: our side (credentials, address, option)."
+    TargetBulkPatch:
+      type: object
+      description: What a bulk edit changes; a field left out stays as it is.
+      properties:
+        interval_secs: { type: integer, minimum: 10, maximum: 604800 }
+        channels:
+          description: "Notification channels of each device: replace the list, add to it or remove from it. An empty `set` goes back to the channels of the alert rules."
+          oneOf:
+            - type: object
+              required: [set]
+              properties: { set: { type: array, items: { type: integer, format: int64 } } }
+            - type: object
+              required: [add]
+              properties: { add: { type: array, items: { type: integer, format: int64 } } }
+            - type: object
+              required: [remove]
+              properties: { remove: { type: array, items: { type: integer, format: int64 } } }
+        tags:
+          type: object
+          properties:
+            add:
+              type: object
+              description: "Free tags to set (key: 1 to 64 characters without `=`; value: one line, at most 200 characters)."
+              additionalProperties: { type: string }
+            remove:
+              type: array
+              items: { type: string }
+        group_name: { type: string, maxLength: 60, description: "Destination folder; empty: no folder." }
+    TargetBulkReport:
+      type: object
+      required: [updated, failed, results]
+      properties:
+        updated: { type: integer }
+        failed: { type: integer }
+        results:
+          type: array
+          items:
+            type: object
+            required: [id, ok]
+            properties:
+              id: { type: integer, format: int64 }
+              ok: { type: boolean }
+              error: { type: string, description: Why this device was left as it was. }
+    MonitorTemplate:
+      type: object
+      required: [id, name, kind, interval_secs, tags, channels, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        kind: { type: string }
+        interval_secs: { type: integer }
+        tags:
+          type: object
+          description: Options of the type and free tags; never a secret.
+          additionalProperties: { type: string }
+        channels:
+          type: array
+          description: Notification channels of a device created from it; empty means the channels of its alert rules.
+          items: { type: integer, format: int64 }
+        created_at: { type: string, description: "UTC, without suffix." }
+        updated_at: { type: string, description: "UTC, without suffix." }
     TargetManaged:
       type: object
       description: >-
@@ -13673,6 +15228,10 @@ components:
           additionalProperties: { type: string }
         group_name: { type: [string, "null"], description: "Flat folder shown on `/targets`. Empty or `null`: no folder. Absent on `PUT` keeps the folder." }
         location_id: { type: [integer, "null"], format: int64, description: "Location on the world map; `null`: none. Absent on `PUT` keeps the assignment." }
+        channels:
+          type: array
+          description: "Notification channels of this device (see `Target.channels`). Absent on `PUT` keeps them; `[]` goes back to the channels of the alert rules. A channel of another MSP client is refused."
+          items: { type: integer, format: int64 }
         multisite:
           description: "Probe from several locations (uptime monitors only, at least two locations, not combined with `via_agent`); `null`: one place. Absent on `PUT` keeps the setting."
           oneOf:
@@ -13852,6 +15411,11 @@ components:
           type: array
           description: Tickets opened for this alert by the Jira, GLPI, Zammad, GitHub Issues and GitLab Issues channels.
           items: { $ref: "#/components/schemas/AlertTicket" }
+        after_change:
+          oneOf:
+            - { $ref: "#/components/schemas/AlertAfterChange" }
+            - { type: "null" }
+          description: The change marker that preceded this alert by less than 30 minutes, if any.
     AlertTicket:
       type: object
       required: [channel_id, channel_name, kind, label, url, state]
@@ -13960,6 +15524,134 @@ components:
           type: array
           items: { $ref: "#/components/schemas/RuleOverride" }
         last_fired_at: { type: [string, "null"], description: "Last time the rule went to firing according to the alert history (RFC 3339, UTC); `null` when it never fired within the retained history." }
+    RuleBacktestRequest:
+      type: object
+      required: [rule]
+      properties:
+        rule: { $ref: "#/components/schemas/RulePayload" }
+        rule_id:
+          type: [integer, "null"]
+          format: int64
+          description: >-
+            The saved rule being edited: its identifier and per-device
+            overrides apply. Omitted for a rule not saved yet.
+        days: { type: integer, enum: [1, 7, 30], default: 7 }
+    RuleBacktestPeriod:
+      type: object
+      required: [start, end, peak]
+      properties:
+        start: { type: integer, format: int64, description: Unix seconds. }
+        end:
+          type: [integer, "null"]
+          format: int64
+          description: Unix seconds; null while still firing at the end of the window.
+        peak:
+          type: number
+          description: The worst value of the period (highest for > and >=, lowest for < and <=).
+    RuleBacktestSeries:
+      type: object
+      required: [series_key, target_id, target_name, threshold, clear_threshold, periods, notifications, absorbed, firing_secs, spark]
+      properties:
+        series_key: { type: string }
+        target_id: { type: [integer, "null"], format: int64 }
+        target_name: { type: string }
+        threshold: { type: number, description: Per-device override included. }
+        clear_threshold: { type: [number, "null"] }
+        periods:
+          type: array
+          items: { $ref: "#/components/schemas/RuleBacktestPeriod" }
+        notifications: { type: integer }
+        absorbed: { type: integer, description: Breaches that cleared before the hold duration. }
+        firing_secs: { type: integer, format: int64 }
+        spark:
+          type: array
+          description: The window summed up in at most 96 values (worst of each slice).
+          items: { type: number }
+    RuleBacktest:
+      type: object
+      required: [replayable, not_replayable, days, start, end, step_secs, interval_secs, coarsened, series_total, truncated, fired, notifications, absorbed, quiet_series, series]
+      properties:
+        replayable: { type: boolean }
+        not_replayable:
+          type: [object, "null"]
+          required: [code, reason]
+          properties:
+            code: { type: string, enum: [anomaly, log_pattern, forecast, drift, slo_burn] }
+            reason: { type: string }
+        days: { type: integer }
+        start: { type: integer, format: int64, description: Unix seconds. }
+        end: { type: integer, format: int64, description: Unix seconds. }
+        step_secs: { type: integer, description: Step of the replay. }
+        interval_secs: { type: integer, description: Evaluation interval of the engine. }
+        coarsened: { type: boolean, description: The step was widened to bound the cost. }
+        series_total: { type: integer, description: Series returned by the query after selector and overrides. }
+        truncated: { type: boolean, description: Not every series was replayed. }
+        fired: { type: integer, description: "Firing periods, all replayed series together." }
+        notifications: { type: integer }
+        absorbed: { type: integer }
+        quiet_series: { type: integer, description: Replayed series that would never have fired. }
+        series:
+          type: array
+          description: Series that would have fired, noisiest first.
+          items: { $ref: "#/components/schemas/RuleBacktestSeries" }
+    AlertNoiseStats:
+      type: object
+      required: [fired, notifications, acknowledged, resolved, mtta_secs, mttr_secs]
+      properties:
+        fired: { type: integer, description: Firing episodes in the window. }
+        notifications: { type: integer }
+        acknowledged: { type: integer, description: Episodes acknowledged or dismissed. }
+        resolved: { type: integer }
+        mtta_secs: { type: [integer, "null"], description: Mean time to acknowledge. }
+        mttr_secs: { type: [integer, "null"], description: Mean time to resolve. }
+    AlertNoise:
+      type: object
+      required: [days, since, truncated, overall, rules, flapping, teams]
+      properties:
+        days: { type: integer }
+        since: { type: string, description: "Start of the window, UTC without suffix." }
+        truncated:
+          type: boolean
+          description: More than 100,000 episodes in the window; the report covers the most recent.
+        overall: { $ref: "#/components/schemas/AlertNoiseStats" }
+        rules:
+          type: array
+          description: The 20 noisiest rules (notifications, then episodes).
+          items:
+            allOf:
+              - $ref: "#/components/schemas/AlertNoiseStats"
+              - type: object
+                required: [rule_uid, rule_id, rule_name, replayable]
+                properties:
+                  rule_uid: { type: string }
+                  rule_id: { type: [integer, "null"], format: int64, description: Null once the rule is deleted. }
+                  rule_name: { type: string }
+                  replayable: { type: boolean, description: The rule can be tested on history. }
+        flapping:
+          type: array
+          description: Alerts that fired at least 3 times, most state changes first (10 at most).
+          items:
+            type: object
+            required: [fingerprint, rule_uid, rule_id, rule_name, target_id, target_name, changes, firings]
+            properties:
+              fingerprint: { type: string }
+              rule_uid: { type: string }
+              rule_id: { type: [integer, "null"], format: int64 }
+              rule_name: { type: string }
+              target_id: { type: [integer, "null"], format: int64 }
+              target_name: { type: [string, "null"] }
+              changes: { type: integer, description: Transitions to firing or resolved. }
+              firings: { type: integer }
+        teams:
+          type: array
+          items:
+            allOf:
+              - $ref: "#/components/schemas/AlertNoiseStats"
+              - type: object
+                required: [team_id, team_name]
+                properties:
+                  team_id: { type: integer, format: int64 }
+                  team_name: { type: string }
     RulePayload:
       type: object
       required: [name, query]
@@ -14136,6 +15828,10 @@ components:
           type: string
           enum: [buttons, links, none]
           description: "How the channel shows the Acknowledge / Snooze action links: native buttons, links in the message, or not at all."
+        template_format:
+          type: string
+          enum: ["", plain, slack_mrkdwn, html, telegram_markdown_v2]
+          description: "Format of the channel's message templates, which decides how values are escaped; empty when the type takes no message template."
         settings:
           type: array
           items: { $ref: "#/components/schemas/ChannelField" }
@@ -14175,6 +15871,9 @@ components:
         last_error: { type: [string, "null"] }
         last_sent_at: { type: [string, "null"] }
         policy: { $ref: "#/components/schemas/ChannelPolicy" }
+        callback_url:
+          type: string
+          description: "With interactive buttons on Slack or Telegram and a public URL: where the platform sends button presses (paste it as the Slack app's Interactivity Request URL; DumbMonit registers it as the Telegram webhook). Absent otherwise."
     ChannelPayload:
       type: object
       required: [name, kind]
@@ -14310,6 +16009,22 @@ components:
         escalate_channel: { type: [integer, "null"], format: int64 }
         action_links: { type: boolean }
         resolutions_during_silence: { type: string, enum: [suppress, send] }
+    TemplatePreviewRequest:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, description: The channel type. }
+        title_template: { type: [string, "null"], description: "Empty or absent: the default, `{{title}}`." }
+        body_template: { type: [string, "null"], description: "Empty or absent: the default, `{{summary}}` then `{{url}}`." }
+    TemplatePreview:
+      type: object
+      required: [format, title, body, default_title, default_body]
+      properties:
+        format: { type: string, enum: [plain, slack_mrkdwn, html, telegram_markdown_v2] }
+        title: { type: string }
+        body: { type: string, description: In the service's format (escaped values). }
+        default_title: { type: string }
+        default_body: { type: string }
     AlertActionToken:
       type: object
       required: [token]
@@ -14868,6 +16583,76 @@ components:
                 minItems: 2
                 maxItems: 2
                 items: { type: number }
+    AnnotationScope:
+      description: >-
+        Where a marker applies: the whole instance (`global`), these monitors, a
+        folder with its subfolders, or the monitors carrying one of these tags
+        (`key` or `key=value`).
+      oneOf:
+        - type: object
+          required: [kind]
+          properties:
+            kind: { type: string, enum: [global] }
+        - type: object
+          required: [kind, targets]
+          properties:
+            kind: { type: string, enum: [monitors] }
+            targets: { type: array, items: { type: integer, format: int64 } }
+        - type: object
+          required: [kind, folder]
+          properties:
+            kind: { type: string, enum: [folder] }
+            folder: { type: string }
+        - type: object
+          required: [kind, tags]
+          properties:
+            kind: { type: string, enum: [tags] }
+            tags: { type: array, items: { type: string } }
+    Annotation:
+      type: object
+      required: [id, at, until, title, text, link, tags, scope, source, author, created_at]
+      properties:
+        id: { type: integer, format: int64 }
+        at: { type: string, description: "UTC without suffix, `2026-11-22 10:00:00`." }
+        until: { type: [string, "null"], description: End of the window; null for a single instant. }
+        title: { type: string }
+        text: { type: string }
+        link: { type: string, description: An http(s) address, or empty. }
+        tags: { type: array, items: { type: string } }
+        scope: { $ref: "#/components/schemas/AnnotationScope" }
+        source: { type: string, enum: [api, ui, ci] }
+        author: { type: string, description: "Account, or `token:name` for an API token." }
+        created_at: { type: string }
+    AnnotationPayload:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, maxLength: 200 }
+        text: { type: string, maxLength: 4000 }
+        at: { type: string, description: RFC 3339; now when omitted. }
+        until: { type: [string, "null"], description: RFC 3339; makes the marker a window. }
+        link: { type: string, description: An http(s) address. }
+        tags: { type: array, maxItems: 10, items: { type: string } }
+        scope: { $ref: "#/components/schemas/AnnotationScope" }
+        source: { type: string, enum: [api, ui, ci], description: "`api` for a token, `ui` for a session by default." }
+    AnnotationUpdate:
+      type: object
+      properties:
+        title: { type: string }
+        text: { type: string }
+        at: { type: string }
+        until: { type: [string, "null"] }
+        link: { type: string }
+        tags: { type: array, items: { type: string } }
+        scope: { $ref: "#/components/schemas/AnnotationScope" }
+    AlertAfterChange:
+      type: object
+      required: [id, title, at]
+      description: The marker of the same monitor that precedes the alert by less than 30 minutes.
+      properties:
+        id: { type: integer, format: int64 }
+        title: { type: string }
+        at: { type: string }
     IncidentPayload:
       type: object
       required: [title]
@@ -14895,6 +16680,28 @@ components:
           type: boolean
           default: true
           description: "`false` publishes the message without notifying subscribers."
+    StatusPageLanguages:
+      type: object
+      properties:
+        default_lang:
+          type: string
+          description: Default interface language of the page ("" means English).
+          enum: ["", en, de, es, fr, it, pt, pt-BR, ru, zh-Hans, ja, ko, nl, pl, tr]
+        translations:
+          type: array
+          items:
+            type: object
+            required: [lang]
+            properties:
+              lang: { type: string, enum: [en, de, es, fr, it, pt, pt-BR, ru, zh-Hans, ja, ko, nl, pl, tr] }
+              title: { type: string }
+              description: { type: string }
+              footer_text: { type: string }
+              labels:
+                type: object
+                additionalProperties: { type: string }
+                description: Written service or group name to its translation.
+
     PublicStatus:
       type: object
       required: [page, overall, generated_at, groups, incidents, maintenance]
@@ -14922,6 +16729,9 @@ components:
             show_calendar: { type: boolean, description: Present (true) only when the page shows the calendar. }
             show_latency: { type: boolean, description: Present (true) only when the page shows response times. }
             hide_branding: { type: boolean, description: "White label: the page names nothing of DumbMonit; the tab icon is the logo, or none." }
+            default_lang: { type: string, description: "Default interface language of the page (en when the admin set none)." }
+            lang: { type: string, description: "Language the page's own texts were served in." }
+            languages: { type: array, items: { type: string }, description: "Languages the admin translated the page's texts into." }
             seo:
               type: object
               description: Effective search-engine values (settings, or defaults built from the page name).
@@ -15388,11 +17198,25 @@ components:
           oneOf:
             - type: "null"
             - $ref: "#/components/schemas/GatewayCheck"
+        gateway_state:
+          description: "The gateway as the relay really opened it: requested and bound address, or why it could not listen. Null: no gateway asked, or an older relay."
+          type: [object, "null"]
+          properties:
+            wanted: { type: string, description: "Address asked (host:port)." }
+            listen: { type: [string, "null"], description: "Address really bound; null when opening failed." }
+            error: { type: [string, "null"], description: Why the port could not be opened. }
+            local: { type: boolean, description: "The address comes from `gateway_listen` in the relay's agent.yaml, which wins." }
+            encrypted: { type: boolean, description: The relay talks to the server on the encrypted channel (needed for tunnels). }
+        gateway_problem:
+          type: [string, "null"]
+          description: What keeps the gateway from accepting the site's machines, when known (an offline relay is shown elsewhere).
+          enum: [closed, too_old, offline, bind_failed, loopback, no_tunnel, null]
         server_link:
           description: "Server the agent uses when its configuration lists several (`server_urls`); null with a single address."
           oneOf:
             - type: "null"
             - $ref: "#/components/schemas/ServerLink"
+        via_websocket: { type: boolean, description: "Its last encrypted batch came through the agent WebSocket of the web address (`/api/agent/ws`, behind Cloudflare Tunnel or a proxy) rather than straight to the agent port. Seen by the server, not declared by the agent." }
     RebindWindow:
       type: object
       required: [rebind_until, minutes]
@@ -16187,6 +18011,81 @@ components:
             enabled: { type: boolean }
             interval_hours: { type: boolean }
             keep: { type: boolean }
+    BackupDestinationRequest:
+      type: object
+      required: [name, kind, settings]
+      properties:
+        name: { type: string, maxLength: 64 }
+        kind: { type: string, enum: [s3, webdav, sftp] }
+        enabled: { type: boolean, default: true }
+        keep: { type: integer, minimum: 1, maximum: 365, default: 7 }
+        include_key:
+          type: boolean
+          default: false
+          description: Upload `secret.key` with the database. Whoever reads the destination can then decrypt every stored credential.
+        settings:
+          type: object
+          description: >-
+            s3: `endpoint` (empty = AWS), `region`, `bucket`, `prefix`, `access_key_id`,
+            `path_style`. webdav: `url` (an existing folder), `username`. sftp: `host`, `port`,
+            `username`, `directory`, `host_key` (`SHA256:…`). Unknown fields are refused.
+          additionalProperties: true
+        secrets:
+          type: [object, "null"]
+          description: >-
+            s3: `secret_access_key`. webdav: `password`. sftp: `password` and/or `private_key`
+            (Ed25519 or ECDSA, OpenSSH format) with `key_passphrase`.
+          additionalProperties: { type: string }
+    BackupDestinationResult:
+      type: object
+      properties:
+        at: { type: string, description: UTC, no suffix. }
+        ok: { type: boolean }
+        file: { type: string }
+        bytes: { type: integer }
+        duration_ms: { type: integer }
+        error:
+          type: [string, "null"]
+          description: The failure, or on a success a remark (old copies not pruned).
+    BackupDestination:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        kind: { type: string, enum: [s3, webdav, sftp] }
+        enabled: { type: boolean }
+        keep: { type: integer }
+        include_key: { type: boolean }
+        settings: { type: object, additionalProperties: true }
+        has_secret: { type: boolean }
+        saved_secrets:
+          type: array
+          items: { type: string }
+          description: Names of the stored secret fields, never their values.
+        last:
+          oneOf:
+            - { $ref: "#/components/schemas/BackupDestinationResult" }
+            - { type: "null" }
+        last_success_at: { type: [string, "null"] }
+    BackupDestinationList:
+      type: object
+      properties:
+        destinations:
+          type: array
+          items: { $ref: "#/components/schemas/BackupDestination" }
+        uploading: { type: boolean }
+    BackupDestinationTest:
+      type: object
+      properties:
+        ok: { type: boolean }
+        message: { type: string }
+        duration_ms: { type: integer }
+        host_key:
+          type: [string, "null"]
+          description: SFTP fingerprint presented by the server when it is not the confirmed one.
+        host_key_changed:
+          type: boolean
+          description: True when another fingerprint was confirmed (reinstalled server, or impostor).
     ConfigRequest:
       type: object
       description: Either `yaml` or `config`.
@@ -17208,7 +19107,7 @@ components:
         disabled: { type: boolean }
         on_call: { type: boolean, description: On call right now on at least one schedule. }
         username: { type: string, description: Administrators and the person themselves only. }
-        role: { type: string, enum: [admin, operator, viewer], description: Administrators and the person themselves only. }
+        role: { type: string, enum: [admin, operator, viewer, wall], description: Administrators and the person themselves only. }
         contacts: { type: integer, description: Enabled contact methods. Administrators and the person themselves only. }
     OnCallEntry:
       type: object

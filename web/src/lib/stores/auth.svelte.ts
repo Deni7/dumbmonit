@@ -3,7 +3,8 @@
  *
  * Accounts have three roles: `admin` (everything), `operator` (reads everything
  * and handles alerts: ack, ignore, snooze — no configuration) and `viewer`
- * (read only). This
+ * (read only), plus `wall`, a wall display that only ever shows `/wall`. A
+ * viewer may also carry a custom role, whose permissions `can()` answers for. This
  * store is the single source of truth about the session. The cookie set by the
  * server is `HttpOnly`: the interface can neither read nor forge it, and stores
  * no token. The state is therefore deduced only from `GET /api/auth/status`
@@ -26,6 +27,7 @@ import {
 	type AccessInfo,
 	type MspAccess,
 	type HttpsStatus,
+	type Permission,
 	type User
 } from '#lib/api/index.js';
 import { signInWithPasskey } from '#lib/api/passkeys.js';
@@ -82,10 +84,11 @@ export const PUBLIC_ROUTES = ['/login', '/setup'];
 
 /**
  * Prefixes of pages served to anyone, outside the app shell: the public status
- * pages (`/s/<slug>`). They never redirect to sign-in, and never bounce a
+ * pages (`/s/<slug>`), and the pages a reset link or an invitation opens
+ * (`/reset`, `/invite`). They never redirect to sign-in, and never bounce a
  * signed-in user away either.
  */
-export const STANDALONE_PREFIXES = ['/s/', '/alert-action'];
+export const STANDALONE_PREFIXES = ['/s/', '/alert-action', '/reset', '/invite'];
 
 export function isStandaloneRoute(pathname: string): boolean {
 	return STANDALONE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
@@ -147,6 +150,8 @@ class AuthStore {
 	 * and the layout shows only that.
 	 */
 	totpSetupRequired = $state(false);
+	/** "Forgot password?" emails a reset link; otherwise it points to the docs. */
+	passwordReset = $state(false);
 	/** Error preventing us from knowing the session state (server unreachable). */
 	error = $state<unknown>(null);
 
@@ -167,7 +172,30 @@ class AuthStore {
 	 */
 	get canOperate(): boolean {
 		if (this.isAdmin) return true;
-		return this.user?.role === 'operator';
+		return this.user?.role === 'operator' || this.can('alerts.operate');
+	}
+
+	/**
+	 * True when the current user holds `permission` of the server's catalog:
+	 * admins hold them all; a custom role holds its own (`user.permissions`).
+	 * A convenience for hiding controls — the server checks every route.
+	 */
+	can(permission: Permission): boolean {
+		if (this.isAdmin) return true;
+		return this.user?.permissions?.includes(permission) ?? false;
+	}
+
+	/** True when the current user may schedule and edit maintenance windows. */
+	get canSilence(): boolean {
+		return this.canOperate || this.can('maintenance.manage');
+	}
+
+	/**
+	 * True for a wall-display account (`wall` role): it signs in straight to
+	 * `/wall`, the layout keeps it there, and the server answers nothing else.
+	 */
+	get isWall(): boolean {
+		return this.available && this.configured && this.user?.role === 'wall';
 	}
 
 	/**
@@ -202,6 +230,7 @@ class AuthStore {
 
 	/** Badge shown on configuration screens the current user cannot change. */
 	get readOnlyLabel(): string {
+		if (this.user?.custom_role) return this.user.custom_role.name;
 		return this.user?.role === 'operator' ? 'Operator — config is admin only' : 'Viewer — read only';
 	}
 
@@ -252,6 +281,7 @@ class AuthStore {
 			this.demo = state.demo;
 			this.https = state.https;
 			this.totpSetupRequired = state.totpSetupRequired;
+			this.passwordReset = state.passwordReset === true;
 			this.error = null;
 			const rights = state.user ? await getMyRights(signal) : { access: null, msp: null };
 			this.access = rights.access;

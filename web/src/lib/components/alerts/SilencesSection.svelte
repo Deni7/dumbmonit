@@ -9,7 +9,7 @@
 	 * removing: the window stays in the list until it expires.
 	 */
 	import type { Silence, Target } from '#lib/api/index.js';
-	import { Confirm, EmptyState, Plate, Button, Menu } from '#lib/ui/index.js';
+	import { EmptyState, Plate, Button } from '#lib/ui/index.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import { CalendarClock, Search } from 'lucide-svelte';
 	import { formatDateTime, parseServerDate } from '#lib/format.js';
@@ -17,6 +17,8 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import FileManagedBadge from '#lib/components/settings/FileManagedBadge.svelte';
 	import Segmented from '#lib/components/devices/Segmented.svelte';
+	import SilenceActions from './SilenceActions.svelte';
+	import SilenceCalendar from './SilenceCalendar.svelte';
 
 	interface Props {
 		silences: Silence[];
@@ -30,6 +32,8 @@
 		onextend?: (silence: Silence, minutes: number) => void;
 		onedit?: (silence: Silence) => void;
 		onduplicate?: (silence: Silence) => void;
+		/** A click on an empty day of the calendar: schedule a window there (`YYYY-MM-DD`). */
+		oncreateday?: (day: string) => void;
 	}
 
 	let {
@@ -42,8 +46,17 @@
 		onend,
 		onextend,
 		onedit,
-		onduplicate
+		onduplicate,
+		oncreateday
 	}: Props = $props();
+
+	type View = 'list' | 'month' | 'week';
+	let view = $state<View>('list');
+	const viewOptions = $derived([
+		{ id: 'list' as const, label: m.w5calendar_view_list() },
+		{ id: 'month' as const, label: m.w5calendar_view_month() },
+		{ id: 'week' as const, label: m.w5calendar_view_week() }
+	]);
 
 	type Quick = 'all' | 'active' | 'scheduled' | 'recurring';
 	let search = $state('');
@@ -82,17 +95,6 @@
 			return true;
 		})
 	);
-
-	/** Only a one-off window has an end to move. */
-	function isOneOff(silence: Silence): boolean {
-		return silence.schedule.kind === 'once';
-	}
-
-	const EXTENSIONS = $derived([
-		{ minutes: 30, label: m.w1alerts_silences_extend_30() },
-		{ minutes: 60, label: m.w1alerts_silences_extend_60() },
-		{ minutes: 240, label: m.w1alerts_silences_extend_240() }
-	]);
 </script>
 
 {#if silences.length === 0}
@@ -102,12 +104,35 @@
 		description={m.alerts_silences_empty_description()}
 	>
 		{#snippet action()}
-			{#if auth.canOperate}
+			{#if auth.canSilence}
 				<Button variant="primary" onclick={onschedule}>{m.alerts_silences_schedule()}</Button>
 			{/if}
 		{/snippet}
 	</EmptyState>
 {:else}
+	<div class="mb-3">
+		<Segmented
+			options={viewOptions}
+			value={view}
+			onchange={(next) => (view = next)}
+			label={m.w5calendar_view_label()}
+			size="sm"
+		/>
+	</div>
+	{#if view !== 'list'}
+		<SilenceCalendar
+			{silences}
+			{view}
+			{removingId}
+			{busyId}
+			{onremove}
+			{onend}
+			{onextend}
+			{onedit}
+			{onduplicate}
+			{oncreateday}
+		/>
+	{:else}
 	{#if silences.length > 3}
 		<div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center">
 			<label class="relative min-w-0 flex-1 sm:max-w-sm">
@@ -131,9 +156,8 @@
 			/>
 		</div>
 	{/if}
-	{#if shown.length === 0}
-		<p class="py-3 text-[0.8125rem] text-ink-2" aria-live="polite">{m.w1alerts_silences_nomatch()}</p>
-	{/if}
+	<!-- Always in the page, so a search that empties the list is announced. -->
+	<p class="py-3 text-[0.8125rem] text-ink-2 empty:hidden" aria-live="polite">{#if shown.length === 0}{m.w1alerts_silences_nomatch()}{/if}</p>
 	<div class="space-y-2.5">
 		{#each shown as silence, i (silence.id)}
 			<div
@@ -147,7 +171,7 @@
 						{:else}
 							<Plate tone="ghost" label={m.alerts_silences_scheduled()} />
 						{/if}
-						<span class="truncate font-semibold text-ink">{silence.name}</span>
+						<span class="min-w-0 truncate font-semibold text-ink" title={silence.name}>{silence.name}</span>
 						<FileManagedBadge kind="silence" id={silence.name} />
 					</div>
 					<!-- Phones: scope and the one date that matters (until / next), no separators, no comment. -->
@@ -167,66 +191,9 @@
 						<p class="mt-1 text-[0.8125rem] text-ink-2 max-sm:hidden">{silence.comment}</p>
 					{/if}
 				</div>
-				{#if auth.canOperate}
-					<div class="flex flex-wrap items-center gap-1.5">
-						{#if silence.active_now && isOneOff(silence)}
-							<Button
-								size="sm"
-								variant="secondary"
-								loading={busyId === silence.id}
-								disabled={busyId !== null}
-								onclick={() => onend?.(silence)}
-							>
-								{m.w1alerts_silences_end_now()}
-							</Button>
-							<Menu label={m.w1alerts_silences_extend()} align="right">
-								{#snippet trigger({ toggle, open })}
-									<Button
-										size="sm"
-										variant="ghost"
-										aria-haspopup="menu"
-										aria-expanded={open}
-										disabled={busyId !== null}
-										onclick={toggle}
-									>
-										{m.w1alerts_silences_extend()}
-									</Button>
-								{/snippet}
-								{#snippet children({ close })}
-									<div class="grid gap-1">
-										{#each EXTENSIONS as option (option.minutes)}
-											<Button
-												size="sm"
-												variant="ghost"
-												class="!justify-start"
-												onclick={() => {
-													close();
-													onextend?.(silence, option.minutes);
-												}}
-											>
-												{option.label}
-											</Button>
-										{/each}
-									</div>
-								{/snippet}
-							</Menu>
-						{/if}
-						{#if silence.schedule.kind !== 'recovery'}
-							<Button size="sm" variant="ghost" onclick={() => onedit?.(silence)}>{m.w1alerts_silences_edit()}</Button>
-							<Button size="sm" variant="ghost" onclick={() => onduplicate?.(silence)}>{m.w1alerts_silences_duplicate()}</Button>
-						{/if}
-						<Confirm
-							size="sm"
-							variant="danger"
-							confirmLabel={m.alerts_silences_remove_confirm()}
-							loading={removingId === silence.id}
-							onconfirm={() => onremove(silence.id)}
-						>
-							{m.alerts_silences_remove()}
-						</Confirm>
-					</div>
-				{/if}
+				<SilenceActions {silence} {removingId} {busyId} {onremove} {onend} {onextend} {onedit} {onduplicate} />
 			</div>
 		{/each}
 	</div>
+	{/if}
 {/if}

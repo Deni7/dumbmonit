@@ -1117,6 +1117,22 @@
 	"deviceform_channelcheck_dns_title": "Имя {host} не разрешается",
 	"deviceform_channelcheck_error": "Не удалось проверить канал агентов",
 	"deviceform_channelcheck_firewall": "Затем откройте TCP-порт {port} в межсетевом экране сервера (firewalld, ufw или Windows):",
+	"deviceform_channelcheck_gateway_bind_body": "Релей сообщает: {error}. Освободите порт {port} на релее или выберите другой порт шлюза в панели «Ретранслятор» на странице {relay}. Чтобы узнать, какая программа занимает порт на релее:",
+	"deviceform_channelcheck_gateway_bind_title": "{relay} не может открыть порт {port}",
+	"deviceform_channelcheck_gateway_closed_body": "Машины площадки подключаются через шлюз релея, а для этого релея он выключен. На странице {relay}, в панели «Ретранслятор», включите «{setting}» и сохраните: релей откроет его за несколько секунд.",
+	"deviceform_channelcheck_gateway_closed_title": "Шлюз {relay} выключен",
+	"deviceform_channelcheck_gateway_copy_listen": "Скопировать строку",
+	"deviceform_channelcheck_gateway_copy_owner": "Скопировать команды",
+	"deviceform_channelcheck_gateway_loopback_body": "agent.yaml на {relay} привязывает шлюз к петлевому интерфейсу, поэтому ни одна другая машина площадки не может до него достучаться. На релее замените строку gateway_listen на эту (или удалите её) и перезапустите агент:",
+	"deviceform_channelcheck_gateway_loopback_title": "{relay} слушает только {address}",
+	"deviceform_channelcheck_gateway_no_tunnel_body": "Его шлюз слушает, но {relay} достигает этого сервера только через веб-порт, поэтому не может передавать агентов площадки. Убедитесь, что {relay} достигает зашифрованного порта агентов сервера (опубликован в Docker и открыт в межсетевом экране): релей перейдёт на него сам.",
+	"deviceform_channelcheck_gateway_no_tunnel_title": "{relay} не использует зашифрованный канал агентов",
+	"deviceform_channelcheck_gateway_offline_body": "{relay} давно не выходил на связь, поэтому не может ни открыть шлюз, ни передавать через него трафик. Убедитесь, что его агент запущен и достигает этого сервера; проверка продолжится сама.",
+	"deviceform_channelcheck_gateway_offline_title": "{relay} не подключён",
+	"deviceform_channelcheck_gateway_open_relay": "Открыть страницу {relay}",
+	"deviceform_channelcheck_gateway_tested_by": "Проверено самим {relay} по адресу {address}, {when}. Эта проверка не проходит через межсетевой экран между машинами площадки и релеем.",
+	"deviceform_channelcheck_gateway_too_old_body": "Релей открывает шлюз начиная с агента {min}. Обновите агент на {relay} (на его странице или повторно выполнив команду установки); после этого проверка продолжится сама.",
+	"deviceform_channelcheck_gateway_too_old_title": "На {relay} работает агент {version}, в котором нет шлюза",
 	"deviceform_channelcheck_hairpin": "Проверка выполняется с самого сервера: за NAT без hairpin она может не пройти, хотя машины снаружи подключаются нормально.",
 	"deviceform_channelcheck_ok": "Зашифрованный канал агентов доступен по адресу {address} (TLS 1.3).",
 	"deviceform_channelcheck_refused_body": "Сервер не смог подключиться к собственному каналу агентов по адресу {address}: соединение отклонено. Агенты получат ту же ошибку.",
@@ -1133,6 +1149,12 @@
 	"deviceform_channelcheck_timeout_title": "Нет ответа на порту {port}",
 	"deviceform_channelcheck_tls_body": "По адресу {address} отвечает что-то другое, а не канал агентов DumbMonit. Проверьте, что порт {port} ведёт в контейнер DumbMonit.",
 	"deviceform_channelcheck_tls_title": "Порт {port} отвечает, но это не канал агентов",
+	"deviceform_channelcheck_use_direct": "Через порт агентов",
+	"deviceform_channelcheck_use_websocket": "Через веб-адрес (WebSocket)",
+	"deviceform_channelcheck_websocket_body": "Этот адрес проходит через туннель или обратный прокси. Он должен пересылать WebSocket в DumbMonit (заголовки Upgrade и Connection, без буферизации ответов, длинный тайм-аут чтения): см. «Агенты за прокси» в документации.",
+	"deviceform_channelcheck_websocket_hint": "Если этот порт открыть нельзя (Cloudflare Tunnel, обратный прокси, корпоративный межсетевой экран), агенты могут идти через веб-адрес: их зашифрованный канал тогда передаётся внутри WebSocket, по-прежнему из конца в конец.",
+	"deviceform_channelcheck_websocket_ok": "Агенты подключаются через адрес интерфейса {address}: их зашифрованный канал (TLS 1.3, клиентский сертификат) идёт внутри WebSocket. Открывать другие порты не нужно.",
+	"deviceform_channelcheck_websocket_title": "WebSocket агентов не отвечает по адресу {address}",
 	"deviceform_checksums_summary": "Контрольные суммы бинарных файлов (SHA-256) — установщик сверяет с ними загрузку",
 	"deviceform_cred_auth_label": "Аутентификация",
 	"deviceform_cred_choice_none": "Нет",
@@ -1709,6 +1731,9 @@
 	"devices_agent_binding": "Привязка",
 	"devices_agent_bound": "Привязан",
 	"devices_agent_bound_detail": "У этого агента есть собственный секрет. Никакая другая машина не может отправлять измерения от его имени или забирать его команды для контейнеров.",
+	"devices_agent_channel": "Канал",
+	"devices_agent_channel_websocket": "WebSocket через веб-адрес",
+	"devices_agent_channel_websocket_detail": "Его последний зашифрованный пакет пришёл через WebSocket веб-адреса (Cloudflare Tunnel, обратный прокси), а не напрямую на порт агентов. TLS-сессия внутри та же, из конца в конец.",
 	"devices_agent_err_rebind": "Не удалось открыть окно повторной регистрации",
 	"devices_agent_help_intro": "Выполните на самой машине, если агент не передаёт данные.",
 	"devices_agent_help_logs": "Последние журналы",
@@ -3693,6 +3718,7 @@
 	"devicesb_relay_panel_devices_one": "1 монитор",
 	"devicesb_relay_panel_devices_other": "мониторов: {count}",
 	"devicesb_relay_panel_gateway": "Шлюз для агентов этой площадки",
+	"devicesb_relay_panel_gateway_bind_failed": "Не удаётся слушать {address}: {error}",
 	"devicesb_relay_panel_gateway_check_failed": "Недоступен по адресу {address}: {error}",
 	"devicesb_relay_panel_gateway_check_ok": "Доступен по адресу {address} (проверено самим релеем)",
 	"devicesb_relay_panel_gateway_closed": "Закрыт",
@@ -3700,10 +3726,13 @@
 	"devicesb_relay_panel_gateway_host": "Адрес со стороны площадки",
 	"devicesb_relay_panel_gateway_host_help": "IP или локальное имя, записывается в команды установки.",
 	"devicesb_relay_panel_gateway_listening": "Слушает порт {port}",
+	"devicesb_relay_panel_gateway_loopback": "Слушает только {address}: машины площадки не могут до него достучаться. В agent.yaml релея используйте {line}.",
+	"devicesb_relay_panel_gateway_no_tunnel": "Релей ещё не использует зашифрованный канал агентов: шлюз не может передавать агентов площадки.",
 	"devicesb_relay_panel_gateway_opening": "Откроется, как только релей подключится",
 	"devicesb_relay_panel_gateway_port": "Порт",
 	"devicesb_relay_panel_gateway_port_invalid": "От 1 до 65535.",
 	"devicesb_relay_panel_gateway_state": "Шлюз",
+	"devicesb_relay_panel_gateway_too_old": "Агент {version} слишком старый, чтобы открыть шлюз: обновите его.",
 	"devicesb_relay_panel_gateway_tunnels": [
 		{
 			"declarations": [
@@ -7455,6 +7484,8 @@
 	"settings_ldap_user_filter_help": "{placeholder} заменяется введённым именем пользователя с экранированием, чтобы оно не могло изменить фильтр.",
 	"settings_ldap_username_attribute": "Атрибут имени пользователя",
 	"settings_ldap_viewer_groups": "Группы наблюдателей",
+	"settings_ldap_wall_groups": "Группы настенных экранов",
+	"settings_ldap_wall_groups_help": "Участники, не входящие ни в одну другую указанную группу, становятся настенными экранами: они видят только режим стены.",
 	"settings_logs_action_error": "Не удалось выполнить действие.",
 	"settings_logs_days_available": "Дней на диске",
 	"settings_logs_description": "Собственные журналы DumbMonit: хранятся на диске, экспортируются и пересылаются на ваш лог-сервер.",
@@ -8029,6 +8060,8 @@
 	"settings_saml_sp_heading": "Передайте поставщику",
 	"settings_saml_sp_help": "Большинство поставщиков принимают URL метаданных; иначе введите entity ID и URL ACS вручную.",
 	"settings_saml_title": "Вход через SAML",
+	"settings_saml_wall_groups": "Группы настенных экранов",
+	"settings_saml_wall_groups_help": "Через запятую. Участники, не входящие ни в группу администраторов, ни в группу операторов, становятся настенными экранами: они видят только режим стены.",
 	"settings_scim_action_error": "Изменение SCIM не удалось",
 	"settings_scim_base_url": "Базовый URL SCIM",
 	"settings_scim_base_url_help": "Укажите его у поставщика как URL клиента или коннектора, а токен ниже — как секрет.",
@@ -8284,6 +8317,8 @@
 	"settings_sso_title": "Единый вход",
 	"settings_sso_turn_off": "Отключить единый вход?",
 	"settings_sso_use_env": "Использовать значения из окружения?",
+	"settings_sso_wall_groups": "Группы настенных экранов",
+	"settings_sso_wall_groups_help": "Через запятую. Участники, не являющиеся ни администраторами, ни операторами, становятся настенными экранами: они видят только режим стены. Если заполнена только эта группа, она решает лишь о роли настенного экрана.",
 	"settings_tab_account": "Моя учётная запись",
 	"settings_tab_monitoring": "Мониторинг",
 	"settings_tab_notifications": "Уведомления",
@@ -8486,6 +8521,9 @@
 	"settings_users_role_operator_option": "Оператор — работает с оповещениями, без настройки",
 	"settings_users_role_viewer": "Наблюдатель",
 	"settings_users_role_viewer_option": "Наблюдатель — только чтение",
+	"settings_users_role_wall": "Настенный экран",
+	"settings_users_role_wall_help": "Для экрана на стене: после входа он сразу открывает режим стены и не может открыть ни другие страницы, ни настройки, ни данные. Сеанс длится, пока экран показывает стену; чтобы завершить его, отключите учётную запись, сбросьте её пароль или назначьте ей другую роль.",
+	"settings_users_role_wall_option": "Настенный экран — показывает только стену",
 	"settings_users_save": "Сохранить изменения",
 	"settings_users_save_error": "Не удалось сохранить пользователя",
 	"settings_users_search_label": "Поиск пользователей",
@@ -9900,6 +9938,9 @@
 	"w2ops_audit_action_logs_destination_updated": "Получатель журналов изменён",
 	"w2ops_audit_action_logs_exported": "Журналы экспортированы",
 	"w2ops_audit_action_logs_settings": "Настройки журналов изменены",
+	"w2ops_audit_action_monitor_template_created": "Шаблон монитора создан",
+	"w2ops_audit_action_monitor_template_deleted": "Шаблон монитора удалён",
+	"w2ops_audit_action_monitor_template_renamed": "Шаблон монитора переименован",
 	"w2ops_audit_action_netconfig_downloaded": "Конфигурация устройства скачана",
 	"w2ops_audit_action_netconfig_host_key_accepted": "Ключ SSH-хоста устройства принят",
 	"w2ops_audit_action_netconfig_revealed": "Секреты конфигурации устройства показаны",
@@ -9948,6 +9989,7 @@
 	"w2ops_audit_action_spotify_connected": "Spotify подключён",
 	"w2ops_audit_action_spotify_disconnected": "Spotify отключён",
 	"w2ops_audit_action_storage_settings": "Настройки хранилища изменены",
+	"w2ops_audit_action_targets_bulk_update": "Мониторы изменены массово",
 	"w2ops_audit_action_team_created": "Команда создана",
 	"w2ops_audit_action_team_deleted": "Команда удалена",
 	"w2ops_audit_action_team_settings": "Настройки команд изменены",
@@ -10002,6 +10044,842 @@
 	"w3audit_action_totp_recovery_regenerated": "Коды восстановления заменены",
 	"w3audit_action_user_signed_out": "Учётная запись вышла везде",
 	"w3tech_alerts_detail_slo": "SLO",
+	"w5alerting_backtest_absorbed": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Задержка поглотила {count} короткое превышение.",
+				"countPlural=few": "Задержка поглотила {count} коротких превышения.",
+				"countPlural=many": "Задержка поглотила {count} коротких превышений.",
+				"countPlural=other": "Задержка поглотила {count} короткого превышения."
+			}
+		}
+	],
+	"w5alerting_backtest_coarsened": "Оценка каждые {step} вместо каждых {interval}, чтобы проверка шла быстро: короткие задержки срабатывания приблизительны.",
+	"w5alerting_backtest_error": "Не удалось выполнить проверку.",
+	"w5alerting_backtest_fired": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Сработало бы {count} раз.",
+				"countPlural=few": "Сработало бы {count} раза.",
+				"countPlural=many": "Сработало бы {count} раз.",
+				"countPlural=other": "Сработало бы {count} раза."
+			}
+		}
+	],
+	"w5alerting_backtest_help": "Прогоняет эти настройки, сохранённые или нет, по уже накопленным измерениям — так, как их оценивает движок оповещений.",
+	"w5alerting_backtest_never_fired": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Не сработало бы за последние сутки.",
+				"countPlural=few": "Не сработало бы за последние {count} суток.",
+				"countPlural=many": "Не сработало бы за последние {count} суток.",
+				"countPlural=other": "Не сработало бы за последние {count} суток."
+			}
+		}
+	],
+	"w5alerting_backtest_not_anomaly": "Правила аномалий нельзя проверить на истории: они сравнивают каждое значение с базовой линией, выученной неделя за неделей.",
+	"w5alerting_backtest_not_drift": "Правила дрейфа нельзя проверить на истории: каждая оценка сравнивает значение с прошлыми неделями.",
+	"w5alerting_backtest_not_forecast": "Правила прогноза нельзя проверить на истории: каждая оценка экстраполирует измерения за несколько дней.",
+	"w5alerting_backtest_not_log_pattern": "Правила по шаблону журнала нельзя проверить на истории: они считают строки журнала, а не сохранённые измерения.",
+	"w5alerting_backtest_not_slo_burn": "Правила бюджета ошибок нельзя проверить на истории: они вычисляются из SLO, а не из сохранённого запроса.",
+	"w5alerting_backtest_notifications": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Это {count} уведомление.",
+				"countPlural=few": "Это {count} уведомления.",
+				"countPlural=many": "Это {count} уведомлений.",
+				"countPlural=other": "Это {count} уведомления."
+			}
+		}
+	],
+	"w5alerting_backtest_period": "С {start} по {end}, пик {peak}",
+	"w5alerting_backtest_period_more": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "и ещё {count} период",
+				"countPlural=few": "и ещё {count} периода",
+				"countPlural=many": "и ещё {count} периодов",
+				"countPlural=other": "и ещё {count} периода"
+			}
+		}
+	],
+	"w5alerting_backtest_period_open": "С {start}, всё ещё активно в конце, пик {peak}",
+	"w5alerting_backtest_quiet": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Ещё {count} ряд ни разу не пересёк порог.",
+				"countPlural=few": "Ещё {count} ряда ни разу не пересекли порог.",
+				"countPlural=many": "Ещё {count} рядов ни разу не пересекли порог.",
+				"countPlural=other": "Ещё {count} ряда ни разу не пересекли порог."
+			}
+		}
+	],
+	"w5alerting_backtest_run": "Проверить на истории",
+	"w5alerting_backtest_scope_note": "Учитывается только само правило: окна обслуживания, зависимости, подтверждения и настройки каналов не применяются.",
+	"w5alerting_backtest_series_notifications": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} уведомление",
+				"countPlural=few": "{count} уведомления",
+				"countPlural=many": "{count} уведомлений",
+				"countPlural=other": "{count} уведомления"
+			}
+		}
+	],
+	"w5alerting_backtest_series_periods": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Сработало {count} раз, всего {duration}",
+				"countPlural=few": "Сработало {count} раза, всего {duration}",
+				"countPlural=many": "Сработало {count} раз, всего {duration}",
+				"countPlural=other": "Сработало {count} раза, всего {duration}"
+			}
+		}
+	],
+	"w5alerting_backtest_show_all": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Показать все ряды ({count})",
+				"countPlural=few": "Показать все ряды ({count})",
+				"countPlural=many": "Показать все ряды ({count})",
+				"countPlural=other": "Показать все ряды ({count})"
+			}
+		}
+	],
+	"w5alerting_backtest_show_less": "Показать меньше",
+	"w5alerting_backtest_spark_label": "Значения, измеренные на {name}",
+	"w5alerting_backtest_title": "Проверить на истории",
+	"w5alerting_backtest_truncated": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Прогнаны только 100 рядов, чаще всего превышавших порог, из {count}.",
+				"countPlural=few": "Прогнаны только 100 рядов, чаще всего превышавших порог, из {count}.",
+				"countPlural=many": "Прогнаны только 100 рядов, чаще всего превышавших порог, из {count}.",
+				"countPlural=other": "Прогнаны только 100 рядов, чаще всего превышавших порог, из {count}."
+			}
+		}
+	],
+	"w5alerting_backtest_window": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Последние сутки",
+				"countPlural=few": "Последние {count} суток",
+				"countPlural=many": "Последние {count} суток",
+				"countPlural=other": "Последние {count} суток"
+			}
+		}
+	],
+	"w5alerting_backtest_window_label": "Период истории",
+	"w5alerting_noise_acknowledged": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "по {count} подтверждённому оповещению",
+				"countPlural=few": "по {count} подтверждённым оповещениям",
+				"countPlural=many": "по {count} подтверждённым оповещениям",
+				"countPlural=other": "по {count} подтверждённого оповещения"
+			}
+		}
+	],
+	"w5alerting_noise_edit_rule": "Изменить правило",
+	"w5alerting_noise_empty": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "За последний {count} день оповещений не было.",
+				"countPlural=few": "За последние {count} дня оповещений не было.",
+				"countPlural=many": "За последние {count} дней оповещений не было.",
+				"countPlural=other": "За последние {count} дня оповещений не было."
+			}
+		}
+	],
+	"w5alerting_noise_empty_help": "Пока настраивать нечего.",
+	"w5alerting_noise_error": "Не удалось загрузить отчёт о шуме.",
+	"w5alerting_noise_fired_label": "Сработавшие оповещения",
+	"w5alerting_noise_flap_changes": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} смена состояния",
+				"countPlural=few": "{count} смены состояния",
+				"countPlural=many": "{count} смен состояния",
+				"countPlural=other": "{count} смены состояния"
+			}
+		}
+	],
+	"w5alerting_noise_flap_on": "{rule} на {device}",
+	"w5alerting_noise_flapping_help": "Оповещения, сработавшие за период не менее 3 раз: порог возврата или более долгая задержка обычно их успокаивают.",
+	"w5alerting_noise_flapping_title": "Мигающие оповещения",
+	"w5alerting_noise_intro": "Какие правила срабатывают слишком часто и как быстро на оповещения реагируют — по истории оповещений.",
+	"w5alerting_noise_mtta": "До подтверждения: {delay}",
+	"w5alerting_noise_mtta_label": "Среднее время до подтверждения",
+	"w5alerting_noise_mttr": "До устранения: {delay}",
+	"w5alerting_noise_mttr_label": "Среднее время до устранения",
+	"w5alerting_noise_no_delay": "данных пока нет",
+	"w5alerting_noise_notifications_label": "Отправленные уведомления",
+	"w5alerting_noise_resolved": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "по {count} устранённому оповещению",
+				"countPlural=few": "по {count} устранённым оповещениям",
+				"countPlural=many": "по {count} устранённым оповещениям",
+				"countPlural=other": "по {count} устранённого оповещения"
+			}
+		}
+	],
+	"w5alerting_noise_row_fired": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "сработало {count} раз",
+				"countPlural=few": "сработало {count} раза",
+				"countPlural=many": "сработало {count} раз",
+				"countPlural=other": "сработало {count} раза"
+			}
+		}
+	],
+	"w5alerting_noise_row_notifications": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} уведомление",
+				"countPlural=few": "{count} уведомления",
+				"countPlural=many": "{count} уведомлений",
+				"countPlural=other": "{count} уведомления"
+			}
+		}
+	],
+	"w5alerting_noise_rules_help": "По числу отправленных уведомлений, включая напоминания и сообщения об устранении.",
+	"w5alerting_noise_rules_title": "Самые шумные правила",
+	"w5alerting_noise_tab": "Шум",
+	"w5alerting_noise_teams_title": "По командам",
+	"w5alerting_noise_test_rule": "Проверить на истории",
+	"w5alerting_noise_truncated": "Очень насыщенный период: отчёт охватывает 100 000 последних оповещений.",
+	"w5alerting_noise_window": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} день",
+				"countPlural=few": "{count} дня",
+				"countPlural=many": "{count} дней",
+				"countPlural=other": "{count} дня"
+			}
+		}
+	],
+	"w5alerting_noise_window_label": "Период",
+	"w5annot_alert_after_change": "После изменения: {title}",
+	"w5annot_audit_action_created": "Метка изменения добавлена",
+	"w5annot_audit_action_deleted": "Метка изменения удалена",
+	"w5annot_audit_action_updated": "Метка изменения изменена",
+	"w5annot_chart_open_link": "Открыть ссылку",
+	"w5annot_form_cancel": "Отмена",
+	"w5annot_form_error": "Не удалось добавить метку",
+	"w5annot_form_heading": "Добавить метку изменения",
+	"w5annot_form_link": "Ссылка (необязательно)",
+	"w5annot_form_link_help": "Запуск пайплайна, тикет или список изменений. Начинается с http:// или https://.",
+	"w5annot_form_link_invalid": "Введите веб-адрес, начинающийся с http:// или https://.",
+	"w5annot_form_save": "Добавить метку",
+	"w5annot_form_scope": "Относится к",
+	"w5annot_form_scope_all": "Все мониторы",
+	"w5annot_form_scope_this": "Только этот монитор",
+	"w5annot_form_text": "Подробности (необязательно)",
+	"w5annot_form_title": "Название",
+	"w5annot_form_title_placeholder": "Деплой v2.4.1",
+	"w5annot_form_title_required": "Укажите название метки.",
+	"w5annot_form_until": "До (необязательно)",
+	"w5annot_form_until_help": "Для изменения, которое длилось некоторое время, например деплоя на 10 минут.",
+	"w5annot_form_until_invalid": "Окончание должно быть корректным временем после начала.",
+	"w5annot_form_when": "Когда",
+	"w5annot_form_when_invalid": "Выберите корректное время.",
+	"w5annot_list_delete": "Удалить",
+	"w5annot_list_delete_confirm": "Удалить эту метку?",
+	"w5annot_list_link": "Открыть ссылку",
+	"w5annot_list_meta": "{source} · {author} · {scope}",
+	"w5annot_list_meta_anon": "{source} · {scope}",
+	"w5annot_list_window": "с {start} по {end}",
+	"w5annot_panel_add": "Добавить метку",
+	"w5annot_panel_empty": "За этот период нет меток изменений. Добавьте метку вручную или пусть их публикует ваш пайплайн.",
+	"w5annot_panel_list_label": "Метки изменений за этот период, сначала новые",
+	"w5annot_panel_title": "Метки изменений",
+	"w5annot_panel_toggle": "Показывать метки изменений на графиках",
+	"w5annot_panel_toggle_short": "На графиках",
+	"w5annot_scope_folder": "Папка {folder}",
+	"w5annot_scope_global": "Все мониторы",
+	"w5annot_scope_monitors": "Выбранные мониторы",
+	"w5annot_scope_tags": "Теги {tags}",
+	"w5annot_source_api": "API",
+	"w5annot_source_ci": "CI",
+	"w5annot_source_ui": "Вручную",
+	"w5backups_action_error": "Действие не выполнено",
+	"w5backups_add": "Добавить место хранения",
+	"w5backups_audit_destination_created": "Внешнее место хранения добавлено",
+	"w5backups_audit_destination_deleted": "Внешнее место хранения удалено",
+	"w5backups_audit_destination_tested": "Внешнее место хранения проверено",
+	"w5backups_audit_destination_updated": "Внешнее место хранения изменено",
+	"w5backups_delete": "Удалить",
+	"w5backups_delete_confirm": "Удалить? Уже загруженные копии останутся.",
+	"w5backups_edit": "Изменить",
+	"w5backups_edit_label": "Изменить {name}",
+	"w5backups_empty": "Мест хранения пока нет. Добавьте бакет S3, папку WebDAV или сервер SFTP, чтобы хранить копии вне этой машины.",
+	"w5backups_form_cancel": "Отмена",
+	"w5backups_form_edit_title": "Изменить {name}",
+	"w5backups_form_enabled": "Загружать после каждой копии",
+	"w5backups_form_include_key": "Также загружать ключ шифрования (secret.key)",
+	"w5backups_form_include_key_warning": "Любой, кто может читать это место, сможет расшифровать все сохранённые учётные данные. Без ключа храните secret.key сами в надёжном месте, иначе копии оттуда не восстановятся вместе с учётными данными.",
+	"w5backups_form_keep": "Хранить копий там",
+	"w5backups_form_keep_help": "Сверх этого числа старые копии в этом месте удаляются. Другие файлы там никогда не затрагиваются.",
+	"w5backups_form_keep_invalid": "Введите число от 1 до 365.",
+	"w5backups_form_kind": "Тип",
+	"w5backups_form_name": "Название",
+	"w5backups_form_name_required": "Дайте месту хранения название.",
+	"w5backups_form_new_title": "Новое внешнее место хранения",
+	"w5backups_form_port_invalid": "Введите порт от 1 до 65535.",
+	"w5backups_form_required": "Обязательно.",
+	"w5backups_form_save": "Сохранить место хранения",
+	"w5backups_form_save_error": "Не удалось сохранить место хранения",
+	"w5backups_form_secret_saved": "Сохранено. Оставьте пустым, чтобы не менять.",
+	"w5backups_form_secrets_replace": "Введённые здесь пароль или ключ заменят сохранённые; оставьте оба поля пустыми, чтобы их не менять.",
+	"w5backups_hostkey_changed": "Сервер предъявил другой ключ хоста, чем подтверждённый вами, поэтому ничего не отправлено. Если сервер переустановлен, подтвердите новый ключ; иначе кто-то может выдавать себя за него.",
+	"w5backups_hostkey_trust": "Подтвердить этот ключ",
+	"w5backups_hostkey_trust_confirm": "Заменить подтверждённый ключ?",
+	"w5backups_hostkey_unknown": "Ключ хоста этого сервера ещё не подтверждён, поэтому ничего не отправлено. Убедитесь, что отпечаток ниже принадлежит серверу (ssh-keygen -lf на сервере), затем подтвердите его.",
+	"w5backups_intro": "После каждой локальной резервной копии тот же файл загружается в эти места. Неудачная загрузка никогда не затрагивает локальную копию.",
+	"w5backups_kind_s3": "Совместимое с S3",
+	"w5backups_kind_sftp": "SFTP",
+	"w5backups_kind_webdav": "WebDAV",
+	"w5backups_last_failed": "Загрузка не удалась",
+	"w5backups_last_ok": "Загружено",
+	"w5backups_never": "Пока ничего не загружено: загрузится следующая локальная копия.",
+	"w5backups_password": "Пароль",
+	"w5backups_paused": "Приостановлено",
+	"w5backups_read_error": "Не удалось прочитать внешние места хранения",
+	"w5backups_s3_access_key": "Идентификатор ключа доступа",
+	"w5backups_s3_bucket": "Бакет",
+	"w5backups_s3_endpoint": "Адрес сервера",
+	"w5backups_s3_endpoint_help": "Оставьте пустым для AWS. Для MinIO, Backblaze B2, Wasabi или Cloudflare R2 — адрес сервера, который даёт провайдер.",
+	"w5backups_s3_path_style": "Запросы в стиле пути",
+	"w5backups_s3_path_style_help": "Нужно для MinIO, большинства собственных серверов и любого адреса, заданного IP-адресом.",
+	"w5backups_s3_prefix": "Папка в бакете",
+	"w5backups_s3_prefix_help": "Необязательно. Одна папка на каждый экземпляр DumbMonit: старые копии чистятся внутри неё.",
+	"w5backups_s3_region": "Регион",
+	"w5backups_s3_region_help": "Оставьте пустым для us-east-1. Cloudflare R2 использует auto.",
+	"w5backups_s3_secret_key": "Секретный ключ доступа",
+	"w5backups_section_destinations": "Внешние места хранения резервных копий и их учётные данные.",
+	"w5backups_sftp_auth_help": "Введите пароль, закрытый ключ или и то и другое.",
+	"w5backups_sftp_directory": "Удалённая папка",
+	"w5backups_sftp_directory_help": "Оставьте пустым для домашней папки учётной записи. Папка должна существовать.",
+	"w5backups_sftp_host": "Хост",
+	"w5backups_sftp_host_key": "Отпечаток ключа хоста",
+	"w5backups_sftp_host_key_help": "Необязательно: SHA256:… как выводит ssh-keygen -lf. Если оставить пустым, проверка покажет отпечаток сервера для подтверждения.",
+	"w5backups_sftp_key_passphrase": "Парольная фраза ключа",
+	"w5backups_sftp_port": "Порт",
+	"w5backups_sftp_private_key": "Закрытый ключ",
+	"w5backups_sftp_private_key_help": "Ed25519 или ECDSA в формате OpenSSH. Ключи RSA не принимаются.",
+	"w5backups_summary_failed": "Последняя загрузка не удалась",
+	"w5backups_summary_none": "Не настроено",
+	"w5backups_test": "Проверить",
+	"w5backups_test_failed": "Проверка не пройдена",
+	"w5backups_test_label": "Проверить {name}",
+	"w5backups_test_ok": "Проверка пройдена",
+	"w5backups_title": "Внешние копии",
+	"w5backups_uploading": "Загрузка…",
+	"w5backups_username": "Имя пользователя",
+	"w5backups_webdav_password_help": "В Nextcloud используйте пароль приложения.",
+	"w5backups_webdav_url": "Адрес папки",
+	"w5backups_webdav_url_help": "Папка должна существовать. В Nextcloud: https://cloud.example.com/remote.php/dav/files/me/Backups.",
+	"w5backups_with_key": "С secret.key",
+	"w5calendar_agenda_create": "Запланировать окно на этот день",
+	"w5calendar_agenda_empty": "В этот день обслуживания нет.",
+	"w5calendar_agenda_title": "Обслуживание на {date}",
+	"w5calendar_chip_time": "{start} – {end}",
+	"w5calendar_continues_after": "продолжается на следующий день",
+	"w5calendar_continues_before": "началось накануне",
+	"w5calendar_day_label_busy": "{date}, в этот день: {count}. Выберите, чтобы посмотреть.",
+	"w5calendar_day_label_empty": "{date}, обслуживания нет. Выберите, чтобы запланировать.",
+	"w5calendar_disabled": "Отключено",
+	"w5calendar_error_load": "Не удалось загрузить календарь.",
+	"w5calendar_grid_label": "Календарь обслуживания",
+	"w5calendar_kind_active": "Идёт",
+	"w5calendar_kind_past": "Прошло",
+	"w5calendar_kind_recurring": "Повторяется",
+	"w5calendar_kind_upcoming": "Предстоит",
+	"w5calendar_langs_add": "Добавить",
+	"w5calendar_langs_add_label": "Добавить язык",
+	"w5calendar_langs_add_placeholder": "Выберите язык",
+	"w5calendar_langs_default_help": "Используется для посетителей, чей язык браузера не входит в языки интерфейса.",
+	"w5calendar_langs_default_label": "Язык по умолчанию",
+	"w5calendar_langs_empty": "Переводов пока нет.",
+	"w5calendar_langs_error_load": "Не удалось загрузить переводы.",
+	"w5calendar_langs_error_save": "Не удалось сохранить переводы.",
+	"w5calendar_langs_field_description": "Описание",
+	"w5calendar_langs_field_footer": "Нижний колонтитул",
+	"w5calendar_langs_field_title": "Заголовок",
+	"w5calendar_langs_intro": "Написанные вами тексты можно показывать на других языках. Посетители видят язык своего браузера, если вы его перевели; пустое поле сохраняет исходный текст. Сообщения об инцидентах показываются как написаны и никогда не переводятся.",
+	"w5calendar_langs_names_heading": "Названия сервисов и групп",
+	"w5calendar_langs_remove": "Удалить язык: {language}",
+	"w5calendar_langs_save": "Сохранить переводы",
+	"w5calendar_langs_saved": "Переводы сохранены.",
+	"w5calendar_langs_section": "Переводы",
+	"w5calendar_langs_tabs_label": "Переведённые языки",
+	"w5calendar_legend_label": "Обозначения",
+	"w5calendar_more": "ещё {count}",
+	"w5calendar_nav_next": "Вперёд",
+	"w5calendar_nav_previous": "Назад",
+	"w5calendar_nav_today": "Сегодня",
+	"w5calendar_public_language": "Язык",
+	"w5calendar_view_label": "Вид обслуживания",
+	"w5calendar_view_list": "Список",
+	"w5calendar_view_month": "Месяц",
+	"w5calendar_view_week": "Неделя",
+	"w5chat_interactive_after_save_slack": "Сохраните канал, чтобы получить адрес для вставки в приложение Slack.",
+	"w5chat_interactive_after_save_telegram": "Сохраните канал: тогда DumbMonit зарегистрирует себя как вебхук бота.",
+	"w5chat_interactive_no_public_url": "Интерактивным кнопкам нужен публичный URL экземпляра по https (политика уведомлений). До тех пор сообщения сохраняют ссылки.",
+	"w5chat_interactive_slack_url_help": "В приложении Slack откройте Interactivity & Shortcuts, включите функцию и вставьте этот адрес в поле Request URL.",
+	"w5chat_interactive_slack_url_label": "URL запросов интерактивности",
+	"w5chat_interactive_telegram_url_help": "DumbMonit зарегистрировал этот адрес как вебхук бота при сохранении канала.",
+	"w5chat_interactive_telegram_url_label": "Вебхук бота",
+	"w5chat_template_body_label": "Сообщение",
+	"w5chat_template_format_html": "Почта: сообщение в HTML, тема — обычным текстом. Значения экранируются.",
+	"w5chat_template_format_plain": "Обычный текст: значения подставляются как есть.",
+	"w5chat_template_format_slack": "Форматирование Slack: *жирный*, _курсив_ и ссылки. Значения экранируются, поэтому имя устройства не может добавить форматирование.",
+	"w5chat_template_format_telegram": "MarkdownV2 Telegram: *жирный*, _курсив_, [текст](адрес). Ставьте обратную косую черту перед ( ) [ ] * _ ~ | >, если нужен сам символ; точки, дефисы и значения экранируются автоматически.",
+	"w5chat_template_heading": "Шаблон сообщения",
+	"w5chat_template_insert_aria": "Вставить {name}",
+	"w5chat_template_intro": "Измените заголовок и текст сообщений этого канала. Оставьте поле пустым, чтобы сохранить обычный текст.",
+	"w5chat_template_preview": "Предпросмотр на примере оповещения",
+	"w5chat_template_preview_loading": "Предпросмотр обновляется…",
+	"w5chat_template_preview_note": "В том виде, в каком его получает сервис, до применения форматирования.",
+	"w5chat_template_reset": "Вернуть шаблон по умолчанию",
+	"w5chat_template_state_custom": "Свой",
+	"w5chat_template_state_default": "По умолчанию",
+	"w5chat_template_title_label": "Заголовок",
+	"w5chat_template_variables": "Переменные",
+	"w5chat_template_variables_help": "Вставляет переменную в позицию курсора. Подойдёт и любой тег устройства, например tags.room.",
+	"w5monitors_bulkedit_apply": "Применить изменения",
+	"w5monitors_bulkedit_cancel": "Отмена",
+	"w5monitors_bulkedit_channel_off": "выключен",
+	"w5monitors_bulkedit_channels_add": "Добавить",
+	"w5monitors_bulkedit_channels_help_keep": "Каждый монитор сохраняет свои каналы.",
+	"w5monitors_bulkedit_channels_help_set": "Ничего не отмечено: возврат к каналам, которые выбирают правила оповещений.",
+	"w5monitors_bulkedit_channels_keep": "Оставить",
+	"w5monitors_bulkedit_channels_label": "Каналы оповещений",
+	"w5monitors_bulkedit_channels_none": "Пока нет ни одного канала оповещений. Добавьте его в настройках и вернитесь.",
+	"w5monitors_bulkedit_channels_remove": "Убрать",
+	"w5monitors_bulkedit_channels_set": "Заменить на",
+	"w5monitors_bulkedit_close": "Закрыть",
+	"w5monitors_bulkedit_done": "Обновлено мониторов: {count}",
+	"w5monitors_bulkedit_error": "Не удалось применить изменения",
+	"w5monitors_bulkedit_folder_label": "Папка",
+	"w5monitors_bulkedit_folder_name": "Имя папки",
+	"w5monitors_bulkedit_folder_new": "Новая папка…",
+	"w5monitors_bulkedit_interval_label": "Интервал проверки",
+	"w5monitors_bulkedit_keep": "Не менять",
+	"w5monitors_bulkedit_lead": "Выбрано: {count}. Применяется только то, что вы меняете здесь; всё остальное остаётся как есть.",
+	"w5monitors_bulkedit_nothing": "Пока нечего менять.",
+	"w5monitors_bulkedit_open": "Изменить",
+	"w5monitors_bulkedit_tag_add_help": "Введите ключ=значение, например room=rack-1. Параметр типа монитора нельзя добавить как тег.",
+	"w5monitors_bulkedit_tag_add_label": "Добавить тег",
+	"w5monitors_bulkedit_tag_key_needed": "Введите имя тега перед =.",
+	"w5monitors_bulkedit_tag_remove_label": "Убрать теги",
+	"w5monitors_bulkedit_tag_removing": "Убрать {key}",
+	"w5monitors_bulkedit_title": "Изменить выбранное",
+	"w5monitors_form_channel_n": "Канал {id} (удалён)",
+	"w5monitors_form_channels_help_all": "Ничего не отмечено: оповещения уходят во все каналы, которые выбирает их правило.",
+	"w5monitors_form_channels_help_some": "Оповещения, которые правило отправляет во все каналы, уходят только в отмеченные.",
+	"w5monitors_form_channels_label": "Каналы оповещений",
+	"w5monitors_form_template_notice": "Заполнено по шаблону {name}. Введите адрес и при необходимости учётные данные: шаблон их никогда не хранит.",
+	"w5monitors_template_add_from": "Добавить монитор по этому шаблону",
+	"w5monitors_template_done": "Готово",
+	"w5monitors_template_name_label": "Имя шаблона",
+	"w5monitors_template_save": "Сохранить шаблон",
+	"w5monitors_template_save_error": "Не удалось сохранить шаблон",
+	"w5monitors_template_save_lead": "Сохраняются тип, его параметры и теги, интервал проверки и каналы оповещений. Адрес и секреты — никогда.",
+	"w5monitors_template_save_open": "Сохранить как шаблон",
+	"w5monitors_template_save_title": "Сохранить как шаблон",
+	"w5monitors_template_saved": "Сохранено как шаблон {name}.",
+	"w5monitors_templates_delete": "Удалить {name}",
+	"w5monitors_templates_delete_confirm": "Удалить этот шаблон?",
+	"w5monitors_templates_error": "Не удалось изменить шаблоны",
+	"w5monitors_templates_rename": "Переименовать {name}",
+	"w5monitors_templates_rename_save": "Сохранить имя",
+	"w5monitors_templates_summary": "{kind}, каждые {interval}",
+	"w5monitors_templates_title": "По шаблону",
+	"w5monitors_templates_unknown_kind": "Неизвестный тип {kind}: установите его пакет, чтобы использовать этот шаблон.",
+	"w6accounts_audit_invitation_accepted": "Приглашение принято",
+	"w6accounts_audit_invitation_created": "Приглашение создано",
+	"w6accounts_audit_invitation_invalid_link": "Попытка использовать негодную ссылку приглашения",
+	"w6accounts_audit_invitation_resent": "Приглашение отправлено повторно",
+	"w6accounts_audit_invitation_revoked": "Приглашение отозвано",
+	"w6accounts_audit_notifications_personal": "Личные уведомления изменены",
+	"w6accounts_audit_recovery_settings": "Изменены настройки ссылок сброса и приглашений",
+	"w6accounts_audit_reset_completed": "Пароль сброшен по ссылке",
+	"w6accounts_audit_reset_ignored": "Запрошен сброс для неизвестной или неподходящей учётной записи",
+	"w6accounts_audit_reset_invalid_link": "Попытка использовать негодную ссылку сброса",
+	"w6accounts_audit_reset_link_created": "Создана ссылка сброса пароля",
+	"w6accounts_audit_reset_requested": "Ссылка сброса отправлена по почте",
+	"w6accounts_audit_reset_unavailable": "Запрошен сброс, когда отправка по почте недоступна",
+	"w6accounts_backup_section_accounts": "Настройки ссылок сброса и приглашений, ожидающие приглашения и личные уведомления каждой учётной записи.",
+	"w6accounts_forgot_back": "Назад ко входу",
+	"w6accounts_forgot_docs": "Другие способы вернуть доступ",
+	"w6accounts_forgot_failed": "Запрос не прошёл",
+	"w6accounts_forgot_intro": "Введите имя пользователя или адрес почты. Если учётную запись можно сбросить по почте, вы получите ссылку для выбора нового пароля.",
+	"w6accounts_forgot_login_help": "Учётные записи с входом через SSO или LDAP меняют пароль у своего поставщика.",
+	"w6accounts_forgot_login_label": "Имя пользователя или почта",
+	"w6accounts_forgot_login_required": "Введите имя пользователя или адрес почты.",
+	"w6accounts_forgot_sent_detail": "Если учётная запись найдена и её можно сбросить по почте, ссылка уже в пути. Она действует один раз и скоро истечёт.",
+	"w6accounts_forgot_sent_none": "Ничего через несколько минут? Загляните в спам или попросите администратора сбросить пароль.",
+	"w6accounts_forgot_sent_title": "Проверьте почту",
+	"w6accounts_forgot_submit": "Прислать ссылку",
+	"w6accounts_forgot_title": "Сброс пароля",
+	"w6accounts_forgot_too_many": "Слишком много запросов отсюда. Подождите несколько минут и попробуйте снова.",
+	"w6accounts_invite_check_failed": "Не удалось проверить приглашение",
+	"w6accounts_invite_failed": "Учётная запись не создана",
+	"w6accounts_invite_for": "Для {email}, до {until}.",
+	"w6accounts_invite_intro": "{inviter} приглашает вас с ролью «{role}».",
+	"w6accounts_invite_invalid_detail": "Срок истёк, оно уже использовано или отозвано. Попросите пригласившего отправить его снова.",
+	"w6accounts_invite_invalid_title": "Это приглашение больше не работает",
+	"w6accounts_invite_page_title": "Приглашение · DumbMonit",
+	"w6accounts_invite_sso_help": "Ваш поставщик должен подтвердить адрес {email}: учётная запись использует его как имя пользователя.",
+	"w6accounts_invite_sso_leaving": "Учётная запись создана. Переходим к вашему поставщику удостоверений…",
+	"w6accounts_invite_submit": "Создать учётную запись",
+	"w6accounts_invite_title": "Создайте учётную запись",
+	"w6accounts_invite_username_help": "Это вы будете вводить при входе. Без пробелов.",
+	"w6accounts_invites_add": "Пригласить",
+	"w6accounts_invites_copy": "Приглашение для {email}: скопируйте ссылку и отправьте её сами",
+	"w6accounts_invites_copy_link": "Скопировать ссылку",
+	"w6accounts_invites_create": "Создать приглашение",
+	"w6accounts_invites_create_error": "Приглашение не создано",
+	"w6accounts_invites_days": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} день",
+				"countPlural=few": "{count} дня",
+				"countPlural=many": "{count} дней",
+				"countPlural=other": "{count} дня"
+			}
+		}
+	],
+	"w6accounts_invites_description": "Приглашайте людей по почте с ролью и командами и задайте срок действия ссылок сброса и приглашений.",
+	"w6accounts_invites_email_failed": "Письмо не ушло: {error}",
+	"w6accounts_invites_empty": "Нет приглашений, ожидающих ответа.",
+	"w6accounts_invites_expired": "Истекло",
+	"w6accounts_invites_form_aria": "Новое приглашение",
+	"w6accounts_invites_hours": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} час",
+				"countPlural=few": "{count} часа",
+				"countPlural=many": "{count} часов",
+				"countPlural=other": "{count} часа"
+			}
+		}
+	],
+	"w6accounts_invites_invite_lifetime": "Срок приглашений",
+	"w6accounts_invites_load_error": "Не удалось загрузить приглашения",
+	"w6accounts_invites_minutes": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} минута",
+				"countPlural=few": "{count} минуты",
+				"countPlural=many": "{count} минут",
+				"countPlural=other": "{count} минуты"
+			}
+		}
+	],
+	"w6accounts_invites_resend": "Отправить снова",
+	"w6accounts_invites_reset_lifetime": "Срок ссылок сброса",
+	"w6accounts_invites_revoke": "Отозвать",
+	"w6accounts_invites_revoke_confirm": "Отозвать окончательно?",
+	"w6accounts_invites_row_error": "Приглашение не изменено",
+	"w6accounts_invites_row_expired": "Пригласил(а) {by}, истекло {when}",
+	"w6accounts_invites_row_pending": "Пригласил(а) {by}, истекает {when}",
+	"w6accounts_invites_row_teams": "Команды: {teams}",
+	"w6accounts_invites_search_kw": "пригласить приглашение почта ссылка сброс забыли пароль",
+	"w6accounts_invites_self_service": "«Забыли пароль?» по почте",
+	"w6accounts_invites_self_service_no_base": "Нужен публичный URL для ссылок: задайте его в политике уведомлений.",
+	"w6accounts_invites_self_service_no_mail": "Нужен почтовый сервер: настройте его в разделе «Уведомления».",
+	"w6accounts_invites_self_service_off": "Выключено: экран входа отсылает к документации.",
+	"w6accounts_invites_self_service_on": "Включено: ссылки ведут на {base}.",
+	"w6accounts_invites_send": "Отправить приглашение по почте",
+	"w6accounts_invites_send_no_mail": "Почтовый сервер не настроен: вы получите ссылку, чтобы скопировать и отправить её самостоятельно.",
+	"w6accounts_invites_sent": "Приглашение отправлено на {email}",
+	"w6accounts_invites_settings_error": "Настройки не сохранены",
+	"w6accounts_invites_teams": "Команды для вступления",
+	"w6accounts_invites_title": "Приглашения",
+	"w6accounts_link_shown": "Ссылка показана один раз — скопируйте её сейчас",
+	"w6accounts_mine_description": "Оповещения лично вам — в дополнение к каналам команды.",
+	"w6accounts_mine_email": "По почте",
+	"w6accounts_mine_email_no_address": "У вашей учётной записи нет адреса почты: попросите администратора добавить его.",
+	"w6accounts_mine_email_no_server": "На этом экземпляре ещё не настроен почтовый сервер.",
+	"w6accounts_mine_email_to": "На {email}.",
+	"w6accounts_mine_folders": "Папки",
+	"w6accounts_mine_folders_none": "Папок пока нет.",
+	"w6accounts_mine_load_error": "Не удалось загрузить ваши уведомления",
+	"w6accounts_mine_push": "На мои push-устройства",
+	"w6accounts_mine_push_devices": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Подписано {count} устройство.",
+				"countPlural=few": "Подписано {count} устройства.",
+				"countPlural=many": "Подписано {count} устройств.",
+				"countPlural=other": "Подписано {count} устройства."
+			}
+		}
+	],
+	"w6accounts_mine_push_none": "Устройств пока нет: включите push-уведомления для этого браузера выше.",
+	"w6accounts_mine_quiet_help": "В тихие часы до вас доходят только оповещения уровня «Тревога»; остальное остаётся в списке оповещений. Время — по часовому поясу этого браузера.",
+	"w6accounts_mine_resolved_help": "Выключено: вы узнаёте только о проблемах, но не об их устранении.",
+	"w6accounts_mine_save": "Сохранить",
+	"w6accounts_mine_save_error": "Уведомления не сохранены",
+	"w6accounts_mine_scope": "О чём",
+	"w6accounts_mine_scope_all": "Всё, что я вижу",
+	"w6accounts_mine_scope_all_help": "Все мониторы, которые видит ваша учётная запись.",
+	"w6accounts_mine_scope_no_team": "Вы пока не состоите ни в одной команде: до вас ничего не дойдёт.",
+	"w6accounts_mine_scope_pick": "Выбранные папки и метки",
+	"w6accounts_mine_scope_pick_help": "Монитор подходит, если он в одной из этих папок (включая вложенные) или имеет одну из этих меток.",
+	"w6accounts_mine_scope_teams": "Папки моих команд",
+	"w6accounts_mine_scope_teams_help": "Папки, открытые командами: {teams}.",
+	"w6accounts_mine_search_kw": "мои уведомления личные почта push тихие часы",
+	"w6accounts_mine_tags": "Метки",
+	"w6accounts_mine_tags_filter": "Фильтр меток",
+	"w6accounts_mine_tags_none": "У видимых вам мониторов нет меток.",
+	"w6accounts_mine_test": "Прислать тест",
+	"w6accounts_mine_test_email_failed": "Ошибка почты: {error}",
+	"w6accounts_mine_test_email_ok": "Тестовое письмо отправлено",
+	"w6accounts_mine_test_error": "Тест не отправлен",
+	"w6accounts_mine_test_push_failed": "Ошибка push: {error}",
+	"w6accounts_mine_test_push_ok": "Тестовый push доставлен",
+	"w6accounts_mine_title": "Мои уведомления",
+	"w6accounts_reset_check_failed": "Не удалось проверить ссылку",
+	"w6accounts_reset_done_detail": "Войдите с новым паролем. Все остальные сеансы этой учётной записи завершены.",
+	"w6accounts_reset_done_title": "Пароль изменён",
+	"w6accounts_reset_failed": "Пароль не изменён",
+	"w6accounts_reset_intro": "Для учётной записи {username}. Ссылка действует до {until}.",
+	"w6accounts_reset_invalid_detail": "Срок истёк, ссылка уже использована или заменена более новой. Запросите новую на экране входа.",
+	"w6accounts_reset_invalid_title": "Эта ссылка больше не работает",
+	"w6accounts_reset_note": "После сохранения все сеансы этой учётной записи будут завершены. Двухфакторная аутентификация остаётся включённой.",
+	"w6accounts_reset_page_title": "Сброс пароля · DumbMonit",
+	"w6accounts_reset_password": "Новый пароль",
+	"w6accounts_reset_submit": "Сохранить новый пароль",
+	"w6accounts_reset_title": "Выберите новый пароль",
+	"w6accounts_reset_to_login": "Ко входу",
+	"w6accounts_resetlink_button": "Ссылка сброса",
+	"w6accounts_resetlink_copy": "Ссылка сброса для {username}: скопируйте и передайте её",
+	"w6accounts_resetlink_expires": "Действует один раз, до {until}.",
+	"w6accounts_resetlink_sent": "Ссылка сброса для {username} отправлена на {email}",
+	"w6accounts_resetlink_title_copy": "Создаёт ссылку сброса, чтобы скопировать и передать",
+	"w6accounts_resetlink_title_email": "Отправляет ссылку сброса пароля на {email}",
+	"w6design_gate_checking": "Проверяем ссылку…",
+	"w6roles_audit_created": "Пользовательская роль создана",
+	"w6roles_audit_deleted": "Пользовательская роль удалена",
+	"w6roles_audit_updated": "Пользовательская роль изменена",
+	"w6roles_editor_cancel": "Отмена",
+	"w6roles_editor_create": "Создать роль",
+	"w6roles_editor_description": "Описание",
+	"w6roles_editor_edit_title": "Изменить {name}",
+	"w6roles_editor_err_name": "Укажите название роли.",
+	"w6roles_editor_implied": "всегда включено",
+	"w6roles_editor_name": "Название",
+	"w6roles_editor_new_title": "Новая роль",
+	"w6roles_editor_permissions": "Разрешения",
+	"w6roles_editor_save": "Сохранить роль",
+	"w6roles_editor_save_error": "Не удалось сохранить роль",
+	"w6roles_perm_alerts_help": "Подтверждать, игнорировать и заглушать оповещения, брать дежурства, добавлять отметки изменений и запускать действия по устранению — как оператор.",
+	"w6roles_perm_alerts_label": "Обработка оповещений",
+	"w6roles_perm_maintenance_help": "Планировать, изменять и удалять окна обслуживания.",
+	"w6roles_perm_maintenance_label": "Управление обслуживанием",
+	"w6roles_perm_monitors_help": "Создавать, изменять, импортировать и удалять мониторы, шаблоны мониторов, правила оповещений и SLO. Учётные данные устройств можно ввести, но не прочитать обратно.",
+	"w6roles_perm_monitors_label": "Управление мониторами",
+	"w6roles_perm_notifications_help": "Изменять каналы уведомлений, политику уведомлений и шаблоны сообщений. Почтовый сервер остаётся за администраторами.",
+	"w6roles_perm_notifications_label": "Управление уведомлениями",
+	"w6roles_perm_reports_help": "Читать запланированные отчёты и скачивать их PDF.",
+	"w6roles_perm_reports_label": "Просмотр отчётов",
+	"w6roles_perm_status_pages_help": "Изменять страницы статуса и публиковать инциденты. Пароли страниц и подписчики остаются за администраторами.",
+	"w6roles_perm_status_pages_label": "Управление страницами статуса",
+	"w6roles_perm_view_help": "Читать мониторы, оповещения, метрики и всё остальное, что доступно наблюдателю.",
+	"w6roles_perm_view_label": "Просмотр",
+	"w6roles_section_add": "Добавить роль",
+	"w6roles_section_admin_only": "Учётные записи, роли, команды, API-токены, единый вход, резервные копии и настройки экземпляра остаются за администраторами: никакое разрешение не открывает к ним доступ.",
+	"w6roles_section_delete": "Удалить",
+	"w6roles_section_delete_confirm": "Удалить безвозвратно?",
+	"w6roles_section_delete_error": "Не удалось удалить роль",
+	"w6roles_section_description": "Дайте учётной записи выбранные права, не делая её администратором. Пользовательская роль заменяет встроенную роль у учётных записей, которым она назначена.",
+	"w6roles_section_edit": "Изменить",
+	"w6roles_section_empty_body": "Встроенных ролей обычно достаточно. Создайте свою, когда кому-то нужно, например, изменять мониторы, не трогая учётные записи.",
+	"w6roles_section_empty_title": "Пользовательских ролей пока нет",
+	"w6roles_section_in_use": "Перед удалением назначьте её учётным записям другую роль.",
+	"w6roles_section_load_error": "Не удалось загрузить пользовательские роли",
+	"w6roles_section_read_only": "Только чтение",
+	"w6roles_section_search_kw": "пользовательская роль разрешения права делегировать доступ",
+	"w6roles_section_title": "Пользовательские роли",
+	"w6roles_section_users_count": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} учётная запись",
+				"countPlural=few": "{count} учётные записи",
+				"countPlural=many": "{count} учётных записей",
+				"countPlural=other": "{count} учётной записи"
+			}
+		}
+	],
+	"w6roles_users_custom_group": "Пользовательские роли",
+	"w6roles_users_custom_help": "Пользовательская роль заменяет встроенную: учётная запись получает ровно разрешения этой роли.",
+	"w6roles_users_custom_title": "Пользовательская роль",
 	"wall_band_problems": "Проблемы",
 	"wall_band_problems_note": "Критические оповещения и недоступные мониторы",
 	"wall_devices_aria": "Мониторы",
@@ -10094,6 +10972,9 @@
 	],
 	"wall_scene_world_hint": "Париж рисует город за панелью. «Нет» оставляет простую панель.",
 	"wall_scene_world_title": "Город за панелью",
+	"wall_sign_out": "Выйти",
+	"wall_sign_out_confirm": "Выйти на этом экране?",
+	"wall_sign_out_title": "Эта учётная запись — настенный экран: покинуть стену можно, только выйдя из системы.",
 	"wall_status_empty": "Пока нечего отслеживать",
 	"wall_status_no_critical": "Ничего критичного",
 	"wall_status_ok": "Всё в порядке",

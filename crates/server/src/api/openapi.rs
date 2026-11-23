@@ -91,13 +91,15 @@ mod tests {
 
     use super::*;
     use crate::auth::middleware::{TOKEN_DENIED, is_operator_route};
+    use crate::auth::permissions::Permission;
+    use crate::auth::wall::is_wall_route;
 
     /// Routes que la spécification ne décrit volontairement pas :
     ///
     /// - le protocole des agents (`/api/ingest`, `/api/agent/commands*`,
-    ///   `/api/agent/relay*`) : un échange entre le binaire de l'agent et le
-    ///   serveur, authentifié par un jeton d'enregistrement, que nul client n'a
-    ///   à appeler ;
+    ///   `/api/agent/relay*`, la WebSocket `/api/agent/ws`) : un échange entre
+    ///   le binaire de l'agent et le serveur, authentifié par un jeton
+    ///   d'enregistrement ou un certificat, que nul client n'a à appeler ;
     /// - les redirections de la connexion OIDC (`/api/auth/oidc/start` et
     ///   `/callback`) et SAML (`/api/auth/saml/start`, `/acs`, `/complete`), et
     ///   le retour de Spotify (`/api/music/spotify/callback`) :
@@ -116,6 +118,7 @@ mod tests {
         "/api/agent/relay/plan",
         "/api/agent/relay/backlog",
         "/api/agent/update/download/{name}",
+        "/api/agent/ws",
         "/api/auth/oidc/start",
         "/api/auth/oidc/callback",
         "/api/auth/saml/start",
@@ -145,6 +148,11 @@ mod tests {
                 | "/api/auth/setup"
                 | "/api/auth/login"
                 | "/api/auth/login/totp"
+                | "/api/auth/password-reset"
+                | "/api/auth/password-reset/check"
+                | "/api/auth/password-reset/complete"
+                | "/api/auth/invitations/check"
+                | "/api/auth/invitations/accept"
                 | "/api/auth/saml/metadata"
                 | "/api/auth/passkey/login/begin"
                 | "/api/auth/passkey/login/finish"
@@ -362,6 +370,179 @@ mod tests {
                     ));
                 }
             }
+        }
+        assert!(problems.is_empty(), "{}", problems.join("\n"));
+    }
+
+    /// `x-wall: true` est posé exactement sur les opérations que le garde ouvre
+    /// aux écrans muraux (`WALL_ROUTES`) : la liste publiée et la liste
+    /// appliquée ne peuvent pas diverger.
+    #[test]
+    fn the_wall_operations_match_the_guard() {
+        let spec = spec_value();
+        let mut problems = Vec::new();
+        for (path, item) in spec["paths"].as_object().expect("paths") {
+            let concrete: String = path
+                .split('/')
+                .map(|segment| if segment.starts_with('{') { "x" } else { segment })
+                .collect::<Vec<_>>()
+                .join("/");
+            for method in METHODS {
+                let Some(op) = item.get(method) else { continue };
+                let documented = op["x-wall"].as_bool().unwrap_or(false);
+                let http = axum::http::Method::from_bytes(method.to_uppercase().as_bytes())
+                    .expect("méthode");
+                let guarded = path.starts_with("/api/") && is_wall_route(&http, &concrete);
+                if documented != guarded {
+                    problems.push(format!(
+                        "{} {path} : x-wall {documented}, garde du mur {guarded}",
+                        method.to_uppercase()
+                    ));
+                }
+            }
+        }
+        assert!(problems.is_empty(), "{}", problems.join("\n"));
+    }
+
+    /// Chemin concret d'un gabarit de la spécification : un paramètre devient
+    /// un segment quelconque, non vide.
+    fn concrete(path: &str) -> String {
+        path.split('/')
+            .map(|segment| if segment.starts_with('{') { "x" } else { segment })
+            .collect::<Vec<_>>()
+            .join("/")
+    }
+
+    /// `x-permissions` est posé exactement sur les opérations que le garde
+    /// ouvre aux rôles personnalisés, permission par permission.
+    #[test]
+    fn the_permission_operations_match_the_guard() {
+        let spec = spec_value();
+        let mut problems = Vec::new();
+        for (path, item) in spec["paths"].as_object().expect("paths") {
+            let concrete = concrete(path);
+            for method in METHODS {
+                let Some(op) = item.get(method) else { continue };
+                let documented: Vec<&str> = op["x-permissions"]
+                    .as_array()
+                    .map(|names| names.iter().filter_map(Value::as_str).collect())
+                    .unwrap_or_default();
+                let http = axum::http::Method::from_bytes(method.to_uppercase().as_bytes())
+                    .expect("méthode");
+                let guarded: Vec<&str> = Permission::ALL
+                    .into_iter()
+                    .filter(|permission| {
+                        path.starts_with("/api/") && permission.allows(&http, &concrete)
+                    })
+                    .map(Permission::as_str)
+                    .collect();
+                if documented != guarded {
+                    problems.push(format!(
+                        "{} {path} : x-permissions {documented:?}, garde {guarded:?}",
+                        method.to_uppercase()
+                    ));
+                }
+            }
+        }
+        // Chaque route du catalogue est une opération décrite : pas de faute de
+        // frappe qui n'ouvrirait rien.
+        for permission in Permission::ALL {
+            for (method, pattern) in permission.routes() {
+                let found = spec["paths"].as_object().expect("paths").iter().any(|(path, item)| {
+                    item.get(method.to_lowercase()).is_some()
+                        && concrete(path) == format!("/api{}", pattern.replace('*', "x"))
+                });
+                if !found {
+                    problems.push(format!("{permission:?} : {method} {pattern} n'existe pas"));
+                }
+            }
+        }
+        assert!(problems.is_empty(), "{}", problems.join("\n"));
+    }
+
+    /// Écritures des domaines délégables que le catalogue laisse, sciemment, à
+    /// l'administrateur : secrets (serveur de courriel, jeton de poussée, clé
+    /// d'hôte), données personnelles (abonnés), gestes sur les machines
+    /// (agent, conteneurs, commandes), et la configuration des rapports.
+    const KEPT_FOR_ADMINS: &[(&str, &str)] = &[
+        ("PUT", "/api/notify/mail-server"),
+        ("POST", "/api/notify/mail-server/test"),
+        ("PUT", "/api/status-pages/{id}/access"),
+        ("PUT", "/api/status-pages/{id}/subscription"),
+        ("DELETE", "/api/status-pages/{id}/subscribers/{subscriber}"),
+        ("POST", "/api/reports/schedules"),
+        ("PUT", "/api/reports/schedules/{id}"),
+        ("DELETE", "/api/reports/schedules/{id}"),
+        ("POST", "/api/reports/schedules/{id}/send-test"),
+        ("POST", "/api/reports/schedules/{id}/retry"),
+        ("PUT", "/api/reports/logo"),
+        ("DELETE", "/api/reports/logo"),
+        ("POST", "/api/targets/{id}/agent/rebind"),
+        ("POST", "/api/targets/{id}/agent/uninstall"),
+        ("PUT", "/api/targets/{id}/agent/relay"),
+        ("PUT", "/api/targets/{id}/agent/modules/{module}"),
+        ("POST", "/api/targets/{id}/agent/event-rules"),
+        ("PUT", "/api/targets/{id}/agent/event-rules/{rule_id}"),
+        ("DELETE", "/api/targets/{id}/agent/event-rules/{rule_id}"),
+        ("PUT", "/api/targets/{id}/containers/{name}/policy"),
+        ("PUT", "/api/targets/{id}/containers/policy"),
+        ("POST", "/api/targets/{id}/containers/{name}/restart"),
+        ("POST", "/api/targets/{id}/containers/{name}/update"),
+        ("DELETE", "/api/targets/{id}/commands/{command_id}"),
+        ("POST", "/api/targets/{id}/push/regenerate"),
+        ("POST", "/api/targets/{id}/webchange/check"),
+        ("POST", "/api/targets/{id}/netconfig/fetch"),
+        ("POST", "/api/targets/{id}/netconfig/host-key/accept"),
+        ("PUT", "/api/targets/{id}/agent/sentinel"),
+        ("PUT", "/api/targets/{id}/luns/{lun}/consumer"),
+        ("DELETE", "/api/targets/{id}/luns/{lun}/consumer"),
+    ];
+
+    /// Une écriture ajoutée demain sous un domaine délégable (moniteurs,
+    /// alertes, notifications, pages de statut, incidents, SLO, rapports,
+    /// repères) doit être classée : ouverte par une permission, ou inscrite
+    /// dans [`KEPT_FOR_ADMINS`]. Elle reste fermée tant qu'on n'a pas choisi.
+    #[test]
+    fn every_write_of_a_delegable_area_is_classified() {
+        const AREAS: &[&str] = &[
+            "/api/targets",
+            "/api/monitor-templates",
+            "/api/alerts",
+            "/api/notify",
+            "/api/status-pages",
+            "/api/incidents",
+            "/api/slos",
+            "/api/reports",
+            "/api/annotations",
+        ];
+        let spec = spec_value();
+        let mut problems = Vec::new();
+        for (path, item) in spec["paths"].as_object().expect("paths") {
+            let in_area = AREAS.iter().any(|area| {
+                path == area || path.strip_prefix(area).is_some_and(|rest| rest.starts_with('/'))
+            });
+            for method in ["post", "put", "delete", "patch"] {
+                if item.get(method).is_none() {
+                    continue;
+                }
+                let http = axum::http::Method::from_bytes(method.to_uppercase().as_bytes())
+                    .expect("méthode");
+                let opened = Permission::ALL.into_iter().any(|p| p.allows(&http, &concrete(path)));
+                let kept = KEPT_FOR_ADMINS
+                    .iter()
+                    .any(|(m, p)| m.eq_ignore_ascii_case(method) && p == path);
+                let label = format!("{} {path}", method.to_uppercase());
+                if in_area && opened == kept {
+                    problems.push(format!("{label} : ouverte {opened}, réservée {kept}"));
+                }
+                if !in_area && kept {
+                    problems.push(format!("{label} : réservée hors des domaines délégables"));
+                }
+            }
+        }
+        for (method, path) in KEPT_FOR_ADMINS {
+            let present = spec["paths"][path].get(method.to_lowercase()).is_some();
+            assert!(present, "exclusion périmée : {method} {path}");
         }
         assert!(problems.is_empty(), "{}", problems.join("\n"));
     }

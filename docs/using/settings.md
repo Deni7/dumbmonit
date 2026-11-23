@@ -110,6 +110,34 @@ HTTPS (or localhost), Home Screen installation on iPhone and iPad, and the
 push service domains the server must reach. Full guide:
 [Push notifications (PWA)](push-notifications.md).
 
+## My notifications {#my-notifications}
+
+Alerts sent to you personally, on top of the team channels — every account
+sets its own, viewers and operators included (wall displays have no
+settings). Turn on **By email** (to your account's address, through the
+[email server](../notifications.md#email-server) of the instance; an admin
+adds the address in **Users**) and/or **On my push devices** (the devices
+subscribed under *Push notifications* just above), then choose:
+
+- **Send** — the minimum severity: everything, *Advisory and up*, or
+  *Warning only*.
+- **Same alert again no sooner than** — a minimum delay between two
+  messages for the same alert.
+- **Tell me when it clears** — off, you only hear about problems.
+- **About** — everything you can see, your teams' folders, or the folders
+  (sub-folders included) and tags you pick. Whatever the choice, an alert on
+  a monitor your teams do not show never reaches you.
+- **Quiet hours** — days and a time span in this browser's time zone, which
+  follows daylight saving. During quiet hours only *Warning* alerts reach
+  you; the rest is not sent to you and stays in the alert list.
+
+**Send me a test** tries each means saved as on. The rules of the channels
+apply here too: one message per monitor, flapping alerts held back, the
+hourly cap of the notification policy, and a recovery only for what was
+announced to you. Details in
+[Personal notifications](../notifications.md#personal-notifications). The
+choices are part of the backup.
+
 ## Users
 
 Admins only. The accounts that can sign in, and their role:
@@ -119,6 +147,7 @@ Admins only. The accounts that can sign in, and their role:
 | **Viewer** | yes | no | no |
 | **Operator** | yes | yes | no |
 | **Admin** | yes | yes | yes |
+| **Wall display** | only what the wall shows | no | no |
 
 A viewer sees every page with every control that would change something
 hidden. A few things stay admin only even to read: API and agent tokens,
@@ -148,13 +177,139 @@ at least one active admin, and the controls reflect that rule rather than
 reporting it as an error: the last admin cannot be demoted, disabled or
 deleted, and you cannot disable or delete your own account.
 
+**Reset link** (on the row of an account that signs in with a local
+password) creates a single-use link to `/reset`, where the person chooses a
+new password with the same rules as everywhere. It is emailed to the
+account's address when it has one and an email server is configured, and
+shown once in every case, to copy and hand over. A new link replaces the
+previous one. Using it signs the account out everywhere; two-factor
+authentication stays on. Single sign-on and LDAP accounts change their
+password with their provider, and wall displays get a new password through
+**Edit**: neither has a reset link.
+
+### Custom roles {#custom-roles}
+
+When a built-in role gives too much or too little, an admin defines a
+**custom role** under **Settings → Team & access → Custom roles**: a name,
+a description and a set of permissions picked from a fixed list. In
+**Users**, the role picker then offers the custom roles below the built-in
+ones; choosing one replaces the built-in role of that account.
+
+| Permission | What it opens |
+|---|---|
+| **View** | Everything a viewer reads. Always part of a custom role. |
+| **Handle alerts** | What an operator does: acknowledge, ignore and silence alerts, take on-call shifts, add change markers, run remediation actions already defined. |
+| **Manage monitors** | Create, edit, import and delete monitors, monitor templates, alert rules and SLOs, run a probe. Device credentials can be entered, never read back: options that look like secrets still read as `***`, and sending `***` back keeps the stored value. |
+| **Manage notifications** | Notification channels, the notification policy and message templates. Not the email server. |
+| **Manage status pages** | Status pages and incidents. Not the page password, nor the subscribers. |
+| **Manage maintenance** | Maintenance windows. |
+| **View reports** | Read the scheduled reports and download their PDF. |
+
+Accounts, roles, teams, API and agent tokens, single sign-on, LDAP and SCIM,
+backups, instance settings, the email server and actions on machines (agents,
+containers, remediation set-up) stay admin only: no permission opens them.
+The server checks every request against the role, route by route, and
+refuses anything the role does not list; the interface only hides what the
+account cannot do. Each permission's routes are listed by
+`GET /api/roles/permissions` and marked `x-permissions` in the
+[API specification](../reference/api.md).
+
+- Changing a role applies at once to every account that has it.
+- A role still given to an account cannot be deleted: give those accounts
+  another role first.
+- With teams, the permissions also set the ceiling of the account: *Manage
+  monitors* allows up to *manage* on its folders, *Handle alerts* or *Manage
+  maintenance* up to *operate*, anything else *read*. A team-restricted
+  account still only reaches the pages teams can use.
+- *Require two-factor for admins and operators* also covers accounts whose
+  custom role changes something.
+- A custom role is given in **Users**; single sign-on, LDAP and SCIM keep
+  handing out built-in roles. When the groups only say *viewer*, the custom
+  role of the account stays; when they make it an operator or an admin, the
+  custom role is removed.
+- Custom roles and who has them are part of the backup.
+- A wall display cannot have a custom role.
+
+### Invitations {#invitations}
+
+**Invite** asks for an email address, a role (viewer, operator or admin —
+a wall display is created with **Add user**) and the teams to join, and
+sends a link to `/invite`. There the person picks a username (the part of
+the address before `@` is suggested), a display name and a password, and is
+signed in at once. When single sign-on (OIDC or SAML) is enabled, the page
+also offers the provider's button: the account is then created without a
+password, with the invited address as username, and is linked at the first
+sign-in when the provider presents that address as verified. Without an
+email server, the link is shown once to copy and send yourself.
+
+Open invitations are listed under the form, expired ones included: **Send
+again** creates a new link with a new expiry (the previous link stops
+working), **Revoke** withdraws it. Inviting the same address again replaces
+the open invitation; an address already used by an account is refused.
+Only admins invite: team rights do not cover accounts.
+
+### Forgot password by email {#forgot-password}
+
+On the sign-in screen, **Forgot password?** asks for a username or an email
+address and emails a reset link when:
+
+- the switch **"Forgot password?" by email** in **Invitations** is on (it is
+  by default),
+- an [email server](../notifications.md#email-server) is configured,
+- and DumbMonit knows a safe address for the link: the public URL of the
+  [notification policy](../notifications.md) (or `DUMBMONIT_PUBLIC_URL`),
+  otherwise the address an admin last used to open these settings. The
+  address a stranger's browser sends is never used, so nobody can make
+  DumbMonit email a link that leads elsewhere.
+
+Otherwise the link points to the [FAQ](../faq.md#i-lost-the-password), as
+before. Only an active account with a local password and an email address
+gets a link — never a single sign-on, LDAP or wall-display account. The
+screen answers the same way, after the same delay, whether an account
+matches or not, and each request counts against a limit per address and per
+account. Links work once; a reset link lasts 30 minutes and an invitation 7
+days by default (**Reset links last** and **Invitations last**). The links
+hold a 256-bit secret, of which the server only keeps a hash. Every step —
+request, link created, reset, invitation created, resent, revoked, accepted,
+and attempts with an unusable link — is recorded in the
+[audit log](#audit-log). The settings and open invitations are part of the
+backup; reset links are not (they last half an hour).
+
+### Wall display accounts {#wall-display-accounts}
+
+The **Wall display** role is for a screen that stays on in a room (a TV, a
+lobby or control-room monitor). Signed in with such an account, the browser
+goes straight to [wall mode](wall.md) and stays there: every other address
+leads back to the wall, the wall's **Exit** becomes **Sign out** (two taps,
+so a stray one does nothing) and ++esc++ does nothing. Device tiles and
+problems on the wall are not links.
+
+The server enforces the same: the account reaches only what the wall reads
+(devices without their address, options or note, alerts, rules, metrics,
+incidents and maintenance windows, the instance name, the weather and the
+wall's music) and every other call answers `403`, reads included. Team
+rights limit which monitors it shows, as for any account. It cannot create
+API tokens, and a token whose owner becomes a wall display stops working.
+
+- **Session.** A wall display stays signed in as long as it shows the wall:
+  its session is renewed while it is in use, so `DUMBMONIT_SESSION_DAYS` is
+  how long it may stay switched off or idle before it has to sign in again.
+  Disable the account, reset its password, use **Sign out everywhere**, or
+  give it another role to sign the screen out: leaving the wall display role
+  closes its sessions at once.
+- **Two-factor.** The two-factor requirement below never applies to wall
+  displays: nobody stands in front of the screen to type a code.
+- **Single sign-on, LDAP and SCIM** can hand out the role too: see the
+  *Wall display groups* below and the [SCIM](scim.md) default role.
+
 ### Require two-factor for admins and operators
 
 The switch at the top of **Users** makes two-factor authentication mandatory
 for admins and operators who sign in with a local password. One of them
 without a second factor can, after signing in, only set it up (or sign out):
 the rest of the interface waits, and the API answers `403` with
-`"code": "totp_setup_required"` until it is done. Viewers are not concerned.
+`"code": "totp_setup_required"` until it is done. Viewers and wall displays
+are not concerned.
 Sign-ins through single sign-on (OIDC, SAML) and LDAP are exempt — the
 identity provider handles their multi-factor authentication — and so are
 passkey sign-ins, which already prove possession and the user. API tokens
@@ -187,10 +342,14 @@ exist can sign in until you turn it on.
 *Operator groups* the groups whose other members become operators; everyone
 else is a viewer. Leave both empty to keep managing roles under **Users**.
 With only *Operator groups* filled in, the groups never touch the admin role:
-admins stay admins, the others become operators or viewers. Roles are
+admins stay admins, the others become operators or viewers. *Wall display
+groups* lists the groups whose members, when they are neither admins nor
+operators, become [wall displays](#wall-display-accounts); filled in alone,
+it only decides that role (its members become wall displays, a wall display
+that leaves it becomes a viewer, other accounts keep their role). Roles are
 re-evaluated at each sign-in, except that the last active admin is never
-demoted. The matching environment variables are `DUMBMONIT_OIDC_ADMIN_GROUPS`
-and `DUMBMONIT_OIDC_OPERATOR_GROUPS`.
+demoted. The matching environment variables are `DUMBMONIT_OIDC_ADMIN_GROUPS`,
+`DUMBMONIT_OIDC_OPERATOR_GROUPS` and `DUMBMONIT_OIDC_WALL_GROUPS`.
 
 **Which account a sign-in lands on.** The identity is remembered by its
 provider subject after the first sign-in. On a first sign-in:

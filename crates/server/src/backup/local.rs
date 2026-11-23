@@ -523,7 +523,10 @@ pub fn spawn(state: crate::state::AppState) {
             }
             if since.elapsed() >= settings.interval {
                 since = tokio::time::Instant::now();
-                run_once(&state.pool, &settings).await;
+                let record = run_once(&state.pool, &settings).await;
+                // Copie hors site en tâche de fond : un envoi lent ou raté ne
+                // retarde ni ne défait la sauvegarde locale.
+                crate::backup::offsite::after_local_backup(&state, &settings, &record).await;
             }
             publish(&state).await;
         }

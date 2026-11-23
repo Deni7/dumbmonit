@@ -40,6 +40,7 @@ pub fn detect(config: &Config) -> AgentIdentity {
         self_update: None,
         relay_gateway: None,
         relay_gateway_check: None,
+        relay_gateway_state: None,
         server_link: None,
         // Relu du disque à chaque démarrage : ajouter un manifeste demande de
         // redémarrer l'agent, comme toute modification de agent.yaml.
@@ -178,6 +179,7 @@ mod tests {
             server_pin: None,
             plain_server_url: false,
             fallback_servers: Vec::new(),
+            transport: crate::ws::TransportMode::Auto,
             log_level: tracing::Level::INFO,
             proxy: crate::proxy::ProxyConfig::default(),
             deprecated_env: Vec::new(),

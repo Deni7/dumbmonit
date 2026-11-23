@@ -30,6 +30,7 @@ use sqlx::{Row, Sqlite, SqlitePool, Transaction};
 
 use crate::api::topology_edits::{self, CorrectionKind, RuleKind, RuleSpec, RuleStatus};
 use crate::backup::bundle::*;
+use crate::backup::monitor_templates as templates;
 use crate::collectors::agent;
 use crate::crypto::Cipher;
 
@@ -113,6 +114,8 @@ pub async fn restore(
         ..RestoreReport::default()
     };
 
+    // Les rôles personnalisés avant les comptes, qui les citent.
+    report.push(crate::backup::accounts::restore_roles(&mut tx, &bundle.accounts).await?);
     report.push(restore_users(&mut tx, cipher, bundle).await?);
     // Les clients avant le reste : leurs membres sont des comptes, et les
     // rattachements, appliqués à la fin, les désignent par leur nom.
@@ -124,6 +127,11 @@ pub async fn restore(
     let refs = target_ids(&mut tx).await?;
     report.push(restore_locations(&mut tx, bundle, &refs).await?);
     report.push(restore_teams(&mut tx, bundle).await?);
+    // Après les comptes et les équipes : les invitations citent des équipes,
+    // les notifications personnelles des comptes.
+    for section in crate::backup::accounts::restore(&mut tx, &bundle.accounts).await? {
+        report.push(section);
+    }
     report.push(restore_topology_corrections(&mut tx, bundle, &refs).await?);
     report.push(restore_topology_rules(&mut tx, bundle, &refs).await?);
     report.push(restore_lun_links(&mut tx, bundle, &refs).await?);
@@ -141,12 +149,20 @@ pub async fn restore(
     report.push(restore_auth_policy(&mut tx, bundle).await?);
     report.push(restore_agent_update_rollout(&mut tx, bundle).await?);
     report.push(restore_mail_server(&mut tx, cipher, bundle).await?);
+    let destinations = &bundle.backup_destinations;
+    report.push(crate::backup::offsite::bundle::restore(&mut tx, cipher, destinations).await?);
     report.push(restore_instance(&mut tx, bundle).await?);
     report.push(restore_silences(&mut tx, bundle, &refs).await?);
     report.push(restore_status_pages(&mut tx, bundle, &refs).await?);
     report.push(restore_report_schedules(&mut tx, bundle, &channels, &refs).await?);
     report.push(restore_report_logo(&mut tx, bundle).await?);
     report.push(restore_slos(&mut tx, bundle, &refs).await?);
+    report.push(templates::restore_templates(&mut tx, &bundle.monitor_templates, &channels).await?);
+    report.push(
+        templates::restore_target_channels(&mut tx, &bundle.target_channels, &refs, &channels)
+            .await?,
+    );
+    report.push(crate::backup::annotations::restore(&mut tx, &bundle.annotations, &refs).await?);
     report.push(restore_incidents(&mut tx, bundle).await?);
     report.push(restore_agent_tokens(&mut tx, bundle).await?);
     report.push(restore_api_tokens(&mut tx, bundle).await?);

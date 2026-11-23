@@ -110,7 +110,7 @@
 		<div class="rise-in" style="--rise-delay: 0ms">
 			<Panel id="status-pages" title={m.settings_tab_status()} description={m.status_list_description()} padded={false}>
 				{#snippet aside()}
-					{#if auth.isAdmin}
+					{#if auth.can('status_pages.manage')}
 						<Button variant="secondary" size="sm" href="/status/new">
 							<Plus class="size-4" aria-hidden="true" />
 							{m.status_list_new_page()}
@@ -119,7 +119,7 @@
 				{/snippet}
 				{#if pages.length === 0}
 					<div class="px-5 py-4">
-						<EmptyState icon={LayoutList} title={m.status_list_empty_title()} description={m.status_list_empty_description()} primary={auth.isAdmin ? { label: m.status_list_new_page(), href: '/status/new' } : undefined} />
+						<EmptyState icon={LayoutList} title={m.status_list_empty_title()} description={m.status_list_empty_description()} primary={auth.can('status_pages.manage') ? { label: m.status_list_new_page(), href: '/status/new' } : undefined} />
 					</div>
 				{:else}
 					<ul class="divide-y divide-line" role="list">
@@ -144,7 +144,7 @@
 											{m.status_list_open()}
 											<ExternalLink class="size-3.5" aria-hidden="true" />
 										</Button>
-										{#if auth.isAdmin}
+										{#if auth.can('status_pages.manage')}
 											<ClientAssign kind="status_page" id={item.id} />
 											<Button variant="ghost" size="sm" href={`/status/${item.id}`}>{m.status_list_edit()}</Button>
 											<Menu label={m.status_list_more()}>

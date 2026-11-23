@@ -20,8 +20,8 @@
 //! vol) :
 //!
 //! - un administrateur n'est jamais créé, modifié, désactivé ni supprimé : le
-//!   rôle des comptes créés est le réglage `default_role` (lecteur ou
-//!   opérateur), un compte existant de même identifiant n'est rattaché que s'il
+//!   rôle des comptes créés est le réglage `default_role` (lecteur, opérateur
+//!   ou écran mural), un compte existant de même identifiant n'est rattaché que s'il
 //!   n'est pas administrateur, et un administrateur n'est jamais inscrit dans
 //!   une équipe par SCIM ;
 //! - aucun mot de passe n'est lu : un compte provisionné se connecte par le SSO
@@ -1327,8 +1327,10 @@ async fn resolve_members(
                 .context("recherche d'un membre")?;
         match row {
             Some((id, role)) => {
+                // Un écran mural (`wall`) entre dans une équipe comme les
+                // autres : c'est elle qui limite les moniteurs qu'il affiche.
                 let provisionable =
-                    matches!(Role::parse(&role), Some(Role::Viewer | Role::Operator));
+                    matches!(Role::parse(&role), Some(Role::Viewer | Role::Operator | Role::Wall));
                 if provisionable && !out.contains(&id) {
                     out.push(id);
                 }
@@ -1952,7 +1954,9 @@ pub async fn put_settings(
     let mut config = scim::config(&state.pool).await?;
     if let Some(role) = payload.default_role.as_deref() {
         config.default_role = DefaultRole::parse(role).ok_or_else(|| {
-            AuthError::Invalid("The default role must be \"viewer\" or \"operator\".".into())
+            AuthError::Invalid(
+                "The default role must be \"viewer\", \"operator\" or \"wall\".".into(),
+            )
         })?;
     }
     let action = match (config.enabled, payload.enabled) {
