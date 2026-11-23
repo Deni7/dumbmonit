@@ -121,7 +121,9 @@ html.dark,
    component follows unchanged.
    --------------------------------------------------------------------------- */
 html.obsidian,
-html.obsidian .sp-preview-dark {
+html.obsidian .sp-preview-dark,
+/* The night band of the Hybrid overview dashboard: dark in both lights. */
+html.obsidian .dash-band {
 	color-scheme: dark;
 
 	--c-canvas: #07080a;
@@ -394,6 +396,18 @@ html.console-light[data-accent] {
 	--c-brand-ink: var(--accent-light-ink);
 	--c-brand-soft: color-mix(in srgb, var(--accent-light) 14%, transparent);
 	--c-series: var(--accent-light);
+}
+
+/* The Hybrid dashboard's night band keeps the dark accent in both lights. */
+html[data-accent] .dash-band {
+	--c-primary: var(--accent-dark);
+	--c-on-primary: var(--accent-dark-on);
+	--c-focus: var(--accent-dark);
+	--c-brand: var(--accent-dark);
+	--c-brand-on: var(--accent-dark-on);
+	--c-brand-ink: var(--accent-dark-ink);
+	--c-brand-soft: color-mix(in srgb, var(--accent-dark) 16%, transparent);
+	--c-series: var(--accent-dark);
 }
 
 /* Where the accent shows beyond the button: the active item of the side bar, the

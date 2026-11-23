@@ -34,6 +34,31 @@ The **health river** is one strip per monitor, one cell per slot of the range,
 the worst monitors on top. A state is always written next to a shape (circle up,
 diamond degraded, square down), never shown by colour alone.
 
+## Overview layouts {#overview-layouts}
+
+A small switch above the figures picks how the page is laid out. The choice is
+kept in the browser, so a wall screen and your laptop can show different ones.
+
+- **Classic**: the figures, what needs attention, what is coming up and the
+  fleet's response time, as described on this page.
+- **Command**: a console of widgets for a screen left open all day: problems
+  with their quick actions, alert volume and response times (MTTA, MTTR), a
+  fleet map with one hexagon per monitor, top consumers, SLOs, backups with
+  their last 14 runs, expiries and forecasts, service checks, maintenance,
+  agents, recent events and status pages.
+- **NOC**: site first, then category, then monitor. A sunburst and a
+  site × category matrix show where things break; problems are grouped by
+  site, and CPU, memory, disk and network each get a top 5.
+- **Hybrid**: a dark band on top, the same in both themes, holds the figures,
+  what to act on now and the next 14 days (maintenance windows, expiries, disk
+  forecasts, vulnerabilities, updates); under it, one card per site and the
+  rest of the widgets.
+
+A site is the set of monitors reached through one [relay](../install/remote-site.md);
+monitors watched directly by the server form one site named after the
+instance. In every view, a monitor that is not up carries a glyph or a shape
+(× down, ! degraded, ‖ paused) as well as its colour.
+
 ## The monitor table {#the-monitor-table}
 
 The table lists every monitor, worst first. It filters by state, type and text,

@@ -1,0 +1,370 @@
+{
+	"w9layout_backups_changed": "Modificato",
+	"w9layout_backups_duration": "Durata",
+	"w9layout_backups_empty": "Ancora nessun job di backup segnalato: qui compaiono quelli di PBS, Synology, restic, borg e Veeam.",
+	"w9layout_backups_engine": "Motore",
+	"w9layout_backups_failed": "Non riuscito",
+	"w9layout_backups_job": "Job",
+	"w9layout_backups_last_success": "Ultimo esito positivo",
+	"w9layout_backups_never": "Mai",
+	"w9layout_backups_ok": "OK",
+	"w9layout_backups_reports": "Report",
+	"w9layout_backups_running": "In corso",
+	"w9layout_backups_runs": "Ultime 14 esecuzioni",
+	"w9layout_backups_runs_failed": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Ultima esecuzione non riuscita",
+				"countPlural=other": "Ultime {count} esecuzioni, {failed} non riuscite"
+			}
+		}
+	],
+	"w9layout_backups_runs_ok": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Ultima esecuzione riuscita",
+				"countPlural=other": "Ultime {count} esecuzioni, tutte riuscite"
+			}
+		}
+	],
+	"w9layout_backups_stale": "Obsoleto",
+	"w9layout_backups_status": "Stato",
+	"w9layout_backups_sub_check": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} job, {check} da controllare",
+				"countPlural=other": "{count} job, {check} da controllare"
+			}
+		}
+	],
+	"w9layout_backups_sub_fresh": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} job, aggiornato",
+				"countPlural=other": "{count} job, tutti aggiornati"
+			}
+		}
+	],
+	"w9layout_backups_title": "Backup",
+	"w9layout_category_backups": "Backup",
+	"w9layout_category_network": "Rete",
+	"w9layout_category_other": "Altro",
+	"w9layout_category_servers": "Server",
+	"w9layout_category_services": "Servizi",
+	"w9layout_category_storage": "Storage",
+	"w9layout_count_up_of": "{up} / {total}",
+	"w9layout_fleet_empty": "Ancora nessun monitor: aggiungine uno e comparirà qui.",
+	"w9layout_health_degraded": "Degradato",
+	"w9layout_health_down": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} non attivo",
+				"countPlural=other": "{count} non attivi"
+			}
+		}
+	],
+	"w9layout_health_healthy": "Integro",
+	"w9layout_health_idle": "Niente sotto controllo",
+	"w9layout_hex_site_aria": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{site}: {up} monitor attivo su {count}, {down} non attivi",
+				"countPlural=other": "{site}: {up} monitor attivi su {count}, {down} non attivi"
+			}
+		}
+	],
+	"w9layout_hex_sub": "Una cella per monitor, per sede e categoria",
+	"w9layout_hex_title": "Mappa del parco",
+	"w9layout_hybrid_act_now": "Da gestire ora",
+	"w9layout_hybrid_band_label": "Ciò che richiede attenzione ora",
+	"w9layout_matrix_cell_degraded": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{up} / {total}, {count} degradato",
+				"countPlural=other": "{up} / {total}, {count} degradati"
+			}
+		}
+	],
+	"w9layout_matrix_cell_down": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{up} / {total}, {count} non attivo",
+				"countPlural=other": "{up} / {total}, {count} non attivi"
+			}
+		}
+	],
+	"w9layout_matrix_cell_paused": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{up} / {total}, {count} in pausa",
+				"countPlural=other": "{up} / {total}, {count} in pausa"
+			}
+		}
+	],
+	"w9layout_matrix_next_maintenance": "Prossima manutenzione",
+	"w9layout_matrix_none": "Nessuno",
+	"w9layout_matrix_site": "Sede",
+	"w9layout_matrix_sub": "Un segno per monitor",
+	"w9layout_matrix_title": "Stato per sede e categoria",
+	"w9layout_matrix_wan": "Latenza WAN, {range}",
+	"w9layout_matrix_wan_local": "Questa sede",
+	"w9layout_matrix_wan_none": "Ancora nessun dato",
+	"w9layout_monitor_title": "{name}, {kind}: {status}",
+	"w9layout_monitor_title_bare": "{name}: {status}",
+	"w9layout_ms": "{value} ms",
+	"w9layout_next_deadlines_link": "Tutte le scadenze",
+	"w9layout_next_empty": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Niente in programma o in scadenza nel prossimo {count} giorno.",
+				"countPlural=other": "Niente in programma o in scadenza nei prossimi {count} giorni."
+			}
+		}
+	],
+	"w9layout_next_maint_active": "Manutenzione in corso",
+	"w9layout_next_maint_meta": "Finestra di manutenzione, {duration}",
+	"w9layout_next_maintenance_link": "Manutenzione",
+	"w9layout_next_now": "Ora",
+	"w9layout_next_title": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Prossimo {count} giorno",
+				"countPlural=other": "Prossimi {count} giorni"
+			}
+		}
+	],
+	"w9layout_next_until": "fino alle {time}",
+	"w9layout_noc_problems_title": "Problemi per sede",
+	"w9layout_none_planned": "Nessuna prevista",
+	"w9layout_pct": "{value}%",
+	"w9layout_rate": "{value} {unit}",
+	"w9layout_services_30d": "30 giorni",
+	"w9layout_services_all": "Tutti i monitor",
+	"w9layout_services_beats": "Ultimi controlli",
+	"w9layout_services_beats_failed": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Ultimo controllo non superato",
+				"countPlural=other": "Ultimi {count} controlli, {failed} non superati"
+			}
+		}
+	],
+	"w9layout_services_beats_ok": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Ultimo controllo superato",
+				"countPlural=other": "Ultimi {count} controlli, tutti superati"
+			}
+		}
+	],
+	"w9layout_services_check": "Controllo",
+	"w9layout_services_empty": "Ancora nessun controllo di servizio: qui compaiono i controlli HTTP, DNS, TLS, SMTP o ping.",
+	"w9layout_services_p95": "p95",
+	"w9layout_services_state": "Stato",
+	"w9layout_services_sub": "Controlli HTTP, DNS, TLS e altri, i peggiori per primi",
+	"w9layout_services_title": "Servizi",
+	"w9layout_sites_last_backup": "Ultimo backup",
+	"w9layout_sites_no_backup": "Nessuno segnalato",
+	"w9layout_sites_sub": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} monitor",
+				"countPlural=other": "{count} monitor"
+			}
+		}
+	],
+	"w9layout_sites_title": "Sede",
+	"w9layout_sites_up_of": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "/ {count} attivo",
+				"countPlural=other": "/ {count} attivi"
+			}
+		}
+	],
+	"w9layout_sites_wan": "WAN",
+	"w9layout_state_error": "Impossibile caricare questi dati. Verrà ritentato a breve.",
+	"w9layout_status_degraded": "Degradato",
+	"w9layout_status_down": "Non attivo",
+	"w9layout_status_paused": "In pausa",
+	"w9layout_status_up": "Attivo",
+	"w9layout_sun_aria": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{up} monitor attivo su {count}; {down} non attivi, {degraded} degradati",
+				"countPlural=other": "{up} monitor attivi su {count}; {down} non attivi, {degraded} degradati"
+			}
+		}
+	],
+	"w9layout_sun_category_title": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{site}, {category}: {count} monitor",
+				"countPlural=other": "{site}, {category}: {count} monitor"
+			}
+		}
+	],
+	"w9layout_sun_center": "monitor attivi",
+	"w9layout_sun_rings": "Anello interno: sede · centrale: categoria · esterno: monitor",
+	"w9layout_sun_sub": "Sede, categoria, monitor",
+	"w9layout_sun_title": "Parco per sede",
+	"w9layout_switch_classic": "Classico",
+	"w9layout_switch_command": "Comando",
+	"w9layout_switch_hybrid": "Ibrido",
+	"w9layout_switch_legend": "Layout della panoramica",
+	"w9layout_switch_noc": "NOC",
+	"w9layout_top_cpu": "CPU",
+	"w9layout_top_disk": "Disco",
+	"w9layout_top_empty": "Ancora nessun dato: agenti e collettori riportano qui CPU, memoria, disco e rete.",
+	"w9layout_top_forecast": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{site}, pieno tra circa {count} giorno",
+				"countPlural=other": "{site}, pieno tra circa {count} giorni"
+			}
+		}
+	],
+	"w9layout_top_mem": "Memoria",
+	"w9layout_top_metric": "Metrica",
+	"w9layout_top_net": "Rete",
+	"w9layout_top_sub_pct": "% usato ora, andamento su {range}",
+	"w9layout_top_sub_rate": "Mb/s ora, andamento su {range}",
+	"w9layout_top_title": "Maggiori consumatori",
+	"w9layout_top_title_cpu": "Top 5 CPU",
+	"w9layout_top_title_disk": "Top 5 disco",
+	"w9layout_top_title_mem": "Top 5 memoria",
+	"w9layout_top_title_net": "Top 5 rete",
+	"w9layout_when_today": "Oggi {time}",
+	"w9layout_when_today_bare": "Oggi",
+	"w9layout_when_tomorrow": "Domani {time}",
+	"w9layout_when_tomorrow_bare": "Domani",
+	"w9layout_when_weekday": "{day} {time}",
+	"w9layout_when_yesterday": "Ieri {time}",
+	"w9layout_when_yesterday_bare": "Ieri"
+}

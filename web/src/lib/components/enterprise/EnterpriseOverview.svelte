@@ -25,6 +25,11 @@
 	import UpdatedAgo from '#lib/components/alerts/UpdatedAgo.svelte';
 	import AlertTrend from '#lib/components/overview/AlertTrend.svelte';
 	import ComingUp from '#lib/components/overview/ComingUp.svelte';
+	import LayoutSwitcher from '#lib/components/overview/dash/LayoutSwitcher.svelte';
+	import LayoutCommand from '#lib/components/overview/dash/LayoutCommand.svelte';
+	import LayoutNoc from '#lib/components/overview/dash/LayoutNoc.svelte';
+	import LayoutHybrid from '#lib/components/overview/dash/LayoutHybrid.svelte';
+	import { layoutChoice, widgetsStore } from '#lib/components/overview/dash/widgets.svelte.js';
 	import { fleetStore } from './fleet.svelte.js';
 	import { mean } from './fleet.js';
 	import { consoleStatus, type ConsoleStatus } from './status.js';
@@ -35,6 +40,21 @@
 	$effect(() => {
 		consoleState.range;
 		fleetStore.rangeChanged();
+	});
+
+	// The dashboards (Command, NOC, Hybrid) read one more route; polled only while one is shown.
+	const dashboard = $derived(layoutChoice.value !== 'classic');
+	$effect(() => {
+		if (!dashboard) return;
+		return untrack(() => widgetsStore.start());
+	});
+	// A new range reloads their figures at once (the first load comes with `start`).
+	let widgetsRange = untrack(() => consoleState.range);
+	$effect(() => {
+		const range = consoleState.range;
+		const changed = range !== widgetsRange;
+		widgetsRange = range;
+		if (changed && dashboard) untrack(() => void widgetsStore.refresh());
 	});
 
 	const alertCounts = $derived(countAlertsByTarget(alertsStore.alerts));
@@ -153,37 +173,46 @@
 			{/snippet}
 		</EmptyState>
 	{:else}
-		<!-- Height kept: the text appearing does not shift anything. -->
-		<div class="flex min-h-5 justify-end">
-			<UpdatedAgo updatedAt={alertsStore.updatedAt} />
+		<!-- Height kept: the switcher is always there and the text appearing does not shift anything. -->
+		<div class="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-2">
+			<LayoutSwitcher />
+			<div class="ml-auto"><UpdatedAgo updatedAt={alertsStore.updatedAt} /></div>
 		</div>
-		<div class="grid grid-cols-2 gap-3 lg:grid-cols-3">
-			{#each kpis as kpi, i (kpi.id)}
-				<div class={`min-w-0 rounded-xl border border-line bg-surface px-4 py-3.5 max-lg:last:col-span-2 sm:px-[18px] sm:py-4 ${animate ? 'rise-in' : ''}`} style={`--rise-delay: ${i * 40}ms`}>
-					<p class="m-0 truncate text-sm font-medium text-ink-2">{kpi.label}</p>
-					<p class="m-0 mt-2 flex items-baseline gap-1.5">
-						{#key kpi.value}
-							<span class="state-in font-mono text-2xl leading-none font-medium tracking-[-0.03em] text-ink tabular-nums sm:text-[2rem]">{kpi.value}</span>
-						{/key}
-						{#if kpi.unit}<span class="truncate text-sm text-ink-3 sm:text-base">{kpi.unit}</span>{/if}
-					</p>
-					<p class={`m-0 mt-2 truncate text-xs font-medium ${kpi.noteTone}`}>{kpi.note}</p>
-				</div>
-			{/each}
-		</div>
-
-		{#if fleetStore.error}
-			<ErrorNotice error={fleetStore.error} />
-		{/if}
-
-		<div class="grid items-stretch gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-			<NeedsAttention />
-			<div class="flex min-w-0 flex-col gap-3">
-				<div class="flex min-h-0 flex-1 flex-col [&>section]:flex-1"><AlertTrend /></div>
-				<ComingUp />
+		{#if layoutChoice.value === 'command'}
+			<LayoutCommand />
+		{:else if layoutChoice.value === 'noc'}
+			<LayoutNoc />
+		{:else if layoutChoice.value === 'hybrid'}
+			<LayoutHybrid />
+		{:else}
+			<div class="grid grid-cols-2 gap-3 lg:grid-cols-3">
+				{#each kpis as kpi, i (kpi.id)}
+					<div class={`min-w-0 rounded-xl border border-line bg-surface px-4 py-3.5 max-lg:last:col-span-2 sm:px-[18px] sm:py-4 ${animate ? 'rise-in' : ''}`} style={`--rise-delay: ${i * 40}ms`}>
+						<p class="m-0 truncate text-sm font-medium text-ink-2">{kpi.label}</p>
+						<p class="m-0 mt-2 flex items-baseline gap-1.5">
+							{#key kpi.value}
+								<span class="state-in font-mono text-2xl leading-none font-medium tracking-[-0.03em] text-ink tabular-nums sm:text-[2rem]">{kpi.value}</span>
+							{/key}
+							{#if kpi.unit}<span class="truncate text-sm text-ink-3 sm:text-base">{kpi.unit}</span>{/if}
+						</p>
+						<p class={`m-0 mt-2 truncate text-xs font-medium ${kpi.noteTone}`}>{kpi.note}</p>
+					</div>
+				{/each}
 			</div>
-		</div>
 
-		<FleetLatency />
+			{#if fleetStore.error}
+				<ErrorNotice error={fleetStore.error} />
+			{/if}
+
+			<div class="grid items-stretch gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+				<NeedsAttention />
+				<div class="flex min-w-0 flex-col gap-3">
+					<div class="flex min-h-0 flex-1 flex-col [&>section]:flex-1"><AlertTrend /></div>
+					<ComingUp />
+				</div>
+			</div>
+
+			<FleetLatency />
+		{/if}
 	{/if}
 </div>
