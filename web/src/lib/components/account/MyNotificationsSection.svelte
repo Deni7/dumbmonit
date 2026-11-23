@@ -18,7 +18,7 @@
 		type PersonalScope,
 		type PersonalTestReport
 	} from '#lib/api/accounts.js';
-	import { Button, ErrorNotice, Field, Panel, Plate, Segmented, Skeleton, Toggle } from '#lib/ui/index.js';
+	import { Button, Chip, ErrorNotice, Field, Panel, Plate, Segmented, Skeleton, Toggle } from '#lib/ui/index.js';
 	import QuietHoursEditor from '#lib/components/notifications/QuietHoursEditor.svelte';
 	import { m } from '#lib/paraglide/messages.js';
 
@@ -160,7 +160,7 @@
 	{#if loadError}
 		<ErrorNotice error={loadError} title={m.w6accounts_mine_load_error()} onretry={() => void load()} />
 	{:else if !view}
-		<Skeleton class="h-16 w-full" rows={3} />
+		<div class="grid gap-2"><Skeleton class="h-16 w-full" rows={3} /></div>
 	{:else}
 		<div class="grid gap-4">
 			<Field label={m.w6accounts_mine_email()} for="mine-email" inline help={emailHelp}>
@@ -209,15 +209,9 @@
 						{:else}
 							<div class="flex flex-wrap gap-2">
 								{#each view.folders as folder (folder)}
-									<button
-										type="button"
-										class={`min-h-10 rounded-lg border px-3 py-1.5 text-sm font-medium break-all transition ${prefs.folders.includes(folder) ? 'border-signal bg-signal-soft text-signal-ink' : 'border-line-strong bg-surface text-ink-2 hover:text-ink'}`}
-										aria-pressed={prefs.folders.includes(folder)}
-										disabled={saving}
-										onclick={() => togglePick('folders', folder)}
-									>
-										{folder}
-									</button>
+									<Chip pressed={prefs.folders.includes(folder)} disabled={saving} onclick={() => togglePick('folders', folder)}>
+										<span class="max-w-[14rem] truncate" title={folder}>{folder}</span>
+									</Chip>
 								{/each}
 							</div>
 						{/if}
@@ -231,15 +225,9 @@
 							<input id="mine-tag-filter" type="search" class="input" bind:value={tagFilter} placeholder={m.w6accounts_mine_tags_filter()} autocomplete="off" spellcheck="false" />
 							<div class="flex flex-wrap gap-2">
 								{#each shownTags as tag (tag)}
-									<button
-										type="button"
-										class={`min-h-10 rounded-lg border px-3 py-1.5 text-sm font-medium break-all transition ${prefs.tags.includes(tag) ? 'border-signal bg-signal-soft text-signal-ink' : 'border-line-strong bg-surface text-ink-2 hover:text-ink'}`}
-										aria-pressed={prefs.tags.includes(tag)}
-										disabled={saving}
-										onclick={() => togglePick('tags', tag)}
-									>
-										{tag}
-									</button>
+									<Chip pressed={prefs.tags.includes(tag)} disabled={saving} onclick={() => togglePick('tags', tag)}>
+										<span class="max-w-[14rem] truncate" title={tag}>{tag}</span>
+									</Chip>
 								{/each}
 							</div>
 						{/if}
@@ -267,22 +255,26 @@
 			{#if testError}
 				<ErrorNotice error={testError} title={m.w6accounts_mine_test_error()} />
 			{/if}
-			{#if report}
-				<div class="flex flex-wrap gap-2" aria-live="polite">
+			<!-- Always in the page, so the outcome of a test is announced when it lands. -->
+			<div class="flex flex-wrap gap-2 empty:hidden" aria-live="polite">
+				{#if report}
 					{#if report.email}
+						<!-- A failure carries the server's reason: the plate grows to wrap it on a phone. -->
 						<Plate
+							class="max-w-full !h-auto min-h-7 py-1 !leading-snug"
 							tone={report.email.ok ? 'signal' : 'warning'}
 							label={report.email.ok ? m.w6accounts_mine_test_email_ok() : m.w6accounts_mine_test_email_failed({ error: report.email.error ?? '' })}
 						/>
 					{/if}
 					{#if report.push}
 						<Plate
+							class="max-w-full !h-auto min-h-7 py-1 !leading-snug"
 							tone={report.push.ok ? 'signal' : 'warning'}
 							label={report.push.ok ? m.w6accounts_mine_test_push_ok() : m.w6accounts_mine_test_push_failed({ error: report.push.error ?? '' })}
 						/>
 					{/if}
-				</div>
-			{/if}
+				{/if}
+			</div>
 		</div>
 	{/if}
 </Panel>
