@@ -17,7 +17,7 @@
 	import MuteControl from '../../MuteControl.svelte';
 	import Glyph from './Glyph.svelte';
 	import { actorName, initials, type ProblemRow } from './problems.js';
-	import type { MonitorPlace } from './sites.js';
+	import type { MonitorPlace } from './site-index.js';
 	import { clockText, durationText } from './words.js';
 
 	interface Props {

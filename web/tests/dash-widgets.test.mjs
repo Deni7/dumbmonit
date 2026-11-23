@@ -17,7 +17,7 @@ import {
 	versionShares
 } from '../src/lib/components/overview/dash/parts/format.ts';
 import { actorName, initials, problemRows, recentResolved } from '../src/lib/components/overview/dash/parts/problems.ts';
-import { groupBySite, siteIndex } from '../src/lib/components/overview/dash/parts/sites.ts';
+import { groupBySite, siteIndex } from '../src/lib/components/overview/dash/parts/site-index.ts';
 import { maintenanceStrip, nextOccurrences } from '../src/lib/components/overview/dash/parts/timeline.ts';
 import { withDiskForecasts } from '../src/lib/components/overview/dash/parts/expiries.ts';
 import { eventGroup } from '../src/lib/components/overview/dash/parts/plates.ts';

@@ -25,7 +25,7 @@
 	import Glyph from '../parts/Glyph.svelte';
 	import ProblemLine from '../parts/ProblemLine.svelte';
 	import { problemRows, recentResolved, type ProblemRow } from '../parts/problems.js';
-	import { siteIndex } from '../parts/sites.js';
+	import { siteIndex } from '../parts/site-index.js';
 	import { clockText, durationText } from '../parts/words.js';
 
 	type Span = 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 12;

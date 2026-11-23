@@ -21,7 +21,7 @@
 	import { widgetsStore } from '../widgets.svelte.js';
 	import { availabilityText, barWidth, budgetTone, monitorBars, pointDelta, signed } from '../parts/format.js';
 	import { STATUS_FILL, type DashStatus } from '../parts/plates.js';
-	import { groupBySite } from '../parts/sites.js';
+	import { groupBySite } from '../parts/site-index.js';
 	import { dayText, statusWord } from '../parts/words.js';
 
 	interface Props {
