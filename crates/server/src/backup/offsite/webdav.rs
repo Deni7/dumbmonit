@@ -9,7 +9,7 @@ use std::time::Duration;
 use reqwest::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use reqwest::{Method, StatusCode, Url};
 
-use super::transfer::{self, Failure, SHORT_TIMEOUT, TRANSFER_TIMEOUT};
+use super::transfer::{self, Failure, MAX_LISTING_BYTES, SHORT_TIMEOUT, TRANSFER_TIMEOUT};
 use super::{WebDavSettings, check_name};
 
 const PROPFIND_BODY: &str = r#"<?xml version="1.0" encoding="utf-8"?>
@@ -116,7 +116,7 @@ impl Client {
             .await
             .map_err(|error| Failure::request(what, &error))?;
         let response = self.check(response, what).await?;
-        let body = response.text().await.map_err(|error| Failure::request(what, &error))?;
+        let body = transfer::read_listing(response, what, MAX_LISTING_BYTES).await?;
         parse_multistatus(&body)
     }
 

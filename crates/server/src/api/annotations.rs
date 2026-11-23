@@ -95,9 +95,12 @@ fn bad_date(error: String) -> ApiError {
     ApiError::BadRequest(error)
 }
 
-/// Vrai si un compte restreint peut voir ce repère.
+/// Vrai si un compte restreint peut voir ce repère. Appelé pour chacun des
+/// repères lus : on s'arrête au premier moniteur visible, sans construire
+/// l'ensemble des moniteurs couverts.
 fn visible_to_scoped(scope: &Scope, all: &[TargetInfo], visible: &HashSet<i64>) -> bool {
-    matches!(scope, Scope::Global) || scope.covered(all).iter().any(|id| visible.contains(id))
+    matches!(scope, Scope::Global)
+        || all.iter().any(|target| visible.contains(&target.id) && scope.matches(target))
 }
 
 /// Un compte restreint n'écrit qu'un repère dont chaque moniteur concerné est à
@@ -273,4 +276,30 @@ pub async fn remove(
     audit::record(&state.pool, Some(&author), "annotation.deleted", Some(&id.to_string()), ip)
         .await;
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use super::*;
+
+    fn info(id: i64, folder: &str) -> TargetInfo {
+        TargetInfo { id, folder: folder.into(), tags: BTreeMap::new() }
+    }
+
+    #[test]
+    fn a_scoped_account_sees_markers_that_touch_one_visible_monitor() {
+        let all = vec![info(1, "Lyon"), info(2, "Paris"), info(3, "Paris")];
+        let visible = HashSet::from([2]);
+        assert!(visible_to_scoped(&Scope::Global, &all, &visible));
+        let paris = Scope::Folder { folder: "Paris".into() };
+        assert!(visible_to_scoped(&paris, &all, &visible));
+        let lyon = Scope::Folder { folder: "Lyon".into() };
+        assert!(!visible_to_scoped(&lyon, &all, &visible));
+        assert!(visible_to_scoped(&Scope::Monitors { targets: vec![1, 2] }, &all, &visible));
+        assert!(!visible_to_scoped(&Scope::Monitors { targets: vec![1, 3] }, &all, &visible));
+        // Un moniteur supprimé ne rend rien visible.
+        assert!(!visible_to_scoped(&Scope::Monitors { targets: vec![9] }, &all, &visible));
+    }
 }

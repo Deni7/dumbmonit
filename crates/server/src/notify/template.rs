@@ -76,18 +76,19 @@ impl Template {
     /// `field` nomme le réglage fautif dans le message d'erreur : l'utilisateur doit
     /// savoir si le problème vient de l'URL ou du corps.
     pub fn parse(source: &str, field: &str) -> Result<Self, NotifyError> {
-        Self::parse_with(source, field, is_known, &known_names().join(", "))
+        Self::parse_with(source, field, is_known, || known_names().join(", "))
     }
 
     /// Comme [`Template::parse`], avec un autre jeu de variables : `is_known`
-    /// décide, `available` est la liste citée dans le message d'erreur. C'est
+    /// décide, `available` donne la liste citée dans le message d'erreur (calculée
+    /// seulement en cas d'erreur : un gabarit est relu à chaque envoi). C'est
     /// ce que les gabarits de message ([`crate::notify::message_template`])
     /// réutilisent, avec leurs variables et leurs `tags.<clé>`.
     pub fn parse_with(
         source: &str,
         field: &str,
         is_known: impl Fn(&str) -> bool,
-        available: &str,
+        available: impl FnOnce() -> String,
     ) -> Result<Self, NotifyError> {
         let mut segments = Vec::new();
         let mut literal = String::new();
@@ -112,7 +113,8 @@ impl Template {
             }
             if !is_known(&name) {
                 return Err(NotifyError::Config(format!(
-                    "\"{field}\": unknown variable \"{name}\" (available: {available})"
+                    "\"{field}\": unknown variable \"{name}\" (available: {})",
+                    available()
                 )));
             }
 

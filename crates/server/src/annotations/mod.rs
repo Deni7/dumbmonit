@@ -11,7 +11,7 @@
 
 pub mod store;
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use chrono::{DateTime, NaiveDateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
@@ -278,13 +278,14 @@ pub fn after_change(
 #[derive(Default)]
 pub struct AlertChanges {
     changes: Vec<Annotation>,
-    targets: Vec<TargetInfo>,
+    /// Par identifiant : la liste d'alertes interroge un moniteur par alerte.
+    targets: HashMap<i64, TargetInfo>,
 }
 
 impl AlertChanges {
     /// Le repère que cite cette alerte, s'il y en a un.
     pub fn cited_by(&self, alert: &crate::alerting::cycle::StoredAlert) -> Option<AfterChange> {
-        let target = self.targets.iter().find(|t| Some(t.id) == alert.target_id)?;
+        let target = self.targets.get(&alert.target_id?)?;
         after_change(&self.changes, target, alert.state.firing_since?)
     }
 }
@@ -310,7 +311,9 @@ pub async fn changes_before_alerts(
         if changes.is_empty() {
             return anyhow::Ok(AlertChanges::default());
         }
-        Ok(AlertChanges { changes, targets: store::target_infos(pool).await? })
+        let targets = store::target_infos(pool).await?;
+        let targets = targets.into_iter().map(|target| (target.id, target)).collect();
+        Ok(AlertChanges { changes, targets })
     };
     loaded.await.unwrap_or_else(|error| {
         tracing::warn!(%error, "markers before alerts not read");

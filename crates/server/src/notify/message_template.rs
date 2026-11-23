@@ -151,7 +151,7 @@ fn parse_one(source: Option<&str>, field: &str) -> Result<Option<Template>, Noti
             "\"{field}\": a template is limited to {MAX_TEMPLATE_LEN} characters"
         )));
     }
-    Template::parse_with(source, field, is_known, &available()).map(Some)
+    Template::parse_with(source, field, is_known, available).map(Some)
 }
 
 fn read_text<'a>(settings: &'a Value, key: &str) -> Result<Option<&'a str>, NotifyError> {
@@ -164,7 +164,7 @@ fn read_text<'a>(settings: &'a Value, key: &str) -> Result<Option<&'a str>, Noti
 
 /// Un gabarit intégré, analysé à chaque usage (quelques octets).
 fn builtin(source: &str) -> Template {
-    Template::parse_with(source, "default", is_known, "").expect("built-in templates are valid")
+    Template::parse_with(source, "default", is_known, String::new).expect("built-in templates are valid")
 }
 
 impl MessageTemplates {

@@ -199,12 +199,7 @@ impl Permission {
 
     /// Vrai si `method path` est l'une des routes de la permission.
     pub fn allows(self, method: &Method, path: &str) -> bool {
-        let path = path.strip_prefix("/api").unwrap_or(path);
-        let path = path.strip_suffix('/').filter(|p| !p.is_empty()).unwrap_or(path);
-        self.routes().iter().any(|(wanted, pattern)| {
-            (*wanted == method.as_str() || (*wanted == "GET" && *method == Method::HEAD))
-                && teams::path_matches(pattern, path)
-        })
+        teams::route_listed(self.routes(), method, path)
     }
 }
 

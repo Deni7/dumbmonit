@@ -68,12 +68,7 @@ pub const WALL_ONLY_MESSAGE: &str = "This account is a wall display: it can only
 
 /// Vrai si `method path` fait partie de ce qu'un écran mural peut appeler.
 pub fn is_wall_route(method: &Method, path: &str) -> bool {
-    let path = path.strip_prefix("/api").unwrap_or(path);
-    let path = path.strip_suffix('/').filter(|p| !p.is_empty()).unwrap_or(path);
-    WALL_ROUTES.iter().any(|(allowed, pattern)| {
-        (*allowed == method.as_str() || (*allowed == "GET" && *method == Method::HEAD))
-            && teams::path_matches(pattern, path)
-    })
+    teams::route_listed(WALL_ROUTES, method, path)
 }
 
 #[cfg(test)]

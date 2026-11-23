@@ -185,16 +185,23 @@ pub async fn backtest(
 
     let targets = db::alerts::list_target_nodes(&state.pool).await?;
     let overrides = policy_store::list_overrides(&state.pool, Some(&rule.uid), None).await?;
-    let mut candidates = candidates(&rule, &ranges, &targets, &overrides, grid);
-    view.series_total = candidates.len();
-    if candidates.len() > MAX_SERIES {
-        candidates.sort_by_key(|c| std::cmp::Reverse(c.violations));
-        candidates.truncate(MAX_SERIES);
-        view.truncated = true;
-    }
-
-    // Dix mille pas sur cent séries : du calcul pur, hors de la boucle d'axum.
-    let replayed = tokio::task::spawn_blocking(move || replay_all(&rule, candidates, grid)).await?;
+    // Ranger chaque série sur la grille (dix mille pas, avant même la coupe à
+    // cent séries) puis rejouer : du calcul pur, hors de la boucle d'axum.
+    let (series_total, truncated, replayed) = tokio::task::spawn_blocking(move || {
+        let mut candidates = candidates(&rule, &ranges, &targets, &overrides, grid);
+        // Les points bruts ne servent plus : rendus avant le rejeu.
+        drop(ranges);
+        let total = candidates.len();
+        let truncated = total > MAX_SERIES;
+        if truncated {
+            candidates.sort_by_key(|c| std::cmp::Reverse(c.violations));
+            candidates.truncate(MAX_SERIES);
+        }
+        (total, truncated, replay_all(&rule, candidates, grid))
+    })
+    .await?;
+    view.series_total = series_total;
+    view.truncated = truncated;
     view.quiet_series = replayed.iter().filter(|series| series.periods.is_empty()).count();
     view.fired = replayed.iter().map(|series| series.periods.len() as u32).sum();
     view.notifications = replayed.iter().map(|series| series.notifications).sum();
