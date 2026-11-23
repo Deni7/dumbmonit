@@ -190,47 +190,47 @@ pub async fn count(pool: &SqlitePool) -> Result<i64> {
 
 pub async fn list(pool: &SqlitePool) -> Result<Vec<User>> {
     let rows = sqlx::query(select_users!("ORDER BY u.username COLLATE NOCASE"))
-    .fetch_all(pool)
-    .await
-    .context("liste des comptes")?;
+        .fetch_all(pool)
+        .await
+        .context("liste des comptes")?;
     rows.into_iter().map(read).collect()
 }
 
 pub async fn get(pool: &SqlitePool, id: i64) -> Result<Option<User>> {
     let row = sqlx::query(select_users!("WHERE u.id = ?"))
-    .bind(id)
-    .fetch_optional(pool)
-    .await
-    .context("lecture du compte")?;
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+        .context("lecture du compte")?;
     row.map(read).transpose()
 }
 
 pub async fn by_username(pool: &SqlitePool, username: &str) -> Result<Option<User>> {
     let row = sqlx::query(select_users!("WHERE u.username = ?"))
-    .bind(username)
-    .fetch_optional(pool)
-    .await
-    .context("recherche du compte par identifiant")?;
+        .bind(username)
+        .fetch_optional(pool)
+        .await
+        .context("recherche du compte par identifiant")?;
     row.map(read).transpose()
 }
 
 pub async fn by_oidc(pool: &SqlitePool, issuer: &str, subject: &str) -> Result<Option<User>> {
     let row = sqlx::query(select_users!("WHERE u.oidc_issuer = ? AND u.oidc_subject = ?"))
-    .bind(issuer)
-    .bind(subject)
-    .fetch_optional(pool)
-    .await
-    .context("recherche du compte par identité OIDC")?;
+        .bind(issuer)
+        .bind(subject)
+        .fetch_optional(pool)
+        .await
+        .context("recherche du compte par identité OIDC")?;
     row.map(read).transpose()
 }
 
 pub async fn by_saml(pool: &SqlitePool, issuer: &str, subject: &str) -> Result<Option<User>> {
     let row = sqlx::query(select_users!("WHERE u.saml_issuer = ? AND u.saml_subject = ?"))
-    .bind(issuer)
-    .bind(subject)
-    .fetch_optional(pool)
-    .await
-    .context("recherche du compte par identité SAML")?;
+        .bind(issuer)
+        .bind(subject)
+        .fetch_optional(pool)
+        .await
+        .context("recherche du compte par identité SAML")?;
     row.map(read).transpose()
 }
 
@@ -274,10 +274,10 @@ pub async fn insert_saml(
 
 pub async fn by_ldap(pool: &SqlitePool, ldap_id: &str) -> Result<Option<User>> {
     let row = sqlx::query(select_users!("WHERE u.ldap_id = ?"))
-    .bind(ldap_id)
-    .fetch_optional(pool)
-    .await
-    .context("recherche du compte par identité LDAP")?;
+        .bind(ldap_id)
+        .fetch_optional(pool)
+        .await
+        .context("recherche du compte par identité LDAP")?;
     row.map(read).transpose()
 }
 
@@ -342,9 +342,9 @@ pub async fn disable_by_ldap(pool: &SqlitePool, id: i64) -> Result<()> {
 /// formulaire de connexion (mot de passe seul) de continuer à fonctionner.
 pub async fn sole_password_user(pool: &SqlitePool) -> Result<Option<User>> {
     let rows = sqlx::query(select_users!("WHERE u.password_hash IS NOT NULL LIMIT 2"))
-    .fetch_all(pool)
-    .await
-    .context("recherche du compte local unique")?;
+        .fetch_all(pool)
+        .await
+        .context("recherche du compte local unique")?;
     if rows.len() != 1 {
         return Ok(None);
     }

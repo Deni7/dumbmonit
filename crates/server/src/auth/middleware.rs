@@ -34,10 +34,10 @@ use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use sqlx::SqlitePool;
 
+use crate::auth::permissions::{self, Delegated};
 use crate::auth::session::SessionToken;
 use crate::auth::token::{self, ApiToken, Scope};
 use crate::auth::users::{self, User};
-use crate::auth::permissions::{self, Delegated};
 use crate::auth::{AuthError, AuthState, clients, cookie, policy, session, teams, wall};
 use crate::state::AppState;
 
