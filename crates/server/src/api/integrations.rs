@@ -258,11 +258,8 @@ mod tests {
         let names: Vec<&str> = plugin_files().map(|(name, _)| *name).collect();
         let main = String::from_utf8_lossy(PLUGIN_FILES[0].1);
         // `require_once DMT_DIR . 'includes/….php'` : chacun doit être dans l'archive.
-        let required: Vec<&str> = main
-            .split("DMT_DIR . '")
-            .skip(1)
-            .filter_map(|rest| rest.split('\'').next())
-            .collect();
+        let required: Vec<&str> =
+            main.split("DMT_DIR . '").skip(1).filter_map(|rest| rest.split('\'').next()).collect();
         assert!(required.len() >= 5, "{required:?}");
         for path in required {
             assert!(names.contains(&path), "{path} manque dans l'archive");

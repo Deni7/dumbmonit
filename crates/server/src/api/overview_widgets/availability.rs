@@ -29,9 +29,11 @@ pub async fn load(state: &AppState, ctx: &Context) -> AvailabilitySeries {
         // jour, en cours, est lu à part sur ce qui en est écoulé.
         let first = today - TimeDelta::days(2 * DAYS - 1);
         let elapsed = (ctx.now - today).num_seconds().max(60);
+        let per_day = fleet_over("1d");
+        let so_far = fleet_over(&format!("{elapsed}s"));
         let (days, current) = tokio::join!(
-            vm::range(state, ctx, &fleet_over("1d"), first.timestamp(), today.timestamp(), DAY),
-            vm::instant_in(state, ctx, &fleet_over(&format!("{elapsed}s"))),
+            vm::range(state, ctx, &per_day, first.timestamp(), today.timestamp(), DAY),
+            vm::instant_in(state, ctx, &so_far),
         );
         for serie in days.unwrap_or_default() {
             for (at, value) in vm::points(&serie) {

@@ -116,7 +116,8 @@ async fn update_events(state: &AppState, ctx: &Context) -> Vec<WidgetEvent> {
                 "refused" => format!("Agent update refused on {name}"),
                 _ => format!("Agent update failed on {name}"),
             };
-            let kind = if outcome.outcome == "succeeded" { EventKind::Info } else { EventKind::Warn };
+            let kind =
+                if outcome.outcome == "succeeded" { EventKind::Info } else { EventKind::Warn };
             Some(WidgetEvent { at: stamp(at), kind, text, target_id: Some(host.target_id) })
         })
         .collect()

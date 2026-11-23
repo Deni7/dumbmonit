@@ -116,7 +116,7 @@ async fn metric_jobs(state: &AppState, ctx: &Context) -> Vec<BackupJob> {
         let succeeded = sampled - age;
         let late = now - succeeded > family.limit_days * DAY;
         let label = |key: &str| series.metric.get(key).filter(|v| !v.is_empty()).cloned();
-        let parts: Vec<String> = family.what.iter().filter_map(|key| label(*key)).collect();
+        let parts: Vec<String> = family.what.iter().filter_map(|key| label(key)).collect();
         let job = if parts.is_empty() { monitor.name.clone() } else { parts.join(" · ") };
         let detail = match label("datastore").or_else(|| label("repo")) {
             Some(place) if !parts.contains(&place) => format!("{} → {place}", monitor.name),

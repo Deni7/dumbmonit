@@ -19,7 +19,9 @@ use crate::db::{self, alert_insights};
 use crate::state::AppState;
 
 use super::events::{self, EVENT_DAYS};
-use super::model::{AlertDay, AlertStats, AlertsOpened, DayCount, EventKind, Noisiest, WidgetEvent};
+use super::model::{
+    AlertDay, AlertStats, AlertsOpened, DayCount, EventKind, Noisiest, WidgetEvent,
+};
 use super::{Context, round, stamp, vm};
 
 const WINDOW_DAYS: i64 = 30;
@@ -137,7 +139,7 @@ fn stats(
     episodes: &[Episode],
     days: &[String],
     counts: &HashMap<String, AlertDay>,
-    rule_name: &dyn Fn(&str) -> String,
+    rule_name: &(dyn Fn(&str) -> String + Sync),
 ) -> AlertStats {
     let cut = ctx.now - TimeDelta::days(WINDOW_DAYS);
     let (current, previous): (Vec<Episode>, Vec<Episode>) =
@@ -168,10 +170,8 @@ fn stats(
             count,
         });
 
-    let per_day: Vec<AlertDay> = days
-        .iter()
-        .map(|day| counts.get(day).cloned().unwrap_or_else(|| empty_day(day)))
-        .collect();
+    let per_day: Vec<AlertDay> =
+        days.iter().map(|day| counts.get(day).cloned().unwrap_or_else(|| empty_day(day))).collect();
     AlertStats {
         days: per_day,
         total: u32::try_from(current.len()).unwrap_or(u32::MAX),
@@ -219,7 +219,7 @@ fn opened(
 async fn history_events(
     pool: &SqlitePool,
     ctx: &Context,
-    rule_name: &dyn Fn(&str) -> String,
+    rule_name: &(dyn Fn(&str) -> String + Sync),
 ) -> Result<Vec<WidgetEvent>> {
     let since = ctx.now - TimeDelta::days(EVENT_DAYS);
     let sql = format!(
