@@ -182,16 +182,16 @@ const FAMILIES: &[Family] = &[
 /// secondes » et le délai au-delà duquel la sauvegarde est en retard. Les délais
 /// sont ceux des règles livrées (deux jours pour une sauvegarde nocturne, sept
 /// pour Proxmox).
-struct BackupFamily {
+pub(crate) struct BackupFamily {
     /// Nom de la série, sans le préfixe `dumbmonit_`.
-    metric: &'static str,
-    limit_days: f64,
+    pub(crate) metric: &'static str,
+    pub(crate) limit_days: f64,
     /// Étiquettes qui nomment la tâche, jointes par « · ». Aucune : le nom de la
     /// cible.
-    what: &'static [&'static str],
+    pub(crate) what: &'static [&'static str],
 }
 
-const BACKUP_FAMILIES: &[BackupFamily] = &[
+pub(crate) const BACKUP_FAMILIES: &[BackupFamily] = &[
     BackupFamily { metric: "proxmox_backup_last_age_seconds", limit_days: 7.0, what: &["name"] },
     BackupFamily {
         metric: "pbs_backup_last_age_seconds",

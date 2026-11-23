@@ -62,6 +62,7 @@ mod openapi;
 mod opnsense;
 mod opnsense_live;
 mod otlp;
+mod overview_widgets;
 mod packs;
 mod passkeys;
 mod pbs;
@@ -217,6 +218,8 @@ pub fn router_with_hubs(
         .route("/collectors", get(collectors::list))
         // Compteurs plats pour Homepage / tableaux de bord tiers (`summary.rs`).
         .route("/summary", get(summary::get))
+        // Chiffres des tableaux de bord de la vue d'ensemble (`overview_widgets/`).
+        .route("/overview/widgets", get(overview_widgets::get))
         .route("/discovery", post(discovery::scan))
         .route("/discovery/subnets", get(discovery::local_subnets))
         .route("/discovery/jobs", get(discovery::list_jobs).post(discovery::create_job))
