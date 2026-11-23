@@ -1,7 +1,0 @@
-{
-	"w8wp_discovery_label": "In der Liste öffentlicher Seiten zeigen",
-	"w8wp_discovery_on": "Website-Plugins wie das WordPress-Banner finden diese Seite in der Liste der öffentlichen Seiten des Servers.",
-	"w8wp_discovery_off": "Nicht in der Liste der öffentlichen Seiten. Unter ihrer Adresse bleibt die Seite erreichbar.",
-	"w8wp_discovery_unpublished": "Nur veröffentlichte Seiten erscheinen in der Liste der öffentlichen Seiten.",
-	"w8wp_discovery_private": "Eine private Seite erscheint nie in der Liste der öffentlichen Seiten."
-}

@@ -1,7 +1,0 @@
-{
-	"w8wp_discovery_label": "公開ページの一覧に表示",
-	"w8wp_discovery_on": "WordPress バナーなどのサイト用プラグインが、サーバーの公開ページ一覧からこのページを見つけられます。",
-	"w8wp_discovery_off": "公開ページの一覧には載りません。アドレスからは引き続き閲覧できます。",
-	"w8wp_discovery_unpublished": "公開ページの一覧に載るのは公開済みのページだけです。",
-	"w8wp_discovery_private": "非公開のページが公開ページの一覧に載ることはありません。"
-}

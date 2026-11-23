@@ -1,7 +1,0 @@
-{
-	"w8wp_discovery_label": "Herkese açık sayfalar listesinde göster",
-	"w8wp_discovery_on": "WordPress banner'ı gibi site eklentileri bu sayfayı sunucunun herkese açık sayfalar listesinde bulabilir.",
-	"w8wp_discovery_off": "Herkese açık sayfalar listesinde değil. Sayfaya adresinden erişilmeye devam edilir.",
-	"w8wp_discovery_unpublished": "Herkese açık sayfalar listesinde yalnızca yayımlanmış sayfalar yer alır.",
-	"w8wp_discovery_private": "Gizli bir sayfa herkese açık sayfalar listesinde hiçbir zaman yer almaz."
-}

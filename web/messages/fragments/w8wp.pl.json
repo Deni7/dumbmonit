@@ -1,7 +1,0 @@
-{
-	"w8wp_discovery_label": "Pokazuj na liście stron publicznych",
-	"w8wp_discovery_on": "Wtyczki do stron internetowych, takie jak baner WordPress, znajdą tę stronę na liście stron publicznych serwera.",
-	"w8wp_discovery_off": "Poza listą stron publicznych. Strona nadal jest dostępna pod swoim adresem.",
-	"w8wp_discovery_unpublished": "Na liście stron publicznych pojawiają się tylko opublikowane strony.",
-	"w8wp_discovery_private": "Strona prywatna nigdy nie pojawia się na liście stron publicznych."
-}

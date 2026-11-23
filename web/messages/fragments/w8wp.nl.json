@@ -1,7 +1,0 @@
-{
-	"w8wp_discovery_label": "Tonen in de lijst met openbare pagina's",
-	"w8wp_discovery_on": "Websiteplug-ins, zoals de WordPress-banner, vinden deze pagina in de lijst met openbare pagina's van de server.",
-	"w8wp_discovery_off": "Niet in de lijst met openbare pagina's. De pagina blijft bereikbaar op haar adres.",
-	"w8wp_discovery_unpublished": "Alleen gepubliceerde pagina's staan in de lijst met openbare pagina's.",
-	"w8wp_discovery_private": "Een privépagina staat nooit in de lijst met openbare pagina's."
-}
