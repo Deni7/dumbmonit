@@ -265,8 +265,15 @@ Built-in rules on devices:
 
 | Rule | Severity | Fires when |
 |---|---|---|
-| Active Backup device overdue | advisory | `dumbmonit_abb_device_overdue > 0` for 30 minutes. |
+| Active Backup device overdue | advisory | The device is late by its own rhythm (`dumbmonit_abb_device_overdue`), for 30 minutes. Nothing to set. |
 | Active Backup device failing | warning | Two or more failed attempts in a row, for 10 minutes. |
+| Active Backup device backup too old | advisory | The last successful backup of the device is older than a limit you choose (3 days by default), for 30 minutes. |
+
+"Overdue" needs no setting: it learns each device's habits. If you would
+rather say "alert me when a device has not been backed up for N days", edit
+**Active Backup device backup too old** under Alerts → Rules and type the
+number of days (or hours). Both rules can stay on: the first catches a device
+that drifts from its routine, the second is your fixed limit.
 
 !!! warning "Permissions"
     ABB only answers an account in the `administrators` group with the package

@@ -45,6 +45,7 @@
 	import RuleEditor from './rules/RuleEditor.svelte';
 	import NewRuleForm from './rules/NewRuleForm.svelte';
 	import { anomalySummary, payloadFrom } from './rules/options';
+	import { durationBase, isFlagUnit } from './rules/units';
 
 	interface Props {
 		rules: AlertRule[];
@@ -387,11 +388,15 @@
 			parts.push(m.alerts_rules_drift_summary({ ratio: rule.threshold }));
 		} else if (rule.kind === 'slo_burn') {
 			parts.push(m.alerts_rules_slo_burn_summary());
+		} else if (isFlagUnit(rule.unit)) {
+			// An on/off signal: "above 0" would say nothing.
+			parts.push(m.w8rules_list_summary_flag());
 		} else {
-			// Seconds read better as a duration: "above 7 d", not "above 604800 s".
+			// A duration reads as one: "above 7 d", not "above 604800 s".
+			const base = durationBase(rule.unit);
 			const amount =
-				rule.unit === 's' && rule.threshold >= 60
-					? formatDuration(rule.threshold)
+				base !== null && rule.threshold * base >= 60
+					? formatDuration(rule.threshold * base)
 					: `${rule.threshold}${rule.unit ? ` ${rule.unit}` : ''}`;
 			parts.push(
 				rule.operator === '>'

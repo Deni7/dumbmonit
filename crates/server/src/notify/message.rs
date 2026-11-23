@@ -12,6 +12,7 @@ use crate::alerting::group::{AlertGroup, GroupItem, NotifyReason};
 use crate::alerting::machine::EffectivePhase;
 use crate::alerting::model::Severity;
 use crate::alerting::notify_policy::{DIGEST_MAX_LINES, Digest, Hold};
+use crate::alerting::units;
 pub use crate::notify::action_link::MessageAction;
 use crate::notify::action_link::{Action, AlertRef};
 pub use crate::notify::message_template::MessageContext;
@@ -401,7 +402,7 @@ fn is_boolean(item: &GroupItem) -> bool {
     let is_bit = |v: f64| v == 0.0 || v == 1.0;
     is_bit(value)
         && is_bit(item.threshold)
-        && item.unit.is_empty()
+        && (item.unit.is_empty() || units::is_flag(&item.unit))
         && matches!(
             (item.operator.as_str(), item.threshold as u8),
             (">", 0) | (">=", 1) | ("<", 1) | ("<=", 0)
@@ -430,12 +431,18 @@ pub fn format_value(value: f64, unit: &str) -> String {
     if !value.is_finite() {
         return "n/a".to_string();
     }
+    // Une durée se lit à son échelle : « 2 d », pas « 172800 s ».
+    if let Some(base) = units::duration_base_secs(unit)
+        && (value * base).abs() >= 60.0
+    {
+        return units::human_seconds(value * base);
+    }
     let rendered = if value.abs() >= 100.0 || value.fract().abs() < 1e-9 {
         format!("{}", value.round() as i64)
     } else {
         format!("{value:.1}")
     };
-    if unit.is_empty() { rendered } else { format!("{rendered} {unit}") }
+    if unit.is_empty() || units::is_flag(unit) { rendered } else { format!("{rendered} {unit}") }
 }
 
 /// Formate une durée en français, à la granularité utile.

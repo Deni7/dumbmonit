@@ -1,0 +1,12 @@
+{
+	"w8rules_editor_error_hold": "Type how long the condition must last: a number, 0 or more.",
+	"w8rules_editor_flag_label": "When it fires",
+	"w8rules_editor_flag_nothing": "This rule reads an on/off signal: there is no threshold to set. You can still choose how long it must last before you are told.",
+	"w8rules_editor_hold_anomaly_help": "How long the anomaly must last before you are told. 0 tells you at once.",
+	"w8rules_editor_hold_help": "How long the condition must hold before you are told. 0 tells you at the first check that sees it.",
+	"w8rules_editor_hold_label": "Must last for",
+	"w8rules_editor_threshold_duration_help": "An age or a delay: type it in the unit that suits you.",
+	"w8rules_list_summary_flag": "on/off signal",
+	"w8rules_overrides_flag": "On/off rule: nothing to set per device, only whether it applies.",
+	"w8rules_unitinput_aria": "{field}: unit"
+}

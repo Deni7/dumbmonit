@@ -1,0 +1,343 @@
+//! Règles livrées « tout ou rien » : la série lue vaut 0 ou 1.
+//!
+//! Leur seuil (`> 0`, `< 1`) n'est pas un réglage : il traduit « le signal est
+//! levé ». L'unité `bool` ([`FLAG_UNIT`]) le dit à l'interface, qui écrit alors
+//! « se déclenche quand… ; rien à régler » au lieu d'un champ numérique, et aux
+//! messages, qui taisent ce seuil.
+//!
+//! La liste vient d'un relevé règle par règle (voir `docs/alerting/rules.md`,
+//! « Thresholds you can set ») : une série publiée par `flag(...)`, un `== bool 0`,
+//! un `1 - up`… Une règle qui compte quelque chose (mises à jour en attente,
+//! tâches en échec, partitions) n'y figure pas, même avec `> 0` : « plus de trois »
+//! y reste un réglage qui a du sens.
+
+use super::{RULE_NETSCAN_MAC_CHANGE, RULE_NETSCAN_NEW_DEVICE, RULE_NETSCAN_NEW_PORT};
+use crate::alerting::model::Rule;
+use crate::alerting::units::FLAG_UNIT;
+
+/// `uid` des règles livrées qui lisent un signal 0/1.
+pub(super) const FLAG_RULES: &[&str] = &[
+    // `rules/adguard.rs`
+    "adguard_tls_invalid",
+    // `rules/builtin_apps.rs`
+    "nextcloud_maintenance",
+    "nextcloud_upgrade_pending",
+    "nextcloud_update_available",
+    "nextcloud_opcache_full",
+    "immich_queue_paused",
+    "immich_update_available",
+    "paperless_update_available",
+    "jellyfin_restart_pending",
+    "plex_update_available",
+    "forgejo_cron_task_overdue",
+    "pihole_blocking_disabled",
+    "adguard_protection_disabled",
+    "adguard_dns_not_running",
+    "adguard_upstream_down",
+    "adguard_update_available",
+    "nut_on_battery",
+    "nut_battery_low",
+    "nut_replace_battery",
+    "nut_data_stale",
+    "mikrotik_hardware_failed",
+    "mikrotik_update_available",
+    "mikrotik_firmware_upgrade_pending",
+    "unifi_device_offline",
+    "unifi_internet_down",
+    "unifi_wan_link_down",
+    "homeassistant_recovery_mode",
+    "homeassistant_not_running",
+    "vsphere_host_red",
+    "vsphere_host_maintenance",
+    "vsphere_datastore_inaccessible",
+    "vsphere_vm_tools_not_running",
+    "vsphere_alarm_red",
+    // `rules/builtin_data.rs`
+    "pve_disk_smart_failed",
+    "pve_zfs_pool_degraded",
+    "synology_disk_bad_sectors",
+    "synology_abb_device_overdue",
+    "redis_replication_broken",
+    "redis_save_failed",
+    "redis_aof_write_failed",
+    "mongodb_no_primary",
+    "mongodb_member_unhealthy",
+    "rabbitmq_resource_alarm",
+    "rabbitmq_node_down",
+    "rabbitmq_queue_not_running",
+    "mssql_database_unavailable",
+    "mssql_agent_job_failed",
+    "oracle_instance_not_open",
+    "elasticsearch_cluster_yellow",
+    "influxdb_unhealthy",
+    "influxdb_not_ready",
+    "kafka_no_controller",
+    // `rules/builtin_general.rs`
+    "ups_on_battery",
+    "redfish_drive_failure_predicted",
+    "pbs_backup_verification_failed",
+    "service_down",
+    "push_missed",
+    "push_failed",
+    "push_too_long",
+    "container_stopped",
+    "container_unhealthy",
+    "container_update_available",
+    "plakar_backup_failed",
+    "plakar_kloset_unreadable",
+    "backup_repo_unreachable",
+    "database_service_stopped",
+    "ipsec_tunnel_down",
+    "disk_smart_failed",
+    "synology_abb_task_failed",
+    "synology_abb_task_disabled",
+    // `rules/builtin_infra.rs`
+    "mdaemon_service_down",
+    "mdaemon_api_down",
+    "mail_server_service_stopped",
+    "mdaemon_queue_frozen",
+    "securitygateway_service_down",
+    "securitygateway_api_down",
+    "opnsense_gateway_down",
+    "opnsense_vpn_tunnel_down",
+    "opnsense_resolver_down",
+    "opnsense_core_service_down",
+    "opnsense_carp_maintenance",
+    "opnsense_reboot_pending",
+    "truenas_pool_degraded",
+    "truenas_disk_smart_failed",
+    "truenas_service_down",
+    "victoria_unhealthy",
+    "loki_not_ready",
+    "graylog_not_processing",
+    "graylog_search_cluster_yellow",
+    // `rules/builtin_proxmox.rs`
+    "pve_guest_stopped",
+    "pve_ha_resource_error",
+    "pve_cluster_no_quorum",
+    "pve_node_offline",
+    "pve_backup_job_failed",
+    "pve_replication_failed",
+    "pve_ceph_health_warning",
+    "pve_interface_offline",
+    "pve_ceph_osd_down",
+    "pve_ceph_noout_set",
+    "pve_ha_lrm_stale",
+    "pve_guest_locked",
+    "pbs_sync_failed",
+    "pbs_prune_failed",
+    "pbs_verify_job_failed",
+    "pbs_gc_failed",
+    "pbs_disk_smart_failed",
+    "pbs_zpool_degraded",
+    "pbs_service_down",
+    "pbs_version_stale",
+    "pbs_tape_job_failed",
+    "pbs_datastore_unmounted",
+    "pdm_remote_unreachable",
+    "pmg_filter_service_down",
+    "pmg_cluster_degraded",
+    // `rules/builtin_services.rs`
+    "crowdsec_lapi_down",
+    "traefik_server_down",
+    "caddy_upstream_unhealthy",
+    "caddy_reload_failed",
+    "npm_host_offline",
+    "domain_on_hold",
+    "domain_redemption",
+    "domain_dnssec_lost",
+    "blacklist_reverse_dns",
+    "netconfig_changed",
+    "netconfig_host_key_changed",
+    "website_down",
+    "website_blank",
+    "website_expected_text_missing",
+    "website_noindex",
+    "website_robots_blocks_all",
+    "website_canonical_changed",
+    "website_final_url_changed",
+    "website_metadata_changed",
+    "website_text_dropped",
+    "website_google_verification_changed",
+    "website_seo_markup_changed",
+    "ad_dc_unreachable",
+    "ad_bind_failed",
+    "k8s_node_not_ready",
+    "k8s_node_pressure",
+    "k8s_pod_crashlooping",
+    "k8s_pod_pending",
+    "k8s_pvc_pending",
+    "pfsense_gateway_down",
+    "pfsense_interface_down",
+    "pfsense_service_stopped",
+    "unraid_array_stopped",
+    "unraid_disk_problem",
+    "unraid_parity_errors",
+    "unraid_container_stopped",
+    "veeam_job_failed",
+    "veeam_job_warning",
+    "kopia_repo_disconnected",
+    "duplicati_backup_failed",
+    // `rules/builtin_vendors.rs`
+    "tailscale_device_unapproved",
+    "tailscale_update_available",
+    "fortigate_ipsec_tunnel_down",
+    "fortigate_interface_down",
+    "fortigate_ha_out_of_sync",
+    "fortigate_firmware_update",
+    "sophos_interface_down",
+    "omada_device_offline",
+    "omada_firmware_update",
+    "arubacentral_device_offline",
+    "qnap_disk_unhealthy",
+    "qnap_firmware_update",
+    "libvirt_domain_crashed",
+    "dsm_volume_read_only",
+    "dsm_package_down",
+    "xcpng_host_offline",
+    "xcpng_vm_ha_protected_down",
+    "xcpng_pool_ha_overcommitted",
+    "nutanix_host_degraded",
+    "cve_exploited_vulnerable",
+    // `rules/cloud/cloudflare.rs`
+    "cloudflare_tunnel_down",
+    "cloudflare_tunnel_degraded",
+    "cloudflare_zone_inactive",
+    "cloudflare_pool_down",
+    // `rules/cloud/hetzner.rs`
+    "hetzner_server_not_running",
+    "hetzner_volume_unattached",
+    // `rules/cloud/infomaniak.rs`
+    "infomaniak_product_locked",
+    "infomaniak_product_maintenance",
+    // `rules/cloud/ovh.rs`
+    "ovh_vps_down",
+    "ovh_dedicated_down",
+    // `rules/homeassistant.rs`
+    "homeassistant_safety_alert",
+    "homeassistant_alarm_triggered",
+    "homeassistant_problem_sensor",
+    // `rules/immich.rs`
+    "immich_maintenance_mode",
+    // `rules/nextcloud.rs`
+    "nextcloud_debug_mode",
+    "nextcloud_extended_support",
+    // `rules/opnsense.rs`
+    "opnsense_pf_disabled",
+    "opnsense_firmware_mirror_unreachable",
+    // `rules/pbs.rs`
+    "pbs_datastore_unavailable",
+    "pbs_datastore_maintenance",
+    "pbs_subscription_expired",
+    // `rules/pfsense.rs`
+    "pfsense_carp_maintenance",
+    // `rules/plex.rs`
+    "plex_remote_access_failed",
+    "plex_signin_lost",
+    "plex_database_backup_off",
+    // `rules/postgres.rs`
+    "postgres_replica_not_streaming",
+    "postgres_archiving_failing",
+    // `rules/pve.rs`
+    "pve_storage_inactive",
+    "pve_reboot_required",
+    "pve_subscription_expired",
+    // `rules/selfhosted.rs`
+    "sonarr_queue_errors",
+    "radarr_queue_errors",
+    "lidarr_queue_errors",
+    "sonarr_update_available",
+    "radarr_update_available",
+    "lidarr_update_available",
+    "prowlarr_update_available",
+    "qbittorrent_disconnected",
+    "frigate_camera_offline",
+    "frigate_update_available",
+    "keycloak_not_ready",
+    "authentik_not_ready",
+    "authentik_no_worker",
+    "authentik_update_available",
+    "vaultwarden_signups_open",
+    "mailcow_container_down",
+    // `rules/synology.rs`
+    "synology_system_crashed",
+    "synology_system_need_repair",
+    "synology_dsm_update_available",
+    "synology_volume_read_only",
+    "synology_volume_locked",
+    "synology_volume_inodes_full",
+    "synology_certificate_broken",
+    // `rules/tailscale.rs`
+    "tailscale_router_offline",
+    "tailscale_tailnet_lock_error",
+    // `rules/truenas.rs`
+    "truenas_boot_pool_degraded",
+    "truenas_backup_task_failed",
+    "truenas_app_crashed",
+    "truenas_vm_down",
+    // `rules/unifi.rs`
+    "unifi_device_overheating",
+    // `rules/unraid.rs`
+    "unraid_vm_crashed",
+    "unraid_license_problem",
+    // `rules/veeam.rs`
+    "veeam_repository_offline",
+    "veeam_license_invalid",
+    "veeam_config_backup_disabled",
+    // `rules/builtin_vendors.rs` : inventaire du réseau, uid en constantes.
+    RULE_NETSCAN_NEW_DEVICE,
+    RULE_NETSCAN_NEW_PORT,
+    RULE_NETSCAN_MAC_CHANGE,
+];
+
+/// Pose l'unité `bool` sur les règles « tout ou rien » qui n'en ont pas d'autre.
+pub(super) fn mark_flags(rules: &mut [Rule]) {
+    for rule in rules.iter_mut() {
+        if rule.unit.is_empty() && FLAG_RULES.contains(&rule.uid.as_str()) {
+            rule.unit = FLAG_UNIT.to_string();
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::alerting::model::Operator;
+    use crate::alerting::rules::builtin_rules;
+
+    #[test]
+    fn chaque_drapeau_designe_une_regle_livree() {
+        let rules = builtin_rules();
+        for uid in FLAG_RULES {
+            assert!(rules.iter().any(|rule| rule.uid == *uid), "{uid} is not a built-in rule");
+        }
+        let mut uids = FLAG_RULES.to_vec();
+        uids.sort_unstable();
+        let total = uids.len();
+        uids.dedup();
+        assert_eq!(uids.len(), total, "a flag rule is listed twice");
+    }
+
+    #[test]
+    fn un_drapeau_compare_a_zero_ou_un_sans_hysteresis() {
+        for rule in builtin_rules().iter().filter(|rule| rule.unit == FLAG_UNIT) {
+            let bit = match rule.operator {
+                Operator::Gt | Operator::Le => rule.threshold == 0.0,
+                Operator::Lt | Operator::Ge => rule.threshold == 1.0,
+            };
+            assert!(bit, "{} reads a 0/1 signal but compares it with {}", rule.uid, rule.threshold);
+            assert!(rule.clear_threshold.is_none(), "{} has a clear threshold", rule.uid);
+        }
+    }
+
+    #[test]
+    fn les_regles_livrees_marquees_portent_l_unite_bool() {
+        let rules = builtin_rules();
+        let overdue = rules.iter().find(|r| r.uid == "synology_abb_device_overdue").unwrap();
+        assert_eq!(overdue.unit, FLAG_UNIT);
+        // Une règle qui compte garde son seuil réglable.
+        let failing = rules.iter().find(|r| r.uid == "synology_abb_device_failing").unwrap();
+        assert_eq!(failing.unit, "");
+        assert!(!FLAG_RULES.contains(&"pve_tasks_failed"));
+    }
+}

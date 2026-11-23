@@ -1,0 +1,12 @@
+{
+	"w8rules_editor_error_hold": "Indique quanto tempo a condição deve durar: um número, 0 ou mais.",
+	"w8rules_editor_flag_label": "Quando dispara",
+	"w8rules_editor_flag_nothing": "Esta regra lê um sinal ligado/desligado: não há limiar a definir. Pode ainda escolher quanto tempo deve durar antes de ser avisado.",
+	"w8rules_editor_hold_anomaly_help": "Quanto tempo a anomalia deve durar antes de ser avisado. 0 avisa de imediato.",
+	"w8rules_editor_hold_help": "Quanto tempo a condição deve manter-se antes de ser avisado. 0 avisa na primeira verificação que a detetar.",
+	"w8rules_editor_hold_label": "Deve durar",
+	"w8rules_editor_threshold_duration_help": "Uma idade ou um atraso: introduza-o na unidade que lhe convier.",
+	"w8rules_list_summary_flag": "sinal ligado/desligado",
+	"w8rules_overrides_flag": "Regra ligado/desligado: nada a definir por dispositivo, apenas se se aplica.",
+	"w8rules_unitinput_aria": "{field}: unidade"
+}

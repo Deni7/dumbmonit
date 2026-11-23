@@ -25,6 +25,7 @@
 		type ProbeStatus
 	} from '#lib/format.js';
 	import { alertDetail, coveringSilence, formatAlertValue } from './helpers';
+	import { isFlagUnit } from './rules/units';
 	import { operatorSymbol, recentTransitions, secondsSince } from './facts';
 	import { fingerprintsOf, type Folded } from './list';
 	import { m } from '#lib/paraglide/messages.js';
@@ -140,9 +141,9 @@
 		// One series: the measured value reads next to the line it crossed.
 		return limit && alert?.value !== null && alert?.value !== undefined ? `${details[0]} (${m.alerts_row_limit({ limit })})` : details[0];
 	});
-	/** The rule's line, "> 90%": what the value is compared with. */
+	/** The rule's line, "> 90%": what the value is compared with. An on/off rule has none. */
 	const limit = $derived(
-		row.kind === 'alert' && row.rule
+		row.kind === 'alert' && row.rule && !isFlagUnit(row.rule.unit)
 			? `${operatorSymbol(row.rule.operator)} ${formatAlertValue(row.rule.threshold, row.rule.unit)}`
 			: ''
 	);
@@ -373,7 +374,7 @@
 					{/if}
 					<dt class="text-ink-3">{m.alerts_detail_rule()}</dt>
 					<dd class="break-words text-ink">{title}</dd>
-					{#if alert.value !== null && Number.isFinite(alert.value)}
+					{#if alert.value !== null && Number.isFinite(alert.value) && !isFlagUnit(row.rule?.unit)}
 						<dt class="text-ink-3">{m.alerts_detail_value()}</dt>
 						<dd class="tnum text-ink">
 							{formatAlertValue(alert.value, row.rule?.unit)}{#if limit}<span class="text-ink-2">
