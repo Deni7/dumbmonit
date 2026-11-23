@@ -156,9 +156,8 @@
 			/>
 		</div>
 	{/if}
-	{#if shown.length === 0}
-		<p class="py-3 text-[0.8125rem] text-ink-2" aria-live="polite">{m.w1alerts_silences_nomatch()}</p>
-	{/if}
+	<!-- Always in the page, so a search that empties the list is announced. -->
+	<p class="py-3 text-[0.8125rem] text-ink-2 empty:hidden" aria-live="polite">{#if shown.length === 0}{m.w1alerts_silences_nomatch()}{/if}</p>
 	<div class="space-y-2.5">
 		{#each shown as silence, i (silence.id)}
 			<div
@@ -172,7 +171,7 @@
 						{:else}
 							<Plate tone="ghost" label={m.alerts_silences_scheduled()} />
 						{/if}
-						<span class="truncate font-semibold text-ink">{silence.name}</span>
+						<span class="min-w-0 truncate font-semibold text-ink" title={silence.name}>{silence.name}</span>
 						<FileManagedBadge kind="silence" id={silence.name} />
 					</div>
 					<!-- Phones: scope and the one date that matters (until / next), no separators, no comment. -->

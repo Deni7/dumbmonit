@@ -18,7 +18,7 @@
 	import { toChartEvents } from '#lib/annotations/events.js';
 	import { snapRange } from '#lib/annotations/layout.js';
 	import type { ChartEvent } from '#lib/components/Chart.svelte';
-	import { Button, Confirm, ErrorNotice, Toggle } from '#lib/ui/index.js';
+	import { Button, Confirm, ErrorNotice, Skeleton, Toggle } from '#lib/ui/index.js';
 	import AnnotationForm from './AnnotationForm.svelte';
 
 	interface Props {
@@ -50,6 +50,8 @@
 	let shown = $state(readShown());
 	let annotations = $state.raw<Annotation[]>([]);
 	let loadError = $state<unknown>(null);
+	/** Set after the first answer, so "no marker" never shows while the list is on its way. */
+	let loaded = $state(false);
 	let adding = $state(false);
 
 	const canWrite = $derived(auth.canOperate && targetId !== undefined);
@@ -76,6 +78,7 @@
 					: null;
 		if (!span) {
 			annotations = [];
+			loaded = true;
 			return;
 		}
 		try {
@@ -87,9 +90,11 @@
 			});
 			annotations = Array.isArray(found) ? found : [];
 			loadError = null;
+			loaded = true;
 		} catch (cause) {
 			if (signal?.aborted) return;
 			loadError = cause;
+			loaded = true;
 			return false;
 		}
 	}
@@ -180,7 +185,9 @@
 		<div class="mt-3"><ErrorNotice error={loadError} onretry={() => void load()} /></div>
 	{/if}
 
-	{#if listed.length === 0}
+	{#if !loaded}
+		<div class="mt-2"><Skeleton class="h-4 w-48 max-w-full" /></div>
+	{:else if listed.length === 0}
 		{#if !loadError}<p class="mt-2 text-[0.8125rem] text-ink-2">{m.w5annot_panel_empty()}</p>{/if}
 	{:else}
 		<ul class="mt-2 divide-y divide-line" aria-label={m.w5annot_panel_list_label()}>
@@ -190,7 +197,7 @@
 						<p class="break-words font-medium text-ink">{item.title}</p>
 						<p class="tnum text-ink-2">{whenOf(item)}</p>
 						{#if item.text}<p class="break-words text-ink-2">{item.text}</p>{/if}
-						<p class="text-ink-3">{metaOf(item)}</p>
+						<p class="break-words text-ink-2">{metaOf(item)}</p>
 						{#if /^https?:\/\//.test(item.link)}
 							<a
 								href={item.link}
