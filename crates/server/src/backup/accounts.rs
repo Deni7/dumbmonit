@@ -167,10 +167,7 @@ pub async fn collect(pool: &SqlitePool) -> Result<BundleAccounts> {
     .context("attributions des rôles personnalisés")?
     .iter()
     .map(|row| {
-        Ok(BundleRoleAssignment {
-            user: row.try_get("username")?,
-            role: row.try_get("role_name")?,
-        })
+        Ok(BundleRoleAssignment { user: row.try_get("username")?, role: row.try_get("role_name")? })
     })
     .collect::<Result<_>>()?;
 

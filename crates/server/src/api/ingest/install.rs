@@ -1,8 +1,8 @@
 //! Paramètres d'installation des agents : commandes, passerelles de relais et révocation de jetons.
 
+use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
-use axum::Json;
 use dumbmonit_proto::TargetId;
 use serde::{Deserialize, Serialize};
 
@@ -14,8 +14,6 @@ use crate::auth::clients;
 use crate::auth::middleware::{AdminIdentity, Authenticated};
 use crate::collectors::agent;
 use crate::state::AppState;
-
-use super::TokenPayload;
 
 /// Tout ce qu'une commande d'installation porte, hormis le jeton.
 ///

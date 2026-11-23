@@ -44,11 +44,6 @@ mod items;
 mod public;
 mod public_build;
 
-pub use feeds::*;
-pub use incidents::*;
-pub use items::*;
-pub use public::*;
-pub use public_build::*;
 use crate::auth::teams::TeamAccess;
 use crate::db::status_pages::{
     DEFAULT_SCENE, GroupLabel, Incident, IncidentInput, IncidentUpdate, LEGACY_SCENES, PageItem,
@@ -59,6 +54,11 @@ use crate::db::targets::TargetStatus;
 use crate::state::AppState;
 use crate::status_seo::Seo;
 use crate::tsdb::{InstantSeries, Victoria, log_query_failure};
+pub use feeds::*;
+pub use incidents::*;
+pub use items::*;
+pub use public::*;
+use public_build::*;
 
 // --------------------------------------------------------------------------
 // Constantes

@@ -5,8 +5,6 @@ use sqlx::SqlitePool;
 
 use super::Role;
 
-}
-
 /// Ferme les sessions d'un écran mural qui quitte ce rôle, avant le
 /// changement. Sa session se renouvelle tant qu'il affiche le mur : laissée
 /// ouverte, elle donnerait au premier passant devant l'écran tout ce que le

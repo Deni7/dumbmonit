@@ -49,7 +49,7 @@ pub async fn create_silence(
             let client = clients::target_client(&state.pool, target).await?;
             clients::assign(&state.pool, clients::Kind::Silence, &[silence.id], client)
                 .await
-                .map_err(super::clients::api_error)?;
+                .map_err(crate::api::clients::api_error)?;
         }
         None => clients::adopt(&state.pool, &access, clients::Kind::Silence, silence.id).await?,
     }
@@ -111,7 +111,7 @@ pub async fn update_silence(
         let client = clients::target_client(&state.pool, target).await?;
         clients::assign(&state.pool, clients::Kind::Silence, &[silence.id], client)
             .await
-            .map_err(super::clients::api_error)?;
+            .map_err(crate::api::clients::api_error)?;
     }
     Ok(Json(SilenceView::new(silence, Utc::now())))
 }

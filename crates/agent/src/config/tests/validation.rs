@@ -4,10 +4,8 @@ use super::*;
 
 #[test]
 fn too_short_an_interval_is_refused() {
-    let config = Config::merge(
-        file_with_url_and_token(),
-        env(&[("DUMBMONIT_AGENT_INTERVAL_SECS", "1")]),
-    );
+    let config =
+        Config::merge(file_with_url_and_token(), env(&[("DUMBMONIT_AGENT_INTERVAL_SECS", "1")]));
     assert!(config.is_err());
 }
 
@@ -88,11 +86,9 @@ fn databases_are_detected_by_default_without_any_backup_path() {
     let config = Config::merge(file_with_url_and_token(), env(&[])).expect("configuration");
     assert_eq!(config.databases, DatabasesConfig::default());
     assert!(config.databases.enabled && config.databases.backups.is_empty());
-    let off = Config::merge(
-        file_with_url_and_token(),
-        env(&[("DUMBMONIT_AGENT_DATABASES", "false")]),
-    )
-    .expect("configuration");
+    let off =
+        Config::merge(file_with_url_and_token(), env(&[("DUMBMONIT_AGENT_DATABASES", "false")]))
+            .expect("configuration");
     assert!(!off.databases.enabled);
     let listed = Config::merge(with_yaml("modules: [docker]\n"), env(&[])).expect("config");
     assert!(!listed.databases.enabled, "absent de la liste des modules");
@@ -118,7 +114,8 @@ fn invalid_database_backup_sections_are_refused() {
     assert!(error.to_string().contains("unknown engine 'oracle'"), "{error}");
     let empty = "databases:\n  backups:\n    postgresql:\n      paths: []\n";
     assert!(Config::merge(with_yaml(empty), env(&[])).is_err());
-    let zero = "databases:\n  backups:\n    postgresql:\n      paths: [/x/*]\n      max_age_hours: 0\n";
+    let zero =
+        "databases:\n  backups:\n    postgresql:\n      paths: [/x/*]\n      max_age_hours: 0\n";
     assert!(Config::merge(with_yaml(zero), env(&[])).is_err());
     let fast = "databases:\n  interval_secs: 5\n";
     assert!(Config::merge(with_yaml(fast), env(&[])).is_err());
@@ -153,9 +150,8 @@ fn the_outbound_proxy_comes_from_the_file_or_the_environment() {
     let config = Config::merge(file_with_url_and_token(), env(&[])).unwrap();
     assert_eq!(config.proxy.mode, ProxyMode::Environment);
 
-    let file = from_yaml(
-        "proxy: http://jo:s3cret@proxy.corp:3128\nno_proxy: [.corp.lan, 10.0.0.0/8]\n",
-    );
+    let file =
+        from_yaml("proxy: http://jo:s3cret@proxy.corp:3128\nno_proxy: [.corp.lan, 10.0.0.0/8]\n");
     let config = Config::merge(file, env(&[])).unwrap();
     let ProxyMode::Explicit(url) = &config.proxy.mode else { panic!("explicite") };
     assert_eq!(url.url, "http://proxy.corp:3128/");
@@ -255,8 +251,7 @@ fn the_mdaemon_preset_is_automatic_by_default_and_follows_the_environment() {
     .expect("configuration");
     assert_eq!(config.perf_counters.mdaemon, PresetMode::On);
     // Point-virgule : la virgule appartient ici au nom de l'instance.
-    let paths: Vec<&str> =
-        config.perf_counters.counters.iter().map(|c| c.path.as_str()).collect();
+    let paths: Vec<&str> = config.perf_counters.counters.iter().map(|c| c.path.as_str()).collect();
     assert_eq!(
         paths,
         [r"\Processor Information(0,1)\% Processor Time", r"\Memory\Available MBytes"]

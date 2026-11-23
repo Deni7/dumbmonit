@@ -36,8 +36,7 @@ fn device_queries_merge_every_series_of_a_target() {
     let sel = r#"target=~"3|4""#;
     let presence = presence_query(sel, "1d");
     assert!(
-        presence
-            .contains(r#"sum by (target) (count_over_time(dumbmonit_up{target=~"3|4"}[5m]))"#),
+        presence.contains(r#"sum by (target) (count_over_time(dumbmonit_up{target=~"3|4"}[5m]))"#),
         "{presence}"
     );
     assert!(presence.starts_with("avg_over_time(((sum by (target)"), "{presence}");
@@ -102,8 +101,7 @@ fn disabled_device_stops_counting_at_last_sample() {
     assert_eq!(rescale(50.0, day, paused), Some(100.0));
     // Les jours suivants : aucune couverture, donc aucune valeur (gris).
     for d in 8..=10 {
-        let covered =
-            device_covered(d as f64 * day, (d + 1) as f64 * day, first, inactive, now);
+        let covered = device_covered(d as f64 * day, (d + 1) as f64 * day, first, inactive, now);
         assert!(covered <= 0.0);
         assert_eq!(rescale(0.0, day, covered), None);
     }

@@ -164,7 +164,8 @@ fn read_text<'a>(settings: &'a Value, key: &str) -> Result<Option<&'a str>, Noti
 
 /// Un gabarit intégré, analysé à chaque usage (quelques octets).
 fn builtin(source: &str) -> Template {
-    Template::parse_with(source, "default", is_known, String::new).expect("built-in templates are valid")
+    Template::parse_with(source, "default", is_known, String::new)
+        .expect("built-in templates are valid")
 }
 
 impl MessageTemplates {

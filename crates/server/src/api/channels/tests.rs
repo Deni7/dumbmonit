@@ -175,8 +175,8 @@ fn un_objet_vide_efface_toujours_les_secrets() {
         settings: json!({ "topic": "alertes" }),
         secrets: json!({ "token": "tk_ancien" }),
     };
-    let Ok(draft) = payload("ntfy", json!({ "topic": "alertes" }), Some(json!({})))
-        .validate(Some(&current))
+    let Ok(draft) =
+        payload("ntfy", json!({ "topic": "alertes" }), Some(json!({}))).validate(Some(&current))
     else {
         panic!("l'effacement aurait dû être accepté");
     };

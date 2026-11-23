@@ -23,8 +23,7 @@ fn a_malformed_counter_path_or_mdaemon_value_is_refused_at_startup() {
     assert!(format!("{error:#}").contains("perf_counters"), "{error:#}");
     assert!(Config::merge(from_yaml("mdaemon: sometimes\n"), env(&[])).is_err());
     assert!(
-        Config::merge(file_with_url_and_token(), env(&[("DUMBMONIT_AGENT_MDAEMON", "2")]))
-            .is_err()
+        Config::merge(file_with_url_and_token(), env(&[("DUMBMONIT_AGENT_MDAEMON", "2")])).is_err()
     );
 }
 
@@ -89,11 +88,9 @@ fn a_repository_entry_must_be_complete_and_unique() {
     )
     .expect("yaml");
     assert!(Config::merge(too_fast, env(&[])).is_err());
-    let off = Config::merge(
-        file_with_url_and_token(),
-        env(&[("DUMBMONIT_AGENT_WIREGUARD", "false")]),
-    )
-    .expect("configuration");
+    let off =
+        Config::merge(file_with_url_and_token(), env(&[("DUMBMONIT_AGENT_WIREGUARD", "false")]))
+            .expect("configuration");
     assert!(!off.wireguard.enabled);
 }
 
@@ -122,8 +119,7 @@ fn without_a_module_list_everything_is_auto_detected() {
 
 #[test]
 fn a_module_list_keeps_only_the_modules_it_names() {
-    let config =
-        Config::merge(with_yaml("modules: [docker, plakar]\n"), env(&[])).expect("config");
+    let config = Config::merge(with_yaml("modules: [docker, plakar]\n"), env(&[])).expect("config");
     assert!(config.docker);
     assert!(config.plakar.enabled);
     assert!(!config.sensors, "non demandé : pas de sondes");

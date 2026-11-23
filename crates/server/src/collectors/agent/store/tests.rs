@@ -65,8 +65,7 @@ async fn enrol(db: &TestDb, identity: &AgentIdentity, token_id: i64) -> Registra
 #[tokio::test]
 async fn a_created_token_can_be_verified_then_revoked() {
     let db = setup().await;
-    let (record, clear) =
-        create_token(&db.pool, TokenPolicy::default()).await.expect("création");
+    let (record, clear) = create_token(&db.pool, TokenPolicy::default()).await.expect("création");
 
     let found =
         find_active_token(&db.pool, &token::fingerprint(&clear)).await.expect("vérification");
@@ -115,10 +114,9 @@ async fn an_unknown_machine_registers_itself() {
     let db = setup().await;
     let token_id = token(&db, "parc").await;
 
-    let first =
-        register(&db.pool, &db.cipher, &identity("nas", Some("id-nas")), token_id, None)
-            .await
-            .expect("enregistrement");
+    let first = register(&db.pool, &db.cipher, &identity("nas", Some("id-nas")), token_id, None)
+        .await
+        .expect("enregistrement");
     assert!(first.created, "la première présentation crée la cible");
 
     let target = db::targets::get(&db.pool, &db.cipher, first.target_id)
@@ -426,10 +424,9 @@ async fn a_second_machine_cannot_claim_an_existing_registration() {
     let victim = enrol(&db, &identity("nas", Some("id-nas")), token_id).await;
 
     // Sans secret : refusé.
-    let error =
-        register(&db.pool, &db.cipher, &identity("pirate", Some("id-nas")), token_id, None)
-            .await
-            .expect_err("l'usurpation doit être refusée");
+    let error = register(&db.pool, &db.cipher, &identity("pirate", Some("id-nas")), token_id, None)
+        .await
+        .expect_err("l'usurpation doit être refusée");
     assert!(matches!(error, RegisterError::BindingMismatch), "{error:?}");
 
     // Avec un secret inventé : refusé aussi.
@@ -504,10 +501,9 @@ async fn an_agent_too_old_to_be_bound_is_not_enrolled() {
     let db = setup().await;
     let token_id = token(&db, "parc").await;
 
-    let error =
-        register(&db.pool, &db.cipher, &legacy("vieux", Some("id-vieux")), token_id, None)
-            .await
-            .expect_err("un agent qui ne sait pas se lier n'entre plus");
+    let error = register(&db.pool, &db.cipher, &legacy("vieux", Some("id-vieux")), token_id, None)
+        .await
+        .expect_err("un agent qui ne sait pas se lier n'entre plus");
     assert!(matches!(error, RegisterError::AgentTooOld), "{error:?}");
     // Rien n'a été créé, et le jeton n'a rien consommé.
     assert!(db::targets::list(&db.pool, &db.cipher).await.unwrap().is_empty());
@@ -521,9 +517,7 @@ async fn a_legacy_unbound_machine_is_refused_everywhere_until_re_enrolled() {
     let target_id = legacy_host(&db, "vieux-nas", "id-vieux", token_id).await;
 
     // Ni le binaire d'origine, ni un binaire à jour, même avec son propre jeton.
-    for agent in
-        [legacy("vieux-nas", Some("id-vieux")), identity("vieux-nas", Some("id-vieux"))]
-    {
+    for agent in [legacy("vieux-nas", Some("id-vieux")), identity("vieux-nas", Some("id-vieux"))] {
         let error = register(&db.pool, &db.cipher, &agent, token_id, None)
             .await
             .expect_err("une machine jamais liée est refusée");
@@ -614,9 +608,7 @@ async fn a_reinstalled_machine_rebinds_only_inside_the_window_someone_opened() {
         .expect_err("l'ancien secret est périmé"),
         RegisterError::BindingMismatch
     ));
-    assert!(
-        host(&db.pool, registration.target_id).await.unwrap().unwrap().rebind_until.is_none()
-    );
+    assert!(host(&db.pool, registration.target_id).await.unwrap().unwrap().rebind_until.is_none());
 
     // Une cible qui n'a pas d'agent n'ouvre aucune fenêtre.
     assert_eq!(allow_rebind(&db.pool, 4_242).await.unwrap(), None);
@@ -633,10 +625,9 @@ async fn a_single_use_token_enrols_one_machine_and_not_a_second() {
     let first = enrol(&db, &identity("portable", Some("id-1")), record.id).await;
     let secret = first.issued_secret.clone().expect("secret");
 
-    let error =
-        register(&db.pool, &db.cipher, &identity("autre", Some("id-2")), record.id, None)
-            .await
-            .expect_err("une seconde machine doit être refusée");
+    let error = register(&db.pool, &db.cipher, &identity("autre", Some("id-2")), record.id, None)
+        .await
+        .expect_err("une seconde machine doit être refusée");
     assert!(
         matches!(error, RegisterError::EnrolmentDenied(EnrolmentDenied::Exhausted)),
         "{error:?}"
@@ -745,15 +736,9 @@ async fn a_token_past_its_deadline_stops_enrolling_but_not_reporting() {
     ));
     // La machine déjà enrôlée n'est pas coupée pour autant.
     assert!(
-        register(
-            &db.pool,
-            &db.cipher,
-            &identity("nas", Some("id-nas")),
-            record.id,
-            Some(&secret)
-        )
-        .await
-        .is_ok()
+        register(&db.pool, &db.cipher, &identity("nas", Some("id-nas")), record.id, Some(&secret))
+            .await
+            .is_ok()
     );
     // Le jeton reste « actif » au sens de l'ingestion : seule la révocation ferme tout.
     assert!(find_active_token(&db.pool, &token::fingerprint("x")).await.unwrap().is_none());
@@ -776,8 +761,7 @@ async fn the_enrolment_count_starts_from_the_machines_already_there() {
 fn an_ad_domain_is_normalised_or_refused() {
     assert_eq!(clean_ad_domain(" Corp.Example.COM. ").as_deref(), Some("corp.example.com"));
     assert_eq!(clean_ad_domain("ad-01.lan").as_deref(), Some("ad-01.lan"));
-    for bad in ["", "  ", "corp..lan", "-corp.lan", "corp-.lan", "corp lan", "corp';exit;'.lan"]
-    {
+    for bad in ["", "  ", "corp..lan", "-corp.lan", "corp-.lan", "corp lan", "corp';exit;'.lan"] {
         assert_eq!(clean_ad_domain(bad), None, "{bad:?} doit être refusé");
     }
     assert_eq!(clean_ad_domain(&"a".repeat(64)), None, "étiquette de plus de 63 caractères");

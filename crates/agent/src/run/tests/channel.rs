@@ -99,8 +99,7 @@ async fn once_enrolled_an_agent_never_falls_back_to_the_plain_channel() {
     // Un état rangé verrouillé (déjà enrôlé une fois), certificat perdu :
     // l'agent doit se réenrôler, pas reparler en clair.
     let dir = tempfile::tempdir().unwrap();
-    let mut state =
-        TlsState::new(format!("https://127.0.0.1:{}", closed_port()), vec![PIN.into()]);
+    let mut state = TlsState::new(format!("https://127.0.0.1:{}", closed_port()), vec![PIN.into()]);
     state.locked = true;
     state.save(&crate::tls::beside(&dir.path().join("agent-secret"))).unwrap();
     let (url, calls) = crate::testsupport::fake_http(|_| (200, ACK.to_string())).await;

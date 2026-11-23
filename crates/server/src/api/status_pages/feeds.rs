@@ -71,7 +71,7 @@ pub async fn public_rss(
     State(state): State<AppState>,
     Path(slug): Path<String>,
     headers: HeaderMap,
-    origin: super::oidc::Origin,
+    origin: crate::api::oidc::Origin,
     Query(query): Query<RssQuery>,
 ) -> ApiResult<Response> {
     let (body, private) = load_public_checked(&state, &slug, &headers).await?;

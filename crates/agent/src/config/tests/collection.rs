@@ -87,11 +87,8 @@ fn docker_and_command_flags_follow_the_environment() {
     assert!(!config.docker_update_check);
     assert!(!config.commands);
     assert!(
-        Config::merge(
-            file_with_url_and_token(),
-            env(&[("DUMBMONIT_AGENT_COMMANDS", "peut-être")])
-        )
-        .is_err()
+        Config::merge(file_with_url_and_token(), env(&[("DUMBMONIT_AGENT_COMMANDS", "peut-être")]))
+            .is_err()
     );
 }
 
@@ -128,9 +125,8 @@ fn plakar_can_be_switched_off_from_the_file_or_the_environment() {
     let config = Config::merge(file, env(&[])).expect("configuration");
     assert!(!config.plakar.enabled);
 
-    let config =
-        Config::merge(file_with_url_and_token(), env(&[("DUMBMONIT_AGENT_PLAKAR", "0")]))
-            .expect("configuration");
+    let config = Config::merge(file_with_url_and_token(), env(&[("DUMBMONIT_AGENT_PLAKAR", "0")]))
+        .expect("configuration");
     assert!(!config.plakar.enabled);
     assert!(
         Config::merge(file_with_url_and_token(), env(&[("DUMBMONIT_AGENT_PLAKAR", "maybe")]))
@@ -151,9 +147,8 @@ fn libvirt_reads_the_system_uri_by_default_and_both_sources() {
         token: Some("dmon_abc".into()),
         ..dumbmonit_collectors::yaml::from_str(yaml).expect("YAML valide")
     };
-    let config =
-        Config::merge(file, env(&[("DUMBMONIT_AGENT_LIBVIRT_URI", "qemu:///session")]))
-            .expect("configuration");
+    let config = Config::merge(file, env(&[("DUMBMONIT_AGENT_LIBVIRT_URI", "qemu:///session")]))
+        .expect("configuration");
     assert_eq!(config.libvirt.bin, "/usr/bin/virsh");
     assert_eq!(config.libvirt.uri, "qemu:///session", "l'environnement prime");
     assert_eq!(config.libvirt.interval, Duration::from_secs(30));
@@ -163,9 +158,8 @@ fn libvirt_reads_the_system_uri_by_default_and_both_sources() {
         env(&[("DUMBMONIT_AGENT_LIBVIRT_INTERVAL_SECS", "5")]),
     );
     assert!(too_fast.is_err());
-    let off =
-        Config::merge(file_with_url_and_token(), env(&[("DUMBMONIT_AGENT_LIBVIRT", "0")]))
-            .expect("configuration");
+    let off = Config::merge(file_with_url_and_token(), env(&[("DUMBMONIT_AGENT_LIBVIRT", "0")]))
+        .expect("configuration");
     assert!(!off.libvirt.enabled);
 }
 

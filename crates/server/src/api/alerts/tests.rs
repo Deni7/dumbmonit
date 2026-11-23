@@ -79,10 +79,7 @@ fn les_regles_de_prevision_et_de_derive_sont_reconnues() {
 fn une_duree_negative_est_refusee() {
     assert!(refus(parse_duration(Some(-1), "The duration")).contains("negative"));
     assert_eq!(accepte(parse_duration(Some(0), "The duration")), None);
-    assert_eq!(
-        accepte(parse_duration(Some(30), "The duration")),
-        Some(Duration::from_secs(30))
-    );
+    assert_eq!(accepte(parse_duration(Some(30), "The duration")), Some(Duration::from_secs(30)));
 }
 
 #[test]
@@ -95,9 +92,7 @@ fn l_identifiant_reserve_de_la_regle_injoignable_est_protege() {
 fn un_seuil_de_retour_du_mauvais_cote_est_refuse() {
     assert!(refus(check_clear_threshold(Operator::Gt, 90.0, Some(95.0))).contains("below"));
     assert!(refus(check_clear_threshold(Operator::Lt, 10.0, Some(5.0))).contains("above"));
-    assert!(
-        refus(check_clear_threshold(Operator::Gt, 90.0, Some(f64::NAN))).contains("finite")
-    );
+    assert!(refus(check_clear_threshold(Operator::Gt, 90.0, Some(f64::NAN))).contains("finite"));
     accepte(check_clear_threshold(Operator::Gt, 90.0, Some(80.0)));
     accepte(check_clear_threshold(Operator::Le, 10.0, Some(12.0)));
     accepte(check_clear_threshold(Operator::Gt, 90.0, None));
@@ -209,8 +204,7 @@ fn les_reglages_d_anomalie_incoherents_sont_refuses() {
     assert!(refus(parse_params(Some(serde_json::json!({"alpha": 0})))).contains("alpha"));
     assert!(refus(parse_params(Some(serde_json::json!({"k": -1})))).contains("k"));
     assert!(
-        refus(parse_params(Some(serde_json::json!({"min_samples": 0}))))
-            .contains("min_samples")
+        refus(parse_params(Some(serde_json::json!({"min_samples": 0})))).contains("min_samples")
     );
     // Un objet partiel complète avec les valeurs du domaine.
     let params = accepte(parse_params(Some(serde_json::json!({"k": 4.0}))));

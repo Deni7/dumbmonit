@@ -278,7 +278,7 @@ pub(super) async fn public_banner_js() -> Response {
             (header::CACHE_CONTROL, "public, max-age=3600"),
             (HeaderName::from_static("cross-origin-resource-policy"), "cross-origin"),
         ],
-        include_str!("../../assets/banner.js"),
+        include_str!("../../../assets/banner.js"),
     )
         .into_response()
 }

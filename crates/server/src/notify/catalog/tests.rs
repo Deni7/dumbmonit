@@ -8,7 +8,7 @@ use super::*;
 use crate::notify::channel::test_config;
 use crate::notify::{NotifyError, build, http_client};
 
-const DOC: &str = include_str!("../../../../docs/notifications.md");
+const DOC: &str = include_str!("../../../../../docs/notifications.md");
 
 /// Ancre qu'un moteur Markdown classique attribue à un titre : minuscules,
 /// accents conservés, espaces en tirets, ponctuation supprimée.
@@ -74,11 +74,7 @@ fn chaque_type_de_canal_est_catalogue() {
         assert!(!kind.label.trim().is_empty(), "{}: empty label", kind.kind);
         assert!(!kind.summary.trim().is_empty(), "{}: empty summary", kind.kind);
         assert!(!kind.doc_url.is_empty(), "{}: empty documentation link", kind.kind);
-        assert!(
-            !kind.settings.is_empty() || !kind.secrets.is_empty(),
-            "{}: no field",
-            kind.kind
-        );
+        assert!(!kind.settings.is_empty() || !kind.secrets.is_empty(), "{}: no field", kind.kind);
     }
 }
 
@@ -174,15 +170,10 @@ fn un_choix_entre_deux_champs_est_explique_quand_aucun_n_est_rempli() {
         };
         assert!(matches!(error, NotifyError::Config(_)), "{}: {error}", kind.kind);
         let message = error.to_string();
-        assert!(
-            message.contains(first) && message.contains(second),
-            "{}: {message}",
-            kind.kind
-        );
+        assert!(message.contains(first) && message.contains(second), "{}: {message}", kind.kind);
         let all_fields: Vec<&Field> = kind.settings.iter().chain(&kind.secrets).collect();
         for key in [first, second] {
-            let field =
-                all_fields.iter().find(|f| f.key == key).expect("field of the alternative");
+            let field = all_fields.iter().find(|f| f.key == key).expect("field of the alternative");
             assert!(!field.required, "{}: \"{key}\" cannot be required", kind.kind);
             assert!(
                 field.help.contains("Required if"),
@@ -249,8 +240,7 @@ fn le_catalogue_se_serialise_avec_le_contrat_de_l_interface() {
     for key in ["kind", "label", "summary", "doc_url", "settings", "secrets", "actions"] {
         assert!(first.contains_key(key), "\"{key}\" missing from KindInfo");
     }
-    let field: &Map<String, Value> =
-        first["secrets"][0].as_object().expect("one object per field");
+    let field: &Map<String, Value> = first["secrets"][0].as_object().expect("one object per field");
     for key in ["key", "label", "required", "input", "help", "placeholder", "options"] {
         assert!(field.contains_key(key), "\"{key}\" missing from Field");
     }

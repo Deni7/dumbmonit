@@ -47,9 +47,7 @@ async fn a_requested_report_waits_for_the_loop_and_close_requests_make_one_batch
     client.request_report();
     // La demande est déjà là : l'attente rend la main aussitôt, le plafond
     // ne sert qu'à ne pas pendre si elle s'était perdue.
-    tokio::time::timeout(Duration::from_secs(5), signal.notified())
-        .await
-        .expect("demande gardée");
+    tokio::time::timeout(Duration::from_secs(5), signal.notified()).await.expect("demande gardée");
     let again = tokio::time::timeout(Duration::from_millis(50), signal.notified()).await;
     assert!(again.is_err(), "deux demandes rapprochées, un seul lot");
 }

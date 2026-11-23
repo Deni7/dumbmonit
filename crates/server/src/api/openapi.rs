@@ -527,8 +527,7 @@ mod tests {
                 }
                 let http = axum::http::Method::from_bytes(method.to_uppercase().as_bytes())
                     .expect("méthode");
-                let opened =
-                    Permission::ALL.into_iter().any(|p| p.allows(&http, &concrete(path)));
+                let opened = Permission::ALL.into_iter().any(|p| p.allows(&http, &concrete(path)));
                 let kept = KEPT_FOR_ADMINS
                     .iter()
                     .any(|(m, p)| m.eq_ignore_ascii_case(method) && p == path);

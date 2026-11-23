@@ -280,7 +280,11 @@ pub(super) async fn target_exists(state: &AppState, target_id: i64) -> ApiResult
 /// Un seuil de retour doit être du côté « calme » du seuil : en dessous pour
 /// « > » ou « ≥ », au-dessus pour « < » ou « ≤ ». Sinon l'alerte ne se
 /// résoudrait jamais, ou l'hystérésis ne servirait à rien.
-pub(super) fn check_clear_threshold(operator: Operator, threshold: f64, clear: Option<f64>) -> ApiResult<()> {
+pub(super) fn check_clear_threshold(
+    operator: Operator,
+    threshold: f64,
+    clear: Option<f64>,
+) -> ApiResult<()> {
     let Some(clear) = clear else { return Ok(()) };
     if !clear.is_finite() {
         return Err(ApiError::BadRequest("The clear threshold must be a finite number.".into()));

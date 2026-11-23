@@ -169,8 +169,7 @@ async fn the_inventory_rides_the_next_batch_and_is_forgotten_once_accepted() {
     let dir = tempfile::tempdir().unwrap();
     let answer = std::sync::Arc::new(std::sync::Mutex::new((503u16, "{}".to_string())));
     let shared = answer.clone();
-    let (url, calls) =
-        crate::testsupport::fake_http(move |_| shared.lock().unwrap().clone()).await;
+    let (url, calls) = crate::testsupport::fake_http(move |_| shared.lock().unwrap().clone()).await;
     let mut agent = agent_for(&url, &dir);
     let samples = agent.collect().await;
     // Activé après la collecte : la tâche de fond n'a pas à tourner ici.
@@ -263,9 +262,9 @@ async fn a_collection_cycle_produces_metrics_for_the_local_machine() {
         s.labels.get("mountpoint").is_none_or(|m| !m.starts_with("/var/lib/docker/"))
     }));
     assert!(
-        samples.iter().all(|s| {
-            !s.metric.starts_with("disk_") || !s.labels.contains_key("mountpoint")
-        })
+        samples
+            .iter()
+            .all(|s| { !s.metric.starts_with("disk_") || !s.labels.contains_key("mountpoint") })
     );
 }
 

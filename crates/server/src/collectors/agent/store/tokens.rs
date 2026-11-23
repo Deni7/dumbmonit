@@ -347,7 +347,11 @@ pub(super) async fn enrolment_allowed_for(
 
 /// Reporte sur la machine le mode relais porté par son jeton d'enrôlement.
 /// Sans effet pour un jeton ordinaire : un réglage fait dans l'interface reste.
-pub(super) async fn apply_token_relay(pool: &SqlitePool, target_id: TargetId, token_id: i64) -> Result<()> {
+pub(super) async fn apply_token_relay(
+    pool: &SqlitePool,
+    target_id: TargetId,
+    token_id: i64,
+) -> Result<()> {
     sqlx::query(
         "UPDATE agent_hosts
          SET relay_wanted = 1,
@@ -558,4 +562,21 @@ pub async fn touch_token(pool: &SqlitePool, id: i64) -> Result<()> {
     .await
     .context("updating the token timestamp")?;
     Ok(())
+}
+
+pub(super) fn row_to_token(row: &sqlx::sqlite::SqliteRow) -> Result<TokenRecord> {
+    Ok(TokenRecord {
+        id: row.try_get("id")?,
+        name: row.try_get("name")?,
+        prefix: row.try_get("prefix")?,
+        created_at: row.try_get("created_at")?,
+        last_used_at: row.try_get("last_used_at")?,
+        revoked_at: row.try_get("revoked_at")?,
+        max_uses: row.try_get("max_uses")?,
+        uses: row.try_get("uses")?,
+        expires_at: row.try_get("expires_at")?,
+        relay: row.try_get::<i64, _>("relay")? != 0,
+        relay_site: row.try_get("relay_site")?,
+        ad_domain: row.try_get("ad_domain")?,
+    })
 }

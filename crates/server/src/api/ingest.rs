@@ -12,8 +12,8 @@
 
 use std::sync::LazyLock;
 
-use axum::extract::rejection::JsonRejection;
 use axum::extract::State;
+use axum::extract::rejection::JsonRejection;
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::{Extension, Json};

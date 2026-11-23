@@ -7,8 +7,7 @@ async fn the_binding_secret_issued_by_the_server_is_kept_then_forgotten_on_refus
     let dir = tempfile::tempdir().unwrap();
     let answer = std::sync::Arc::new(std::sync::Mutex::new((200u16, ACK.to_string())));
     let shared = answer.clone();
-    let (url, calls) =
-        crate::testsupport::fake_http(move |_| shared.lock().unwrap().clone()).await;
+    let (url, calls) = crate::testsupport::fake_http(move |_| shared.lock().unwrap().clone()).await;
     let mut agent = agent_for(&url, &dir);
     let samples = agent.collect().await;
     agent.buffer.push(samples);
@@ -76,8 +75,7 @@ async fn a_403_that_is_not_the_binding_refusal_keeps_the_secret() {
     let dir = tempfile::tempdir().unwrap();
     let answer = std::sync::Arc::new(std::sync::Mutex::new((200u16, ACK.to_string())));
     let shared = answer.clone();
-    let (url, calls) =
-        crate::testsupport::fake_http(move |_| shared.lock().unwrap().clone()).await;
+    let (url, calls) = crate::testsupport::fake_http(move |_| shared.lock().unwrap().clone()).await;
     let mut agent = agent_for(&url, &dir);
     let samples = agent.collect().await;
     agent.buffer.push(samples);

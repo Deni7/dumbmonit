@@ -158,8 +158,7 @@ async fn an_unreachable_primary_hands_over_to_the_backup_then_back() {
         (200, ACK.to_string())
     })
     .await;
-    let (backup, backup_calls) =
-        crate::testsupport::fake_http(|_| (200, ACK.to_string())).await;
+    let (backup, backup_calls) = crate::testsupport::fake_http(|_| (200, ACK.to_string())).await;
     let dir = tempfile::tempdir().unwrap();
     let mut config = config();
     config.server_url = primary.clone();

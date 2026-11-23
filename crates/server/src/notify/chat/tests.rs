@@ -318,9 +318,7 @@ fn chaque_service_annonce_son_type() {
         "rocketchat"
     );
     assert_eq!(
-        GoogleChat::new(client(), &test_config("googlechat", json!({}), webhook))
-            .unwrap()
-            .kind(),
+        GoogleChat::new(client(), &test_config("googlechat", json!({}), webhook)).unwrap().kind(),
         "googlechat"
     );
 }

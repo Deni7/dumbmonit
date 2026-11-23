@@ -59,8 +59,7 @@ fn group(items: Vec<GroupItem>) -> AlertGroup {
 
 #[test]
 fn une_alerte_unique_donne_un_titre_explicite() {
-    let message =
-        render(&group(vec![item("Disk full", NotifyReason::Firing, Severity::Warning)]));
+    let message = render(&group(vec![item("Disk full", NotifyReason::Firing, Severity::Warning)]));
     assert_eq!(message.title, "nas — Disk full");
     assert!(message.text.contains("95 %"));
     assert!(message.text.contains("threshold > 90 %"));
@@ -87,10 +86,7 @@ fn la_ligne_nomme_la_serie_derriere_l_alerte() {
     vm.threshold = 0.0;
     vm.unit = String::new();
     let message = render(&group(vec![vm]));
-    assert_eq!(
-        message.text,
-        "Warning · VM or container stopped — win11-desktop (101), for 1 h"
-    );
+    assert_eq!(message.text, "Warning · VM or container stopped — win11-desktop (101), for 1 h");
 
     let mut node = item("Proxmox node offline", NotifyReason::Firing, Severity::Critical);
     node.series_key =
@@ -110,23 +106,18 @@ fn la_ligne_nomme_la_serie_derriere_l_alerte() {
     // Une série sans autre étiquette que celles de l'équipement n'ajoute rien.
     let mut host = item("Monitor unreachable", NotifyReason::Firing, Severity::Critical);
     host.series_key = r#"dumbmonit_up{host="nas",tag_site="cellar",target="1"}"#.to_string();
-    assert!(
-        render(&group(vec![host])).text.starts_with("Critical · Monitor unreachable — 95 %")
-    );
+    assert!(render(&group(vec![host])).text.starts_with("Critical · Monitor unreachable — 95 %"));
 }
 
 #[test]
 fn l_identite_d_une_serie_prefere_les_etiquettes_parlantes() {
     assert_eq!(
-        series_identity(r#"m{datastore="main",group="vm/101",host="pbs",target="12"}"#)
-            .as_deref(),
+        series_identity(r#"m{datastore="main",group="vm/101",host="pbs",target="12"}"#).as_deref(),
         Some("vm/101 · main")
     );
     assert_eq!(
-        series_identity(
-            r#"m{host="nas",result="fail",target="13",task="Office VMs",task_id="6"}"#
-        )
-        .as_deref(),
+        series_identity(r#"m{host="nas",result="fail",target="13",task="Office VMs",task_id="6"}"#)
+            .as_deref(),
         Some("Office VMs")
     );
     assert_eq!(
@@ -206,8 +197,7 @@ fn un_groupe_entierement_resolu_le_dit_dans_son_titre() {
 
 #[test]
 fn une_escalade_est_annoncee_dans_la_ligne() {
-    let message =
-        render(&group(vec![item("CPU", NotifyReason::Escalation, Severity::Critical)]));
+    let message = render(&group(vec![item("CPU", NotifyReason::Escalation, Severity::Critical)]));
     assert!(message.text.contains("escalation"));
 }
 
@@ -255,8 +245,7 @@ fn la_priorite_suit_la_severite() {
 
 #[test]
 fn la_table_de_substitution_couvre_exactement_les_variables_annoncees() {
-    let message =
-        render(&group(vec![item("Disk full", NotifyReason::Firing, Severity::Warning)]));
+    let message = render(&group(vec![item("Disk full", NotifyReason::Firing, Severity::Warning)]));
     let variables = message.variables();
     for (nom, description) in TEMPLATE_VARIABLES {
         assert!(variables.contains_key(nom), "\"{nom}\" is documented but missing");
@@ -308,9 +297,8 @@ fn une_alerte_sans_valeur_laisse_les_variables_chiffrees_vides() {
 
 #[test]
 fn une_resolution_le_dit_dans_ses_variables() {
-    let vars =
-        render(&group(vec![item("Disk full", NotifyReason::Resolved, Severity::Warning)]))
-            .variables();
+    let vars = render(&group(vec![item("Disk full", NotifyReason::Resolved, Severity::Warning)]))
+        .variables();
     assert_eq!(vars["status"], "resolved");
     assert_eq!(vars["status_fr"], "résolu");
     assert_eq!(vars["emoji"], "OK");
@@ -332,8 +320,7 @@ fn les_liens_d_action_visent_les_alertes_actives_seulement() {
     reminder.fingerprint = "cpu@1".into();
     let mut resolved = item("RAM", NotifyReason::Resolved, Severity::Warning);
     resolved.fingerprint = "ram@1".into();
-    let d =
-        digest(vec![group(vec![firing, reminder.clone(), resolved]), group(vec![reminder])]);
+    let d = digest(vec![group(vec![firing, reminder.clone(), resolved]), group(vec![reminder])]);
     let fingerprints: Vec<String> =
         actionable_alerts(&d).into_iter().map(|alert| alert.fingerprint).collect();
     assert_eq!(fingerprints, vec!["disk@1", "cpu@1"]);
@@ -433,11 +420,7 @@ fn la_fin_des_heures_calmes_mentionne_ce_qui_s_est_resolu_entre_temps() {
         "{}",
         message.title
     );
-    assert!(
-        message.text.contains("Resolved during quiet hours: CPU (router)"),
-        "{}",
-        message.text
-    );
+    assert!(message.text.contains("Resolved during quiet hours: CPU (router)"), "{}", message.text);
 }
 
 #[test]

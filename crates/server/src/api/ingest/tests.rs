@@ -173,10 +173,7 @@ fn over_a_self_signed_certificate_both_commands_pin_the_server_key() {
     assert!(!windows.contains("http://"), "{windows}");
     assert!(windows.contains("ServerCertificateValidationCallback"), "{windows}");
     assert!(windows.contains(&format!("-ceq '{PIN}'")), "{windows}");
-    assert!(
-        windows.contains("DownloadString('https://nas.lan:8080/install.ps1')"),
-        "{windows}"
-    );
+    assert!(windows.contains("DownloadString('https://nas.lan:8080/install.ps1')"), "{windows}");
     assert!(windows.contains(&format!(" -Url https://nas.lan:8080 -PinnedKey {PIN}")));
     assert!(windows.contains(P256_SPKI_PREFIX));
     // Le rappel précède le téléchargement.

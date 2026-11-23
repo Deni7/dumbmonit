@@ -22,13 +22,8 @@ fn counts(report: &RestoreReport, name: &str) -> (usize, usize, usize) {
 }
 
 async fn viewer(pool: &SqlitePool, username: &str) -> i64 {
-    let new = NewUser {
-        username,
-        display_name: "",
-        role: Role::Viewer,
-        password_hash: None,
-        oidc: None,
-    };
+    let new =
+        NewUser { username, display_name: "", role: Role::Viewer, password_hash: None, oidc: None };
     users::insert(pool, new).await.unwrap().expect("compte")
 }
 

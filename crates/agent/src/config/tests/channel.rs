@@ -89,8 +89,8 @@ fn the_disk_buffer_bound_comes_from_the_file_or_the_environment() {
     assert_eq!(Config::merge(file, env(&[])).expect("configuration").buffer_max_mb, 64);
 
     let file = FileConfig { buffer_max_mb: Some(64), ..file_with_url_and_token() };
-    let config = Config::merge(file, env(&[("DUMBMONIT_AGENT_BUFFER_MAX_MB", "0")]))
-        .expect("configuration");
+    let config =
+        Config::merge(file, env(&[("DUMBMONIT_AGENT_BUFFER_MAX_MB", "0")])).expect("configuration");
     assert_eq!(config.buffer_max_mb, 0, "zéro coupe le tampon disque");
 
     let bad = env(&[("DUMBMONIT_AGENT_BUFFER_MAX_MB", "beaucoup")]);
@@ -198,9 +198,8 @@ fn relay_mode_and_site_come_from_the_file_or_the_environment() {
     assert_eq!(config.site.as_deref(), Some("Datacenter"));
 
     // Un site vide n'est pas un site.
-    let config =
-        Config::merge(file_with_url_and_token(), env(&[("DUMBMONIT_AGENT_SITE", "  ")]))
-            .expect("configuration");
+    let config = Config::merge(file_with_url_and_token(), env(&[("DUMBMONIT_AGENT_SITE", "  ")]))
+        .expect("configuration");
     assert_eq!(config.site, None);
 }
 

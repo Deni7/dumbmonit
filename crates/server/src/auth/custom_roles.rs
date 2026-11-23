@@ -128,7 +128,7 @@ const SELECT: &str = "SELECT r.id, r.name, r.description, r.permissions, r.creat
      FROM custom_roles r";
 
 pub async fn list(pool: &SqlitePool) -> Result<Vec<CustomRole>> {
-    let rows = sqlx::query(&format!("{SELECT} ORDER BY r.name COLLATE NOCASE"))
+    let rows = sqlx::query(sqlx::AssertSqlSafe(format!("{SELECT} ORDER BY r.name COLLATE NOCASE")))
         .fetch_all(pool)
         .await
         .context("liste des rôles personnalisés")?;
@@ -136,7 +136,7 @@ pub async fn list(pool: &SqlitePool) -> Result<Vec<CustomRole>> {
 }
 
 pub async fn get(pool: &SqlitePool, id: i64) -> Result<Option<CustomRole>> {
-    let row = sqlx::query(&format!("{SELECT} WHERE r.id = ?"))
+    let row = sqlx::query(sqlx::AssertSqlSafe(format!("{SELECT} WHERE r.id = ?")))
         .bind(id)
         .fetch_optional(pool)
         .await
@@ -145,7 +145,7 @@ pub async fn get(pool: &SqlitePool, id: i64) -> Result<Option<CustomRole>> {
 }
 
 pub async fn by_name(pool: &SqlitePool, name: &str) -> Result<Option<CustomRole>> {
-    let row = sqlx::query(&format!("{SELECT} WHERE r.name = ? COLLATE NOCASE"))
+    let row = sqlx::query(sqlx::AssertSqlSafe(format!("{SELECT} WHERE r.name = ? COLLATE NOCASE")))
         .bind(name.trim())
         .fetch_optional(pool)
         .await
