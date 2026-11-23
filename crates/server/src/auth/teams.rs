@@ -345,7 +345,8 @@ async fn team_access_for_user(pool: &SqlitePool, user: &User) -> Result<Access> 
         return Ok(match settings(pool).await?.unassigned_access {
             UnassignedAccess::All => Access::All,
             UnassignedAccess::None => {
-                Access::Scoped(Arc::new(Scope::nothing(Level::ceiling(user.role))))
+                let ceiling = crate::auth::permissions::team_ceiling(user);
+                Access::Scoped(Arc::new(Scope::nothing(ceiling)))
             }
         });
     }
@@ -364,7 +365,7 @@ async fn team_access_for_user(pool: &SqlitePool, user: &User) -> Result<Access> 
         }
     }
     Ok(Access::Scoped(Arc::new(Scope {
-        ceiling: Level::ceiling(user.role),
+        ceiling: crate::auth::permissions::team_ceiling(user),
         grants,
         teams,
         clients: None,

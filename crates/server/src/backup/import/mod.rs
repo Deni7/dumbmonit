@@ -114,6 +114,8 @@ pub async fn restore(
         ..RestoreReport::default()
     };
 
+    // Les rôles personnalisés avant les comptes, qui les citent.
+    report.push(crate::backup::accounts::restore_roles(&mut tx, &bundle.accounts).await?);
     report.push(restore_users(&mut tx, cipher, bundle).await?);
     // Les clients avant le reste : leurs membres sont des comptes, et les
     // rattachements, appliqués à la fin, les désignent par leur nom.

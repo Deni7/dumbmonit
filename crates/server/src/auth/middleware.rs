@@ -13,7 +13,8 @@
 //! (liste des comptes, réglages SSO) le disent elles-mêmes avec l'extracteur
 //! [`AdminUser`]. Le quatrième rôle, `wall` (écran mural), n'a droit qu'à la
 //! liste blanche [`wall::WALL_ROUTES`] : le reste lui répond 403, lectures
-//! comprises.
+//! comprises. Un compte à rôle personnalisé est un lecteur à qui ses
+//! permissions ouvrent leurs routes, et rien d'autre ([`permissions`]).
 //!
 //! Deux façons de se présenter : le cookie de session d'un navigateur, ou un
 //! jeton d'API (`Authorization: Bearer dmt_…`) pour les scripts et les
@@ -36,6 +37,7 @@ use sqlx::SqlitePool;
 use crate::auth::session::SessionToken;
 use crate::auth::token::{self, ApiToken, Scope};
 use crate::auth::users::{self, User};
+use crate::auth::permissions::{self, Delegated};
 use crate::auth::{AuthError, AuthState, clients, cookie, policy, session, teams, wall};
 use crate::state::AppState;
 
@@ -172,6 +174,7 @@ pub const TOKEN_DENIED: &[&str] = &[
     "/users",
     "/teams",
     "/clients",
+    "/roles",
     "/tokens",
     "/agent/tokens",
     "/agent/ad-kit",
@@ -302,6 +305,9 @@ pub async fn require_session(
         }
     }
 
+    // Rôle personnalisé : la permission qui ouvre cette route, s'il y en a une.
+    let delegated = permissions::granted(&user, request.method(), request.uri().path());
+
     let access = match teams::access_for_user(&state.pool, &user).await {
         Ok(access) => access,
         Err(error) => return AuthError::from(error).into_response(),
@@ -326,6 +332,7 @@ pub async fn require_session(
         // après, par le garde des équipes.
         let allowed = user.role.is_admin()
             || is_self_service(path)
+            || delegated.is_some()
             || (user.role.can_operate() && is_operator_route(request.method(), path))
             || (user.role.can_operate()
                 && access.is_scoped()
@@ -342,6 +349,9 @@ pub async fn require_session(
     }
 
     request.extensions_mut().insert(teams::CurrentAccess(access));
+    if let Some(permission) = delegated {
+        request.extensions_mut().insert(Delegated(permission));
+    }
 
     // Dernière activité, pour la liste « mes sessions » : au plus une écriture
     // toutes les quelques minutes, et seulement pour une requête admise. Un
@@ -587,7 +597,8 @@ impl<S: Send + Sync> FromRequestParts<S> for Identity {
     }
 }
 
-/// Extracteur : une identité d'administrateur — compte `admin` ou jeton `write`.
+/// Extracteur : une identité d'administrateur — compte `admin` ou jeton `write`
+/// — ou un compte dont le rôle personnalisé ouvre cette route ([`Delegated`]).
 pub struct AdminIdentity(pub Principal);
 
 impl<S: Send + Sync> FromRequestParts<S> for AdminIdentity {
@@ -595,7 +606,7 @@ impl<S: Send + Sync> FromRequestParts<S> for AdminIdentity {
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let Identity(principal) = Identity::from_request_parts(parts, state).await?;
-        if !principal.is_admin() {
+        if !principal.is_admin() && parts.extensions.get::<Delegated>().is_none() {
             return Err(AuthError::admin_required());
         }
         Ok(Self(principal))
@@ -612,7 +623,7 @@ impl<S: Send + Sync> FromRequestParts<S> for OperatorIdentity {
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let Identity(principal) = Identity::from_request_parts(parts, state).await?;
-        if !principal.can_operate() {
+        if !principal.can_operate() && parts.extensions.get::<Delegated>().is_none() {
             return Err(AuthError::operator_required());
         }
         Ok(Self(principal))

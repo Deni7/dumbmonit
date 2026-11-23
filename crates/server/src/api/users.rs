@@ -1,4 +1,5 @@
-//! Administration des comptes. Réservée aux administrateurs.
+//! Administration des comptes. Réservée aux administrateurs, comme celle des
+//! rôles personnalisés qu'on leur donne (`roles.rs`).
 //!
 //! Une règle traverse toutes ces routes : il reste toujours au moins un
 //! administrateur actif. Sans elle, une instance pourrait se retrouver avec des
@@ -13,7 +14,7 @@ use crate::api::auth::UserView;
 use crate::auth::client_ip::ClientIp;
 use crate::auth::middleware::AdminUser;
 use crate::auth::users::{self, NewUser, Role, User};
-use crate::auth::{AuthError, AuthResult, audit, ldap, oidc, password};
+use crate::auth::{AuthError, AuthResult, audit, custom_roles, ldap, oidc, password};
 use crate::state::AppState;
 
 #[derive(Deserialize)]
@@ -22,6 +23,9 @@ pub struct CreatePayload {
     #[serde(default)]
     display_name: Option<String>,
     role: Role,
+    /// Rôle personnalisé (`/api/roles`) ; le rôle livré est alors `viewer`.
+    #[serde(default)]
+    custom_role_id: Option<i64>,
     #[serde(default)]
     password: Option<String>,
     /// Facultative ; vide : aucune.
@@ -43,8 +47,13 @@ impl std::fmt::Debug for CreatePayload {
 pub struct UpdatePayload {
     #[serde(default)]
     display_name: Option<String>,
+    /// Rôle livré : retire le rôle personnalisé du compte.
     #[serde(default)]
     role: Option<Role>,
+    /// Rôle personnalisé à donner (le rôle livré devient `viewer`) ; pour le
+    /// retirer, envoyer un `role`.
+    #[serde(default)]
+    custom_role_id: Option<i64>,
     #[serde(default)]
     disabled: Option<bool>,
     #[serde(default)]
@@ -80,6 +89,8 @@ pub async fn create(
 ) -> AuthResult<(StatusCode, Json<UserView>)> {
     let username = payload.username.trim();
     users::validate_username(username).map_err(AuthError::Invalid)?;
+    let custom_role =
+        checked_custom_role(&state, Some(payload.role), payload.custom_role_id).await?;
     let email = users::normalize_email(payload.email.as_deref().unwrap_or(""))
         .map_err(AuthError::Invalid)?;
 
@@ -122,6 +133,10 @@ pub async fn create(
     if email.is_some() {
         users::set_email(&state.pool, id, email.as_deref()).await?;
     }
+    if custom_role.is_some() {
+        let changes = users::AccountChanges { custom_role, ..Default::default() };
+        users::apply_changes(&state.pool, id, &changes).await?;
+    }
     let user = load(&state, id).await?;
     audit::record(&state.pool, Some(&me.username), "user.created", Some(&user.username), ip).await;
     tracing::info!(user = %user.username, role = user.role.as_str(), "user created");
@@ -137,12 +152,15 @@ pub async fn update(
     Json(payload): Json<UpdatePayload>,
 ) -> AuthResult<Json<UserView>> {
     let user = load(&state, id).await?;
+    let custom_role = checked_custom_role(&state, payload.role, payload.custom_role_id).await?;
 
     // Ce que l'on retire à un administrateur actif ne doit pas laisser l'instance
     // sans administrateur.
     let loses_admin = user.role.is_admin()
         && !user.disabled
-        && (payload.role.is_some_and(|role| !role.is_admin()) || payload.disabled == Some(true));
+        && (payload.role.is_some_and(|role| !role.is_admin())
+            || custom_role.is_some()
+            || payload.disabled == Some(true));
     if loses_admin && users::active_admin_count(&state.pool).await? <= 1 {
         return Err(AuthError::Conflict(
             "This is the last admin: promote another user first.".into(),
@@ -168,10 +186,19 @@ pub async fn update(
         .transpose()
         .map_err(AuthError::Invalid)?;
     let disabled = payload.disabled.filter(|disabled| *disabled != user.disabled);
+    // Un rôle livré retire le rôle personnalisé, même s'il ne change pas
+    // (`viewer` d'un compte à rôle personnalisé) ; avec un rôle personnalisé,
+    // c'est celui-ci qui décide.
+    let role_change = payload
+        .role
+        .filter(|role| custom_role.is_none() && (*role != user.role || user.custom_role.is_some()));
+    let current_custom = user.custom_role.as_ref().map(|role| role.id);
+    let custom_change = custom_role.filter(|wanted| current_custom != Some(*wanted));
     let changes = users::AccountChanges {
         display_name: payload.display_name.as_deref().map(str::trim),
         email: email.as_ref().map(Option::as_deref),
-        role: payload.role.filter(|role| *role != user.role),
+        role: role_change,
+        custom_role: custom_change,
         // Un mot de passe remis par un administrateur ferme les sessions du compte :
         // c'est le geste qu'on fait quand on croit le compte compromis. Désactiver
         // le compte les ferme aussi.
@@ -211,6 +238,27 @@ pub async fn delete(
     audit::record(&state.pool, Some(&me.username), "user.deleted", Some(&user.username), ip).await;
     tracing::info!(user = %user.username, "user deleted");
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Le rôle personnalisé demandé, s'il existe. Il remplace le rôle livré, qui ne
+/// peut alors être que `viewer` : un rôle personnalisé ne s'ajoute pas à un
+/// rôle d'administrateur, d'opérateur ou d'écran mural.
+async fn checked_custom_role(
+    state: &AppState,
+    role: Option<Role>,
+    custom_role_id: Option<i64>,
+) -> AuthResult<Option<i64>> {
+    let Some(id) = custom_role_id else { return Ok(None) };
+    if role.is_some_and(|role| role != Role::Viewer) {
+        return Err(AuthError::Invalid(
+            "A custom role replaces the built-in role: send it with the viewer role, or alone."
+                .into(),
+        ));
+    }
+    if custom_roles::get(&state.pool, id).await?.is_none() {
+        return Err(AuthError::Invalid("This custom role does not exist.".into()));
+    }
+    Ok(Some(id))
 }
 
 async fn load(state: &AppState, id: i64) -> AuthResult<User> {

@@ -4,13 +4,17 @@
 //! alertes (acquitter, ignorer, mettre en sourdine), `admin` fait tout. Un
 //! quatrième, `wall`, est à part : un écran mural, qui ne voit que le mode mur
 //! (`/wall`) et ne lit que les routes dont il a besoin (`wall::WALL_ROUTES`).
-//! Il n'y a ni permission fine, ni groupe local — quand une équipe a besoin de
-//! plus, c'est le fournisseur d'identité qui décide, par ses groupes (voir `oidc`).
+//! Un compte `viewer` peut aussi recevoir un rôle personnalisé
+//! ([`super::custom_roles`]) : des permissions choisies dans un catalogue fixe
+//! ([`super::permissions`]), relues avec le compte à chaque requête.
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::SqliteRow;
 use sqlx::{Row, SqlitePool};
+
+use crate::auth::custom_roles::Assigned;
+use crate::auth::permissions;
 
 /// Rôle d'un compte. Sérialisé en minuscules, tel qu'il est stocké et exposé.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,6 +94,9 @@ pub struct User {
     /// Adresse électronique facultative, pour savoir qui joindre. Jamais un
     /// moyen de se connecter.
     pub email: Option<String>,
+    /// Rôle personnalisé, seulement pour un compte dont le rôle livré est
+    /// `viewer` : sur un autre rôle, il est ignoré à la lecture.
+    pub custom_role: Option<Assigned>,
 }
 
 impl User {
@@ -114,13 +121,47 @@ impl User {
     }
 }
 
+/// Requête de lecture des comptes, rôle personnalisé compris, suivie de `$rest`
+/// (les colonnes de `users` y sont préfixées par `u.`).
+macro_rules! select_users {
+    ($rest:literal) => {
+        concat!(
+            "SELECT u.id AS id, u.username AS username, u.display_name AS display_name,
+                    u.role AS role, u.password_hash AS password_hash,
+                    u.oidc_subject AS oidc_subject, u.oidc_issuer AS oidc_issuer,
+                    u.created_at AS created_at, u.last_login_at AS last_login_at,
+                    u.disabled AS disabled, u.totp_secret AS totp_secret,
+                    u.totp_enabled AS totp_enabled, u.ldap_id AS ldap_id, u.ldap_dn AS ldap_dn,
+                    u.disabled_by_ldap AS disabled_by_ldap, u.saml_subject AS saml_subject,
+                    u.saml_issuer AS saml_issuer, u.email AS email,
+                    r.id AS custom_role_id, r.name AS custom_role_name,
+                    r.permissions AS custom_role_permissions
+             FROM users u LEFT JOIN custom_roles r ON r.id = u.custom_role_id ",
+            $rest
+        )
+    };
+}
+
 fn read(row: SqliteRow) -> Result<User> {
     let role: String = row.try_get("role")?;
+    let role = Role::parse(&role).with_context(|| format!("rôle inconnu en base : {role}"))?;
+    let custom_id: Option<i64> = row.try_get("custom_role_id")?;
+    let custom_role = match custom_id {
+        Some(id) if role == Role::Viewer => {
+            let raw: Option<String> = row.try_get("custom_role_permissions")?;
+            Some(Assigned {
+                id,
+                name: row.try_get::<Option<String>, _>("custom_role_name")?.unwrap_or_default(),
+                permissions: permissions::parse_stored(raw.as_deref().unwrap_or("[]")),
+            })
+        }
+        _ => None,
+    };
     Ok(User {
         id: row.try_get("id")?,
         username: row.try_get("username")?,
         display_name: row.try_get("display_name")?,
-        role: Role::parse(&role).with_context(|| format!("rôle inconnu en base : {role}"))?,
+        role,
         password_hash: row.try_get("password_hash")?,
         oidc_subject: row.try_get("oidc_subject")?,
         oidc_issuer: row.try_get("oidc_issuer")?,
@@ -135,6 +176,7 @@ fn read(row: SqliteRow) -> Result<User> {
         saml_subject: row.try_get("saml_subject")?,
         saml_issuer: row.try_get("saml_issuer")?,
         email: row.try_get("email")?,
+        custom_role,
     })
 }
 
@@ -147,12 +189,7 @@ pub async fn count(pool: &SqlitePool) -> Result<i64> {
 }
 
 pub async fn list(pool: &SqlitePool) -> Result<Vec<User>> {
-    let rows = sqlx::query(
-        "SELECT id, username, display_name, role, password_hash, oidc_subject, oidc_issuer,
-                created_at, last_login_at, disabled, totp_secret, totp_enabled,
-                ldap_id, ldap_dn, disabled_by_ldap, saml_subject, saml_issuer, email
-         FROM users ORDER BY username COLLATE NOCASE",
-    )
+    let rows = sqlx::query(select_users!("ORDER BY u.username COLLATE NOCASE"))
     .fetch_all(pool)
     .await
     .context("liste des comptes")?;
@@ -160,12 +197,7 @@ pub async fn list(pool: &SqlitePool) -> Result<Vec<User>> {
 }
 
 pub async fn get(pool: &SqlitePool, id: i64) -> Result<Option<User>> {
-    let row = sqlx::query(
-        "SELECT id, username, display_name, role, password_hash, oidc_subject, oidc_issuer,
-                created_at, last_login_at, disabled, totp_secret, totp_enabled,
-                ldap_id, ldap_dn, disabled_by_ldap, saml_subject, saml_issuer, email
-         FROM users WHERE id = ?",
-    )
+    let row = sqlx::query(select_users!("WHERE u.id = ?"))
     .bind(id)
     .fetch_optional(pool)
     .await
@@ -174,12 +206,7 @@ pub async fn get(pool: &SqlitePool, id: i64) -> Result<Option<User>> {
 }
 
 pub async fn by_username(pool: &SqlitePool, username: &str) -> Result<Option<User>> {
-    let row = sqlx::query(
-        "SELECT id, username, display_name, role, password_hash, oidc_subject, oidc_issuer,
-                created_at, last_login_at, disabled, totp_secret, totp_enabled,
-                ldap_id, ldap_dn, disabled_by_ldap, saml_subject, saml_issuer, email
-         FROM users WHERE username = ?",
-    )
+    let row = sqlx::query(select_users!("WHERE u.username = ?"))
     .bind(username)
     .fetch_optional(pool)
     .await
@@ -188,12 +215,7 @@ pub async fn by_username(pool: &SqlitePool, username: &str) -> Result<Option<Use
 }
 
 pub async fn by_oidc(pool: &SqlitePool, issuer: &str, subject: &str) -> Result<Option<User>> {
-    let row = sqlx::query(
-        "SELECT id, username, display_name, role, password_hash, oidc_subject, oidc_issuer,
-                created_at, last_login_at, disabled, totp_secret, totp_enabled,
-                ldap_id, ldap_dn, disabled_by_ldap, saml_subject, saml_issuer, email
-         FROM users WHERE oidc_issuer = ? AND oidc_subject = ?",
-    )
+    let row = sqlx::query(select_users!("WHERE u.oidc_issuer = ? AND u.oidc_subject = ?"))
     .bind(issuer)
     .bind(subject)
     .fetch_optional(pool)
@@ -203,12 +225,7 @@ pub async fn by_oidc(pool: &SqlitePool, issuer: &str, subject: &str) -> Result<O
 }
 
 pub async fn by_saml(pool: &SqlitePool, issuer: &str, subject: &str) -> Result<Option<User>> {
-    let row = sqlx::query(
-        "SELECT id, username, display_name, role, password_hash, oidc_subject, oidc_issuer,
-                created_at, last_login_at, disabled, totp_secret, totp_enabled,
-                ldap_id, ldap_dn, disabled_by_ldap, saml_subject, saml_issuer, email
-         FROM users WHERE saml_issuer = ? AND saml_subject = ?",
-    )
+    let row = sqlx::query(select_users!("WHERE u.saml_issuer = ? AND u.saml_subject = ?"))
     .bind(issuer)
     .bind(subject)
     .fetch_optional(pool)
@@ -256,12 +273,7 @@ pub async fn insert_saml(
 }
 
 pub async fn by_ldap(pool: &SqlitePool, ldap_id: &str) -> Result<Option<User>> {
-    let row = sqlx::query(
-        "SELECT id, username, display_name, role, password_hash, oidc_subject, oidc_issuer,
-                created_at, last_login_at, disabled, totp_secret, totp_enabled,
-                ldap_id, ldap_dn, disabled_by_ldap, saml_subject, saml_issuer, email
-         FROM users WHERE ldap_id = ?",
-    )
+    let row = sqlx::query(select_users!("WHERE u.ldap_id = ?"))
     .bind(ldap_id)
     .fetch_optional(pool)
     .await
@@ -287,6 +299,8 @@ pub async fn sync_ldap(pool: &SqlitePool, id: i64, sync: &LdapSync<'_>) -> Resul
         "UPDATE users SET ldap_id = ?, ldap_dn = ?,
                 display_name = CASE WHEN ? = '' THEN display_name ELSE ? END,
                 role = COALESCE(?, role),
+                custom_role_id = CASE WHEN COALESCE(?, role) = 'viewer'
+                                      THEN custom_role_id ELSE NULL END,
                 disabled = CASE WHEN disabled_by_ldap = 1 THEN 0 ELSE disabled END,
                 disabled_by_ldap = 0
          WHERE id = ?",
@@ -295,6 +309,7 @@ pub async fn sync_ldap(pool: &SqlitePool, id: i64, sync: &LdapSync<'_>) -> Resul
     .bind(sync.ldap_dn)
     .bind(sync.display_name)
     .bind(sync.display_name)
+    .bind(sync.role.map(Role::as_str))
     .bind(sync.role.map(Role::as_str))
     .bind(id)
     .execute(pool)
@@ -326,12 +341,7 @@ pub async fn disable_by_ldap(pool: &SqlitePool, id: i64) -> Result<()> {
 /// Le seul compte local, s'il n'y en a qu'un : c'est ce qui permet à l'ancien
 /// formulaire de connexion (mot de passe seul) de continuer à fonctionner.
 pub async fn sole_password_user(pool: &SqlitePool) -> Result<Option<User>> {
-    let rows = sqlx::query(
-        "SELECT id, username, display_name, role, password_hash, oidc_subject, oidc_issuer,
-                created_at, last_login_at, disabled, totp_secret, totp_enabled,
-                ldap_id, ldap_dn, disabled_by_ldap, saml_subject, saml_issuer, email
-         FROM users WHERE password_hash IS NOT NULL LIMIT 2",
-    )
+    let rows = sqlx::query(select_users!("WHERE u.password_hash IS NOT NULL LIMIT 2"))
     .fetch_all(pool)
     .await
     .context("recherche du compte local unique")?;
@@ -433,6 +443,14 @@ pub async fn set_email(pool: &SqlitePool, id: i64, email: Option<&str>) -> Resul
 const CLOSE_WALL_SESSIONS: &str = "DELETE FROM auth_sessions WHERE user_id = ?
      AND EXISTS (SELECT 1 FROM users WHERE id = ? AND role = 'wall')";
 
+/// Pose un rôle livré, pour une décision des groupes d'un fournisseur
+/// d'identité : le rôle personnalisé du compte ne survit qu'à `viewer` (celui
+/// qu'un administrateur lui a donné tient tant que les groupes ne disent rien
+/// de plus que « lecteur »).
+const SET_BUILT_IN_ROLE: &str = "UPDATE users SET role = ?,
+         custom_role_id = CASE WHEN ? = 'viewer' THEN custom_role_id ELSE NULL END
+     WHERE id = ?";
+
 pub async fn set_role(pool: &SqlitePool, id: i64, role: Role) -> Result<()> {
     let mut tx = pool.begin().await.context("ouverture de la transaction")?;
     if !role.is_wall() {
@@ -443,7 +461,8 @@ pub async fn set_role(pool: &SqlitePool, id: i64, role: Role) -> Result<()> {
             .await
             .context("fermeture des sessions de l'écran mural")?;
     }
-    sqlx::query("UPDATE users SET role = ? WHERE id = ?")
+    sqlx::query(SET_BUILT_IN_ROLE)
+        .bind(role.as_str())
         .bind(role.as_str())
         .bind(id)
         .execute(&mut *tx)
@@ -472,7 +491,11 @@ pub struct AccountChanges<'a> {
     pub display_name: Option<&'a str>,
     /// `Some(None)` efface l'adresse ; `None` n'y touche pas.
     pub email: Option<Option<&'a str>>,
+    /// Rôle livré choisi par un administrateur : retire le rôle personnalisé.
     pub role: Option<Role>,
+    /// Rôle personnalisé choisi par un administrateur : le rôle livré devient
+    /// `viewer`. Appliqué après `role`.
+    pub custom_role: Option<i64>,
     pub password_hash: Option<&'a str>,
     pub disabled: Option<bool>,
     /// Ferme les sessions du compte dans la même transaction.
@@ -508,12 +531,26 @@ pub async fn apply_changes(pool: &SqlitePool, id: i64, changes: &AccountChanges<
                 .await
                 .context("fermeture des sessions de l'écran mural")?;
         }
-        sqlx::query("UPDATE users SET role = ? WHERE id = ?")
+        sqlx::query("UPDATE users SET role = ?, custom_role_id = NULL WHERE id = ?")
             .bind(role.as_str())
             .bind(id)
             .execute(&mut *tx)
             .await
             .context("mise à jour du rôle")?;
+    }
+    if let Some(custom) = changes.custom_role {
+        sqlx::query(CLOSE_WALL_SESSIONS)
+            .bind(id)
+            .bind(id)
+            .execute(&mut *tx)
+            .await
+            .context("fermeture des sessions de l'écran mural")?;
+        sqlx::query("UPDATE users SET role = 'viewer', custom_role_id = ? WHERE id = ?")
+            .bind(custom)
+            .bind(id)
+            .execute(&mut *tx)
+            .await
+            .context("attribution du rôle personnalisé")?;
     }
     if let Some(hash) = changes.password_hash {
         sqlx::query("UPDATE users SET password_hash = ? WHERE id = ?")

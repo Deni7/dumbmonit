@@ -112,12 +112,21 @@ pub(super) async fn restore_users(
             None => None,
         };
 
+        // Rôle personnalisé du compte, s'il en a un et qu'il existe ici.
+        let custom_role = crate::backup::accounts::assigned_role(
+            tx,
+            &bundle.accounts,
+            &user.username,
+            &user.role,
+        )
+        .await?;
+
         let row = sqlx::query(
             "INSERT INTO users (username, display_name, role, password_hash, oidc_subject,
                                 oidc_issuer, saml_subject, saml_issuer, disabled, totp_secret,
                                 totp_enabled, scim_id, scim_external_id, scim_email,
-                                disabled_by_scim, email)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+                                disabled_by_scim, email, custom_role_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
         )
         .bind(&user.username)
         .bind(&user.display_name)
@@ -135,6 +144,7 @@ pub(super) async fn restore_users(
         .bind(scim_id.as_ref().and(user.scim_email.as_ref()))
         .bind(i64::from(user.disabled && user.disabled_by_scim))
         .bind(email)
+        .bind(custom_role)
         .fetch_one(&mut **tx)
         .await
         .context("création du compte")?;
