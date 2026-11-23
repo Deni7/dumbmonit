@@ -1,0 +1,307 @@
+{
+	"w9dash_agents_connected": "연결됨",
+	"w9dash_agents_disconnected": "연결 끊김",
+	"w9dash_agents_empty": "아직 설치된 에이전트가 없습니다.",
+	"w9dash_agents_install": "에이전트 설치",
+	"w9dash_agents_last_contact": "마지막 연결 {ago}",
+	"w9dash_agents_manage": "에이전트 관리",
+	"w9dash_agents_never_seen": "연결된 적 없음",
+	"w9dash_agents_on_latest": "{count}개 {version} (최신)",
+	"w9dash_agents_on_version": "{count}개 {version}",
+	"w9dash_agents_title": "에이전트",
+	"w9dash_agents_total": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "에이전트 {count}개"
+			}
+		}
+	],
+	"w9dash_agents_update": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count}개 업데이트"
+			}
+		}
+	],
+	"w9dash_common_all_alerts": "모든 알림",
+	"w9dash_common_error": "이 수치를 불러오지 못했습니다.",
+	"w9dash_common_last_30_days": "최근 30일",
+	"w9dash_common_sev_critical": "심각",
+	"w9dash_common_sev_warning": "경고",
+	"w9dash_common_this_site": "이 사이트",
+	"w9dash_common_today_at": "오늘 {time}",
+	"w9dash_events_alerts": "알림",
+	"w9dash_events_all": "전체",
+	"w9dash_events_audit": "감사 로그",
+	"w9dash_events_changes": "변경",
+	"w9dash_events_empty": "최근에 일어난 일이 없습니다.",
+	"w9dash_events_empty_filter": "최근 이런 종류의 이벤트가 없습니다.",
+	"w9dash_events_filter": "표시",
+	"w9dash_events_history": "전체 기록",
+	"w9dash_events_title": "최근 이벤트",
+	"w9dash_expiries_all": "모든 만료 항목",
+	"w9dash_expiries_bar_hint": "날짜가 다가올수록 채워짐, {days}일 기준",
+	"w9dash_expiries_more": "{count}개 모두 보기",
+	"w9dash_expiries_sub": "앞으로 {days}일",
+	"w9dash_expiries_title": "만료 및 예측",
+	"w9dash_expiries_vulns": "취약점",
+	"w9dash_kpi_all_up": "모두 정상",
+	"w9dash_kpi_avail_delta": "이전 30일 대비 {delta}%p",
+	"w9dash_kpi_avail_note": "목표 {target}%",
+	"w9dash_kpi_bars_label": "모니터마다 막대 하나, 사이트별로 묶음. 높은 막대는 다운된 모니터",
+	"w9dash_kpi_budget_left": "남은 오류 예산",
+	"w9dash_kpi_critical": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "심각 {count}건"
+			}
+		}
+	],
+	"w9dash_kpi_down": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "다운 {count}개"
+			}
+		}
+	],
+	"w9dash_kpi_last_closed": "마지막 알림은 {ago} 해결됨",
+	"w9dash_kpi_none_open": "열린 알림 없음",
+	"w9dash_kpi_opened_label": "최근 {days}일 동안 하루별 새 알림",
+	"w9dash_kpi_opened_week": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "이번 주 {count}건, 지난주 {previous}건"
+			}
+		}
+	],
+	"w9dash_kpi_paused": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "일시 중지 {count}개"
+			}
+		}
+	],
+	"w9dash_kpi_sites": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "사이트 {count}곳"
+			}
+		}
+	],
+	"w9dash_kpi_today": "오늘",
+	"w9dash_kpi_warning": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "경고 {count}건"
+			}
+		}
+	],
+	"w9dash_maint_empty": "앞으로 {days}일 동안 예정된 유지 보수와 일시 중지된 모니터가 없습니다.",
+	"w9dash_maint_error": "유지 보수 기간을 불러오지 못했습니다.",
+	"w9dash_maint_lasts": "{duration} 동안",
+	"w9dash_maint_lasts_recurring": "{duration} 동안, 반복",
+	"w9dash_maint_now": "지금",
+	"w9dash_maint_running": "진행 중",
+	"w9dash_maint_schedule": "예약",
+	"w9dash_maint_strip_label": "앞으로 {days}일 동안의 유지 보수 기간, 사이트별",
+	"w9dash_maint_sub": "앞으로 {days}일",
+	"w9dash_maint_title": "유지 보수",
+	"w9dash_pages_all": "모든 상태 페이지",
+	"w9dash_pages_create": "상태 페이지 만들기",
+	"w9dash_pages_draft": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "초안, 서비스 {count}개"
+			}
+		}
+	],
+	"w9dash_pages_empty": "아직 상태 페이지가 없습니다.",
+	"w9dash_pages_error": "상태 페이지를 불러오지 못했습니다.",
+	"w9dash_pages_maintenance": "유지 보수",
+	"w9dash_pages_major": "주요 장애",
+	"w9dash_pages_operational": "정상 운영",
+	"w9dash_pages_partial": "부분 장애",
+	"w9dash_pages_password": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "비밀번호 보호, 서비스 {count}개"
+			}
+		}
+	],
+	"w9dash_pages_post": "업데이트 게시",
+	"w9dash_pages_public": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "공개, 서비스 {count}개"
+			}
+		}
+	],
+	"w9dash_pages_title": "상태 페이지",
+	"w9dash_pages_users": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "로그인한 사용자만, 서비스 {count}개"
+			}
+		}
+	],
+	"w9dash_problems_ack_recovery": "다시 응답할 때까지",
+	"w9dash_problems_calm_since": "{time} 이후 열린 문제가 없습니다.",
+	"w9dash_problems_calm_text": "모든 모니터가 응답하며 열린 알림이 없습니다.",
+	"w9dash_problems_calm_title": "처리할 일이 없습니다.",
+	"w9dash_problems_col_acked": "확인됨",
+	"w9dash_problems_col_age": "경과",
+	"w9dash_problems_col_monitor": "모니터",
+	"w9dash_problems_col_problem": "문제",
+	"w9dash_problems_col_severity": "심각도",
+	"w9dash_problems_lasted": "{span} 지속",
+	"w9dash_problems_maintenance_link": "무음 및 유지 보수",
+	"w9dash_problems_no_answer": "점검에 응답 없음",
+	"w9dash_problems_no_site": "사이트 없음",
+	"w9dash_problems_not_acked": "미확인",
+	"w9dash_problems_not_notified": "알림을 보내지 않음",
+	"w9dash_problems_notified": "{ago} 알림 전송",
+	"w9dash_problems_place": "{kind}, {site}",
+	"w9dash_problems_resolved": "최근 해결됨",
+	"w9dash_problems_resolved_plate": "해결됨",
+	"w9dash_problems_since": "{time}부터",
+	"w9dash_problems_site_clear": "열린 문제 없음",
+	"w9dash_problems_sub": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "열린 문제 {count}건, 심각한 순"
+			}
+		}
+	],
+	"w9dash_problems_title": "문제",
+	"w9dash_response_acked_fast": "15분 이내 확인",
+	"w9dash_response_alerts": "알림",
+	"w9dash_response_before": "이전 {previous}",
+	"w9dash_response_before_pct": "이전 {previous}, {pct}%",
+	"w9dash_response_chart_label": "{days}일 동안 하루별 알림, 심각도별",
+	"w9dash_response_mtta": "MTTA",
+	"w9dash_response_mttr": "MTTR",
+	"w9dash_response_noisiest": "가장 잦음:",
+	"w9dash_response_noisiest_rule": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{rule}, {count}건"
+			}
+		}
+	],
+	"w9dash_response_title": "알림 및 대응",
+	"w9dash_response_tune": "규칙 조정",
+	"w9dash_slo_all": "모든 목표",
+	"w9dash_slo_create": "목표 설정",
+	"w9dash_slo_empty": "아직 서비스 수준 목표가 없습니다.",
+	"w9dash_slo_error": "목표를 불러오지 못했습니다.",
+	"w9dash_slo_fast": "빠른 소진",
+	"w9dash_slo_left": "예산 {percent}% 남음",
+	"w9dash_slo_more": "{count}개 모두 보기",
+	"w9dash_slo_slow": "느린 소진",
+	"w9dash_slo_spent": "예산 소진",
+	"w9dash_slo_target": "목표 {target}%",
+	"w9dash_slo_title": "SLO",
+	"w9dash_slo_unmeasured": "측정되지 않음",
+	"w9dash_slo_window": "{days}일 기준",
+	"w9dash_status_degraded": "저하",
+	"w9dash_status_paused": "일시 중지",
+	"w9dash_status_up": "정상"
+}

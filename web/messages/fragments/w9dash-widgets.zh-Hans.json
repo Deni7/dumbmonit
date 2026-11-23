@@ -1,0 +1,307 @@
+{
+	"w9dash_agents_connected": "已连接",
+	"w9dash_agents_disconnected": "已断开",
+	"w9dash_agents_empty": "还没有安装代理。",
+	"w9dash_agents_install": "安装代理",
+	"w9dash_agents_last_contact": "最后联系 {ago}",
+	"w9dash_agents_manage": "管理代理",
+	"w9dash_agents_never_seen": "从未连接",
+	"w9dash_agents_on_latest": "{count} 个为 {version}（最新）",
+	"w9dash_agents_on_version": "{count} 个为 {version}",
+	"w9dash_agents_title": "代理",
+	"w9dash_agents_total": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个代理"
+			}
+		}
+	],
+	"w9dash_agents_update": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "更新 {count} 个"
+			}
+		}
+	],
+	"w9dash_common_all_alerts": "全部告警",
+	"w9dash_common_error": "无法读取这些数据。",
+	"w9dash_common_last_30_days": "最近 30 天",
+	"w9dash_common_sev_critical": "严重",
+	"w9dash_common_sev_warning": "警告",
+	"w9dash_common_this_site": "本站点",
+	"w9dash_common_today_at": "今天 {time}",
+	"w9dash_events_alerts": "告警",
+	"w9dash_events_all": "全部",
+	"w9dash_events_audit": "审计日志",
+	"w9dash_events_changes": "变更",
+	"w9dash_events_empty": "最近没有发生任何事。",
+	"w9dash_events_empty_filter": "最近没有此类事件。",
+	"w9dash_events_filter": "显示",
+	"w9dash_events_history": "完整历史",
+	"w9dash_events_title": "最近事件",
+	"w9dash_expiries_all": "全部到期项",
+	"w9dash_expiries_bar_hint": "日期越近填充越满，刻度为 {days} 天",
+	"w9dash_expiries_more": "查看全部 {count} 项",
+	"w9dash_expiries_sub": "未来 {days} 天",
+	"w9dash_expiries_title": "到期与预测",
+	"w9dash_expiries_vulns": "漏洞",
+	"w9dash_kpi_all_up": "全部正常",
+	"w9dash_kpi_avail_delta": "较前 30 天 {delta} 个百分点",
+	"w9dash_kpi_avail_note": "目标 {target}%",
+	"w9dash_kpi_bars_label": "每个监控一根柱，按站点分组；高柱表示该监控已宕机",
+	"w9dash_kpi_budget_left": "剩余错误预算",
+	"w9dash_kpi_critical": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个严重"
+			}
+		}
+	],
+	"w9dash_kpi_down": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个宕机"
+			}
+		}
+	],
+	"w9dash_kpi_last_closed": "上一个关闭于 {ago}",
+	"w9dash_kpi_none_open": "无未处理",
+	"w9dash_kpi_opened_label": "最近 {days} 天每日新增告警",
+	"w9dash_kpi_opened_week": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "本周新增 {count} 个，上周 {previous} 个"
+			}
+		}
+	],
+	"w9dash_kpi_paused": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个已暂停"
+			}
+		}
+	],
+	"w9dash_kpi_sites": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个站点"
+			}
+		}
+	],
+	"w9dash_kpi_today": "今天",
+	"w9dash_kpi_warning": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个警告"
+			}
+		}
+	],
+	"w9dash_maint_empty": "未来 {days} 天没有计划维护，也没有暂停的监控。",
+	"w9dash_maint_error": "无法读取维护窗口。",
+	"w9dash_maint_lasts": "持续 {duration}",
+	"w9dash_maint_lasts_recurring": "持续 {duration}，重复",
+	"w9dash_maint_now": "现在",
+	"w9dash_maint_running": "进行中",
+	"w9dash_maint_schedule": "安排",
+	"w9dash_maint_strip_label": "未来 {days} 天的维护窗口，按站点",
+	"w9dash_maint_sub": "未来 {days} 天",
+	"w9dash_maint_title": "维护",
+	"w9dash_pages_all": "全部状态页",
+	"w9dash_pages_create": "创建状态页",
+	"w9dash_pages_draft": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "草稿，{count} 个服务"
+			}
+		}
+	],
+	"w9dash_pages_empty": "还没有状态页。",
+	"w9dash_pages_error": "无法读取状态页。",
+	"w9dash_pages_maintenance": "维护中",
+	"w9dash_pages_major": "重大中断",
+	"w9dash_pages_operational": "运行正常",
+	"w9dash_pages_partial": "部分中断",
+	"w9dash_pages_password": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "密码保护，{count} 个服务"
+			}
+		}
+	],
+	"w9dash_pages_post": "发布更新",
+	"w9dash_pages_public": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "公开，{count} 个服务"
+			}
+		}
+	],
+	"w9dash_pages_title": "状态页",
+	"w9dash_pages_users": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "仅限已登录用户，{count} 个服务"
+			}
+		}
+	],
+	"w9dash_problems_ack_recovery": "直到恢复响应",
+	"w9dash_problems_calm_since": "自 {time} 起无未解决问题。",
+	"w9dash_problems_calm_text": "所有监控均有响应，没有未处理的告警。",
+	"w9dash_problems_calm_title": "目前无需处理。",
+	"w9dash_problems_col_acked": "已确认",
+	"w9dash_problems_col_age": "持续",
+	"w9dash_problems_col_monitor": "监控",
+	"w9dash_problems_col_problem": "问题",
+	"w9dash_problems_col_severity": "严重性",
+	"w9dash_problems_lasted": "持续 {span}",
+	"w9dash_problems_maintenance_link": "静默与维护",
+	"w9dash_problems_no_answer": "检查无响应",
+	"w9dash_problems_no_site": "无站点",
+	"w9dash_problems_not_acked": "未确认",
+	"w9dash_problems_not_notified": "未发送通知",
+	"w9dash_problems_notified": "{ago}已通知",
+	"w9dash_problems_place": "{kind}，{site}",
+	"w9dash_problems_resolved": "最近已解决",
+	"w9dash_problems_resolved_plate": "已解决",
+	"w9dash_problems_since": "自 {time}",
+	"w9dash_problems_site_clear": "无未解决问题",
+	"w9dash_problems_sub": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个未解决，最严重的在前"
+			}
+		}
+	],
+	"w9dash_problems_title": "问题",
+	"w9dash_response_acked_fast": "15 分钟内确认",
+	"w9dash_response_alerts": "告警",
+	"w9dash_response_before": "此前 {previous}",
+	"w9dash_response_before_pct": "此前 {previous}，{pct}%",
+	"w9dash_response_chart_label": "{days} 天内每日告警，按严重性",
+	"w9dash_response_mtta": "MTTA",
+	"w9dash_response_mttr": "MTTR",
+	"w9dash_response_noisiest": "最频繁：",
+	"w9dash_response_noisiest_rule": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{rule}，{count} 个告警"
+			}
+		}
+	],
+	"w9dash_response_title": "告警与响应",
+	"w9dash_response_tune": "调整规则",
+	"w9dash_slo_all": "全部目标",
+	"w9dash_slo_create": "设定目标",
+	"w9dash_slo_empty": "还没有服务等级目标。",
+	"w9dash_slo_error": "无法读取目标。",
+	"w9dash_slo_fast": "快速消耗",
+	"w9dash_slo_left": "剩余 {percent}% 预算",
+	"w9dash_slo_more": "查看全部 {count} 个",
+	"w9dash_slo_slow": "缓慢消耗",
+	"w9dash_slo_spent": "预算已耗尽",
+	"w9dash_slo_target": "目标 {target}%",
+	"w9dash_slo_title": "SLO",
+	"w9dash_slo_unmeasured": "未测量",
+	"w9dash_slo_window": "{days} 天内",
+	"w9dash_status_degraded": "降级",
+	"w9dash_status_paused": "已暂停",
+	"w9dash_status_up": "正常"
+}

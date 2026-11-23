@@ -1,0 +1,321 @@
+{
+	"w9dash_agents_connected": "Bağlı",
+	"w9dash_agents_disconnected": "Bağlantı kesik",
+	"w9dash_agents_empty": "Henüz kurulu ajan yok.",
+	"w9dash_agents_install": "Ajan kur",
+	"w9dash_agents_last_contact": "Son bağlantı {ago}",
+	"w9dash_agents_manage": "Ajanları yönet",
+	"w9dash_agents_never_seen": "Hiç görülmedi",
+	"w9dash_agents_on_latest": "{count} ajan {version} sürümünde, en yeni",
+	"w9dash_agents_on_version": "{count} ajan {version} sürümünde",
+	"w9dash_agents_title": "Ajanlar",
+	"w9dash_agents_total": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} ajan",
+				"countPlural=other": "{count} ajan"
+			}
+		}
+	],
+	"w9dash_agents_update": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} ajanı güncelle",
+				"countPlural=other": "{count} ajanı güncelle"
+			}
+		}
+	],
+	"w9dash_common_all_alerts": "Tüm uyarılar",
+	"w9dash_common_error": "Bu rakamlar okunamadı.",
+	"w9dash_common_last_30_days": "Son 30 gün",
+	"w9dash_common_sev_critical": "Kritik",
+	"w9dash_common_sev_warning": "Uyarı",
+	"w9dash_common_this_site": "Bu konum",
+	"w9dash_common_today_at": "Bugün {time}",
+	"w9dash_events_alerts": "Uyarılar",
+	"w9dash_events_all": "Tümü",
+	"w9dash_events_audit": "Denetim günlüğü",
+	"w9dash_events_changes": "Değişiklikler",
+	"w9dash_events_empty": "Son zamanlarda bir şey olmadı.",
+	"w9dash_events_empty_filter": "Son zamanlarda bu türden bir şey yok.",
+	"w9dash_events_filter": "Göster",
+	"w9dash_events_history": "Tüm geçmiş",
+	"w9dash_events_title": "Son olaylar",
+	"w9dash_expiries_all": "Tüm süre sonları",
+	"w9dash_expiries_bar_hint": "Tarih yaklaştıkça dolar, {days} günlük ölçekte",
+	"w9dash_expiries_more": "{count} öğenin tümünü gör",
+	"w9dash_expiries_sub": "Önümüzdeki {days} gün",
+	"w9dash_expiries_title": "Süre sonları ve tahminler",
+	"w9dash_expiries_vulns": "Güvenlik açıkları",
+	"w9dash_kpi_all_up": "Hepsi çalışıyor",
+	"w9dash_kpi_avail_delta": "Önceki 30 güne göre {delta} puan",
+	"w9dash_kpi_avail_note": "Hedef %{target}",
+	"w9dash_kpi_bars_label": "Her izleyici için bir çubuk, konuma göre gruplu; uzun çubuk çalışmayan bir izleyicidir",
+	"w9dash_kpi_budget_left": "Kalan hata bütçesi",
+	"w9dash_kpi_critical": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} kritik",
+				"countPlural=other": "{count} kritik"
+			}
+		}
+	],
+	"w9dash_kpi_down": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} çalışmıyor",
+				"countPlural=other": "{count} çalışmıyor"
+			}
+		}
+	],
+	"w9dash_kpi_last_closed": "Sonuncusu {ago} kapandı",
+	"w9dash_kpi_none_open": "Açık uyarı yok",
+	"w9dash_kpi_opened_label": "Son {days} günde günlük açılan uyarılar",
+	"w9dash_kpi_opened_week": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Bu hafta {count} açıldı, önceki hafta {previous}",
+				"countPlural=other": "Bu hafta {count} açıldı, önceki hafta {previous}"
+			}
+		}
+	],
+	"w9dash_kpi_paused": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} duraklatıldı",
+				"countPlural=other": "{count} duraklatıldı"
+			}
+		}
+	],
+	"w9dash_kpi_sites": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} konum",
+				"countPlural=other": "{count} konum"
+			}
+		}
+	],
+	"w9dash_kpi_today": "Bugün",
+	"w9dash_kpi_warning": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} uyarı",
+				"countPlural=other": "{count} uyarı"
+			}
+		}
+	],
+	"w9dash_maint_empty": "Önümüzdeki {days} gün için planlı bakım ve duraklatılmış izleyici yok.",
+	"w9dash_maint_error": "Bakım pencereleri okunamadı.",
+	"w9dash_maint_lasts": "{duration} sürer",
+	"w9dash_maint_lasts_recurring": "{duration} sürer, tekrarlanır",
+	"w9dash_maint_now": "Şimdi",
+	"w9dash_maint_running": "Sürüyor",
+	"w9dash_maint_schedule": "Planla",
+	"w9dash_maint_strip_label": "Önümüzdeki {days} gündeki bakım pencereleri, konuma göre",
+	"w9dash_maint_sub": "Önümüzdeki {days} gün",
+	"w9dash_maint_title": "Bakım",
+	"w9dash_pages_all": "Tüm durum sayfaları",
+	"w9dash_pages_create": "Durum sayfası oluştur",
+	"w9dash_pages_draft": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Taslak, {count} hizmet",
+				"countPlural=other": "Taslak, {count} hizmet"
+			}
+		}
+	],
+	"w9dash_pages_empty": "Henüz durum sayfası yok.",
+	"w9dash_pages_error": "Durum sayfaları okunamadı.",
+	"w9dash_pages_maintenance": "Bakım",
+	"w9dash_pages_major": "Büyük kesinti",
+	"w9dash_pages_operational": "Çalışıyor",
+	"w9dash_pages_partial": "Kısmi kesinti",
+	"w9dash_pages_password": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Parola korumalı, {count} hizmet",
+				"countPlural=other": "Parola korumalı, {count} hizmet"
+			}
+		}
+	],
+	"w9dash_pages_post": "Güncelleme yayımla",
+	"w9dash_pages_public": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Herkese açık, {count} hizmet",
+				"countPlural=other": "Herkese açık, {count} hizmet"
+			}
+		}
+	],
+	"w9dash_pages_title": "Durum sayfaları",
+	"w9dash_pages_users": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Yalnızca oturum açanlar, {count} hizmet",
+				"countPlural=other": "Yalnızca oturum açanlar, {count} hizmet"
+			}
+		}
+	],
+	"w9dash_problems_ack_recovery": "Yeniden yanıt verene kadar",
+	"w9dash_problems_calm_since": "{time} itibarıyla açık sorun yok.",
+	"w9dash_problems_calm_text": "Tüm izleyiciler yanıt veriyor ve açık uyarı yok.",
+	"w9dash_problems_calm_title": "İlgilenmeniz gereken bir şey yok.",
+	"w9dash_problems_col_acked": "Onaylandı",
+	"w9dash_problems_col_age": "Süre",
+	"w9dash_problems_col_monitor": "İzleyici",
+	"w9dash_problems_col_problem": "Sorun",
+	"w9dash_problems_col_severity": "Önem",
+	"w9dash_problems_lasted": "{span} sürdü",
+	"w9dash_problems_maintenance_link": "Susturmalar ve bakım",
+	"w9dash_problems_no_answer": "Denetimlere yanıt vermiyor",
+	"w9dash_problems_no_site": "Konumsuz",
+	"w9dash_problems_not_acked": "Onaylanmadı",
+	"w9dash_problems_not_notified": "Bildirim gönderilmedi",
+	"w9dash_problems_notified": "{ago} bildirildi",
+	"w9dash_problems_place": "{kind}, {site}",
+	"w9dash_problems_resolved": "Son çözülenler",
+	"w9dash_problems_resolved_plate": "Çözüldü",
+	"w9dash_problems_since": "{time} itibarıyla",
+	"w9dash_problems_site_clear": "açık sorun yok",
+	"w9dash_problems_sub": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} açık, en ciddisi önce",
+				"countPlural=other": "{count} açık, en ciddisi önce"
+			}
+		}
+	],
+	"w9dash_problems_title": "Sorunlar",
+	"w9dash_response_acked_fast": "15 dk içinde onaylanan",
+	"w9dash_response_alerts": "Uyarılar",
+	"w9dash_response_before": "önce {previous}",
+	"w9dash_response_before_pct": "önce {previous}, %{pct}",
+	"w9dash_response_chart_label": "{days} gün boyunca günlük uyarılar, öneme göre",
+	"w9dash_response_mtta": "MTTA",
+	"w9dash_response_mttr": "MTTR",
+	"w9dash_response_noisiest": "En gürültülü:",
+	"w9dash_response_noisiest_rule": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{rule}, {count} uyarı",
+				"countPlural=other": "{rule}, {count} uyarı"
+			}
+		}
+	],
+	"w9dash_response_title": "Uyarılar ve müdahale",
+	"w9dash_response_tune": "Kuralı ayarla",
+	"w9dash_slo_all": "Tüm hedefler",
+	"w9dash_slo_create": "Hedef belirle",
+	"w9dash_slo_empty": "Henüz hizmet düzeyi hedefi yok.",
+	"w9dash_slo_error": "Hedefler okunamadı.",
+	"w9dash_slo_fast": "Hızlı tüketim",
+	"w9dash_slo_left": "Bütçenin %{percent} kadarı kaldı",
+	"w9dash_slo_more": "{count} hedefin tümünü gör",
+	"w9dash_slo_slow": "Yavaş tüketim",
+	"w9dash_slo_spent": "Bütçe tükendi",
+	"w9dash_slo_target": "Hedef %{target}",
+	"w9dash_slo_title": "SLO’lar",
+	"w9dash_slo_unmeasured": "Ölçülmedi",
+	"w9dash_slo_window": "{days} gün içinde",
+	"w9dash_status_degraded": "Düşük performans",
+	"w9dash_status_paused": "Duraklatıldı",
+	"w9dash_status_up": "Çalışıyor"
+}

@@ -1,0 +1,307 @@
+{
+	"w9dash_agents_connected": "接続中",
+	"w9dash_agents_disconnected": "切断",
+	"w9dash_agents_empty": "エージェントはまだインストールされていません。",
+	"w9dash_agents_install": "エージェントをインストール",
+	"w9dash_agents_last_contact": "最終接続 {ago}",
+	"w9dash_agents_manage": "エージェントを管理",
+	"w9dash_agents_never_seen": "未接続",
+	"w9dash_agents_on_latest": "{count} 台が {version}（最新）",
+	"w9dash_agents_on_version": "{count} 台が {version}",
+	"w9dash_agents_title": "エージェント",
+	"w9dash_agents_total": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "エージェント {count} 台"
+			}
+		}
+	],
+	"w9dash_agents_update": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 台を更新"
+			}
+		}
+	],
+	"w9dash_common_all_alerts": "すべてのアラート",
+	"w9dash_common_error": "これらの数値を読み込めませんでした。",
+	"w9dash_common_last_30_days": "過去 30 日",
+	"w9dash_common_sev_critical": "重大",
+	"w9dash_common_sev_warning": "警告",
+	"w9dash_common_this_site": "このサイト",
+	"w9dash_common_today_at": "今日 {time}",
+	"w9dash_events_alerts": "アラート",
+	"w9dash_events_all": "すべて",
+	"w9dash_events_audit": "監査ログ",
+	"w9dash_events_changes": "変更",
+	"w9dash_events_empty": "最近は何も起きていません。",
+	"w9dash_events_empty_filter": "最近この種類のイベントはありません。",
+	"w9dash_events_filter": "表示",
+	"w9dash_events_history": "全履歴",
+	"w9dash_events_title": "最近のイベント",
+	"w9dash_expiries_all": "すべての期限",
+	"w9dash_expiries_bar_hint": "期日が近づくほど満ちる（{days} 日スケール）",
+	"w9dash_expiries_more": "{count} 件すべて表示",
+	"w9dash_expiries_sub": "今後 {days} 日間",
+	"w9dash_expiries_title": "期限と予測",
+	"w9dash_expiries_vulns": "脆弱性",
+	"w9dash_kpi_all_up": "すべて稼働中",
+	"w9dash_kpi_avail_delta": "前の 30 日比 {delta} ポイント",
+	"w9dash_kpi_avail_note": "目標 {target}%",
+	"w9dash_kpi_bars_label": "モニターごとに 1 本、サイト別。高い棒はダウンしているモニター",
+	"w9dash_kpi_budget_left": "残りのエラーバジェット",
+	"w9dash_kpi_critical": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "重大 {count} 件"
+			}
+		}
+	],
+	"w9dash_kpi_down": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "ダウン {count} 件"
+			}
+		}
+	],
+	"w9dash_kpi_last_closed": "最後のアラートは {ago} に解決",
+	"w9dash_kpi_none_open": "未解決なし",
+	"w9dash_kpi_opened_label": "過去 {days} 日間の 1 日あたりの新規アラート",
+	"w9dash_kpi_opened_week": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "今週 {count} 件、先週 {previous} 件"
+			}
+		}
+	],
+	"w9dash_kpi_paused": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "一時停止 {count} 件"
+			}
+		}
+	],
+	"w9dash_kpi_sites": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} サイト"
+			}
+		}
+	],
+	"w9dash_kpi_today": "今日",
+	"w9dash_kpi_warning": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "警告 {count} 件"
+			}
+		}
+	],
+	"w9dash_maint_empty": "今後 {days} 日間にメンテナンスの予定はなく、一時停止中のモニターもありません。",
+	"w9dash_maint_error": "メンテナンス期間を読み込めませんでした。",
+	"w9dash_maint_lasts": "所要 {duration}",
+	"w9dash_maint_lasts_recurring": "所要 {duration}、繰り返し",
+	"w9dash_maint_now": "現在",
+	"w9dash_maint_running": "実施中",
+	"w9dash_maint_schedule": "予定する",
+	"w9dash_maint_strip_label": "今後 {days} 日間のメンテナンス期間（サイト別）",
+	"w9dash_maint_sub": "今後 {days} 日間",
+	"w9dash_maint_title": "メンテナンス",
+	"w9dash_pages_all": "すべてのステータスページ",
+	"w9dash_pages_create": "ステータスページを作成",
+	"w9dash_pages_draft": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "下書き、{count} サービス"
+			}
+		}
+	],
+	"w9dash_pages_empty": "ステータスページはまだありません。",
+	"w9dash_pages_error": "ステータスページを読み込めませんでした。",
+	"w9dash_pages_maintenance": "メンテナンス",
+	"w9dash_pages_major": "大規模障害",
+	"w9dash_pages_operational": "稼働中",
+	"w9dash_pages_partial": "一部障害",
+	"w9dash_pages_password": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "パスワード保護、{count} サービス"
+			}
+		}
+	],
+	"w9dash_pages_post": "更新を投稿",
+	"w9dash_pages_public": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "公開、{count} サービス"
+			}
+		}
+	],
+	"w9dash_pages_title": "ステータスページ",
+	"w9dash_pages_users": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "サインイン済みユーザーのみ、{count} サービス"
+			}
+		}
+	],
+	"w9dash_problems_ack_recovery": "再び応答するまで",
+	"w9dash_problems_calm_since": "{time} 以降、未解決の問題はありません。",
+	"w9dash_problems_calm_text": "すべてのモニターが応答し、未解決のアラートはありません。",
+	"w9dash_problems_calm_title": "対応が必要なものはありません。",
+	"w9dash_problems_col_acked": "確認済み",
+	"w9dash_problems_col_age": "経過",
+	"w9dash_problems_col_monitor": "モニター",
+	"w9dash_problems_col_problem": "問題",
+	"w9dash_problems_col_severity": "重大度",
+	"w9dash_problems_lasted": "継続 {span}",
+	"w9dash_problems_maintenance_link": "サイレンスとメンテナンス",
+	"w9dash_problems_no_answer": "チェックに応答なし",
+	"w9dash_problems_no_site": "サイトなし",
+	"w9dash_problems_not_acked": "未確認",
+	"w9dash_problems_not_notified": "通知は未送信",
+	"w9dash_problems_notified": "{ago}に通知",
+	"w9dash_problems_place": "{kind}、{site}",
+	"w9dash_problems_resolved": "最近解決",
+	"w9dash_problems_resolved_plate": "解決",
+	"w9dash_problems_since": "{time} から",
+	"w9dash_problems_site_clear": "未解決なし",
+	"w9dash_problems_sub": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "未解決 {count} 件、深刻な順"
+			}
+		}
+	],
+	"w9dash_problems_title": "問題",
+	"w9dash_response_acked_fast": "15 分以内に確認",
+	"w9dash_response_alerts": "アラート",
+	"w9dash_response_before": "前回 {previous}",
+	"w9dash_response_before_pct": "前回 {previous}、{pct}%",
+	"w9dash_response_chart_label": "{days} 日間の 1 日あたりのアラート（重大度別）",
+	"w9dash_response_mtta": "MTTA",
+	"w9dash_response_mttr": "MTTR",
+	"w9dash_response_noisiest": "最多：",
+	"w9dash_response_noisiest_rule": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{rule}、{count} 件"
+			}
+		}
+	],
+	"w9dash_response_title": "アラートと対応",
+	"w9dash_response_tune": "ルールを調整",
+	"w9dash_slo_all": "すべての目標",
+	"w9dash_slo_create": "目標を設定",
+	"w9dash_slo_empty": "サービスレベル目標はまだありません。",
+	"w9dash_slo_error": "目標を読み込めませんでした。",
+	"w9dash_slo_fast": "高速消費",
+	"w9dash_slo_left": "残りバジェット {percent}%",
+	"w9dash_slo_more": "{count} 件すべて表示",
+	"w9dash_slo_slow": "低速消費",
+	"w9dash_slo_spent": "バジェット超過",
+	"w9dash_slo_target": "目標 {target}%",
+	"w9dash_slo_title": "SLO",
+	"w9dash_slo_unmeasured": "未計測",
+	"w9dash_slo_window": "{days} 日間",
+	"w9dash_status_degraded": "低下",
+	"w9dash_status_paused": "一時停止",
+	"w9dash_status_up": "稼働中"
+}
