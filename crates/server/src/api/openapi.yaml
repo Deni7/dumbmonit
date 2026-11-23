@@ -14970,7 +14970,7 @@ components:
         setup_completed: { type: boolean }
         setup_completed_at: { type: [string, "null"], description: UTC without suffix. }
         name: { type: string, maxLength: 80, description: Empty shows "DumbMonit". }
-        language: { type: string, description: "Default interface language (`en`, `fr`, `de`, `es`, `it`, `pt`, `pt-BR`, `ru`, `zh-Hans`); empty follows the browser." }
+        language: { type: string, description: "Default interface language (`en`, `fr`, `de`, `es`, `it`, `pt`, `pt-BR`, `ru`, `zh-Hans`, `ja`, `ko`, `nl`, `pl`, `tr`); empty follows the browser." }
         timezone: { type: string, description: IANA time zone; empty means UTC. }
         accent: { type: string, pattern: '^(#[0-9a-fA-F]{6})?$', description: "Accent colour of the interface (solid buttons, focus ring) as `#rrggbb`, stored in lower case; empty is the default look. Status colours never change. Included in the backup." }
         oncall_enabled: { type: boolean, description: "On-call schedules are turned on. Off by default (`false` also when the field is missing); turned on at upgrade for an instance that already has a schedule, an escalation policy or an on-call channel. Off, the schedules, policies and channels are kept but inactive: the alerting engine no longer starts escalations through on-call channels and the interface hides the feature." }
@@ -16686,14 +16686,14 @@ components:
         default_lang:
           type: string
           description: Default interface language of the page ("" means English).
-          enum: ["", en, de, es, fr, it, pt, pt-BR, ru, zh-Hans]
+          enum: ["", en, de, es, fr, it, pt, pt-BR, ru, zh-Hans, ja, ko, nl, pl, tr]
         translations:
           type: array
           items:
             type: object
             required: [lang]
             properties:
-              lang: { type: string, enum: [en, de, es, fr, it, pt, pt-BR, ru, zh-Hans] }
+              lang: { type: string, enum: [en, de, es, fr, it, pt, pt-BR, ru, zh-Hans, ja, ko, nl, pl, tr] }
               title: { type: string }
               description: { type: string }
               footer_text: { type: string }

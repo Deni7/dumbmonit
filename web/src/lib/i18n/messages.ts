@@ -25,7 +25,12 @@ const LOADERS: Record<string, () => Promise<unknown>> = {
 	pt: () => import('#lib/paraglide/messages/pt.js'),
 	'pt-BR': () => import('#lib/paraglide/messages/pt-BR.js'),
 	ru: () => import('#lib/paraglide/messages/ru.js'),
-	'zh-Hans': () => import('#lib/paraglide/messages/zh-Hans.js')
+	'zh-Hans': () => import('#lib/paraglide/messages/zh-Hans.js'),
+	ja: () => import('#lib/paraglide/messages/ja.js'),
+	ko: () => import('#lib/paraglide/messages/ko.js'),
+	nl: () => import('#lib/paraglide/messages/nl.js'),
+	pl: () => import('#lib/paraglide/messages/pl.js'),
+	tr: () => import('#lib/paraglide/messages/tr.js')
 };
 
 const tables = new Map<string, LocaleTable>();

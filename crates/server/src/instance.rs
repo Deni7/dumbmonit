@@ -24,7 +24,8 @@ pub const KEY: &str = "instance";
 pub const MAX_NAME_LEN: usize = 80;
 
 /// Langues de l'interface, telles que Paraglide les nomme.
-pub const LANGUAGES: [&str; 9] = ["en", "fr", "de", "es", "it", "pt", "pt-BR", "ru", "zh-Hans"];
+pub const LANGUAGES: [&str; 14] =
+    ["en", "fr", "de", "es", "it", "pt", "pt-BR", "ru", "zh-Hans", "ja", "ko", "nl", "pl", "tr"];
 
 /// Ce qui est écrit en base, et ce qui voyage dans la sauvegarde.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
