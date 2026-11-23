@@ -104,7 +104,7 @@
 				{/snippet}
 				{#if target.managed}
 					<!-- Managed by Docker labels: nothing to edit here until it is released. -->
-					<ManagedNotice {target} canRelease={auth.isAdmin} onreleased={() => void load()} />
+					<ManagedNotice {target} canRelease={auth.can('monitors.manage')} onreleased={() => void load()} />
 				{:else}
 				<!-- Re-mounted per device so every field is seeded fresh. -->
 				{#key target.id}

@@ -187,6 +187,49 @@ authentication stays on. Single sign-on and LDAP accounts change their
 password with their provider, and wall displays get a new password through
 **Edit**: neither has a reset link.
 
+### Custom roles {#custom-roles}
+
+When a built-in role gives too much or too little, an admin defines a
+**custom role** under **Settings → Team & access → Custom roles**: a name,
+a description and a set of permissions picked from a fixed list. In
+**Users**, the role picker then offers the custom roles below the built-in
+ones; choosing one replaces the built-in role of that account.
+
+| Permission | What it opens |
+|---|---|
+| **View** | Everything a viewer reads. Always part of a custom role. |
+| **Handle alerts** | What an operator does: acknowledge, ignore and silence alerts, take on-call shifts, add change markers, run remediation actions already defined. |
+| **Manage monitors** | Create, edit, import and delete monitors, monitor templates, alert rules and SLOs, run a probe. Device credentials can be entered, never read back: options that look like secrets still read as `***`, and sending `***` back keeps the stored value. |
+| **Manage notifications** | Notification channels, the notification policy and message templates. Not the email server. |
+| **Manage status pages** | Status pages and incidents. Not the page password, nor the subscribers. |
+| **Manage maintenance** | Maintenance windows. |
+| **View reports** | Read the scheduled reports and download their PDF. |
+
+Accounts, roles, teams, API and agent tokens, single sign-on, LDAP and SCIM,
+backups, instance settings, the email server and actions on machines (agents,
+containers, remediation set-up) stay admin only: no permission opens them.
+The server checks every request against the role, route by route, and
+refuses anything the role does not list; the interface only hides what the
+account cannot do. Each permission's routes are listed by
+`GET /api/roles/permissions` and marked `x-permissions` in the
+[API specification](../reference/api.md).
+
+- Changing a role applies at once to every account that has it.
+- A role still given to an account cannot be deleted: give those accounts
+  another role first.
+- With teams, the permissions also set the ceiling of the account: *Manage
+  monitors* allows up to *manage* on its folders, *Handle alerts* or *Manage
+  maintenance* up to *operate*, anything else *read*. A team-restricted
+  account still only reaches the pages teams can use.
+- *Require two-factor for admins and operators* also covers accounts whose
+  custom role changes something.
+- A custom role is given in **Users**; single sign-on, LDAP and SCIM keep
+  handing out built-in roles. When the groups only say *viewer*, the custom
+  role of the account stays; when they make it an operator or an admin, the
+  custom role is removed.
+- Custom roles and who has them are part of the backup.
+- A wall display cannot have a custom role.
+
 ### Invitations {#invitations}
 
 **Invite** asks for an email address, a role (viewer, operator or admin —

@@ -252,7 +252,7 @@
 			markedId = rule.id;
 			// From the noise report: `&edit=1` opens the editor, `&backtest=1` also runs the history test.
 			const params = page.url.searchParams;
-			if (auth.isAdmin && (params.get('edit') === '1' || params.get('backtest') === '1')) {
+			if (auth.can('monitors.manage') && (params.get('edit') === '1' || params.get('backtest') === '1')) {
 				editingId = rule.id;
 				backtestId = params.get('backtest') === '1' ? rule.id : null;
 			}
@@ -486,7 +486,7 @@
 </script>
 
 <div class="mb-4 flex justify-end">
-	{#if !auth.isAdmin}
+	{#if !auth.can('monitors.manage')}
 		<Plate tone="ghost" label={auth.readOnlyLabel} />
 	{:else if !creating}
 		<Button variant="secondary" size="sm" onclick={() => (creating = true)}>{m.alerts_rules_new()}</Button>
@@ -642,7 +642,7 @@
 				{/if}
 			</div>
 
-			{#if auth.isAdmin}
+			{#if auth.can('monitors.manage')}
 				<div class="flex shrink-0 flex-wrap items-center gap-3">
 					{#if !editing}
 						<Button variant="ghost" size="sm" onclick={() => (editingId = rule.id)} aria-label={m.alerts_rules_edit_aria({ name: rule.name })}>
@@ -707,7 +707,7 @@
 		icon={SlidersHorizontal}
 		title={m.alerts_rules_empty_title()}
 		description={m.alerts_rules_empty_description()}
-		primary={auth.isAdmin && !creating ? { label: m.alerts_rules_new(), onclick: () => (creating = true) } : undefined}
+		primary={auth.can('monitors.manage') && !creating ? { label: m.alerts_rules_new(), onclick: () => (creating = true) } : undefined}
 	/>
 {:else}
 	<div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center">

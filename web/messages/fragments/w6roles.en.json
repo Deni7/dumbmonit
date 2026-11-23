@@ -1,0 +1,62 @@
+{
+	"w6roles_audit_created": "Custom role created",
+	"w6roles_audit_deleted": "Custom role deleted",
+	"w6roles_audit_updated": "Custom role changed",
+	"w6roles_editor_cancel": "Cancel",
+	"w6roles_editor_create": "Create role",
+	"w6roles_editor_description": "Description",
+	"w6roles_editor_edit_title": "Edit {name}",
+	"w6roles_editor_err_name": "Give the role a name.",
+	"w6roles_editor_implied": "always included",
+	"w6roles_editor_name": "Name",
+	"w6roles_editor_new_title": "New role",
+	"w6roles_editor_permissions": "Permissions",
+	"w6roles_editor_save": "Save role",
+	"w6roles_editor_save_error": "The role could not be saved",
+	"w6roles_perm_alerts_help": "Acknowledge, ignore and silence alerts, take on-call shifts, add change markers and run remediation actions, as an operator does.",
+	"w6roles_perm_alerts_label": "Handle alerts",
+	"w6roles_perm_maintenance_help": "Schedule, edit and remove maintenance windows.",
+	"w6roles_perm_maintenance_label": "Manage maintenance",
+	"w6roles_perm_monitors_help": "Create, edit, import and delete monitors, monitor templates, alert rules and SLOs. Device credentials can be entered, never read back.",
+	"w6roles_perm_monitors_label": "Manage monitors",
+	"w6roles_perm_notifications_help": "Edit notification channels, the notification policy and message templates. The email server stays with administrators.",
+	"w6roles_perm_notifications_label": "Manage notifications",
+	"w6roles_perm_reports_help": "Read the scheduled reports and download their PDF.",
+	"w6roles_perm_reports_label": "View reports",
+	"w6roles_perm_status_pages_help": "Edit status pages and publish incidents. Page passwords and subscribers stay with administrators.",
+	"w6roles_perm_status_pages_label": "Manage status pages",
+	"w6roles_perm_view_help": "Read monitors, alerts, metrics and everything else a viewer reads.",
+	"w6roles_perm_view_label": "View",
+	"w6roles_section_add": "Add role",
+	"w6roles_section_admin_only": "Accounts, roles, teams, API tokens, single sign-on, backups and instance settings stay with administrators: no permission opens them.",
+	"w6roles_section_delete": "Delete",
+	"w6roles_section_delete_confirm": "Delete for good?",
+	"w6roles_section_delete_error": "The role could not be deleted",
+	"w6roles_section_description": "Give an account chosen rights without making it an admin. A custom role replaces the built-in role of the accounts that have it.",
+	"w6roles_section_edit": "Edit",
+	"w6roles_section_empty_body": "The built-in roles cover most needs. Create one when someone should, for example, edit monitors without touching accounts.",
+	"w6roles_section_empty_title": "No custom role yet",
+	"w6roles_section_in_use": "Give its accounts another role before deleting it.",
+	"w6roles_section_load_error": "Custom roles could not be loaded",
+	"w6roles_section_read_only": "Read only",
+	"w6roles_section_search_kw": "custom role permissions rights delegate access",
+	"w6roles_section_title": "Custom roles",
+	"w6roles_section_users_count": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} account",
+				"countPlural=other": "{count} accounts"
+			}
+		}
+	],
+	"w6roles_users_custom_group": "Custom roles",
+	"w6roles_users_custom_help": "A custom role replaces the built-in role: the account gets exactly the permissions of that role.",
+	"w6roles_users_custom_title": "Custom role"
+}

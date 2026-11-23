@@ -834,12 +834,12 @@
 						<Activity class="size-4" aria-hidden="true" />
 						{m.devices_target_probe_now()}
 					</Button>
-				{:else if auth.isAdmin}
+				{:else if auth.can('monitors.manage')}
 					<Button variant="primary" onclick={() => void setEnabled(true)} loading={savingEnabled}>
 						{m.devices_target_enable()}
 					</Button>
 				{/if}
-				{#if auth.isAdmin}
+				{#if auth.can('monitors.manage')}
 					<TargetMenu
 						{target}
 						{refreshKey}
@@ -850,7 +850,7 @@
 						onasktoremove={() => (askAgentRemoval = true)}
 					/>
 				{:else}
-					{#if auth.canOperate && target.enabled}
+					{#if auth.canSilence && target.enabled}
 						<SilenceControl {target} {refreshKey} />
 					{/if}
 					<Plate tone="ghost" label={auth.readOnlyLabel} size="md" />
@@ -875,7 +875,7 @@
 			<ErrorNotice error={enabledError} title={m.devices_target_err_enabled()} class="mt-4" />
 		{/if}
 		{#if target?.managed}
-			<ManagedNotice {target} canRelease={auth.isAdmin} onreleased={() => void loadTarget()} class="mt-4" />
+			<ManagedNotice {target} canRelease={auth.can('monitors.manage')} onreleased={() => void loadTarget()} class="mt-4" />
 		{/if}
 		{#if askAgentRemoval && target}
 			<AgentRemoveNotice {target} {deleting} ondelete={remove} oncancel={() => (askAgentRemoval = false)} />

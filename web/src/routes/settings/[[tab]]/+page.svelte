@@ -3,7 +3,7 @@
 	import { withBase } from '#lib/paths.js';
 	/**
 	 * Settings, in six tabs, each its own URL: My account (language,
-	 * password, two-factor, push), Team & access (users, single sign-on),
+	 * password, two-factor, push), Team & access (users, custom roles, single sign-on),
 	 * Monitoring (agents, packs), Notifications (channels, policy), Wall display and
 	 * System (backup, DumbMonit itself, API & assistants, about). A rail on
 	 * wide screens, a strip of chips on narrow ones, and a search box over the
@@ -40,6 +40,7 @@
 	import LocationsSection from '#lib/components/settings/LocationsSection.svelte';
 	import UsersSection from '#lib/components/settings/UsersSection.svelte';
 	import TeamsSection from '#lib/components/settings/TeamsSection.svelte';
+	import RolesSection from '#lib/components/settings/roles/RolesSection.svelte';
 	import ClientsSection from '#lib/components/settings/ClientsSection.svelte';
 	import SamlSection from '#lib/components/settings/SamlSection.svelte';
 	import ScimSection from '#lib/components/settings/ScimSection.svelte';
@@ -94,7 +95,7 @@
 	/** The sections of each tab, top to bottom. */
 	const SECTIONS = $derived<Record<SettingsTab, Component[]>>({
 		account: [AppearanceSection, SecuritySection, PushSection, ...(auth.configured ? [MyNotificationsSection] : [])],
-		team: [UsersSection, ...(auth.isAdmin ? [InvitationsSection] : []), TeamsSection, ...(auth.isAdmin ? [ClientsSection] : []), SsoSection, SamlSection, ScimSection, LdapSection, ...(auth.isAdmin ? [AuditLogSection] : [])],
+		team: [UsersSection, ...(auth.isAdmin ? [RolesSection, InvitationsSection] : []), TeamsSection, ...(auth.isAdmin ? [ClientsSection] : []), SsoSection, SamlSection, ScimSection, LdapSection, ...(auth.isAdmin ? [AuditLogSection] : [])],
 		monitoring: [AgentsSection, PacksSection, SecurityScoreSection, ...(auth.isAdmin ? [LocationsSection] : [])],
 		notifications: [ChannelsSection, ...(auth.isAdmin ? [MailServerSection] : []), NotificationPolicySection],
 		wall: [WallModeSection, WallWeatherSection, MusicSection],

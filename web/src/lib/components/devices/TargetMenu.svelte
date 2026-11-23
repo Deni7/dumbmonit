@@ -94,7 +94,7 @@
 				<a href={withBase(`/targets/new?kind=${encodeURIComponent(target.kind)}&duplicate=${target.id}`)} role="menuitem" class={item}>
 					<CopyPlus class="size-4 shrink-0 text-ink-2" aria-hidden="true" />{m.w1monitors_detail_duplicate()}
 				</a>
-				{#if auth.isAdmin}
+				{#if auth.can('monitors.manage')}
 					<button type="button" role="menuitem" class={item} aria-haspopup="dialog" onclick={() => { close(); templateDialog?.show(); }}>
 						<BookmarkPlus class="size-4 shrink-0 text-ink-2" aria-hidden="true" />{m.w5monitors_template_save_open()}
 					</button>

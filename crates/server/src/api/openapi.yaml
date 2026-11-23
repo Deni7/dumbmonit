@@ -79,6 +79,14 @@ info:
     everything. Every other write is admin only, and an operator can never
     manage accounts or roles.
 
+    An admin may also define **custom roles** (`/api/roles`): a set of
+    permissions from a fixed catalog (`GET /api/roles/permissions`), given to
+    an account whose built-in role stays `viewer`. Such an account reads like
+    a viewer and reaches, in addition, the operations marked
+    `x-permissions` with one of its permissions; any other write answers
+    `403`. Accounts, roles, teams, tokens, single sign-on, backups and
+    instance settings are never in the catalog.
+
     A fourth role, **`wall`**, is a wall display: it signs in to show the
     wall (`/wall`) and nothing else. It reaches only what the wall reads —
     the operations marked `x-wall: true`:

@@ -149,7 +149,7 @@
 		focused = day;
 		const count = byDay.get(day)?.length ?? 0;
 		selectedId = null;
-		if (count === 0 && auth.canOperate && oncreateday) {
+		if (count === 0 && auth.canSilence && oncreateday) {
 			selectedDay = null;
 			oncreateday(day);
 			return;
@@ -318,7 +318,7 @@
 					</li>
 				{/each}
 			</ul>
-			{#if auth.canOperate && oncreateday}
+			{#if auth.canSilence && oncreateday}
 				<div class="mt-3">
 					<Button size="sm" variant="secondary" onclick={() => selectedDay && oncreateday(selectedDay)}>{m.w5calendar_agenda_create()}</Button>
 				</div>

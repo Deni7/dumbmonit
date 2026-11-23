@@ -42,7 +42,7 @@
 
 <PageHeader title={m.devices_targets_title()} class="min-h-10">
 	{#snippet actions()}
-		{#if auth.isAdmin && onList && !knownEmpty}
+		{#if auth.can('monitors.manage') && onList && !knownEmpty}
 			<ClickSpark>
 				<Button variant="primary" href="/targets/new">
 					<Plus class="size-4" aria-hidden="true" />

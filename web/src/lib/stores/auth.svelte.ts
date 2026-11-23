@@ -3,7 +3,8 @@
  *
  * Accounts have three roles: `admin` (everything), `operator` (reads everything
  * and handles alerts: ack, ignore, snooze — no configuration) and `viewer`
- * (read only), plus `wall`, a wall display that only ever shows `/wall`. This
+ * (read only), plus `wall`, a wall display that only ever shows `/wall`. A
+ * viewer may also carry a custom role, whose permissions `can()` answers for. This
  * store is the single source of truth about the session. The cookie set by the
  * server is `HttpOnly`: the interface can neither read nor forge it, and stores
  * no token. The state is therefore deduced only from `GET /api/auth/status`
@@ -26,6 +27,7 @@ import {
 	type AccessInfo,
 	type MspAccess,
 	type HttpsStatus,
+	type Permission,
 	type User
 } from '#lib/api/index.js';
 import { signInWithPasskey } from '#lib/api/passkeys.js';
@@ -170,7 +172,22 @@ class AuthStore {
 	 */
 	get canOperate(): boolean {
 		if (this.isAdmin) return true;
-		return this.user?.role === 'operator';
+		return this.user?.role === 'operator' || this.can('alerts.operate');
+	}
+
+	/**
+	 * True when the current user holds `permission` of the server's catalog:
+	 * admins hold them all; a custom role holds its own (`user.permissions`).
+	 * A convenience for hiding controls — the server checks every route.
+	 */
+	can(permission: Permission): boolean {
+		if (this.isAdmin) return true;
+		return this.user?.permissions?.includes(permission) ?? false;
+	}
+
+	/** True when the current user may schedule and edit maintenance windows. */
+	get canSilence(): boolean {
+		return this.canOperate || this.can('maintenance.manage');
 	}
 
 	/**
@@ -213,6 +230,7 @@ class AuthStore {
 
 	/** Badge shown on configuration screens the current user cannot change. */
 	get readOnlyLabel(): string {
+		if (this.user?.custom_role) return this.user.custom_role.name;
 		return this.user?.role === 'operator' ? 'Operator — config is admin only' : 'Viewer — read only';
 	}
 
