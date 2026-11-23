@@ -23,7 +23,7 @@
 	} from '#lib/api/backupDestinations.js';
 	import { formatBinaryBytes, formatDateTime, formatRelative } from '#lib/format.js';
 	import { startPolling } from '#lib/poll.js';
-	import { Button, Confirm, Disclosure, ErrorNotice, Plate, Skeleton } from '#lib/ui/index.js';
+	import { Button, Confirm, Disclosure, EmptyState, ErrorNotice, Plate, Skeleton } from '#lib/ui/index.js';
 	import BackupDestinationForm from './BackupDestinationForm.svelte';
 
 	interface Props {
@@ -162,7 +162,7 @@
 		<Skeleton class="mt-3 h-16 w-full" />
 	{:else}
 		{#if destinations.length === 0 && editing === null}
-			<p class="mt-3 text-sm text-ink-2">{m.w5backups_empty()}</p>
+			<EmptyState compact title={m.w5backups_empty()} class="mt-3" />
 		{/if}
 
 		{#if destinations.length > 0}
@@ -174,7 +174,7 @@
 							<BackupDestinationForm {destination} onsaved={saved} oncancel={() => (editing = null)} />
 						{:else}
 							<div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-								<span class="font-semibold text-ink">{destination.name}</span>
+								<span class="min-w-0 font-semibold break-words text-ink">{destination.name}</span>
 								<span class="text-ink-3">{kindLabel(destination.kind)}</span>
 								{#if !destination.enabled}
 									<Plate tone="ghost" label={m.w5backups_paused()} />
@@ -198,12 +198,12 @@
 									</span>
 								</div>
 								{#if last.error}
-									<p class="text-warning break-words">{last.error}</p>
+									<p class="break-words text-warning-ink">{last.error}</p>
 								{/if}
 							{:else if uploading && destination.enabled}
 								<Plate tone="info" label={m.w5backups_uploading()} pulse />
 							{:else}
-								<p class="text-ink-3">{m.w5backups_never()}</p>
+								<p class="text-ink-2">{m.w5backups_never()}</p>
 							{/if}
 
 							{#if result}
@@ -215,7 +215,7 @@
 									{#if result.host_key}
 										<div class="flex items-start gap-2">
 											<ShieldAlert class={`mt-0.5 size-4 shrink-0 ${result.host_key_changed ? 'text-warning' : 'text-ink-2'}`} aria-hidden="true" />
-											<p class={result.host_key_changed ? 'text-warning' : 'text-ink-2'}>
+											<p class={result.host_key_changed ? 'font-medium text-warning-ink' : 'text-ink-2'}>
 												{result.host_key_changed ? m.w5backups_hostkey_changed() : m.w5backups_hostkey_unknown()}
 											</p>
 										</div>

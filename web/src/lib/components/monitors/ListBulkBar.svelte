@@ -104,9 +104,9 @@
 			</Button>
 		{/snippet}
 		{#snippet children({ close })}
-			<ul class="flex min-w-48 flex-col gap-0.5">
+			<ul role="none" class="flex min-w-48 flex-col gap-0.5">
 				{#each silenceChoices as choice (choice.secs)}
-					<li>
+					<li role="none">
 						<button type="button" role="menuitem" class={bulkItem} onclick={() => { close(); onsilence(choice.secs, choice.label); }}>
 							{choice.label}
 						</button>
@@ -123,14 +123,14 @@
 			</Button>
 		{/snippet}
 		{#snippet children({ close })}
-			<ul class="flex min-w-48 flex-col gap-0.5">
-				<li>
+			<ul role="none" class="flex min-w-48 flex-col gap-0.5">
+				<li role="none">
 					<button type="button" role="menuitem" class={bulkItem} onclick={() => { close(); onmove(''); }}>
 						{m.devices_list_bulk_no_folder()}
 					</button>
 				</li>
 				{#each folderChoices as folder (folder)}
-					<li>
+					<li role="none">
 						<button type="button" role="menuitem" class={bulkItem} onclick={() => { close(); onmove(folder); }}>
 							{folder}
 						</button>

@@ -12,7 +12,7 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { listChannels, type Channel, type Target } from '#lib/api/index.js';
 	import { bulkUpdateTargets, type TargetBulkReport } from '#lib/api/targetsBulk.js';
-	import { Button, Chip, ErrorNotice, Field, Segmented } from '#lib/ui/index.js';
+	import { Button, Chip, ErrorNotice, Field, Segmented, Skeleton } from '#lib/ui/index.js';
 	import { INTERVALS } from '#lib/components/device-form/kinds.js';
 	import { KEEP, NEW_FOLDER, NO_FOLDER, buildBulkPatch, parseTag, type ChannelMode } from './bulk-edit.js';
 
@@ -180,7 +180,9 @@
 			<div class="grid gap-2">
 				<Segmented legend={m.w5monitors_bulkedit_channels_label()} options={modes} bind:value={channelMode} name="bulk-channel-mode" help={channelsHelp} />
 				{#if channelMode !== 'keep'}
-					{#if channelsRead && channels.length === 0}
+					{#if !channelsRead}
+						<div class="grid gap-1"><Skeleton class="h-10 w-full" rows={2} /></div>
+					{:else if channels.length === 0}
 						<p class="text-sm text-ink-2">{m.w5monitors_bulkedit_channels_none()}</p>
 					{:else}
 						<fieldset class="grid gap-0.5 rounded-[var(--radius-card)] border border-line p-2">

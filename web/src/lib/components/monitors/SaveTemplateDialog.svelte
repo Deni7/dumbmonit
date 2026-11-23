@@ -47,6 +47,8 @@
 		error = null;
 		try {
 			saved = await createMonitorTemplate(name.trim(), target.id);
+			// The form (and the focused button) is gone: keep focus in the dialog, so Tab and Escape still work.
+			void tick().then(() => dialog?.focus());
 		} catch (cause) {
 			error = cause;
 		} finally {

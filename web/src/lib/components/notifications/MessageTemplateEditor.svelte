@@ -153,11 +153,12 @@
 		<section class="grid gap-1.5" aria-labelledby="channel-template-preview" aria-busy={loading}>
 			<div class="flex flex-wrap items-baseline justify-between gap-2">
 				<h4 id="channel-template-preview" class="text-sm font-medium text-ink">{m.w5chat_template_preview()}</h4>
-				{#if loading}<span class="text-[0.8125rem] text-ink-3" role="status">{m.w5chat_template_preview_loading()}</span>{/if}
+				<!-- Not a live region: it would speak on every pause in the typing; the section is aria-busy. -->
+				{#if loading}<span class="text-[0.8125rem] text-ink-2">{m.w5chat_template_preview_loading()}</span>{/if}
 			</div>
 			<p class="text-[0.8125rem] text-ink-2">{m.w5chat_template_preview_note()}</p>
 			{#if preview}
-				<div class="min-w-0 rounded-lg border-l-4 border-signal bg-surface-2 px-3.5 py-3">
+				<div class="min-w-0 rounded-lg border border-line bg-surface-2 px-3.5 py-3">
 					<p class="text-sm font-semibold break-words text-ink">{preview.title}</p>
 					{#if preview.body}
 						<pre class="mt-1.5 font-mono text-[0.8125rem] leading-relaxed break-words whitespace-pre-wrap text-ink-2">{preview.body}</pre>

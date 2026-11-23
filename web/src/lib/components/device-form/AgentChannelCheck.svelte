@@ -188,7 +188,7 @@
 	{#if checking && !result}
 		<p class="flex items-center gap-2 text-sm text-ink-2">
 			<Led tone="ghost" size="sm" blink />
-			{m.deviceform_channelcheck_checking()}
+			<span class="min-w-0 break-words">{m.deviceform_channelcheck_checking()}</span>
 		</p>
 	{:else if error}
 		<ErrorNotice {error} title={m.deviceform_channelcheck_error()} />
@@ -197,9 +197,9 @@
 	{:else if result?.relay}
 		{#if relayState === 'blocked' && blocked}
 			<div role="alert" class="grid gap-2 rounded-[var(--radius-card)] border border-warning/50 bg-warning-soft px-3 py-3">
-				<p class="flex items-start gap-2 text-sm font-semibold break-words text-warning-ink">
+				<p class="flex items-start gap-2 text-sm font-semibold text-warning-ink">
 					<AlertTriangle class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-					{blocked.title}
+					<span class="min-w-0 break-words">{blocked.title}</span>
 				</p>
 				<p class="max-w-prose text-sm break-words text-ink">{blocked.body}</p>
 				{#if blocked.copy}
@@ -215,7 +215,7 @@
 		{:else if relayState === 'ready'}
 			<p class="flex items-start gap-2 text-sm text-ink">
 				<RadioTower class="mt-0.5 size-4 shrink-0 text-signal-ink" aria-hidden="true" />
-				{m.deviceform_channelcheck_relay_ready({ relay: result.relay.relay_name, port })}
+				<span class="min-w-0 break-words">{m.deviceform_channelcheck_relay_ready({ relay: result.relay.relay_name, port })}</span>
 			</p>
 			{#if testedBy}
 				<p class="-mt-1 max-w-prose text-[0.8125rem] text-ink-2" title={testedBy.title}>{testedBy.text}</p>
@@ -224,7 +224,7 @@
 			<div role="alert" class="grid gap-2 rounded-[var(--radius-card)] border border-warning/50 bg-warning-soft px-3 py-3">
 				<p class="flex items-start gap-2 text-sm font-semibold text-warning-ink">
 					<AlertTriangle class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-					{m.deviceform_channelcheck_relay_unreachable_title({ relay: result.relay.relay_name, address: relayAddress })}
+					<span class="min-w-0 break-words">{m.deviceform_channelcheck_relay_unreachable_title({ relay: result.relay.relay_name, address: relayAddress })}</span>
 				</p>
 				<p class="max-w-prose text-sm break-words text-ink">
 					{m.deviceform_channelcheck_relay_unreachable_body({ error: result.relay.check_error ?? '', port })}
@@ -236,12 +236,12 @@
 		{:else if relayState === 'testing'}
 			<p class="flex items-start gap-2 text-sm text-ink">
 				<Led tone="ghost" size="sm" blink />
-				{m.deviceform_channelcheck_relay_testing({ relay: result.relay.relay_name, address: relayAddress })}
+				<span class="min-w-0 break-words">{m.deviceform_channelcheck_relay_testing({ relay: result.relay.relay_name, address: relayAddress })}</span>
 			</p>
 		{:else}
 			<p class="flex items-start gap-2 text-sm text-ink">
 				<Led tone="ghost" size="sm" blink />
-				{m.deviceform_channelcheck_relay_waiting({ relay: result.relay.relay_name, port })}
+				<span class="min-w-0 break-words">{m.deviceform_channelcheck_relay_waiting({ relay: result.relay.relay_name, port })}</span>
 			</p>
 		{/if}
 		{#if relayState !== 'blocked'}
@@ -254,9 +254,9 @@
 		<div role="alert" class="grid gap-3 rounded-[var(--radius-card)] border border-warning/50 bg-warning-soft px-3 py-3">
 			<p class="flex items-start gap-2 text-sm font-semibold text-warning-ink">
 				<AlertTriangle class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-				{problem.title}
+				<span class="min-w-0 break-words">{problem.title}</span>
 			</p>
-			<p class="max-w-prose text-sm text-ink">{problem.body}</p>
+			<p class="max-w-prose text-sm break-words text-ink">{problem.body}</p>
 			{#if problem.compose}
 				<p class="max-w-prose text-sm text-ink">{m.deviceform_channelcheck_compose({ mapping })}</p>
 				<CopyBlock value={`    ports:\n      - "${mapping}"`} label={m.deviceform_channelcheck_copy_compose()} />
@@ -283,7 +283,7 @@
 	{:else if result?.outcome === 'ok'}
 		<p class="flex items-center gap-2 text-sm text-ink">
 			<Lock class="size-4 shrink-0 text-signal-ink" aria-hidden="true" />
-			{result?.transport === 'websocket' ? m.deviceform_channelcheck_websocket_ok({ address }) : m.deviceform_channelcheck_ok({ address })}
+			<span class="min-w-0 break-words">{result?.transport === 'websocket' ? m.deviceform_channelcheck_websocket_ok({ address }) : m.deviceform_channelcheck_ok({ address })}</span>
 		</p>
 	{/if}
 	{#if !ready && result?.relay}
