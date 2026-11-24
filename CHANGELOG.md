@@ -3,17 +3,16 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## 0.20.2 — 2026-11-23
+## 0.20.2 — 2026-11-24
 
 ### Added
 
-- **Three new overview dashboards to try.** A switch on the overview picks Classic, Command
-  (a widget grid: problems table with acknowledge and mute, alert volume with MTTA and MTTR,
-  fleet honeycomb, top consumers, SLOs, backups with their last runs, expiries and forecasts,
-  services with their last checks, maintenance, agents, events, status pages), NOC (by site and
-  category: sunburst, site × category matrix, problems by site, top 5 lists) or Hybrid (a dark
-  band with the three tiles, what to act on now and the next 14 days, then site cards and the
-  rich grid). The choice is kept per browser. New `GET /api/overview/widgets`.
+- **A new overview.** One screen that never scrolls on a computer: three figures (monitors up with a
+  bar per monitor, 30-day availability against the objective, open problems with the last 14
+  days), **Act now** (every problem with acknowledge and mute), **Coming up** (maintenance windows,
+  expiries, late backups, disk forecasts, critical vulnerabilities, the update), **Services** with
+  their last checks, **Fleet by site** by category, and **Recent events**. The figures count the
+  same problems as Act now. New `GET /api/overview/widgets`.
 - **Status page discovery.** `GET /api/public/status` lists the published public pages; each page
   has a "Show in the list of public pages" switch.
 - **WordPress plugin 2.0.0.** Follows the visitor's language (WordPress, Polylang or WPML) and
@@ -29,8 +28,7 @@ All notable changes to this project are documented here. The format follows
   stale data, unreachable for…) are set in seconds, minutes, hours or days; on/off rules show
   what makes them fire instead of a meaningless "> 0"; "Must last for" is a free duration.
   Notifications write "2 d" instead of "172800 s".
-- The overview no longer has a manual refresh button, and its "updated … ago" line no longer
-  shifts the page.
+- The overview no longer has a manual refresh button.
 
 ### Fixed
 

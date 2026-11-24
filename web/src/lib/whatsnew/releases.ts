@@ -22,11 +22,11 @@ export interface Release {
 export const RELEASES: Release[] = [
 	{
 		version: '0.20.2',
-		date: '2026-11-23',
+		date: '2026-11-24',
 		highlights: [
 			{
-				title: 'Three new overview dashboards',
-				text: 'Command, NOC and Hybrid: problems, backups, services, top consumers, sites and more. Pick one with the switch on the overview.'
+				title: 'A new overview',
+				text: 'One screen, no scrolling: the three figures, what to act on now, what is coming up, services, fleet by site and recent events.'
 			},
 			{
 				title: 'Thresholds in days and hours',
