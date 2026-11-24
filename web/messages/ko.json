@@ -939,8 +939,6 @@
 	],
 	"console_breadcrumb": "탐색 경로",
 	"console_egg": "// 분당 {count}회 점검. 편히 주무세요, 저희가 지키고 있습니다.",
-	"console_kpi_alerts": "열린 경보",
-	"console_kpi_alerts_note": "치명: {critical}, 경고: {warning}",
 	"console_kpi_availability": "가용성 30일",
 	"console_kpi_availability_note": "측정된 모니터: {count}",
 	"console_kpi_none": "아직 데이터 없음",
@@ -950,7 +948,6 @@
 	"console_live": "LIVE",
 	"console_live_off": "실시간 업데이트가 일시 중지되었습니다. 선택하면 재개합니다.",
 	"console_live_on": "실시간 업데이트 켜짐. 선택하면 일시 중지합니다.",
-	"console_panel_attention": "확인 필요",
 	"console_panel_oncall_unknown": "누군가",
 	"console_paused": "일시 중지됨",
 	"console_range": "시간 범위",
@@ -5660,9 +5657,6 @@
 	"overview_ack_err": "이 모니터를 확인 처리하지 못했습니다.",
 	"overview_ack_hint": "확인했고 처리 중입니다. 정상으로 돌아올 때까지 조용합니다.",
 	"overview_ack_item": "확인",
-	"overview_all_good_text": "다운된 것도, 기다리는 경보도 없습니다. 비둘기는 낮잠을 자는 중입니다.",
-	"overview_all_good_title": "모두 정상",
-	"overview_chart_error": "이 차트를 불러오지 못했습니다. 1분 후 다시 시도합니다.",
 	"overview_first_all_done": "세 가지를 모두 마쳤습니다. 이 안내는 다시 나타나지 않습니다.",
 	"overview_first_channel_action": "채널 추가",
 	"overview_first_channel_text": "이메일, ntfy, Discord, Telegram, PagerDuty — 이미 보고 있는 곳이면 어디든. 문제가 생기기 전에는 아무것도 전송되지 않습니다.",
@@ -5686,21 +5680,6 @@
 	"overview_first_test_text": "채널에서 테스트를 보내세요. 하나가 실제로 전송되면 이 단계가 초록색으로 바뀝니다.",
 	"overview_first_test_title": "메시지가 도착하는지 확인",
 	"overview_first_title": "처음 5분",
-	"overview_incidents_bars_label": "일별 인시던트, 왼쪽이 가장 오래된 날",
-	"overview_incidents_before": "그 전 주: {value}",
-	"overview_incidents_count_label": "인시던트",
-	"overview_incidents_day_title": "{day}. 인시던트: {count}건. 지속 시간: {duration}.",
-	"overview_incidents_explain": "발생부터 해결까지. 하루에 막대 하나.",
-	"overview_incidents_noisiest": "가장 시끄러운 모니터",
-	"overview_incidents_none": "최근 {days}일 동안 인시던트가 없습니다.",
-	"overview_incidents_open_label": "지속 시간",
-	"overview_incidents_title": "인시던트, 최근 {days}일",
-	"overview_latency_empty": "이 범위에서 측정된 응답 시간이 아직 없습니다.",
-	"overview_latency_hint": "모든 프로브의 p95와 중앙값, 최근 {range}",
-	"overview_latency_median": "중앙값",
-	"overview_latency_p95": "p95",
-	"overview_latency_slowest": "가장 느린 모니터(p95)",
-	"overview_latency_title": "응답 시간",
 	"overview_mute_aria": "{name} 음소거",
 	"overview_mute_err_create": "이 모니터를 음소거하지 못했습니다.",
 	"overview_mute_err_lift": "이 모니터의 음소거를 해제하지 못했습니다.",
@@ -5724,21 +5703,6 @@
 			],
 			"match": {
 				"countPlural=other": "+{count}개 보류됨"
-			}
-		}
-	],
-	"overview_needs_more": "경보에서 {count}개 모두 보기",
-	"overview_needs_see_all": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "모니터 {count}개 모두 보기"
 			}
 		}
 	],
@@ -5924,15 +5888,7 @@
 	],
 	"overview_upcoming_due_now": "지금",
 	"overview_upcoming_due_today": "오늘",
-	"overview_upcoming_empty": "앞으로 {days}일 안에 예정된 것이 없습니다.",
-	"overview_upcoming_error": "예정된 항목을 읽지 못했습니다.",
-	"overview_upcoming_kind_backup": "백업",
-	"overview_upcoming_kind_disk": "디스크",
-	"overview_upcoming_kind_update": "업데이트",
-	"overview_upcoming_kind_vulnerability": "취약점",
 	"overview_upcoming_list_label": "예정된 항목, 급한 순",
-	"overview_upcoming_scope": "인증서, 도메인, 디스크, 백업, 취약점을 감시합니다.",
-	"overview_upcoming_see_all": "모두 보기",
 	"overview_upcoming_t_backup": "{what} 백업이 늦어질 예정",
 	"overview_upcoming_t_backup_late": "{what} 백업이 늦어짐",
 	"overview_upcoming_t_disk": "{what}이(가) 가득 찰 예정",
@@ -6739,6 +6695,8 @@
 	"settings_agentupdates_hint_pending": "다음 보고 때 업데이트됩니다.",
 	"settings_agentupdates_hint_read_only": "에이전트가 자신의 폴더에 쓸 수 없습니다. 설치 명령을 한 번 다시 실행하세요.",
 	"settings_agentupdates_hint_refused": "에이전트가 업데이트를 거부했습니다.",
+	"settings_agentupdates_hint_reinstall": "이 버전의 Windows 에이전트는 자체 바이너리를 교체할 수 없습니다. 해당 컴퓨터에서 설치 명령을 한 번 다시 실행하세요. 이후 버전은 스스로 업데이트됩니다.",
+	"settings_agentupdates_hint_unknown_key": "이 에이전트는 현재 서명 키보다 오래되어 업데이트를 검증할 수 없습니다. 업데이트가 끝날 때까지 '서명되지 않은 빌드 허용(개발용)'을 켜거나 설치 명령을 다시 실행하세요.",
 	"settings_agentupdates_hint_unsigned": "이 서버의 에이전트 빌드가 서명되지 않았습니다. 에이전트는 서명된 업데이트만 설치합니다.",
 	"settings_agentupdates_hint_unsupported": "이 플랫폼(macOS)은 설치 스크립트로 업데이트합니다.",
 	"settings_agentupdates_hint_up_to_date": "최신 상태입니다.",
@@ -6759,6 +6717,7 @@
 	"settings_agentupdates_policy_follow": "전역 설정 따르기",
 	"settings_agentupdates_policy_off": "끄기",
 	"settings_agentupdates_policy_on": "켜기",
+	"settings_agentupdates_reinstall_command": "설치 명령 가져오기",
 	"settings_agentupdates_resume": "롤아웃 재개",
 	"settings_agentupdates_rollout_canaries": "업데이트된 카나리: {total}개 중 {updated}개",
 	"settings_agentupdates_rollout_held": "다른 에이전트: 보류 중.",
@@ -6781,6 +6740,8 @@
 	"settings_agentupdates_status_pending": "대기 중",
 	"settings_agentupdates_status_read_only": "읽기 전용",
 	"settings_agentupdates_status_refused": "거부됨",
+	"settings_agentupdates_status_reinstall": "재설치 필요",
+	"settings_agentupdates_status_unknown_key": "알 수 없는 서명 키",
 	"settings_agentupdates_status_unsigned": "차단됨: 서명되지 않은 빌드",
 	"settings_agentupdates_status_unsupported": "지원 안 됨",
 	"settings_agentupdates_status_up_to_date": "최신 상태",
@@ -9423,6 +9384,9 @@
 	"upgrade_notice_keep": "유지",
 	"upgrade_notice_title": "적용할 설정 변경",
 	"upgrade_notice_view": "보기",
+	"w10hybrid_coming_empty": "예정되었거나 곧 만료되는 항목이 없습니다.",
+	"w10hybrid_kpi_problems": "열린 문제",
+	"w10hybrid_services_p95": "p95 {value}",
 	"w1alerts_channels_copy_name": "{name}(복사본)",
 	"w1alerts_channels_disable_aria": "채널 {name} 비활성화",
 	"w1alerts_channels_duplicate": "복제",
@@ -9522,8 +9486,6 @@
 	"w1wall_notice_maintenance": "점검 진행 중: {title}",
 	"w1wall_notice_maintenance_until": "점검 진행 중: {title}, {time}까지",
 	"w1wall_notice_more": "+{count}",
-	"w1wall_overview_trend_days": "{days}일",
-	"w1wall_overview_trend_period": "기간",
 	"w1wall_settings_clock_12h": "12시간",
 	"w1wall_settings_clock_24h": "24시간",
 	"w1wall_settings_clock_label": "시계 형식",
@@ -10545,6 +10507,223 @@
 	"w6roles_users_custom_group": "사용자 지정 역할",
 	"w6roles_users_custom_help": "사용자 지정 역할은 기본 제공 역할을 대체합니다. 계정에는 해당 역할의 권한만 부여됩니다.",
 	"w6roles_users_custom_title": "사용자 지정 역할",
+	"w8rules_editor_error_hold": "조건이 지속되어야 하는 시간을 입력하세요: 0 이상의 숫자.",
+	"w8rules_editor_flag_label": "발생 조건",
+	"w8rules_editor_flag_nothing": "이 규칙은 켜짐/꺼짐 신호를 읽습니다. 설정할 임계값이 없습니다. 알림을 받기 전에 얼마나 지속되어야 하는지는 선택할 수 있습니다.",
+	"w8rules_editor_hold_anomaly_help": "알림을 받기 전에 이상이 지속되어야 하는 시간입니다. 0이면 즉시 알립니다.",
+	"w8rules_editor_hold_help": "알림을 받기 전에 조건이 유지되어야 하는 시간입니다. 0이면 처음 감지한 검사에서 바로 알립니다.",
+	"w8rules_editor_hold_label": "지속 시간",
+	"w8rules_editor_threshold_duration_help": "경과 시간 또는 지연입니다. 편한 단위로 입력하세요.",
+	"w8rules_list_summary_flag": "켜짐/꺼짐 신호",
+	"w8rules_overrides_flag": "켜짐/꺼짐 규칙: 장치별로 설정할 것은 없고 적용 여부만 정합니다.",
+	"w8rules_unitinput_aria": "{field}: 단위",
+	"w8wp_discovery_label": "공개 페이지 목록에 표시",
+	"w8wp_discovery_off": "공개 페이지 목록에 없습니다. 주소로는 계속 볼 수 있습니다.",
+	"w8wp_discovery_on": "WordPress 배너 같은 웹사이트 플러그인이 서버의 공개 페이지 목록에서 이 페이지를 찾을 수 있습니다.",
+	"w8wp_discovery_private": "비공개 페이지는 공개 페이지 목록에 나타나지 않습니다.",
+	"w8wp_discovery_unpublished": "게시된 페이지만 공개 페이지 목록에 나타납니다.",
+	"w9dash_common_error": "이 수치를 불러오지 못했습니다.",
+	"w9dash_common_this_site": "이 사이트",
+	"w9dash_events_empty": "최근에 일어난 일이 없습니다.",
+	"w9dash_events_title": "최근 이벤트",
+	"w9dash_kpi_avail_note": "목표 {target}%",
+	"w9dash_kpi_bars_label": "모니터마다 막대 하나, 사이트별로 묶음. 높은 막대는 다운된 모니터",
+	"w9dash_kpi_budget_left": "남은 오류 예산",
+	"w9dash_kpi_critical": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "심각 {count}건"
+			}
+		}
+	],
+	"w9dash_kpi_opened_label": "최근 {days}일 동안 하루별 새 알림",
+	"w9dash_kpi_paused": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "일시 중지 {count}개"
+			}
+		}
+	],
+	"w9dash_kpi_sites": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "사이트 {count}곳"
+			}
+		}
+	],
+	"w9dash_kpi_warning": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "경고 {count}건"
+			}
+		}
+	],
+	"w9dash_problems_ack_recovery": "다시 응답할 때까지",
+	"w9dash_problems_calm_since": "{time} 이후 열린 문제가 없습니다.",
+	"w9dash_problems_calm_text": "모든 모니터가 응답하며 열린 알림이 없습니다.",
+	"w9dash_problems_calm_title": "처리할 일이 없습니다.",
+	"w9dash_problems_col_acked": "확인됨",
+	"w9dash_problems_col_age": "경과",
+	"w9dash_problems_col_monitor": "모니터",
+	"w9dash_problems_col_problem": "문제",
+	"w9dash_problems_col_severity": "심각도",
+	"w9dash_problems_lasted": "{span} 지속",
+	"w9dash_problems_no_answer": "점검에 응답 없음",
+	"w9dash_problems_not_acked": "미확인",
+	"w9dash_problems_not_notified": "알림을 보내지 않음",
+	"w9dash_problems_notified": "{ago} 알림 전송",
+	"w9dash_problems_place": "{kind}, {site}",
+	"w9dash_problems_resolved": "최근 해결됨",
+	"w9dash_problems_resolved_plate": "해결됨",
+	"w9dash_problems_since": "{time}부터",
+	"w9dash_status_degraded": "저하",
+	"w9dash_status_paused": "일시 중지",
+	"w9dash_status_up": "정상",
+	"w9layout_category_backups": "백업",
+	"w9layout_category_network": "네트워크",
+	"w9layout_category_other": "기타",
+	"w9layout_category_servers": "서버",
+	"w9layout_category_services": "서비스",
+	"w9layout_category_storage": "스토리지",
+	"w9layout_count_up_of": "{up} / {total}",
+	"w9layout_fleet_empty": "아직 모니터가 없습니다. 추가하면 여기에 표시됩니다.",
+	"w9layout_health_degraded": "저하",
+	"w9layout_health_down": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count}개 중단"
+			}
+		}
+	],
+	"w9layout_health_healthy": "정상",
+	"w9layout_health_idle": "감시 대상 없음",
+	"w9layout_hybrid_act_now": "지금 조치",
+	"w9layout_hybrid_band_label": "지금 처리해야 할 일",
+	"w9layout_monitor_title": "{name}, {kind}: {status}",
+	"w9layout_monitor_title_bare": "{name}: {status}",
+	"w9layout_ms": "{value}ms",
+	"w9layout_next_empty": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "향후 {count}일 동안 예정되거나 만료되는 항목이 없습니다."
+			}
+		}
+	],
+	"w9layout_next_maint_active": "유지보수 진행 중",
+	"w9layout_next_maint_meta": "유지보수 시간대, {duration}",
+	"w9layout_next_now": "지금",
+	"w9layout_next_title": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "향후 {count}일"
+			}
+		}
+	],
+	"w9layout_next_until": "{time}까지",
+	"w9layout_pct": "{value}%",
+	"w9layout_services_beats_failed": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "최근 {count}회 점검 중 {failed}회 실패"
+			}
+		}
+	],
+	"w9layout_services_beats_ok": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "최근 {count}회 점검 모두 통과"
+			}
+		}
+	],
+	"w9layout_services_empty": "아직 서비스 점검이 없습니다. HTTP, DNS, TLS, SMTP, ping 점검이 여기에 표시됩니다.",
+	"w9layout_services_title": "서비스",
+	"w9layout_sites_up_of": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "/ {count} 정상"
+			}
+		}
+	],
+	"w9layout_sites_wan": "WAN",
+	"w9layout_state_error": "이 수치를 불러오지 못했습니다. 잠시 후 다시 시도합니다.",
+	"w9layout_status_degraded": "저하",
+	"w9layout_status_down": "중단",
+	"w9layout_status_paused": "일시 중지",
+	"w9layout_status_up": "정상",
+	"w9layout_sun_title": "사이트별 장비",
+	"w9layout_when_today_bare": "오늘",
+	"w9layout_when_tomorrow_bare": "내일",
+	"w9layout_when_yesterday_bare": "어제",
 	"wall_band_problems": "문제",
 	"wall_band_problems_note": "치명 경보와 다운된 모니터",
 	"wall_devices_aria": "모니터",

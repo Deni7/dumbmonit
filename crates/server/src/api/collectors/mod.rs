@@ -302,6 +302,11 @@ pub fn option_keys(kind: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Libellé d'affichage d'un type compilé ; son nom brut sinon.
+pub fn kind_label(kind: &str) -> String {
+    compiled(kind).map_or_else(|| kind.to_string(), |view| view.label.to_string())
+}
+
 /// Vrai si ce type compilé ne marche pas sans identifiants : il en déclare, et
 /// aucune de ses formes n'est « none ». Un type inconnu ou sans identifiants :
 /// faux (l'ajout en bloc le crée actif).

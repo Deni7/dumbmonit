@@ -977,8 +977,6 @@
 	],
 	"console_breadcrumb": "Навигационная цепочка",
 	"console_egg": "// {count} проверок в минуту. Иди спать, мы присмотрим.",
-	"console_kpi_alerts": "Открытые оповещения",
-	"console_kpi_alerts_note": "Критические: {critical}, предупреждения: {warning}",
 	"console_kpi_availability": "Доступность 30 д",
 	"console_kpi_availability_note": "Измерено мониторов: {count}",
 	"console_kpi_none": "Данных пока нет",
@@ -988,7 +986,6 @@
 	"console_live": "ОНЛАЙН",
 	"console_live_off": "Обновления приостановлены. Нажмите, чтобы продолжить.",
 	"console_live_on": "Обновления включены. Нажмите, чтобы приостановить.",
-	"console_panel_attention": "Требует внимания",
 	"console_panel_oncall_unknown": "Кто-то",
 	"console_paused": "ПАУЗА",
 	"console_range": "Период",
@@ -5791,9 +5788,6 @@
 	"overview_ack_err": "Не удалось подтвердить этот монитор.",
 	"overview_ack_hint": "Вижу, занимаюсь: тишина до возвращения в норму.",
 	"overview_ack_item": "Подтвердить",
-	"overview_all_good_text": "Ничего не упало, и ни одно оповещение вас не ждёт. Голубь дремлет.",
-	"overview_all_good_title": "Всё в порядке",
-	"overview_chart_error": "Не удалось загрузить график. Повторная попытка через минуту.",
 	"overview_first_all_done": "Все три шага выполнены. Это руководство больше не появится.",
 	"overview_first_channel_action": "Добавить канал",
 	"overview_first_channel_text": "Почта, ntfy, Discord, Telegram, PagerDuty — то, что вы и так читаете. Пока всё в порядке, ничего не отправляется.",
@@ -5817,21 +5811,6 @@
 	"overview_first_test_text": "Отправьте тест из канала. Шаг станет зелёным, когда сообщение действительно уйдёт.",
 	"overview_first_test_title": "Проверьте, что сообщение доходит",
 	"overview_first_title": "Ваши первые пять минут",
-	"overview_incidents_bars_label": "Инциденты по дням, самый старый слева",
-	"overview_incidents_before": "Неделей раньше: {value}",
-	"overview_incidents_count_label": "Инциденты",
-	"overview_incidents_day_title": "{day}. Инциденты: {count}. Время в открытом состоянии: {duration}.",
-	"overview_incidents_explain": "От срабатывания до разрешения. Один столбец на день.",
-	"overview_incidents_noisiest": "Самый шумный монитор",
-	"overview_incidents_none": "Нет инцидентов за последние {days} дн.",
-	"overview_incidents_open_label": "Время в открытом состоянии",
-	"overview_incidents_title": "Инциденты за последние {days} дн.",
-	"overview_latency_empty": "За этот период время ответа ещё не измерялось.",
-	"overview_latency_hint": "p95 и медиана всех проверок за {range}",
-	"overview_latency_median": "Медиана",
-	"overview_latency_p95": "p95",
-	"overview_latency_slowest": "Самые медленные мониторы (p95)",
-	"overview_latency_title": "Время ответа",
 	"overview_mute_aria": "Отключить оповещения: {name}",
 	"overview_mute_err_create": "Не удалось отключить оповещения для этого монитора.",
 	"overview_mute_err_lift": "Не удалось включить оповещения для этого монитора.",
@@ -5858,24 +5837,6 @@
 				"countPlural=few": "+{count} скрыто",
 				"countPlural=many": "+{count} скрыто",
 				"countPlural=other": "+{count} скрыто"
-			}
-		}
-	],
-	"overview_needs_more": "Все {count} в оповещениях",
-	"overview_needs_see_all": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "Все мониторы: {count}",
-				"countPlural=few": "Все мониторы: {count}",
-				"countPlural=many": "Все мониторы: {count}",
-				"countPlural=other": "Все мониторы: {count}"
 			}
 		}
 	],
@@ -6094,15 +6055,7 @@
 	],
 	"overview_upcoming_due_now": "сейчас",
 	"overview_upcoming_due_today": "сегодня",
-	"overview_upcoming_empty": "В ближайшие {days} дн. ничего не наступает.",
-	"overview_upcoming_error": "Не удалось прочитать, что скоро наступит.",
-	"overview_upcoming_kind_backup": "Резервная копия",
-	"overview_upcoming_kind_disk": "Диск",
-	"overview_upcoming_kind_update": "Обновление",
-	"overview_upcoming_kind_vulnerability": "Уязвимость",
 	"overview_upcoming_list_label": "Скоро, самое срочное первым",
-	"overview_upcoming_scope": "Следим за сертификатами, доменами, дисками, резервными копиями и уязвимостями.",
-	"overview_upcoming_see_all": "Показать все",
 	"overview_upcoming_t_backup": "Копия {what} запоздает",
 	"overview_upcoming_t_backup_late": "Копия {what} запаздывает",
 	"overview_upcoming_t_disk": "{what} заполнится",
@@ -6930,6 +6883,8 @@
 	"settings_agentupdates_hint_pending": "Обновится при следующем отчёте.",
 	"settings_agentupdates_hint_read_only": "Агент не может писать в свою папку: один раз повторите команду установки.",
 	"settings_agentupdates_hint_refused": "Агент отклонил обновление.",
+	"settings_agentupdates_hint_reinstall": "Эта версия агента для Windows не может заменить собственный исполняемый файл: один раз повторите команду установки на машине, следующие версии обновляются сами.",
+	"settings_agentupdates_hint_unknown_key": "Этот агент старше текущего ключа подписи и не может проверить обновление: включите «Принимать неподписанные сборки (разработка)», пока он не обновится, или повторите команду установки.",
 	"settings_agentupdates_hint_unsigned": "Сборка агента на этом сервере не подписана: агенты устанавливают только подписанные обновления.",
 	"settings_agentupdates_hint_unsupported": "Эта платформа обновляется скриптом установки (macOS).",
 	"settings_agentupdates_hint_up_to_date": "Актуален.",
@@ -6950,6 +6905,7 @@
 	"settings_agentupdates_policy_follow": "Как в общих настройках",
 	"settings_agentupdates_policy_off": "Выкл.",
 	"settings_agentupdates_policy_on": "Вкл.",
+	"settings_agentupdates_reinstall_command": "Получить команду установки",
 	"settings_agentupdates_resume": "Возобновить развёртывание",
 	"settings_agentupdates_rollout_canaries": "Канареек обновлено: {updated} из {total}",
 	"settings_agentupdates_rollout_held": "Остальные агенты: удерживаются.",
@@ -6972,6 +6928,8 @@
 	"settings_agentupdates_status_pending": "Ожидает",
 	"settings_agentupdates_status_read_only": "Только чтение",
 	"settings_agentupdates_status_refused": "Отклонено",
+	"settings_agentupdates_status_reinstall": "Нужна переустановка",
+	"settings_agentupdates_status_unknown_key": "Неизвестный ключ подписи",
 	"settings_agentupdates_status_unsigned": "Заблокировано: сборка без подписи",
 	"settings_agentupdates_status_unsupported": "Не поддерживается",
 	"settings_agentupdates_status_up_to_date": "Актуален",
@@ -9689,6 +9647,9 @@
 	"upgrade_notice_keep": "Оставить",
 	"upgrade_notice_title": "Нужно изменить конфигурацию",
 	"upgrade_notice_view": "Открыть",
+	"w10hybrid_coming_empty": "Ничего не запланировано и ничего не истекает в ближайшее время.",
+	"w10hybrid_kpi_problems": "Открытые проблемы",
+	"w10hybrid_services_p95": "p95 {value}",
 	"w1alerts_channels_copy_name": "{name} (копия)",
 	"w1alerts_channels_disable_aria": "Отключить канал {name}",
 	"w1alerts_channels_duplicate": "Дублировать",
@@ -9788,8 +9749,6 @@
 	"w1wall_notice_maintenance": "Идёт обслуживание: {title}",
 	"w1wall_notice_maintenance_until": "Идёт обслуживание: {title}, до {time}",
 	"w1wall_notice_more": "+{count}",
-	"w1wall_overview_trend_days": "{days} дн.",
-	"w1wall_overview_trend_period": "Период",
 	"w1wall_settings_clock_12h": "12 ч",
 	"w1wall_settings_clock_24h": "24 ч",
 	"w1wall_settings_clock_label": "Формат часов",
@@ -10880,6 +10839,253 @@
 	"w6roles_users_custom_group": "Пользовательские роли",
 	"w6roles_users_custom_help": "Пользовательская роль заменяет встроенную: учётная запись получает ровно разрешения этой роли.",
 	"w6roles_users_custom_title": "Пользовательская роль",
+	"w8rules_editor_error_hold": "Укажите, как долго должно сохраняться условие: число, 0 или больше.",
+	"w8rules_editor_flag_label": "Когда срабатывает",
+	"w8rules_editor_flag_nothing": "Это правило читает сигнал «вкл/выкл»: порог задавать не нужно. Но можно выбрать, как долго сигнал должен держаться, прежде чем вас оповестят.",
+	"w8rules_editor_hold_anomaly_help": "Как долго должна длиться аномалия, прежде чем вас оповестят. 0 — сразу.",
+	"w8rules_editor_hold_help": "Как долго должно сохраняться условие, прежде чем вас оповестят. 0 — при первой же проверке, которая его заметит.",
+	"w8rules_editor_hold_label": "Должно длиться",
+	"w8rules_editor_threshold_duration_help": "Возраст или задержка: введите в удобных единицах.",
+	"w8rules_list_summary_flag": "сигнал «вкл/выкл»",
+	"w8rules_overrides_flag": "Правило «вкл/выкл»: для отдельного устройства настраивать нечего, только применять его или нет.",
+	"w8rules_unitinput_aria": "{field}: единица",
+	"w8wp_discovery_label": "Показывать в списке публичных страниц",
+	"w8wp_discovery_off": "Страницы нет в списке публичных страниц, но она по-прежнему открывается по своему адресу.",
+	"w8wp_discovery_on": "Плагины для сайтов, например баннер WordPress, находят эту страницу в списке публичных страниц сервера.",
+	"w8wp_discovery_private": "Закрытая страница никогда не попадает в список публичных страниц.",
+	"w8wp_discovery_unpublished": "В список публичных страниц попадают только опубликованные страницы.",
+	"w9dash_common_error": "Не удалось получить эти показатели.",
+	"w9dash_common_this_site": "Этот объект",
+	"w9dash_events_empty": "В последнее время ничего не происходило.",
+	"w9dash_events_title": "Последние события",
+	"w9dash_kpi_avail_note": "Цель {target}%",
+	"w9dash_kpi_bars_label": "Одна полоса на монитор, по объектам; высокая полоса — монитор не работает",
+	"w9dash_kpi_budget_left": "Остаток бюджета ошибок",
+	"w9dash_kpi_critical": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} критичное",
+				"countPlural=few": "{count} критичных",
+				"countPlural=many": "{count} критичных",
+				"countPlural=other": "{count} критичного"
+			}
+		}
+	],
+	"w9dash_kpi_opened_label": "Оповещения за день, последние {days} дн.",
+	"w9dash_kpi_paused": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} приостановлен",
+				"countPlural=few": "{count} приостановлено",
+				"countPlural=many": "{count} приостановлено",
+				"countPlural=other": "{count} приостановлено"
+			}
+		}
+	],
+	"w9dash_kpi_sites": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} объект",
+				"countPlural=few": "{count} объекта",
+				"countPlural=many": "{count} объектов",
+				"countPlural=other": "{count} объекта"
+			}
+		}
+	],
+	"w9dash_kpi_warning": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} предупреждение",
+				"countPlural=few": "{count} предупреждения",
+				"countPlural=many": "{count} предупреждений",
+				"countPlural=other": "{count} предупреждения"
+			}
+		}
+	],
+	"w9dash_problems_ack_recovery": "Пока снова не ответит",
+	"w9dash_problems_calm_since": "Открытых проблем нет с {time}.",
+	"w9dash_problems_calm_text": "Все мониторы отвечают, открытых оповещений нет.",
+	"w9dash_problems_calm_title": "Ничего не требует вашего внимания.",
+	"w9dash_problems_col_acked": "Подтверждено",
+	"w9dash_problems_col_age": "Длится",
+	"w9dash_problems_col_monitor": "Монитор",
+	"w9dash_problems_col_problem": "Проблема",
+	"w9dash_problems_col_severity": "Важность",
+	"w9dash_problems_lasted": "Длилось {span}",
+	"w9dash_problems_no_answer": "Не отвечает на проверки",
+	"w9dash_problems_not_acked": "Не подтверждено",
+	"w9dash_problems_not_notified": "Уведомление не отправлено",
+	"w9dash_problems_notified": "Уведомление {ago}",
+	"w9dash_problems_place": "{kind}, {site}",
+	"w9dash_problems_resolved": "Недавно решённые",
+	"w9dash_problems_resolved_plate": "Решено",
+	"w9dash_problems_since": "с {time}",
+	"w9dash_status_degraded": "Ухудшено",
+	"w9dash_status_paused": "Приостановлен",
+	"w9dash_status_up": "Работает",
+	"w9layout_category_backups": "Резервные копии",
+	"w9layout_category_network": "Сеть",
+	"w9layout_category_other": "Прочее",
+	"w9layout_category_servers": "Серверы",
+	"w9layout_category_services": "Сервисы",
+	"w9layout_category_storage": "Хранилище",
+	"w9layout_count_up_of": "{up} / {total}",
+	"w9layout_fleet_empty": "Мониторов пока нет: добавьте первый, и он появится здесь.",
+	"w9layout_health_degraded": "Ухудшен",
+	"w9layout_health_down": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} не работает",
+				"countPlural=few": "{count} не работают",
+				"countPlural=many": "{count} не работают",
+				"countPlural=other": "{count} не работают"
+			}
+		}
+	],
+	"w9layout_health_healthy": "В норме",
+	"w9layout_health_idle": "Ничего не отслеживается",
+	"w9layout_hybrid_act_now": "Действовать сейчас",
+	"w9layout_hybrid_band_label": "Что требует внимания сейчас",
+	"w9layout_monitor_title": "{name}, {kind}: {status}",
+	"w9layout_monitor_title_bare": "{name}: {status}",
+	"w9layout_ms": "{value} мс",
+	"w9layout_next_empty": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "В ближайший {count} день ничего не запланировано и не истекает.",
+				"countPlural=few": "В ближайшие {count} дня ничего не запланировано и не истекает.",
+				"countPlural=many": "В ближайшие {count} дней ничего не запланировано и не истекает.",
+				"countPlural=other": "В ближайшие {count} дня ничего не запланировано и не истекает."
+			}
+		}
+	],
+	"w9layout_next_maint_active": "Идёт обслуживание",
+	"w9layout_next_maint_meta": "Окно обслуживания, {duration}",
+	"w9layout_next_now": "Сейчас",
+	"w9layout_next_title": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Ближайший {count} день",
+				"countPlural=few": "Ближайшие {count} дня",
+				"countPlural=many": "Ближайшие {count} дней",
+				"countPlural=other": "Ближайшие {count} дня"
+			}
+		}
+	],
+	"w9layout_next_until": "до {time}",
+	"w9layout_pct": "{value} %",
+	"w9layout_services_beats_failed": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Последняя {count} проверка, сбоев: {failed}",
+				"countPlural=few": "Последние {count} проверки, сбоев: {failed}",
+				"countPlural=many": "Последние {count} проверок, сбоев: {failed}",
+				"countPlural=other": "Последние {count} проверки, сбоев: {failed}"
+			}
+		}
+	],
+	"w9layout_services_beats_ok": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Последняя {count} проверка пройдена",
+				"countPlural=few": "Последние {count} проверки пройдены",
+				"countPlural=many": "Последние {count} проверок пройдены",
+				"countPlural=other": "Последние {count} проверки пройдены"
+			}
+		}
+	],
+	"w9layout_services_empty": "Проверок сервисов пока нет: здесь появятся проверки HTTP, DNS, TLS, SMTP или ping.",
+	"w9layout_services_title": "Сервисы",
+	"w9layout_sites_up_of": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "/ {count} работает",
+				"countPlural=few": "/ {count} работают",
+				"countPlural=many": "/ {count} работают",
+				"countPlural=other": "/ {count} работают"
+			}
+		}
+	],
+	"w9layout_sites_wan": "WAN",
+	"w9layout_state_error": "Не удалось загрузить эти данные. Скоро будет новая попытка.",
+	"w9layout_status_degraded": "Ухудшен",
+	"w9layout_status_down": "Не работает",
+	"w9layout_status_paused": "Приостановлен",
+	"w9layout_status_up": "Работает",
+	"w9layout_sun_title": "Парк по площадкам",
+	"w9layout_when_today_bare": "Сегодня",
+	"w9layout_when_tomorrow_bare": "Завтра",
+	"w9layout_when_yesterday_bare": "Вчера",
 	"wall_band_problems": "Проблемы",
 	"wall_band_problems_note": "Критические оповещения и недоступные мониторы",
 	"wall_devices_aria": "Мониторы",

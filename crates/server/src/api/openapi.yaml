@@ -3786,6 +3786,39 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /api/overview/widgets:
+    get:
+      operationId: getOverviewWidgets
+      tags: [Devices]
+      summary: Figures of the overview dashboards
+      description: >-
+        Everything the Command, NOC and Hybrid overview dashboards add to the
+        existing routes, in one read: monitors grouped by site (the relay that
+        reaches them, or this instance) with their status and category, the
+        top five CPU, memory, disk (with days until full) and network
+        consumers, backup jobs, service checks with their last 36 results,
+        30 days of alert statistics (MTTA, MTTR, noisiest rule), agents and
+        relays, the latest events, fleet availability per day and alerts
+        opened per day. Each part degrades on its own: when VictoriaMetrics
+        does not answer, the metric parts are empty lists and the rest is
+        still served. A team-restricted account only sees its own monitors.
+        Timestamps are UTC without suffix.
+      x-token-scope: read
+      parameters:
+        - name: range
+          in: query
+          description: Window of the sparklines, p95 and top series. 24h by default.
+          schema: { type: string, enum: [1h, 24h, 7d, 30d] }
+      responses:
+        "200":
+          description: The dashboard figures.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OverviewWidgets" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /api/targets/reorder:
     post:
       operationId: reorderTargets
@@ -5302,8 +5335,8 @@ paths:
       description: >-
         A full replacement: `title` is required and every omitted field goes back
         to its default — except `accent`, `footer_text`, `homepage_url`,
-        `subscribe_channel_id`, `subscribe_email`, `domain` and `hide_branding`, which keep their
-        stored value when omitted.
+        `subscribe_channel_id`, `subscribe_email`, `domain`, `hide_branding` and `listed`, which
+        keep their stored value when omitted.
       x-token-scope: write
       x-permissions: [status_pages.manage]
       requestBody:
@@ -6347,6 +6380,33 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
 
   # -------------------------------------------------- pages de statut publiques
+  /api/public/status:
+    get:
+      operationId: listPublicStatusPages
+      x-codeSamples:
+        - lang: Shell
+          label: curl
+          source: |
+            # No token: lists the pages anyone may read.
+            curl -sk https://dumbmonit.example:8080/api/public/status
+      tags: [Public status]
+      summary: Directory of the public status pages
+      description: >-
+        The status pages a website can show, for clients that know the server
+        address and let their user pick a page (the WordPress plugin's "Find
+        status pages"). Only pages that are published, readable by anyone (no
+        password, no accounts) and left in the directory (`listed`, on by
+        default) are listed; titles are as written. Cached for thirty seconds,
+        like the status documents. Not served on a page's own domain.
+      security: []
+      x-token-scope: public
+      responses:
+        "200":
+          description: The listed pages, sorted by title.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicStatusDirectory" }
+
   /api/public/status/{slug}:
     parameters:
       - $ref: "#/components/parameters/Slug"
@@ -14458,7 +14518,7 @@ components:
               wave: { type: [integer, "null"], description: "Rank, from 1, of the agent's wave; null without waves or when it is in none." }
               status:
                 type: string
-                enum: [up_to_date, pending, updating, failed, refused, disabled, manual, waiting_window, waiting_canary, waiting_wave, paused, halted, newer, legacy, container, read_only, disabled_locally, unsupported, no_binary, unsigned]
+                enum: [up_to_date, pending, updating, failed, refused, disabled, manual, waiting_window, waiting_canary, waiting_wave, paused, halted, newer, legacy, container, read_only, disabled_locally, unsupported, no_binary, unsigned, reinstall, unknown_key]
               reason: { type: [string, "null"] }
               last:
                 type: [object, "null"]
@@ -15107,6 +15167,211 @@ components:
         source: { type: [integer, "null"], format: int64, description: Agent whose containers declare it. }
         key: { type: string, description: "`project/service/http` for a Compose service, else `container/http`." }
         missing_since: { $ref: "#/components/schemas/NullableServerTimestamp" }
+    OverviewWidgets:
+      type: object
+      required:
+        [sites, top, backups, services, alert_stats, agents, events, availability, alerts_opened]
+      properties:
+        sites:
+          type: array
+          items:
+            type: object
+            required: [key, name, monitors, wan_latency_ms, next_maintenance, last_backup]
+            properties:
+              key: { type: string, description: "`local` or `relay:<site name>`." }
+              name: { type: string }
+              monitors:
+                type: array
+                items:
+                  type: object
+                  required: [id, name, kind, category, status]
+                  properties:
+                    id: { type: integer }
+                    name: { type: string }
+                    kind: { type: string, description: Short kind label. }
+                    category:
+                      type: string
+                      enum: [servers, storage, network, services, backups, other]
+                    status: { type: string, enum: [up, down, degraded, paused] }
+              wan_latency_ms:
+                type: [array, "null"]
+                items: { type: number }
+                description: Latency to the relay over the range; null when not measured.
+              next_maintenance: { type: [string, "null"] }
+              last_backup: { type: [string, "null"] }
+        top:
+          type: object
+          required: [cpu, mem, disk, net]
+          properties:
+            cpu: { type: array, items: { $ref: "#/components/schemas/OverviewTopEntry" } }
+            mem: { type: array, items: { $ref: "#/components/schemas/OverviewTopEntry" } }
+            disk: { type: array, items: { $ref: "#/components/schemas/OverviewTopEntry" } }
+            net: { type: array, items: { $ref: "#/components/schemas/OverviewTopEntry" } }
+        backups:
+          type: array
+          items:
+            type: object
+            required:
+              [job, engine, detail, site, target_id, last_success, duration_s, changed_bytes, runs, status]
+            properties:
+              job: { type: string }
+              engine: { type: string, description: "PBS, Active Backup, Hyper Backup, restic…" }
+              detail: { type: string }
+              site: { type: string }
+              target_id: { type: integer }
+              last_success: { type: [string, "null"] }
+              duration_s: { type: [number, "null"] }
+              changed_bytes: { type: [number, "null"] }
+              runs:
+                type: array
+                description: Last runs, oldest first (14 at most); empty without history.
+                items:
+                  type: object
+                  required: [at, ok]
+                  properties:
+                    at: { type: string }
+                    ok: { type: boolean }
+              status: { type: string, enum: [ok, failed, running, stale] }
+        services:
+          type: array
+          items:
+            type: object
+            required: [target_id, name, kind, status, checks, p95_ms, availability_30d]
+            properties:
+              target_id: { type: integer }
+              name: { type: string }
+              kind: { type: string, description: "HTTPS, HTTP, DNS, TLS, SMTP, Ping, TCP." }
+              status: { type: string, enum: [up, down, degraded, paused] }
+              checks:
+                type: array
+                description: Last 36 check slots, oldest first; null when nothing was measured.
+                items: { type: [boolean, "null"] }
+              p95_ms: { type: [number, "null"] }
+              availability_30d: { type: [number, "null"] }
+        alert_stats:
+          type: object
+          required:
+            - days
+            - total
+            - previous_total
+            - mtta_s
+            - previous_mtta_s
+            - mttr_s
+            - previous_mttr_s
+            - acked_within_15m_pct
+            - noisiest
+          properties:
+            days:
+              type: array
+              items:
+                type: object
+                required: [day, critical, warning, info]
+                properties:
+                  day: { type: string, description: "`YYYY-MM-DD` (UTC)." }
+                  critical: { type: integer }
+                  warning: { type: integer }
+                  info: { type: integer }
+            total: { type: integer }
+            previous_total: { type: integer }
+            mtta_s: { type: [integer, "null"] }
+            previous_mtta_s: { type: [integer, "null"] }
+            mttr_s: { type: [integer, "null"] }
+            previous_mttr_s: { type: [integer, "null"] }
+            acked_within_15m_pct: { type: [number, "null"] }
+            noisiest:
+              type: [object, "null"]
+              required: [rule, target, target_id, count]
+              properties:
+                rule: { type: string }
+                target: { type: string }
+                target_id: { type: [integer, "null"] }
+                count: { type: integer }
+        agents:
+          type: object
+          required: [total, versions, relays, server_update]
+          properties:
+            total: { type: integer }
+            versions:
+              type: array
+              items:
+                type: object
+                required: [version, count, latest]
+                properties:
+                  version: { type: string }
+                  count: { type: integer }
+                  latest: { type: boolean, description: The version this server ships. }
+            relays:
+              type: array
+              items:
+                type: object
+                required: [name, connected, last_seen]
+                properties:
+                  name: { type: string }
+                  connected: { type: boolean }
+                  last_seen: { type: [string, "null"] }
+            server_update:
+              type: [object, "null"]
+              required: [version]
+              properties:
+                version: { type: string }
+        events:
+          type: array
+          description: The 20 latest events, newest first.
+          items:
+            type: object
+            required: [at, kind, text, target_id]
+            properties:
+              at: { type: string }
+              kind: { type: string, enum: [crit, warn, ok, info, maint, ack] }
+              text: { type: string }
+              target_id: { type: [integer, "null"] }
+        availability:
+          type: object
+          required: [days, avg_30d, previous_avg_30d, slo_target, budget_left_pct]
+          properties:
+            days:
+              type: array
+              items:
+                type: object
+                required: [day, pct]
+                properties:
+                  day: { type: string }
+                  pct: { type: [number, "null"] }
+            avg_30d: { type: [number, "null"] }
+            previous_avg_30d: { type: [number, "null"] }
+            slo_target: { type: number }
+            budget_left_pct: { type: [number, "null"] }
+        alerts_opened:
+          type: object
+          required: [days, this_week, last_week, last_resolved_at]
+          properties:
+            days:
+              type: array
+              items:
+                type: object
+                required: [day, count]
+                properties:
+                  day: { type: string }
+                  count: { type: integer }
+            this_week: { type: integer }
+            last_week: { type: integer }
+            last_resolved_at: { type: [string, "null"] }
+    OverviewTopEntry:
+      type: object
+      required: [target_id, label, site, value, unit, series, forecast_days]
+      properties:
+        target_id: { type: integer }
+        label: { type: string, description: "Monitor name, or \"<monitor> <volume>\" for disks and interfaces." }
+        site: { type: string }
+        value: { type: number }
+        unit: { type: string, description: "`%` for cpu, mem and disk; `Mb/s` for net." }
+        series:
+          type: array
+          items: { type: number }
+          description: Values over the range, oldest first (48 at most).
+        forecast_days:
+          type: [number, "null"]
+          description: Disk only, days until full at the current growth.
     StatusSummary:
       type: object
       required: [status, devices, alerts]
@@ -15515,7 +15780,7 @@ components:
           description: Channel ids; empty means every enabled channel.
           items: { type: integer, format: int64 }
         params: { $ref: "#/components/schemas/AnomalyParams" }
-        unit: { type: string }
+        unit: { type: string, description: "Display unit of `threshold`. `s`, `min`, `h` and `d` mark a duration stored in that unit (the UI types it in minutes, hours or days); `bool` marks an on/off signal with nothing to set; anything else (`%`, `°C`, `GiB`…) is a suffix." }
         repeat_secs: { type: [integer, "null"] }
         escalate_after_secs: { type: [integer, "null"] }
         enabled: { type: boolean }
@@ -16292,6 +16557,7 @@ components:
         access_mode: { type: string, enum: [public, password, users], description: "Who can read the page; set through `PUT /api/status-pages/{id}/access`." }
         has_password: { type: boolean, description: A page password is stored (the hash is never returned). }
         hide_branding: { type: boolean, description: "White label: the public page shows no DumbMonit name, icon or app name; its browser-tab icon is the page logo, or none." }
+        listed: { type: boolean, description: "Shown in the public directory (GET /api/public/status) when the page is also published and public." }
         group_labels:
           type: array
           items: { $ref: "#/components/schemas/StatusPageGroupLabel" }
@@ -16366,6 +16632,7 @@ components:
         show_calendar: { type: boolean, default: false, description: Public 90-day calendar. Omitted keeps the saved value. }
         show_latency: { type: boolean, default: false, description: Public response-time graph per service. Omitted keeps the saved value. }
         hide_branding: { type: boolean, default: false, description: "White label: nothing of DumbMonit on the public page (tab title, icon, app name). The tab icon becomes the page logo, or none. Omitted keeps the saved value." }
+        listed: { type: boolean, default: true, description: "List the page in the public directory (GET /api/public/status); only published, public pages are ever listed. Omitted keeps the saved value." }
         subscribe_email: { type: boolean, description: "Lets visitors subscribe by email. The emails go through `subscribe_channel_id` when set, otherwise through the email server of the instance (`/api/notify/mail-server`). Omitted keeps the saved value, unless `subscribe_channel_id` is given: a channel opens it, `null` closes it (as before this field)." }
         subscribe_channel_id: { type: [integer, "null"], format: int64, description: "An `smtp` channel that sends the subscriber emails instead of the email server; `null`: the email server. Omitted keeps the saved channel." }
         seo:
@@ -16701,6 +16968,22 @@ components:
                 type: object
                 additionalProperties: { type: string }
                 description: Written service or group name to its translation.
+
+    PublicStatusDirectory:
+      type: object
+      required: [pages]
+      properties:
+        pages:
+          type: array
+          items:
+            type: object
+            required: [slug, title, url, default_lang, languages]
+            properties:
+              slug: { type: string, description: "Address of the page: its document is /api/public/status/{slug}." }
+              title: { type: string }
+              url: { type: string, description: "The public page: absolute when the server knows its address (the page's domain, or the address it is managed from), else /s/{slug}, relative to the server." }
+              default_lang: { type: string, description: "Default interface language of the page (en when the admin set none)." }
+              languages: { type: array, items: { type: string }, description: "Languages the page's texts can be read in: the default one first, then those translated by the admin. Pass one as ?lang= to the page's document." }
 
     PublicStatus:
       type: object

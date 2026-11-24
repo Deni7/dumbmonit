@@ -433,10 +433,6 @@ pub struct Config {
     pub log_level: tracing::Level,
     /// Mandataire sortant vers le serveur (voir `proxy.rs`).
     pub proxy: crate::proxy::ProxyConfig,
-    /// Variables `EZYMONIT_*` encore utilisées, sous la forme (ancien nom, nouveau
-    /// nom) : le journal n'existe pas encore quand la configuration est lue, les
-    /// avertissements sont rejoués par [`Config::warn_deprecated_env`].
-    pub deprecated_env: Vec<(String, String)>,
 }
 
 /// Le jeton n'est jamais affiché, pas même tronqué.
@@ -513,23 +509,24 @@ impl Config {
     ///
     /// Le même que celui où `install.sh` et `install.ps1` l'écrivent, pour que
     /// `dumbmonit-agent --dry-run` lancé à la main lise la configuration du
-    /// service. Un second emplacement est encore reconnu tant que le premier
-    /// n'existe pas : celui d'avant le renommage du produit (`/etc/ezymonit`,
-    /// `C:\ProgramData\EzyMonit`), que le script d'installation déplace à la
-    /// première mise à jour, et `/etc/dumbmonit` sous macOS et FreeBSD, qui y
-    /// était l'emplacement par défaut avant que l'agent ne suive le script.
+    /// service. Sous macOS et FreeBSD, `/etc/dumbmonit` reste reconnu tant que
+    /// le premier emplacement n'existe pas : c'était l'emplacement par défaut
+    /// avant que l'agent ne suive le script.
     pub fn default_path() -> PathBuf {
         let (current, fallback) = Self::default_paths();
-        if !current.exists() && fallback.exists() { fallback } else { current }
+        match fallback {
+            Some(fallback) if !current.exists() && fallback.exists() => fallback,
+            _ => current,
+        }
     }
 
-    fn default_paths() -> (PathBuf, PathBuf) {
+    fn default_paths() -> (PathBuf, Option<PathBuf>) {
         #[cfg(windows)]
         {
             let root =
                 std::env::var("ProgramData").unwrap_or_else(|_| r"C:\ProgramData".to_string());
             let root = PathBuf::from(root);
-            (root.join("DumbMonit").join("agent.yaml"), root.join("EzyMonit").join("agent.yaml"))
+            (root.join("DumbMonit").join("agent.yaml"), None)
         }
         // macOS réserve `/etc` au système, et les ports de FreeBSD rangent tout
         // ce qui n'est pas la base sous `/usr/local` : c'est là qu'écrit install.sh.
@@ -537,12 +534,12 @@ impl Config {
         {
             (
                 PathBuf::from("/usr/local/etc/dumbmonit/agent.yaml"),
-                PathBuf::from("/etc/dumbmonit/agent.yaml"),
+                Some(PathBuf::from("/etc/dumbmonit/agent.yaml")),
             )
         }
         #[cfg(not(any(windows, target_os = "macos", target_os = "freebsd")))]
         {
-            (PathBuf::from("/etc/dumbmonit/agent.yaml"), PathBuf::from("/etc/ezymonit/agent.yaml"))
+            (PathBuf::from("/etc/dumbmonit/agent.yaml"), None)
         }
     }
 
@@ -570,14 +567,6 @@ impl Config {
     fn merge(file: FileConfig, env: EnvSource) -> Result<Self> {
         Self::merge_at(file, env, None)
     }
-
-    /// Signale, une fois le journal en place, les variables d'environnement lues
-    /// sous leur ancien nom.
-    pub fn warn_deprecated_env(&self) {
-        for (legacy, name) in &self.deprecated_env {
-            dumbmonit_proto::env::warn_deprecated(legacy, name);
-        }
-    }
 }
 
 /// Source des surcharges. Indirection volontaire : elle rend la fusion testable
@@ -585,8 +574,6 @@ impl Config {
 /// globales et donc hostiles à l'exécution parallèle des tests.
 struct EnvSource {
     vars: BTreeMap<String, String>,
-    /// Anciens noms rencontrés, dans l'ordre de lecture.
-    deprecated: std::cell::RefCell<Vec<(String, String)>>,
 }
 
 impl EnvSource {
@@ -595,19 +582,12 @@ impl EnvSource {
     }
 
     fn from_map(vars: BTreeMap<String, String>) -> Self {
-        Self { vars, deprecated: Default::default() }
+        Self { vars }
     }
 
-    /// Lit une variable `DUMBMONIT_AGENT_*`, en acceptant encore `EZYMONIT_AGENT_*`.
+    /// Lit une variable `DUMBMONIT_AGENT_*` ; une valeur vide est traitée comme absente.
     fn get(&self, key: &str) -> Option<String> {
-        let found = dumbmonit_proto::env::lookup(key, |name| self.vars.get(name).cloned())?;
-        if let Some(legacy) = found.legacy_name {
-            self.deprecated.borrow_mut().push((legacy, key.to_string()));
-        }
-        Some(found.value.trim().to_string())
-    }
-
-    fn deprecated(&self) -> Vec<(String, String)> {
-        self.deprecated.borrow().clone()
+        let value = self.vars.get(key)?.trim();
+        (!value.is_empty()).then(|| value.to_string())
     }
 }

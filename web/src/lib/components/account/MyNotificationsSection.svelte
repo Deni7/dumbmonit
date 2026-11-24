@@ -246,7 +246,7 @@
 			<div class="flex flex-wrap items-center gap-2">
 				<Button variant="primary" loading={saving} onclick={save}>{m.w6accounts_mine_save()}</Button>
 				{#if view.prefs.email || view.prefs.webpush}
-					<Button variant="secondary" loading={testing} onclick={() => void test()}>
+					<Button variant="secondary" class="max-sm:w-full" loading={testing} onclick={() => void test()}>
 						<Send class="size-4" aria-hidden="true" />
 						{m.w6accounts_mine_test()}
 					</Button>

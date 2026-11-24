@@ -472,14 +472,6 @@ service. That is the upgrade procedure. Take the command from the current
 server (add a monitor, **Server with the agent**): its `--sha256` must match the binaries of the
 server version you upgraded to.
 
-The same command migrates a machine still running the EzyMonit agent, on Linux
-and on Windows. The installer stops and removes the old service
-(`ezymonit-agent`, or `EzyMonitAgent` on Windows), moves the configuration to
-the new path (`/etc/dumbmonit/agent.yaml`, `C:\ProgramData\DumbMonit\agent.yaml`)
-and installs `dumbmonit-agent` in its place. The old `ezym_…` token stays
-valid, so the command shown when the token was created still works; nothing
-has to be revoked first.
-
 ## Automatic updates {#automatic-updates}
 
 From this version on, the agent updates itself from your server: after you
@@ -556,7 +548,8 @@ cannot change these settings). The same settings are available through
 The agent list shows the version and an update status for each agent: up to
 date, pending, updating, failed (with the reason), refused, disabled, manual,
 waiting for window, waiting for canaries, newer than server, legacy, container,
-read-only, disabled locally, unsupported, no binary.
+read-only, disabled locally, unsupported, no binary, reinstall needed, unknown
+signing key (see [Agents that cannot update themselves](#automatic-updates-old-agents)).
 
 ### Rollout waves {#automatic-updates-waves}
 
@@ -599,6 +592,12 @@ The agents no wave takes form a last wave. Agents marked **canary** are always i
   the plain channel anyone in the middle could set the flag, so signatures are
   mandatory there. A refusal is reported (status *refused*) without downloading
   anything, and is evaluated again when the setting changes.
+- **Agents older than the signing key** (before 0.20.1) cannot check the
+  current signature. With *Accept unsigned builds* on, and only then, the server
+  sends them the offer without a signature, which they treat as an unsigned
+  build (encrypted channel only). Agents from 0.20.1 on always receive the
+  signature and verify it. See
+  [Agents that cannot update themselves](#automatic-updates-old-agents).
 - Signatures are separate files (`<binary>.sig`, 64 raw bytes, also served at
   `/download/<binary>.sig`), so the binaries stay bit-for-bit
   [reproducible](../development/reproducible-builds.md).
@@ -627,6 +626,53 @@ That build is then not retried automatically on that machine, neither by the
 agent nor by the server, until an administrator clicks **Update now**, which
 retries once. OpenRC without supervision does not restart a crashed agent: the
 rollback then happens at its next start.
+
+### Agents that cannot update themselves {#automatic-updates-old-agents}
+
+Two kinds of older agents cannot finish an automatic update. The server knows
+them by their version, offers them nothing that would fail, and says what to do
+in the agent list.
+
+**Windows agents up to 0.20.1: *Reinstall needed*.** Every attempt ended with
+
+```
+cannot install the new binary: syncing the copy: Access is denied. (os error 5)
+```
+
+(the last part is in the language of Windows, `Accès refusé.` in French). The
+agent flushed its copy of the binary to disk through a read-only handle, which
+Windows refuses. That step is on the only Windows install path, so no server
+setting avoids it: the agent has to be reinstalled **once**. Re-run the install
+command on the machine (**Get the install command** next to the agent, or add a
+monitor, **Server with the agent**). It replaces the binary in place and keeps
+the binding secret; from 0.20.2 on, the agent updates itself.
+
+**Agents 0.15.0 to 0.20.0: *Unknown signing key*.** Release builds are signed
+since 0.20.1 with a new key (see
+[Signing the agent binaries](../development/agent-signing.md#the-first-key)).
+Those agents only know the first key, which never signed anything, so they
+reject the signature (`the signature does not match any release key of this
+agent`); agents before 0.15.0 know no key at all. Two ways out:
+
+- turn on **Accept unsigned builds (development)** until they have updated: the
+  server then offers these agents, and only them, the build **without** its
+  signature. They accept it only over the encrypted agent channel, where the
+  server is authenticated by its pinned CA (see
+  [Security](#automatic-updates-security)). Once on 0.20.1 or later they check
+  signatures again, and agents that know the key always get the signature
+  whatever the setting. Turn the setting off afterwards;
+- or re-run the install command on the machine.
+
+A Windows agent in that range is in the first case: the unsigned build would
+still fail at the same step.
+
+On the machine, the agent's log (see [Managing the service](#managing-the-service))
+tells each step of an attempt: `updating the agent` (with `from` and `to`),
+`agent update signature verified` or `installing an unsigned agent build
+(allowed by the server)`, then `agent update confirmed` once the new binary has
+had a batch accepted. A problem shows as `agent update refused` or `agent update
+failed, keeping this version`, with the `reason` the agent list also shows, or
+`restoring the previous agent` after a failed trial.
 
 ### Docker and other cases {#automatic-updates-other-cases}
 
@@ -1448,7 +1494,7 @@ Automatic actions show in "Recent actions" as requested by `policy`.
   uses.
 - An update that does not come back healthy is rolled back to the previous
   container, and the old image is only removed once the new container runs.
-- Containers named `dumbmonit*` or `ezymonit*` are refused, by hand or by
+- Containers named `dumbmonit*` are refused, by hand or by
   policy: the monitor never acts on its own containers. The check is made twice
   — the server refuses to queue the command, and the agent refuses to run it —
   and the agent makes it again on the name Docker reports after inspecting the

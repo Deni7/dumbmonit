@@ -23,34 +23,63 @@ all three away. The choice is stored on the instance, so a second browser does
 not start the guide over. See
 [Add your first monitor](../install/first-device.md#the-three-first-steps).
 
-## The five figures and the health river {#the-figures}
+## One screen {#one-screen}
 
-Under the banner, five figures: **Monitors up** (out of the total, with down and
-paused counts), **Availability 30 d**, **p95 response time**, **Open alerts**
-(critical and warning) and **MTTR 30 d** (mean time to resolve). The time range
-in the header drives the p95 and the river.
+The overview is a single screen. On a wide window it is exactly as tall as the
+window: the page itself never scrolls, each panel scrolls on its own. On a
+narrower one the panels stack and the page scrolls as usual.
 
-The **health river** is one strip per monitor, one cell per slot of the range,
-the worst monitors on top. A state is always written next to a shape (circle up,
-diamond degraded, square down), never shown by colour alone.
+```
+| Act now                         | Coming up     |
+| Services        | Fleet by site | Recent events |
+```
 
-## The monitor table {#the-monitor-table}
+"Updated 12 s ago", above the figures, says how fresh the data is.
 
-The table lists every monitor, worst first. It filters by state, type and text,
-lets you add columns (address, folder) and remove others, and is driven by the
-keyboard: ++j++ / ++k++ move, ++enter++ selects, ++o++ opens.
+## The three figures {#the-figures}
 
-The monitor you select feeds the **context panel** on the right, like an
-inspector: what needs attention (with the alert actions, see
-[Alerts page](alerts.md)), **Check now** and **Silence 1 h**, the nearest
-forecasts and who is on call. ++i++ shows or hides it; on a narrower screen it
-opens as a drawer. For a full list of monitors, see [Monitors page](devices.md).
+A short row of three tiles, each a name, a figure and a small chart:
 
-## Incidents of the period and freshness {#incident-trend}
+- **Monitors up**, out of the monitors not paused, with one bar per monitor
+  grouped by site (a monitor down stands tall; hover a bar for its name and
+  state).
+- **Availability 30 d**, with the daily availability and the objective as a
+  dashed line.
+- **Open problems**: monitors down, unreachable or misconfigured and firing
+  warning or critical alerts, the same rows as **Act now**; the chart counts
+  the alerts opened per day.
 
-The incidents block counts the last 7, 14 or 30 days (the buttons at its top;
-the choice is remembered in the browser), against the period before. Above the
-figures, "Updated 12 s ago" says how fresh the data is, with a refresh button.
+## Act now {#act-now}
+
+The largest panel: what is broken now, worst first, one row each, with how long
+it has lasted, who took it (or that nobody has, and whether anyone was told),
+and the quick actions: acknowledge, snooze or mute. A problem someone took stays
+in the list, below the open ones. With nothing broken, it says so and lists the
+last alerts that resolved. Its title opens the [Alerts page](alerts.md).
+
+## Coming up and recent events {#coming-up}
+
+**Coming up** is one list, in time order: maintenance windows of the next 14
+days (running ones first), then expiries, late backups, disk forecasts and
+critical vulnerabilities of the next 90 days, and a DumbMonit update last.
+**Recent events** is the log of the last seven days, newest first: alerts
+firing, resolving and acknowledged, maintenance windows starting and ending,
+monitors added.
+
+## Services and fleet by site {#fleet-by-site}
+
+**Services** lists the HTTP, DNS, TLS, SMTP, ping and TCP checks, worst first,
+with their last checks, the 30-day availability and the p95 response time;
+paused checks fold into one line. Without any check, **Fleet by site** takes
+the whole bottom row.
+
+**Fleet by site** shows, per site, how many monitors answer and its health in a
+word, then one line per category with a status mark per monitor. A site is the
+set of monitors reached through one [relay](../install/remote-site.md); monitors
+watched directly by the server form one site named after the instance.
+
+Nothing conveys a state by colour alone: a status mark carries a glyph (× down,
+! degraded, a hollow ring paused), and every icon sits next to a word.
 
 ## Wall mode {#wall-mode}
 

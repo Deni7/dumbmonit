@@ -21,6 +21,28 @@ export interface Release {
 
 export const RELEASES: Release[] = [
 	{
+		version: '0.20.2',
+		date: '2026-11-24',
+		highlights: [
+			{
+				title: 'A new overview',
+				text: 'One screen, no scrolling: the three figures, what to act on now, what is coming up, services, fleet by site and recent events.'
+			},
+			{
+				title: 'Thresholds in days and hours',
+				text: 'Rules about an age or a duration are set in human units, and on/off rules say what makes them fire.'
+			},
+			{
+				title: 'Agent updates fixed',
+				text: 'Windows agents update themselves again from this version on (older ones need one reinstall), and older agents get signed builds.'
+			},
+			{
+				title: 'WordPress plugin 2.0',
+				text: 'Follows the visitor language, finds your status pages, and is configured from the WordPress settings.'
+			}
+		]
+	},
+	{
 		version: '0.20.1',
 		date: '2026-11-23',
 		highlights: [

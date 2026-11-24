@@ -82,12 +82,6 @@ of each monitor whose kind has security checks, and writes
 Identity labels always win over collector labels, and for agents they are set
 on reception: a machine cannot write into another machine's series.
 
-!!! note "Prefix before September 2026"
-    Series written by EzyMonit are named `ezymonit_…`. The prefix changed with
-    the product name and nothing reads the old series: they stay in
-    VictoriaMetrics until the retention removes them, graphs and rules restart
-    from the upgrade, and custom rules still naming `ezymonit_…` must be edited.
-
 ## Retention and storage
 
 The embedded VictoriaMetrics keeps 12 months of data (`DUMBMONIT_VM_RETENTION`)

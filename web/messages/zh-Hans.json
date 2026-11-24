@@ -926,8 +926,6 @@
 	],
 	"console_breadcrumb": "面包屑导航",
 	"console_egg": "// 每分钟 {count} 次检查。去睡吧，这里有我们。",
-	"console_kpi_alerts": "未处理告警",
-	"console_kpi_alerts_note": "严重：{critical}，警告：{warning}",
 	"console_kpi_availability": "30 天可用率",
 	"console_kpi_availability_note": "已测量监控项：{count}",
 	"console_kpi_none": "暂无数据",
@@ -937,7 +935,6 @@
 	"console_live": "实时",
 	"console_live_off": "实时更新已暂停。选择以恢复。",
 	"console_live_on": "实时更新已开启。选择以暂停。",
-	"console_panel_attention": "需要关注",
 	"console_panel_oncall_unknown": "某人",
 	"console_paused": "已暂停",
 	"console_range": "时间范围",
@@ -5654,9 +5651,6 @@
 	"overview_ack_err": "无法确认此监控项。",
 	"overview_ack_hint": "已知晓并在处理：恢复正常前不再通知。",
 	"overview_ack_item": "确认",
-	"overview_all_good_text": "没有宕机，也没有等待处理的告警。鸽子正在打盹。",
-	"overview_all_good_title": "一切正常",
-	"overview_chart_error": "无法加载此图表，一分钟后重试。",
 	"overview_first_all_done": "三步全部完成，此向导不会再出现。",
 	"overview_first_channel_action": "添加通知渠道",
 	"overview_first_channel_text": "邮件、ntfy、Discord、Telegram、PagerDuty，用你平时看的就行。出问题之前不会发送任何内容。",
@@ -5680,21 +5674,6 @@
 	"overview_first_test_text": "在渠道里发送一条测试。消息真正发出后，此步骤会变绿。",
 	"overview_first_test_title": "确认能收到消息",
 	"overview_first_title": "最初的五分钟",
-	"overview_incidents_bars_label": "每日事件数，最早的在左侧",
-	"overview_incidents_before": "前一周：{value}",
-	"overview_incidents_count_label": "事件",
-	"overview_incidents_day_title": "{day}。事件：{count}。持续时间：{duration}。",
-	"overview_incidents_explain": "从触发到恢复。每天一根柱。",
-	"overview_incidents_noisiest": "最吵的监控项",
-	"overview_incidents_none": "最近 {days} 天没有事件。",
-	"overview_incidents_open_label": "持续时间",
-	"overview_incidents_title": "最近 {days} 天的事件",
-	"overview_latency_empty": "此时间范围内尚未测得响应时间。",
-	"overview_latency_hint": "所有探测的 p95 和中位数，最近 {range}",
-	"overview_latency_median": "中位数",
-	"overview_latency_p95": "p95",
-	"overview_latency_slowest": "最慢的监控项（p95）",
-	"overview_latency_title": "响应时间",
 	"overview_mute_aria": "静默 {name}",
 	"overview_mute_err_create": "无法静默此监控项。",
 	"overview_mute_err_lift": "无法取消静默此监控项。",
@@ -5718,21 +5697,6 @@
 			],
 			"match": {
 				"countPlural=other": "另有 {count} 项被抑制"
-			}
-		}
-	],
-	"overview_needs_more": "在告警中查看全部 {count} 项",
-	"overview_needs_see_all": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "查看全部 {count} 个监控项"
 			}
 		}
 	],
@@ -5918,15 +5882,7 @@
 	],
 	"overview_upcoming_due_now": "现在",
 	"overview_upcoming_due_today": "今天",
-	"overview_upcoming_empty": "未来 {days} 天内没有到期事项。",
-	"overview_upcoming_error": "无法读取即将到来的事项。",
-	"overview_upcoming_kind_backup": "备份",
-	"overview_upcoming_kind_disk": "磁盘",
-	"overview_upcoming_kind_update": "更新",
-	"overview_upcoming_kind_vulnerability": "漏洞",
 	"overview_upcoming_list_label": "即将到来，最紧急的在前",
-	"overview_upcoming_scope": "监视证书、域名、磁盘、备份和漏洞。",
-	"overview_upcoming_see_all": "查看全部",
 	"overview_upcoming_t_backup": "{what} 的备份将会延迟",
 	"overview_upcoming_t_backup_late": "{what} 的备份已延迟",
 	"overview_upcoming_t_disk": "{what} 将被占满",
@@ -6733,6 +6689,8 @@
 	"settings_agentupdates_hint_pending": "将在下次上报时更新。",
 	"settings_agentupdates_hint_read_only": "代理无法写入其文件夹：请再运行一次安装命令。",
 	"settings_agentupdates_hint_refused": "代理拒绝了此次更新。",
+	"settings_agentupdates_hint_reinstall": "此版本的 Windows 代理无法替换自身的二进制文件：请在该机器上再运行一次安装命令，之后的版本会自行更新。",
+	"settings_agentupdates_hint_unknown_key": "此代理早于当前的签名密钥，无法验证更新：请在它完成更新前开启“接受未签名的构建（开发用）”，或重新运行安装命令。",
 	"settings_agentupdates_hint_unsigned": "此服务器的代理构建未签名：代理只安装已签名的更新。",
 	"settings_agentupdates_hint_unsupported": "此平台通过安装脚本更新（macOS）。",
 	"settings_agentupdates_hint_up_to_date": "已是最新。",
@@ -6753,6 +6711,7 @@
 	"settings_agentupdates_policy_follow": "跟随全局设置",
 	"settings_agentupdates_policy_off": "关",
 	"settings_agentupdates_policy_on": "开",
+	"settings_agentupdates_reinstall_command": "获取安装命令",
 	"settings_agentupdates_resume": "恢复发布",
 	"settings_agentupdates_rollout_canaries": "金丝雀已更新：{updated} / {total}",
 	"settings_agentupdates_rollout_held": "其他代理：暂缓更新。",
@@ -6775,6 +6734,8 @@
 	"settings_agentupdates_status_pending": "待更新",
 	"settings_agentupdates_status_read_only": "只读",
 	"settings_agentupdates_status_refused": "已拒绝",
+	"settings_agentupdates_status_reinstall": "需要重新安装",
+	"settings_agentupdates_status_unknown_key": "未知的签名密钥",
 	"settings_agentupdates_status_unsigned": "已阻止：未签名的构建",
 	"settings_agentupdates_status_unsupported": "不支持",
 	"settings_agentupdates_status_up_to_date": "已是最新",
@@ -9424,6 +9385,9 @@
 	"upgrade_notice_keep": "保留",
 	"upgrade_notice_title": "需要应用的配置更改",
 	"upgrade_notice_view": "查看",
+	"w10hybrid_coming_empty": "近期没有计划或到期的事项。",
+	"w10hybrid_kpi_problems": "未解决的问题",
+	"w10hybrid_services_p95": "p95 {value}",
 	"w1alerts_channels_copy_name": "{name}（副本）",
 	"w1alerts_channels_disable_aria": "停用渠道 {name}",
 	"w1alerts_channels_duplicate": "复制",
@@ -9523,8 +9487,6 @@
 	"w1wall_notice_maintenance": "维护进行中：{title}",
 	"w1wall_notice_maintenance_until": "维护进行中：{title}，持续到 {time}",
 	"w1wall_notice_more": "+{count}",
-	"w1wall_overview_trend_days": "{days} 天",
-	"w1wall_overview_trend_period": "时间范围",
 	"w1wall_settings_clock_12h": "12 小时",
 	"w1wall_settings_clock_24h": "24 小时",
 	"w1wall_settings_clock_label": "时钟格式",
@@ -10547,6 +10509,223 @@
 	"w6roles_users_custom_group": "自定义角色",
 	"w6roles_users_custom_help": "自定义角色会替换内置角色：账户将恰好获得该角色的权限。",
 	"w6roles_users_custom_title": "自定义角色",
+	"w8rules_editor_error_hold": "请填写条件需要持续多久：0 或更大的数字。",
+	"w8rules_editor_flag_label": "何时触发",
+	"w8rules_editor_flag_nothing": "此规则读取的是开/关信号：没有阈值需要设置。你仍可以选择它需要持续多久才通知你。",
+	"w8rules_editor_hold_anomaly_help": "异常需要持续多久才通知你。0 表示立即通知。",
+	"w8rules_editor_hold_help": "条件需要保持多久才通知你。0 表示在首次检测到时就通知。",
+	"w8rules_editor_hold_label": "需持续",
+	"w8rules_editor_threshold_duration_help": "这是一个时长或延迟：请用合适的单位填写。",
+	"w8rules_list_summary_flag": "开/关信号",
+	"w8rules_overrides_flag": "开/关规则：无需按设备设置，只需决定是否适用。",
+	"w8rules_unitinput_aria": "{field}：单位",
+	"w8wp_discovery_label": "在公开页面列表中显示",
+	"w8wp_discovery_off": "不在公开页面列表中，但仍可通过其地址访问。",
+	"w8wp_discovery_on": "网站插件（例如 WordPress 横幅）可以在服务器的公开页面列表中找到此页面。",
+	"w8wp_discovery_private": "私有页面永远不会出现在公开页面列表中。",
+	"w8wp_discovery_unpublished": "只有已发布的页面才会出现在公开页面列表中。",
+	"w9dash_common_error": "无法读取这些数据。",
+	"w9dash_common_this_site": "本站点",
+	"w9dash_events_empty": "最近没有发生任何事。",
+	"w9dash_events_title": "最近事件",
+	"w9dash_kpi_avail_note": "目标 {target}%",
+	"w9dash_kpi_bars_label": "每个监控一根柱，按站点分组；高柱表示该监控已宕机",
+	"w9dash_kpi_budget_left": "剩余错误预算",
+	"w9dash_kpi_critical": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个严重"
+			}
+		}
+	],
+	"w9dash_kpi_opened_label": "最近 {days} 天每日新增告警",
+	"w9dash_kpi_paused": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个已暂停"
+			}
+		}
+	],
+	"w9dash_kpi_sites": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个站点"
+			}
+		}
+	],
+	"w9dash_kpi_warning": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个警告"
+			}
+		}
+	],
+	"w9dash_problems_ack_recovery": "直到恢复响应",
+	"w9dash_problems_calm_since": "自 {time} 起无未解决问题。",
+	"w9dash_problems_calm_text": "所有监控均有响应，没有未处理的告警。",
+	"w9dash_problems_calm_title": "目前无需处理。",
+	"w9dash_problems_col_acked": "已确认",
+	"w9dash_problems_col_age": "持续",
+	"w9dash_problems_col_monitor": "监控",
+	"w9dash_problems_col_problem": "问题",
+	"w9dash_problems_col_severity": "严重性",
+	"w9dash_problems_lasted": "持续 {span}",
+	"w9dash_problems_no_answer": "检查无响应",
+	"w9dash_problems_not_acked": "未确认",
+	"w9dash_problems_not_notified": "未发送通知",
+	"w9dash_problems_notified": "{ago}已通知",
+	"w9dash_problems_place": "{kind}，{site}",
+	"w9dash_problems_resolved": "最近已解决",
+	"w9dash_problems_resolved_plate": "已解决",
+	"w9dash_problems_since": "自 {time}",
+	"w9dash_status_degraded": "降级",
+	"w9dash_status_paused": "已暂停",
+	"w9dash_status_up": "正常",
+	"w9layout_category_backups": "备份",
+	"w9layout_category_network": "网络",
+	"w9layout_category_other": "其他",
+	"w9layout_category_servers": "服务器",
+	"w9layout_category_services": "服务",
+	"w9layout_category_storage": "存储",
+	"w9layout_count_up_of": "{up} / {total}",
+	"w9layout_fleet_empty": "还没有监控项：添加一个后会显示在这里。",
+	"w9layout_health_degraded": "降级",
+	"w9layout_health_down": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "{count} 个宕机"
+			}
+		}
+	],
+	"w9layout_health_healthy": "健康",
+	"w9layout_health_idle": "未监控任何项",
+	"w9layout_hybrid_act_now": "立即处理",
+	"w9layout_hybrid_band_label": "当前需要您处理的事项",
+	"w9layout_monitor_title": "{name}，{kind}：{status}",
+	"w9layout_monitor_title_bare": "{name}：{status}",
+	"w9layout_ms": "{value} 毫秒",
+	"w9layout_next_empty": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "未来 {count} 天内没有计划或到期事项。"
+			}
+		}
+	],
+	"w9layout_next_maint_active": "维护进行中",
+	"w9layout_next_maint_meta": "维护窗口，{duration}",
+	"w9layout_next_now": "现在",
+	"w9layout_next_title": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "未来 {count} 天"
+			}
+		}
+	],
+	"w9layout_next_until": "至 {time}",
+	"w9layout_pct": "{value}%",
+	"w9layout_services_beats_failed": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "最近 {count} 次检查，{failed} 次失败"
+			}
+		}
+	],
+	"w9layout_services_beats_ok": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "最近 {count} 次检查全部通过"
+			}
+		}
+	],
+	"w9layout_services_empty": "还没有服务检查：HTTP、DNS、TLS、SMTP 或 ping 检查会显示在这里。",
+	"w9layout_services_title": "服务",
+	"w9layout_sites_up_of": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=other": "/ {count} 正常"
+			}
+		}
+	],
+	"w9layout_sites_wan": "WAN",
+	"w9layout_state_error": "无法加载这些数据，稍后将重试。",
+	"w9layout_status_degraded": "降级",
+	"w9layout_status_down": "宕机",
+	"w9layout_status_paused": "已暂停",
+	"w9layout_status_up": "正常",
+	"w9layout_sun_title": "按站点查看设备",
+	"w9layout_when_today_bare": "今天",
+	"w9layout_when_tomorrow_bare": "明天",
+	"w9layout_when_yesterday_bare": "昨天",
 	"wall_band_problems": "问题",
 	"wall_band_problems_note": "严重告警和宕机的监控项",
 	"wall_devices_aria": "监控项",

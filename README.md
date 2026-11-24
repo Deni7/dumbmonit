@@ -44,7 +44,6 @@ One Rust binary with the UI embedded, VictoriaMetrics started by it, SQLite for 
 
 - Some integrations have only met test instances, not years-old production hardware. Validate dumbmonit in your own environment before you rely on it.
 - Before 1.0, the HTTP API and the database schema can still change between minor versions (see the changelog).
-- Formerly called ezymonit; the old `EZYMONIT_*` variables are still accepted.
 
 ## Contributing
 

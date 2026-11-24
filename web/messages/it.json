@@ -957,8 +957,6 @@
 	],
 	"console_breadcrumb": "Percorso",
 	"console_egg": "// {count} controlli al minuto. Vai a dormire, ci pensiamo noi.",
-	"console_kpi_alerts": "Avvisi aperti",
-	"console_kpi_alerts_note": "Critici: {critical}, avvisi: {warning}",
 	"console_kpi_availability": "Disponibilità 30 g",
 	"console_kpi_availability_note": "Monitor misurati: {count}",
 	"console_kpi_none": "Ancora nessun dato",
@@ -968,7 +966,6 @@
 	"console_live": "LIVE",
 	"console_live_off": "Aggiornamenti in tempo reale in pausa. Seleziona per riprendere.",
 	"console_live_on": "Aggiornamenti in tempo reale attivi. Seleziona per mettere in pausa.",
-	"console_panel_attention": "Richiede attenzione",
 	"console_panel_oncall_unknown": "Qualcuno",
 	"console_paused": "IN PAUSA",
 	"console_range": "Intervallo di tempo",
@@ -5709,9 +5706,6 @@
 	"overview_ack_err": "Impossibile prendere in carico questo monitor.",
 	"overview_ack_hint": "Visto, me ne occupo: silenzio fino al ritorno alla normalità.",
 	"overview_ack_item": "Prendi in carico",
-	"overview_all_good_text": "Niente è fuori servizio e nessun avviso ti aspetta. Il piccione fa un pisolino.",
-	"overview_all_good_title": "Tutto bene",
-	"overview_chart_error": "Impossibile caricare il grafico. Nuovo tentativo tra un minuto.",
 	"overview_first_all_done": "Tutti e tre fatti. Questa guida non tornerà.",
 	"overview_first_channel_action": "Aggiungi un canale",
 	"overview_first_channel_text": "Email, ntfy, Discord, Telegram, PagerDuty — quello che già leggi. Non viene inviato nulla finché non c'è un problema.",
@@ -5735,21 +5729,6 @@
 	"overview_first_test_text": "Invia un test dal canale. Questo passaggio diventa verde appena un messaggio parte davvero.",
 	"overview_first_test_title": "Verifica che arrivi un messaggio",
 	"overview_first_title": "I tuoi primi cinque minuti",
-	"overview_incidents_bars_label": "Incidenti al giorno, il più vecchio a sinistra",
-	"overview_incidents_before": "Settimana precedente: {value}",
-	"overview_incidents_count_label": "Incidenti",
-	"overview_incidents_day_title": "{day}. Incidenti: {count}. Tempo aperto: {duration}.",
-	"overview_incidents_explain": "Dall'avviso alla risoluzione. Una barra al giorno.",
-	"overview_incidents_noisiest": "Monitor più rumoroso",
-	"overview_incidents_none": "Nessun incidente negli ultimi {days} giorni.",
-	"overview_incidents_open_label": "Tempo aperto",
-	"overview_incidents_title": "Incidenti, ultimi {days} giorni",
-	"overview_latency_empty": "Nessun tempo di risposta misurato in questo intervallo.",
-	"overview_latency_hint": "p95 e mediana di tutte le sonde, ultime {range}",
-	"overview_latency_median": "Mediana",
-	"overview_latency_p95": "p95",
-	"overview_latency_slowest": "Monitor più lenti (p95)",
-	"overview_latency_title": "Tempo di risposta",
 	"overview_mute_aria": "Silenzia {name}",
 	"overview_mute_err_create": "Impossibile silenziare questo monitor.",
 	"overview_mute_err_lift": "Impossibile riattivare questo monitor.",
@@ -5774,22 +5753,6 @@
 			"match": {
 				"countPlural=one": "+{count} trattenuto",
 				"countPlural=other": "+{count} trattenuti"
-			}
-		}
-	],
-	"overview_needs_more": "Vedi tutti i {count} in Avvisi",
-	"overview_needs_see_all": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "Vedi {count} monitor",
-				"countPlural=other": "Vedi tutti i {count} monitor"
 			}
 		}
 	],
@@ -5986,15 +5949,7 @@
 	],
 	"overview_upcoming_due_now": "ora",
 	"overview_upcoming_due_today": "oggi",
-	"overview_upcoming_empty": "Nulla in scadenza nei prossimi {days} giorni.",
-	"overview_upcoming_error": "Impossibile leggere ciò che sta per accadere.",
-	"overview_upcoming_kind_backup": "Backup",
-	"overview_upcoming_kind_disk": "Disco",
-	"overview_upcoming_kind_update": "Aggiornamento",
-	"overview_upcoming_kind_vulnerability": "Vulnerabilità",
 	"overview_upcoming_list_label": "In arrivo, prima il più urgente",
-	"overview_upcoming_scope": "Controlla certificati, domini, dischi, backup e vulnerabilità.",
-	"overview_upcoming_see_all": "Mostra tutto",
 	"overview_upcoming_t_backup": "Il backup {what} sarà in ritardo",
 	"overview_upcoming_t_backup_late": "Il backup {what} è in ritardo",
 	"overview_upcoming_t_disk": "{what} si riempirà",
@@ -6808,6 +6763,8 @@
 	"settings_agentupdates_hint_pending": "Si aggiornerà al prossimo report.",
 	"settings_agentupdates_hint_read_only": "L'agente non può scrivere nella sua cartella: riesegui una volta il comando di installazione.",
 	"settings_agentupdates_hint_refused": "L'agente ha rifiutato l'aggiornamento.",
+	"settings_agentupdates_hint_reinstall": "Questa versione dell'agente Windows non può sostituire il proprio binario: riesegui una volta il comando di installazione sulla macchina, le versioni successive si aggiornano da sole.",
+	"settings_agentupdates_hint_unknown_key": "Questo agente è precedente alla chiave di firma attuale e non può verificare l'aggiornamento: attiva Accetta build non firmate (sviluppo) finché non si è aggiornato, oppure riesegui il comando di installazione.",
 	"settings_agentupdates_hint_unsigned": "Il build dell'agente di questo server non è firmato: gli agenti installano solo aggiornamenti firmati.",
 	"settings_agentupdates_hint_unsupported": "Questa piattaforma si aggiorna con lo script di installazione (macOS).",
 	"settings_agentupdates_hint_up_to_date": "Aggiornato.",
@@ -6828,6 +6785,7 @@
 	"settings_agentupdates_policy_follow": "Segui l'impostazione globale",
 	"settings_agentupdates_policy_off": "Disattivati",
 	"settings_agentupdates_policy_on": "Attivi",
+	"settings_agentupdates_reinstall_command": "Ottieni il comando di installazione",
 	"settings_agentupdates_resume": "Riprendi il rilascio",
 	"settings_agentupdates_rollout_canaries": "Canary aggiornati: {updated} su {total}",
 	"settings_agentupdates_rollout_held": "Altri agenti: trattenuti.",
@@ -6850,6 +6808,8 @@
 	"settings_agentupdates_status_pending": "In attesa",
 	"settings_agentupdates_status_read_only": "Sola lettura",
 	"settings_agentupdates_status_refused": "Rifiutato",
+	"settings_agentupdates_status_reinstall": "Reinstallazione necessaria",
+	"settings_agentupdates_status_unknown_key": "Chiave di firma sconosciuta",
 	"settings_agentupdates_status_unsigned": "Bloccato: build non firmato",
 	"settings_agentupdates_status_unsupported": "Non supportato",
 	"settings_agentupdates_status_up_to_date": "Aggiornato",
@@ -9517,6 +9477,9 @@
 	"upgrade_notice_keep": "Tienilo",
 	"upgrade_notice_title": "Modifiche di configurazione da applicare",
 	"upgrade_notice_view": "Vedi",
+	"w10hybrid_coming_empty": "Niente in programma né in scadenza a breve.",
+	"w10hybrid_kpi_problems": "Problemi aperti",
+	"w10hybrid_services_p95": "p95 {value}",
 	"w1alerts_channels_copy_name": "{name} (copia)",
 	"w1alerts_channels_disable_aria": "Disattiva il canale {name}",
 	"w1alerts_channels_duplicate": "Duplica",
@@ -9616,8 +9579,6 @@
 	"w1wall_notice_maintenance": "Manutenzione in corso: {title}",
 	"w1wall_notice_maintenance_until": "Manutenzione in corso: {title}, fino alle {time}",
 	"w1wall_notice_more": "+{count}",
-	"w1wall_overview_trend_days": "{days} g",
-	"w1wall_overview_trend_period": "Periodo",
 	"w1wall_settings_clock_12h": "12 h",
 	"w1wall_settings_clock_24h": "24 h",
 	"w1wall_settings_clock_label": "Formato dell'orologio",
@@ -10662,6 +10623,233 @@
 	"w6roles_users_custom_group": "Ruoli personalizzati",
 	"w6roles_users_custom_help": "Un ruolo personalizzato sostituisce il ruolo predefinito: l'account riceve esattamente i permessi di quel ruolo.",
 	"w6roles_users_custom_title": "Ruolo personalizzato",
+	"w8rules_editor_error_hold": "Indica quanto deve durare la condizione: un numero, 0 o più.",
+	"w8rules_editor_flag_label": "Quando scatta",
+	"w8rules_editor_flag_nothing": "Questa regola legge un segnale acceso/spento: non c'è alcuna soglia da impostare. Puoi comunque scegliere quanto deve durare prima di essere avvisato.",
+	"w8rules_editor_hold_anomaly_help": "Quanto deve durare l'anomalia prima che tu venga avvisato. 0 avvisa subito.",
+	"w8rules_editor_hold_help": "Quanto deve persistere la condizione prima che tu venga avvisato. 0 avvisa al primo controllo che la rileva.",
+	"w8rules_editor_hold_label": "Deve durare",
+	"w8rules_editor_threshold_duration_help": "Un'età o un ritardo: inseriscilo nell'unità che preferisci.",
+	"w8rules_list_summary_flag": "segnale acceso/spento",
+	"w8rules_overrides_flag": "Regola acceso/spento: niente da impostare per dispositivo, solo se si applica.",
+	"w8rules_unitinput_aria": "{field}: unità",
+	"w8wp_discovery_label": "Mostra nell'elenco delle pagine pubbliche",
+	"w8wp_discovery_off": "Fuori dall'elenco delle pagine pubbliche. La pagina resta leggibile al suo indirizzo.",
+	"w8wp_discovery_on": "I plugin per siti web, come il banner WordPress, trovano questa pagina nell'elenco delle pagine pubbliche del server.",
+	"w8wp_discovery_private": "Una pagina privata non compare mai nell'elenco delle pagine pubbliche.",
+	"w8wp_discovery_unpublished": "Solo le pagine pubblicate compaiono nell'elenco delle pagine pubbliche.",
+	"w9dash_common_error": "Impossibile leggere questi dati.",
+	"w9dash_common_this_site": "Questo sito",
+	"w9dash_events_empty": "Ultimamente non è successo nulla.",
+	"w9dash_events_title": "Eventi recenti",
+	"w9dash_kpi_avail_note": "Obiettivo {target}%",
+	"w9dash_kpi_bars_label": "Una barra per monitor, raggruppate per sito; una barra alta è un monitor non attivo",
+	"w9dash_kpi_budget_left": "Budget di errore residuo",
+	"w9dash_kpi_critical": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} critico",
+				"countPlural=other": "{count} critici"
+			}
+		}
+	],
+	"w9dash_kpi_opened_label": "Avvisi aperti al giorno negli ultimi {days} giorni",
+	"w9dash_kpi_paused": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} in pausa",
+				"countPlural=other": "{count} in pausa"
+			}
+		}
+	],
+	"w9dash_kpi_sites": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} sito",
+				"countPlural=other": "{count} siti"
+			}
+		}
+	],
+	"w9dash_kpi_warning": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} avviso",
+				"countPlural=other": "{count} avvisi"
+			}
+		}
+	],
+	"w9dash_problems_ack_recovery": "Finché non risponde di nuovo",
+	"w9dash_problems_calm_since": "Nessun problema aperto dalle {time}.",
+	"w9dash_problems_calm_text": "Tutti i monitor rispondono e nessun avviso è aperto.",
+	"w9dash_problems_calm_title": "Niente richiede il tuo intervento.",
+	"w9dash_problems_col_acked": "Preso in carico",
+	"w9dash_problems_col_age": "Durata",
+	"w9dash_problems_col_monitor": "Monitor",
+	"w9dash_problems_col_problem": "Problema",
+	"w9dash_problems_col_severity": "Gravità",
+	"w9dash_problems_lasted": "È durato {span}",
+	"w9dash_problems_no_answer": "Non risponde ai controlli",
+	"w9dash_problems_not_acked": "Non preso in carico",
+	"w9dash_problems_not_notified": "Nessuna notifica inviata",
+	"w9dash_problems_notified": "Notificato {ago}",
+	"w9dash_problems_place": "{kind}, {site}",
+	"w9dash_problems_resolved": "Risolti di recente",
+	"w9dash_problems_resolved_plate": "Risolto",
+	"w9dash_problems_since": "dalle {time}",
+	"w9dash_status_degraded": "Degradato",
+	"w9dash_status_paused": "In pausa",
+	"w9dash_status_up": "Attivo",
+	"w9layout_category_backups": "Backup",
+	"w9layout_category_network": "Rete",
+	"w9layout_category_other": "Altro",
+	"w9layout_category_servers": "Server",
+	"w9layout_category_services": "Servizi",
+	"w9layout_category_storage": "Storage",
+	"w9layout_count_up_of": "{up} / {total}",
+	"w9layout_fleet_empty": "Ancora nessun monitor: aggiungine uno e comparirà qui.",
+	"w9layout_health_degraded": "Degradato",
+	"w9layout_health_down": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} non attivo",
+				"countPlural=other": "{count} non attivi"
+			}
+		}
+	],
+	"w9layout_health_healthy": "Integro",
+	"w9layout_health_idle": "Niente sotto controllo",
+	"w9layout_hybrid_act_now": "Da gestire ora",
+	"w9layout_hybrid_band_label": "Ciò che richiede attenzione ora",
+	"w9layout_monitor_title": "{name}, {kind}: {status}",
+	"w9layout_monitor_title_bare": "{name}: {status}",
+	"w9layout_ms": "{value} ms",
+	"w9layout_next_empty": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Niente in programma o in scadenza nel prossimo {count} giorno.",
+				"countPlural=other": "Niente in programma o in scadenza nei prossimi {count} giorni."
+			}
+		}
+	],
+	"w9layout_next_maint_active": "Manutenzione in corso",
+	"w9layout_next_maint_meta": "Finestra di manutenzione, {duration}",
+	"w9layout_next_now": "Ora",
+	"w9layout_next_title": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Prossimo {count} giorno",
+				"countPlural=other": "Prossimi {count} giorni"
+			}
+		}
+	],
+	"w9layout_next_until": "fino alle {time}",
+	"w9layout_pct": "{value}%",
+	"w9layout_services_beats_failed": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Ultimo controllo non superato",
+				"countPlural=other": "Ultimi {count} controlli, {failed} non superati"
+			}
+		}
+	],
+	"w9layout_services_beats_ok": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Ultimo controllo superato",
+				"countPlural=other": "Ultimi {count} controlli, tutti superati"
+			}
+		}
+	],
+	"w9layout_services_empty": "Ancora nessun controllo di servizio: qui compaiono i controlli HTTP, DNS, TLS, SMTP o ping.",
+	"w9layout_services_title": "Servizi",
+	"w9layout_sites_up_of": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "/ {count} attivo",
+				"countPlural=other": "/ {count} attivi"
+			}
+		}
+	],
+	"w9layout_sites_wan": "WAN",
+	"w9layout_state_error": "Impossibile caricare questi dati. Verrà ritentato a breve.",
+	"w9layout_status_degraded": "Degradato",
+	"w9layout_status_down": "Non attivo",
+	"w9layout_status_paused": "In pausa",
+	"w9layout_status_up": "Attivo",
+	"w9layout_sun_title": "Parco per sede",
+	"w9layout_when_today_bare": "Oggi",
+	"w9layout_when_tomorrow_bare": "Domani",
+	"w9layout_when_yesterday_bare": "Ieri",
 	"wall_band_problems": "Problemi",
 	"wall_band_problems_note": "Avvisi critici e monitor non attivi",
 	"wall_devices_aria": "Monitor",

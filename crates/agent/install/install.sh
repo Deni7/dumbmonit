@@ -27,9 +27,7 @@
 # BusyBox ou dash, et le /bin/sh de FreeBSD n'est pas bash non plus.
 #
 # Idempotent : le relancer met à jour le binaire et la configuration sans rien
-# casser, ce qui en fait aussi la procédure de mise à jour. Une machine encore
-# équipée de l'agent d'avant le renommage (ezymonit-agent) est migrée sur place
-# par la même commande.
+# casser, ce qui en fait aussi la procédure de mise à jour.
 
 set -eu
 
@@ -309,77 +307,6 @@ if [ "$PLATFORM" = "freebsd" ] && [ "$ARCH" != "x86_64" ]; then
        and install it with --bin=PATH."
 fi
 
-# Noms d'avant le renommage EzyMonit → DumbMonit. Une installation qui les porte
-# encore est migrée sur place à l'installation, et `--uninstall` en fait aussi
-# le ménage. L'ancien agent n'a existé que sous Linux.
-LEGACY_CONFIG_DIR="/etc/ezymonit"
-LEGACY_BIN_PATH="/usr/local/bin/ezymonit-agent"
-LEGACY_UNIT_PATH="/etc/systemd/system/ezymonit-agent.service"
-LEGACY_OPENRC_PATH="/etc/init.d/ezymonit-agent"
-LEGACY_SERVICE_NAME="ezymonit-agent"
-
-# --------------------------------------------------------- ancien agent
-
-# Vrai si le service d'avant le renommage est encore connu du gestionnaire de
-# services : fichier d'unité ou script d'init présent, ou unité listée par
-# systemd (elle peut venir d'ailleurs que /etc).
-ancien_service_present() {
-    case "$INIT" in
-        systemd)
-            [ -f "$LEGACY_UNIT_PATH" ] && return 0
-            systemctl list-unit-files "$LEGACY_SERVICE_NAME.service" 2>/dev/null \
-                | grep -q "^$LEGACY_SERVICE_NAME\.service"
-            ;;
-        openrc) [ -f "$LEGACY_OPENRC_PATH" ] ;;
-        *) return 1 ;;
-    esac
-}
-
-# Arrête et retire le service, l'unité et le binaire de l'ancien agent. Ne
-# touche pas à sa configuration. Silencieux quand rien d'ancien n'est présent ;
-# renvoie 0 si quelque chose a été retiré.
-retirer_ancien_agent() {
-    retire=1
-    if ancien_service_present; then
-        case "$INIT" in
-            systemd) systemctl disable --now "$LEGACY_SERVICE_NAME" 2>/dev/null || true ;;
-            openrc)
-                rc-service "$LEGACY_SERVICE_NAME" stop 2>/dev/null || true
-                rc-update del "$LEGACY_SERVICE_NAME" default 2>/dev/null || true
-                ;;
-        esac
-        retire=0
-    fi
-    for fichier in "$LEGACY_UNIT_PATH" "$LEGACY_OPENRC_PATH" "$LEGACY_BIN_PATH"; do
-        if [ -e "$fichier" ] || [ -L "$fichier" ]; then
-            rm -f "$fichier"
-            retire=0
-        fi
-    done
-    if [ "$retire" -eq 0 ] && [ "$INIT" = "systemd" ]; then
-        systemctl daemon-reload 2>/dev/null || true
-    fi
-    return "$retire"
-}
-
-# Migration sur place d'une installation d'avant le renommage : l'ancien service
-# est arrêté et retiré, et sa configuration reprend sa place sous le nouveau nom.
-# Elle est réécrite juste après depuis --token/--url, mais les clés qu'un
-# utilisateur y aurait ajoutées restent à portée de main. Sans rien d'ancien,
-# ne fait rien et ne dit rien.
-migrate_legacy() {
-    migre=1
-    if retirer_ancien_agent; then migre=0; fi
-    if [ -d "$LEGACY_CONFIG_DIR" ] && [ ! -e "$CONFIG_DIR" ]; then
-        # `mv` garde propriétaire et droits, ceux du fichier de jeton compris.
-        mv "$LEGACY_CONFIG_DIR" "$CONFIG_DIR"
-        migre=0
-    fi
-    if [ "$migre" -eq 0 ]; then
-        info "migrating the $LEGACY_SERVICE_NAME install to $SERVICE_NAME"
-    fi
-}
-
 # ------------------------------------------------------------ service
 
 arreter_service() {
@@ -488,9 +415,6 @@ if [ "$UNINSTALL" -eq 1 ]; then
     # Avec le binaire : sa copie de secours et le registre des mises à jour.
     rm -rf "$BIN_DIR"
     rm -rf "$CONFIG_DIR"
-    # Les restes d'une installation d'avant le renommage partent aussi.
-    retirer_ancien_agent || true
-    rm -rf "$LEGACY_CONFIG_DIR"
     [ "$INIT" = "systemd" ] && systemctl daemon-reload 2>/dev/null || true
     info "agent uninstalled"
     exit 0
@@ -760,11 +684,6 @@ ln -sf "$BIN_PATH" "$LINK_PATH"
 if [ "$PLATFORM" = "macos" ]; then
     xattr -d com.apple.quarantine "$BIN_PATH" 2>/dev/null || true
 fi
-
-# Le nouveau binaire est en place : l'ancien agent, s'il est là, peut être
-# arrêté et sa configuration déplacée avant que la nouvelle ne soit écrite. Pas
-# avant — un téléchargement raté ne doit pas laisser la machine sans agent.
-migrate_legacy
 
 # --------------------------------------------------------- configuration
 

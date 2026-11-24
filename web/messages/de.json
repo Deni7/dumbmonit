@@ -957,8 +957,6 @@
 	],
 	"console_breadcrumb": "Brotkrumen",
 	"console_egg": "// {count} Prüfungen pro Minute. Geh schlafen, wir haben das im Griff.",
-	"console_kpi_alerts": "Offene Alarme",
-	"console_kpi_alerts_note": "Kritisch: {critical}, Warnung: {warning}",
 	"console_kpi_availability": "Verfügbarkeit 30 T",
 	"console_kpi_availability_note": "Gemessene Monitore: {count}",
 	"console_kpi_none": "Noch keine Daten",
@@ -968,7 +966,6 @@
 	"console_live": "LIVE",
 	"console_live_off": "Live-Aktualisierung pausiert. Zum Fortsetzen auswählen.",
 	"console_live_on": "Live-Aktualisierung aktiv. Zum Pausieren auswählen.",
-	"console_panel_attention": "Braucht Aufmerksamkeit",
 	"console_panel_oncall_unknown": "Jemand",
 	"console_paused": "PAUSIERT",
 	"console_range": "Zeitraum",
@@ -5709,9 +5706,6 @@
 	"overview_ack_err": "Dieser Monitor konnte nicht bestätigt werden.",
 	"overview_ack_hint": "Gesehen, ich kümmere mich: Ruhe bis zur Normalisierung.",
 	"overview_ack_item": "Bestätigen",
-	"overview_all_good_text": "Nichts ist ausgefallen und keine Warnung wartet auf dich. Die Taube macht ein Nickerchen.",
-	"overview_all_good_title": "Alles gut",
-	"overview_chart_error": "Diagramm konnte nicht geladen werden. Neuer Versuch in einer Minute.",
 	"overview_first_all_done": "Alle drei erledigt. Diese Anleitung kommt nicht wieder.",
 	"overview_first_channel_action": "Kanal hinzufügen",
 	"overview_first_channel_text": "E-Mail, ntfy, Discord, Telegram, PagerDuty – was Sie ohnehin lesen. Es wird nichts gesendet, solange alles in Ordnung ist.",
@@ -5735,21 +5729,6 @@
 	"overview_first_test_text": "Senden Sie einen Test über den Kanal. Dieser Schritt wird grün, sobald wirklich eine Nachricht gesendet wird.",
 	"overview_first_test_title": "Prüfen, ob eine Nachricht ankommt",
 	"overview_first_title": "Ihre ersten fünf Minuten",
-	"overview_incidents_bars_label": "Vorfälle pro Tag, der älteste links",
-	"overview_incidents_before": "Vorwoche: {value}",
-	"overview_incidents_count_label": "Vorfälle",
-	"overview_incidents_day_title": "{day}. Vorfälle: {count}. Dauer insgesamt: {duration}.",
-	"overview_incidents_explain": "Von Alarm bis behoben. Ein Balken pro Tag.",
-	"overview_incidents_noisiest": "Lauteste Überwachung",
-	"overview_incidents_none": "Kein Vorfall in den letzten {days} Tagen.",
-	"overview_incidents_open_label": "Dauer insgesamt",
-	"overview_incidents_title": "Vorfälle, letzte {days} Tage",
-	"overview_latency_empty": "In diesem Zeitraum wurde noch keine Antwortzeit gemessen.",
-	"overview_latency_hint": "p95 und Median aller Prüfungen, letzte {range}",
-	"overview_latency_median": "Median",
-	"overview_latency_p95": "p95",
-	"overview_latency_slowest": "Langsamste Monitore (p95)",
-	"overview_latency_title": "Antwortzeit",
 	"overview_mute_aria": "{name} stummschalten",
 	"overview_mute_err_create": "Der Monitor konnte nicht stummgeschaltet werden.",
 	"overview_mute_err_lift": "Die Stummschaltung konnte nicht aufgehoben werden.",
@@ -5774,22 +5753,6 @@
 			"match": {
 				"countPlural=one": "+{count} zurückgehalten",
 				"countPlural=other": "+{count} zurückgehalten"
-			}
-		}
-	],
-	"overview_needs_more": "Alle {count} unter Warnungen ansehen",
-	"overview_needs_see_all": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} Monitor ansehen",
-				"countPlural=other": "Alle {count} Monitore ansehen"
 			}
 		}
 	],
@@ -5986,15 +5949,7 @@
 	],
 	"overview_upcoming_due_now": "jetzt",
 	"overview_upcoming_due_today": "heute",
-	"overview_upcoming_empty": "In den nächsten {days} Tagen ist nichts fällig.",
-	"overview_upcoming_error": "Anstehendes konnte nicht gelesen werden.",
-	"overview_upcoming_kind_backup": "Backup",
-	"overview_upcoming_kind_disk": "Datenträger",
-	"overview_upcoming_kind_update": "Update",
-	"overview_upcoming_kind_vulnerability": "Schwachstelle",
 	"overview_upcoming_list_label": "Demnächst, Dringendstes zuerst",
-	"overview_upcoming_scope": "Überwacht Zertifikate, Domains, Datenträger, Backups und Schwachstellen.",
-	"overview_upcoming_see_all": "Alle anzeigen",
 	"overview_upcoming_t_backup": "Backup {what} wird überfällig",
 	"overview_upcoming_t_backup_late": "Backup {what} ist überfällig",
 	"overview_upcoming_t_disk": "{what} wird voll sein",
@@ -6808,6 +6763,8 @@
 	"settings_agentupdates_hint_pending": "Wird bei der nächsten Meldung aktualisiert.",
 	"settings_agentupdates_hint_read_only": "Der Agent kann nicht in seinen Ordner schreiben: Installationsbefehl einmal erneut ausführen.",
 	"settings_agentupdates_hint_refused": "Der Agent hat das Update abgelehnt.",
+	"settings_agentupdates_hint_reinstall": "Diese Version des Windows-Agenten kann ihre eigene Binärdatei nicht ersetzen: Führen Sie den Installationsbefehl einmal auf dem Rechner erneut aus, spätere Versionen aktualisieren sich selbst.",
+	"settings_agentupdates_hint_unknown_key": "Dieser Agent ist älter als der aktuelle Signaturschlüssel und kann das Update nicht prüfen: Aktivieren Sie „Unsignierte Builds akzeptieren (Entwicklung)“, bis er aktualisiert ist, oder führen Sie den Installationsbefehl erneut aus.",
 	"settings_agentupdates_hint_unsigned": "Der Agenten-Build dieses Servers ist nicht signiert: Agenten installieren nur signierte Updates.",
 	"settings_agentupdates_hint_unsupported": "Diese Plattform wird mit dem Installationsskript aktualisiert (macOS).",
 	"settings_agentupdates_hint_up_to_date": "Aktuell.",
@@ -6828,6 +6785,7 @@
 	"settings_agentupdates_policy_follow": "Globaler Einstellung folgen",
 	"settings_agentupdates_policy_off": "Aus",
 	"settings_agentupdates_policy_on": "An",
+	"settings_agentupdates_reinstall_command": "Installationsbefehl anzeigen",
 	"settings_agentupdates_resume": "Rollout fortsetzen",
 	"settings_agentupdates_rollout_canaries": "Canaries aktualisiert: {updated} von {total}",
 	"settings_agentupdates_rollout_held": "Übrige Agenten: zurückgehalten.",
@@ -6850,6 +6808,8 @@
 	"settings_agentupdates_status_pending": "Ausstehend",
 	"settings_agentupdates_status_read_only": "Schreibgeschützt",
 	"settings_agentupdates_status_refused": "Abgelehnt",
+	"settings_agentupdates_status_reinstall": "Neuinstallation nötig",
+	"settings_agentupdates_status_unknown_key": "Unbekannter Signaturschlüssel",
 	"settings_agentupdates_status_unsigned": "Blockiert: unsignierter Build",
 	"settings_agentupdates_status_unsupported": "Nicht unterstützt",
 	"settings_agentupdates_status_up_to_date": "Aktuell",
@@ -9517,6 +9477,9 @@
 	"upgrade_notice_keep": "Behalten",
 	"upgrade_notice_title": "Konfigurationsänderungen erforderlich",
 	"upgrade_notice_view": "Ansehen",
+	"w10hybrid_coming_empty": "Nichts geplant und nichts bald fällig.",
+	"w10hybrid_kpi_problems": "Offene Probleme",
+	"w10hybrid_services_p95": "p95 {value}",
 	"w1alerts_channels_copy_name": "{name} (Kopie)",
 	"w1alerts_channels_disable_aria": "Kanal {name} deaktivieren",
 	"w1alerts_channels_duplicate": "Duplizieren",
@@ -9616,8 +9579,6 @@
 	"w1wall_notice_maintenance": "Wartung läuft: {title}",
 	"w1wall_notice_maintenance_until": "Wartung läuft: {title}, bis {time}",
 	"w1wall_notice_more": "+{count}",
-	"w1wall_overview_trend_days": "{days} T",
-	"w1wall_overview_trend_period": "Zeitraum",
 	"w1wall_settings_clock_12h": "12 h",
 	"w1wall_settings_clock_24h": "24 h",
 	"w1wall_settings_clock_label": "Uhrzeitformat",
@@ -10662,6 +10623,233 @@
 	"w6roles_users_custom_group": "Eigene Rollen",
 	"w6roles_users_custom_help": "Eine eigene Rolle ersetzt die vordefinierte Rolle: Das Konto erhält genau die Berechtigungen dieser Rolle.",
 	"w6roles_users_custom_title": "Eigene Rolle",
+	"w8rules_editor_error_hold": "Geben Sie an, wie lange die Bedingung bestehen muss: eine Zahl, 0 oder mehr.",
+	"w8rules_editor_flag_label": "Wann sie auslöst",
+	"w8rules_editor_flag_nothing": "Diese Regel liest ein Ein/Aus-Signal: Es gibt keinen Schwellenwert einzustellen. Sie können trotzdem festlegen, wie lange es anhalten muss, bevor Sie benachrichtigt werden.",
+	"w8rules_editor_hold_anomaly_help": "Wie lange die Anomalie anhalten muss, bevor Sie benachrichtigt werden. 0 benachrichtigt sofort.",
+	"w8rules_editor_hold_help": "Wie lange die Bedingung bestehen muss, bevor Sie benachrichtigt werden. 0 benachrichtigt bei der ersten Prüfung, die sie feststellt.",
+	"w8rules_editor_hold_label": "Muss andauern",
+	"w8rules_editor_threshold_duration_help": "Ein Alter oder eine Verzögerung: Geben Sie sie in der passenden Einheit ein.",
+	"w8rules_list_summary_flag": "Ein/Aus-Signal",
+	"w8rules_overrides_flag": "Ein/Aus-Regel: pro Gerät gibt es nichts einzustellen, nur ob sie gilt.",
+	"w8rules_unitinput_aria": "{field}: Einheit",
+	"w8wp_discovery_label": "In der Liste öffentlicher Seiten zeigen",
+	"w8wp_discovery_off": "Nicht in der Liste der öffentlichen Seiten. Unter ihrer Adresse bleibt die Seite erreichbar.",
+	"w8wp_discovery_on": "Website-Plugins wie das WordPress-Banner finden diese Seite in der Liste der öffentlichen Seiten des Servers.",
+	"w8wp_discovery_private": "Eine private Seite erscheint nie in der Liste der öffentlichen Seiten.",
+	"w8wp_discovery_unpublished": "Nur veröffentlichte Seiten erscheinen in der Liste der öffentlichen Seiten.",
+	"w9dash_common_error": "Diese Werte konnten nicht gelesen werden.",
+	"w9dash_common_this_site": "Dieser Standort",
+	"w9dash_events_empty": "In letzter Zeit ist nichts passiert.",
+	"w9dash_events_title": "Letzte Ereignisse",
+	"w9dash_kpi_avail_note": "Ziel {target} %",
+	"w9dash_kpi_bars_label": "Ein Balken pro Monitor, nach Standort gruppiert; ein hoher Balken ist ein ausgefallener Monitor",
+	"w9dash_kpi_budget_left": "Verbleibendes Fehlerbudget",
+	"w9dash_kpi_critical": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} kritisch",
+				"countPlural=other": "{count} kritisch"
+			}
+		}
+	],
+	"w9dash_kpi_opened_label": "Pro Tag geöffnete Alarme, letzte {days} Tage",
+	"w9dash_kpi_paused": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} pausiert",
+				"countPlural=other": "{count} pausiert"
+			}
+		}
+	],
+	"w9dash_kpi_sites": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} Standort",
+				"countPlural=other": "{count} Standorte"
+			}
+		}
+	],
+	"w9dash_kpi_warning": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} Warnung",
+				"countPlural=other": "{count} Warnungen"
+			}
+		}
+	],
+	"w9dash_problems_ack_recovery": "Bis er wieder antwortet",
+	"w9dash_problems_calm_since": "Kein offenes Problem seit {time}.",
+	"w9dash_problems_calm_text": "Jeder Monitor antwortet und kein Alarm ist offen.",
+	"w9dash_problems_calm_title": "Nichts braucht dich.",
+	"w9dash_problems_col_acked": "Bestätigt",
+	"w9dash_problems_col_age": "Dauer",
+	"w9dash_problems_col_monitor": "Monitor",
+	"w9dash_problems_col_problem": "Problem",
+	"w9dash_problems_col_severity": "Schweregrad",
+	"w9dash_problems_lasted": "Dauer {span}",
+	"w9dash_problems_no_answer": "Keine Antwort auf die Prüfungen",
+	"w9dash_problems_not_acked": "Nicht bestätigt",
+	"w9dash_problems_not_notified": "Keine Benachrichtigung gesendet",
+	"w9dash_problems_notified": "Benachrichtigt {ago}",
+	"w9dash_problems_place": "{kind}, {site}",
+	"w9dash_problems_resolved": "Kürzlich behoben",
+	"w9dash_problems_resolved_plate": "Behoben",
+	"w9dash_problems_since": "seit {time}",
+	"w9dash_status_degraded": "Beeinträchtigt",
+	"w9dash_status_paused": "Pausiert",
+	"w9dash_status_up": "Aktiv",
+	"w9layout_category_backups": "Backups",
+	"w9layout_category_network": "Netzwerk",
+	"w9layout_category_other": "Sonstige",
+	"w9layout_category_servers": "Server",
+	"w9layout_category_services": "Dienste",
+	"w9layout_category_storage": "Speicher",
+	"w9layout_count_up_of": "{up} / {total}",
+	"w9layout_fleet_empty": "Noch keine Monitore: Fügen Sie einen hinzu, dann erscheint er hier.",
+	"w9layout_health_degraded": "Beeinträchtigt",
+	"w9layout_health_down": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} ausgefallen",
+				"countPlural=other": "{count} ausgefallen"
+			}
+		}
+	],
+	"w9layout_health_healthy": "In Ordnung",
+	"w9layout_health_idle": "Nichts überwacht",
+	"w9layout_hybrid_act_now": "Jetzt handeln",
+	"w9layout_hybrid_band_label": "Was Sie jetzt brauchen",
+	"w9layout_monitor_title": "{name}, {kind}: {status}",
+	"w9layout_monitor_title_bare": "{name}: {status}",
+	"w9layout_ms": "{value} ms",
+	"w9layout_next_empty": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Am nächsten {count} Tag ist nichts geplant oder fällig.",
+				"countPlural=other": "In den nächsten {count} Tagen ist nichts geplant oder fällig."
+			}
+		}
+	],
+	"w9layout_next_maint_active": "Wartung läuft",
+	"w9layout_next_maint_meta": "Wartungsfenster, {duration}",
+	"w9layout_next_now": "Jetzt",
+	"w9layout_next_title": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Nächster {count} Tag",
+				"countPlural=other": "Nächste {count} Tage"
+			}
+		}
+	],
+	"w9layout_next_until": "bis {time}",
+	"w9layout_pct": "{value} %",
+	"w9layout_services_beats_failed": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Letzte Prüfung fehlgeschlagen",
+				"countPlural=other": "Letzte {count} Prüfungen, {failed} fehlgeschlagen"
+			}
+		}
+	],
+	"w9layout_services_beats_ok": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Letzte Prüfung bestanden",
+				"countPlural=other": "Letzte {count} Prüfungen, alle bestanden"
+			}
+		}
+	],
+	"w9layout_services_empty": "Noch keine Dienstprüfung: HTTP-, DNS-, TLS-, SMTP- oder Ping-Prüfungen erscheinen hier.",
+	"w9layout_services_title": "Dienste",
+	"w9layout_sites_up_of": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "/ {count} aktiv",
+				"countPlural=other": "/ {count} aktiv"
+			}
+		}
+	],
+	"w9layout_sites_wan": "WAN",
+	"w9layout_state_error": "Diese Werte konnten nicht geladen werden. Es wird gleich erneut versucht.",
+	"w9layout_status_degraded": "Beeinträchtigt",
+	"w9layout_status_down": "Ausgefallen",
+	"w9layout_status_paused": "Pausiert",
+	"w9layout_status_up": "Aktiv",
+	"w9layout_sun_title": "Flotte nach Standort",
+	"w9layout_when_today_bare": "Heute",
+	"w9layout_when_tomorrow_bare": "Morgen",
+	"w9layout_when_yesterday_bare": "Gestern",
 	"wall_band_problems": "Probleme",
 	"wall_band_problems_note": "Kritische Warnungen und ausgefallene Monitore",
 	"wall_devices_aria": "Monitore",

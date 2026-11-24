@@ -48,21 +48,17 @@ case `uname -s` in
         if command -v systemctl >/dev/null 2>&1 \
            && { ! command -v rc-update >/dev/null 2>&1 || [ -d /run/systemd/system ]; }; then
             systemctl disable --now dumbmonit-agent 2>/dev/null || true
-            systemctl disable --now ezymonit-agent 2>/dev/null || true
             rm -f /etc/systemd/system/dumbmonit-agent.service
-            rm -f /etc/systemd/system/ezymonit-agent.service
             systemctl daemon-reload 2>/dev/null || true
         elif command -v rc-update >/dev/null 2>&1; then
             rc-service dumbmonit-agent stop 2>/dev/null || true
             rc-update del dumbmonit-agent default 2>/dev/null || true
-            rc-service ezymonit-agent stop 2>/dev/null || true
-            rc-update del ezymonit-agent default 2>/dev/null || true
-            rm -f /etc/init.d/dumbmonit-agent /etc/init.d/ezymonit-agent
+            rm -f /etc/init.d/dumbmonit-agent
         fi
         if [ -f /etc/dumbmonit/firewall-undo.sh ]; then
             sh /etc/dumbmonit/firewall-undo.sh || true
         fi
-        rm -rf /etc/dumbmonit /etc/ezymonit
+        rm -rf /etc/dumbmonit
         ;;
     Darwin)
         launchctl bootout system/com.dumbmonit.agent 2>/dev/null || true
@@ -76,7 +72,7 @@ case `uname -s` in
         rm -rf /usr/local/etc/dumbmonit
         ;;
 esac
-rm -f /usr/local/bin/dumbmonit-agent /usr/local/bin/ezymonit-agent
+rm -f /usr/local/bin/dumbmonit-agent
 rm -rf /usr/local/lib/dumbmonit-agent
 logger -t dumbmonit-agent "agent uninstalled" 2>/dev/null || true
 exit 0
@@ -101,12 +97,6 @@ for ($i = 0; ($i -lt 15) -and (Test-Path $InstallDir); $i++) {
 }
 Remove-Item -Path $ConfigDir -Recurse -Force -ErrorAction SilentlyContinue
 & netsh.exe advfirewall firewall delete rule name=DumbMonit-relay-gateway | Out-Null
-if (Get-Service -Name 'EzyMonitAgent' -ErrorAction SilentlyContinue) {
-    Stop-Service -Name 'EzyMonitAgent' -Force -ErrorAction SilentlyContinue
-    & sc.exe delete 'EzyMonitAgent' | Out-Null
-}
-Remove-Item -Path (Join-Path $env:ProgramFiles 'EzyMonit') -Recurse -Force -ErrorAction SilentlyContinue
-Remove-Item -Path (Join-Path $env:ProgramData 'EzyMonit') -Recurse -Force -ErrorAction SilentlyContinue
 "#;
 
 /// Message de refus d'un agent en conteneur.

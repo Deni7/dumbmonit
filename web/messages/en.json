@@ -957,8 +957,6 @@
 	],
 	"console_breadcrumb": "Breadcrumb",
 	"console_egg": "// {count} checks per minute. Go to sleep, we've got this.",
-	"console_kpi_alerts": "Open alerts",
-	"console_kpi_alerts_note": "Critical: {critical}, warning: {warning}",
 	"console_kpi_availability": "Availability 30 d",
 	"console_kpi_availability_note": "Monitors measured: {count}",
 	"console_kpi_none": "No data yet",
@@ -968,7 +966,6 @@
 	"console_live": "LIVE",
 	"console_live_off": "Live updates paused. Select to resume.",
 	"console_live_on": "Live updates on. Select to pause.",
-	"console_panel_attention": "Needs attention",
 	"console_panel_oncall_unknown": "Someone",
 	"console_paused": "PAUSED",
 	"console_range": "Time range",
@@ -5709,9 +5706,6 @@
 	"overview_ack_err": "Could not acknowledge this monitor.",
 	"overview_ack_hint": "Seen, I am on it: quiet until it is back to normal.",
 	"overview_ack_item": "Acknowledge",
-	"overview_all_good_text": "Nothing is down and no alert is waiting for you. The pigeon is taking a nap.",
-	"overview_all_good_title": "All good",
-	"overview_chart_error": "Could not load this chart. It tries again in a minute.",
 	"overview_first_all_done": "All three done. This guide will not come back.",
 	"overview_first_channel_action": "Add a channel",
 	"overview_first_channel_text": "Email, ntfy, Discord, Telegram, PagerDuty — whatever you already read. Nothing is sent until something is wrong.",
@@ -5735,21 +5729,6 @@
 	"overview_first_test_text": "Send a test from the channel. This step turns green once one really leaves.",
 	"overview_first_test_title": "Check a message arrives",
 	"overview_first_title": "Your first five minutes",
-	"overview_incidents_bars_label": "Incidents per day, oldest on the left",
-	"overview_incidents_before": "Week before: {value}",
-	"overview_incidents_count_label": "Incidents",
-	"overview_incidents_day_title": "{day}. Incidents: {count}. Time open: {duration}.",
-	"overview_incidents_explain": "Firing to resolved. One bar per day.",
-	"overview_incidents_noisiest": "Noisiest monitor",
-	"overview_incidents_none": "No incident in the last {days} days.",
-	"overview_incidents_open_label": "Time open",
-	"overview_incidents_title": "Incidents, last {days} days",
-	"overview_latency_empty": "No response time measured in this range yet.",
-	"overview_latency_hint": "p95 and median of every probe, last {range}",
-	"overview_latency_median": "Median",
-	"overview_latency_p95": "p95",
-	"overview_latency_slowest": "Slowest monitors (p95)",
-	"overview_latency_title": "Response time",
 	"overview_mute_aria": "Mute {name}",
 	"overview_mute_err_create": "Could not mute this monitor.",
 	"overview_mute_err_lift": "Could not unmute this monitor.",
@@ -5774,22 +5753,6 @@
 			"match": {
 				"countPlural=one": "+{count} held back",
 				"countPlural=other": "+{count} held back"
-			}
-		}
-	],
-	"overview_needs_more": "See all {count} in Alerts",
-	"overview_needs_see_all": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "See {count} monitor",
-				"countPlural=other": "See all {count} monitors"
 			}
 		}
 	],
@@ -5986,15 +5949,7 @@
 	],
 	"overview_upcoming_due_now": "now",
 	"overview_upcoming_due_today": "today",
-	"overview_upcoming_empty": "Nothing due in the next {days} days.",
-	"overview_upcoming_error": "Could not read what is coming up.",
-	"overview_upcoming_kind_backup": "Backup",
-	"overview_upcoming_kind_disk": "Disk",
-	"overview_upcoming_kind_update": "Update",
-	"overview_upcoming_kind_vulnerability": "Vulnerability",
 	"overview_upcoming_list_label": "Coming up, most urgent first",
-	"overview_upcoming_scope": "Watching certificates, domains, disks, backups and vulnerabilities.",
-	"overview_upcoming_see_all": "See all",
 	"overview_upcoming_t_backup": "{what} backup will be late",
 	"overview_upcoming_t_backup_late": "{what} backup is late",
 	"overview_upcoming_t_disk": "{what} will be full",
@@ -6808,6 +6763,8 @@
 	"settings_agentupdates_hint_pending": "Will update at its next report.",
 	"settings_agentupdates_hint_read_only": "The agent cannot write to its folder: re-run the install command once.",
 	"settings_agentupdates_hint_refused": "The agent refused the update.",
+	"settings_agentupdates_hint_reinstall": "This Windows agent version cannot replace its own binary: re-run the install command on the machine once, later versions update themselves.",
+	"settings_agentupdates_hint_unknown_key": "This agent predates the current signing key and cannot verify the update: turn on Accept unsigned builds (development) until it has updated, or re-run the install command.",
 	"settings_agentupdates_hint_unsigned": "This server's agent build is not signed: agents only install signed updates.",
 	"settings_agentupdates_hint_unsupported": "This platform is updated with the install script (macOS).",
 	"settings_agentupdates_hint_up_to_date": "Up to date.",
@@ -6828,6 +6785,7 @@
 	"settings_agentupdates_policy_follow": "Follow global setting",
 	"settings_agentupdates_policy_off": "Off",
 	"settings_agentupdates_policy_on": "On",
+	"settings_agentupdates_reinstall_command": "Get the install command",
 	"settings_agentupdates_resume": "Resume rollout",
 	"settings_agentupdates_rollout_canaries": "Canaries updated: {updated} of {total}",
 	"settings_agentupdates_rollout_held": "Other agents: held back.",
@@ -6850,6 +6808,8 @@
 	"settings_agentupdates_status_pending": "Pending",
 	"settings_agentupdates_status_read_only": "Read-only",
 	"settings_agentupdates_status_refused": "Refused",
+	"settings_agentupdates_status_reinstall": "Reinstall needed",
+	"settings_agentupdates_status_unknown_key": "Unknown signing key",
 	"settings_agentupdates_status_unsigned": "Blocked: unsigned build",
 	"settings_agentupdates_status_unsupported": "Unsupported",
 	"settings_agentupdates_status_up_to_date": "Up to date",
@@ -9517,6 +9477,9 @@
 	"upgrade_notice_keep": "Keep it",
 	"upgrade_notice_title": "Configuration changes to apply",
 	"upgrade_notice_view": "View",
+	"w10hybrid_coming_empty": "Nothing planned or due soon.",
+	"w10hybrid_kpi_problems": "Open problems",
+	"w10hybrid_services_p95": "p95 {value}",
 	"w1alerts_channels_copy_name": "{name} (copy)",
 	"w1alerts_channels_disable_aria": "Disable channel {name}",
 	"w1alerts_channels_duplicate": "Duplicate",
@@ -9616,8 +9579,6 @@
 	"w1wall_notice_maintenance": "Maintenance in progress: {title}",
 	"w1wall_notice_maintenance_until": "Maintenance in progress: {title}, until {time}",
 	"w1wall_notice_more": "+{count}",
-	"w1wall_overview_trend_days": "{days} d",
-	"w1wall_overview_trend_period": "Period",
 	"w1wall_settings_clock_12h": "12 h",
 	"w1wall_settings_clock_24h": "24 h",
 	"w1wall_settings_clock_label": "Clock format",
@@ -10662,6 +10623,233 @@
 	"w6roles_users_custom_group": "Custom roles",
 	"w6roles_users_custom_help": "A custom role replaces the built-in role: the account gets exactly the permissions of that role.",
 	"w6roles_users_custom_title": "Custom role",
+	"w8rules_editor_error_hold": "Type how long the condition must last: a number, 0 or more.",
+	"w8rules_editor_flag_label": "When it fires",
+	"w8rules_editor_flag_nothing": "This rule reads an on/off signal: there is no threshold to set. You can still choose how long it must last before you are told.",
+	"w8rules_editor_hold_anomaly_help": "How long the anomaly must last before you are told. 0 tells you at once.",
+	"w8rules_editor_hold_help": "How long the condition must hold before you are told. 0 tells you at the first check that sees it.",
+	"w8rules_editor_hold_label": "Must last for",
+	"w8rules_editor_threshold_duration_help": "An age or a delay: type it in the unit that suits you.",
+	"w8rules_list_summary_flag": "on/off signal",
+	"w8rules_overrides_flag": "On/off rule: nothing to set per device, only whether it applies.",
+	"w8rules_unitinput_aria": "{field}: unit",
+	"w8wp_discovery_label": "Show in the list of public pages",
+	"w8wp_discovery_off": "Not in the list of public pages. The page stays readable at its address.",
+	"w8wp_discovery_on": "Website plugins, such as the WordPress banner, can find this page in the server's list of public pages.",
+	"w8wp_discovery_private": "A private page never appears in the list of public pages.",
+	"w8wp_discovery_unpublished": "Only published pages appear in the list of public pages.",
+	"w9dash_common_error": "Could not read these figures.",
+	"w9dash_common_this_site": "This site",
+	"w9dash_events_empty": "Nothing happened lately.",
+	"w9dash_events_title": "Recent events",
+	"w9dash_kpi_avail_note": "Objective {target}%",
+	"w9dash_kpi_bars_label": "One bar per monitor, grouped by site; a tall bar is a monitor down",
+	"w9dash_kpi_budget_left": "Error budget left",
+	"w9dash_kpi_critical": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} critical",
+				"countPlural=other": "{count} critical"
+			}
+		}
+	],
+	"w9dash_kpi_opened_label": "Alerts opened per day over the last {days} days",
+	"w9dash_kpi_paused": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} paused",
+				"countPlural=other": "{count} paused"
+			}
+		}
+	],
+	"w9dash_kpi_sites": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} site",
+				"countPlural=other": "{count} sites"
+			}
+		}
+	],
+	"w9dash_kpi_warning": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} warning",
+				"countPlural=other": "{count} warnings"
+			}
+		}
+	],
+	"w9dash_problems_ack_recovery": "Until it answers again",
+	"w9dash_problems_calm_since": "No open problem since {time}.",
+	"w9dash_problems_calm_text": "Every monitor answers and no alert is open.",
+	"w9dash_problems_calm_title": "Nothing needs you.",
+	"w9dash_problems_col_acked": "Acknowledged",
+	"w9dash_problems_col_age": "Age",
+	"w9dash_problems_col_monitor": "Monitor",
+	"w9dash_problems_col_problem": "Problem",
+	"w9dash_problems_col_severity": "Severity",
+	"w9dash_problems_lasted": "Lasted {span}",
+	"w9dash_problems_no_answer": "No answer to its checks",
+	"w9dash_problems_not_acked": "Not acknowledged",
+	"w9dash_problems_not_notified": "No notification sent",
+	"w9dash_problems_notified": "Notified {ago}",
+	"w9dash_problems_place": "{kind}, {site}",
+	"w9dash_problems_resolved": "Recently resolved",
+	"w9dash_problems_resolved_plate": "Resolved",
+	"w9dash_problems_since": "since {time}",
+	"w9dash_status_degraded": "Degraded",
+	"w9dash_status_paused": "Paused",
+	"w9dash_status_up": "Up",
+	"w9layout_category_backups": "Backups",
+	"w9layout_category_network": "Network",
+	"w9layout_category_other": "Other",
+	"w9layout_category_servers": "Servers",
+	"w9layout_category_services": "Services",
+	"w9layout_category_storage": "Storage",
+	"w9layout_count_up_of": "{up} / {total}",
+	"w9layout_fleet_empty": "No monitors yet: add one and it shows up here.",
+	"w9layout_health_degraded": "Degraded",
+	"w9layout_health_down": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} down",
+				"countPlural=other": "{count} down"
+			}
+		}
+	],
+	"w9layout_health_healthy": "Healthy",
+	"w9layout_health_idle": "Nothing watched",
+	"w9layout_hybrid_act_now": "Act now",
+	"w9layout_hybrid_band_label": "What needs you now",
+	"w9layout_monitor_title": "{name}, {kind}: {status}",
+	"w9layout_monitor_title_bare": "{name}: {status}",
+	"w9layout_ms": "{value} ms",
+	"w9layout_next_empty": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Nothing planned or due in the next {count} day.",
+				"countPlural=other": "Nothing planned or due in the next {count} days."
+			}
+		}
+	],
+	"w9layout_next_maint_active": "Maintenance in progress",
+	"w9layout_next_maint_meta": "Maintenance window, {duration}",
+	"w9layout_next_now": "Now",
+	"w9layout_next_title": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Next {count} day",
+				"countPlural=other": "Next {count} days"
+			}
+		}
+	],
+	"w9layout_next_until": "until {time}",
+	"w9layout_pct": "{value}%",
+	"w9layout_services_beats_failed": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Last check failed",
+				"countPlural=other": "Last {count} checks, {failed} failed"
+			}
+		}
+	],
+	"w9layout_services_beats_ok": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Last check passed",
+				"countPlural=other": "Last {count} checks, all passed"
+			}
+		}
+	],
+	"w9layout_services_empty": "No service check yet: HTTP, DNS, TLS, SMTP or ping checks show up here.",
+	"w9layout_services_title": "Services",
+	"w9layout_sites_up_of": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "/ {count} up",
+				"countPlural=other": "/ {count} up"
+			}
+		}
+	],
+	"w9layout_sites_wan": "WAN",
+	"w9layout_state_error": "These figures could not be loaded. They will be tried again shortly.",
+	"w9layout_status_degraded": "Degraded",
+	"w9layout_status_down": "Down",
+	"w9layout_status_paused": "Paused",
+	"w9layout_status_up": "Up",
+	"w9layout_sun_title": "Fleet by site",
+	"w9layout_when_today_bare": "Today",
+	"w9layout_when_tomorrow_bare": "Tomorrow",
+	"w9layout_when_yesterday_bare": "Yesterday",
 	"wall_band_problems": "Problems",
 	"wall_band_problems_note": "Critical alerts and monitors down",
 	"wall_devices_aria": "Monitors",

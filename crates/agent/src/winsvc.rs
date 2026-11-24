@@ -61,7 +61,6 @@ fn run_service() -> Result<()> {
     let loaded = crate::config::Config::load(&config_path);
     init_log(&config_path, loaded.as_ref().map_or(tracing::Level::INFO, |c| c.log_level));
     let config = loaded?;
-    config.warn_deprecated_env();
 
     let (trigger, shutdown) = crate::shutdown::channel();
 

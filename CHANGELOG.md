@@ -3,6 +3,43 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 0.20.2 — 2026-11-24
+
+### Added
+
+- **A new overview.** One screen that never scrolls on a computer: three figures (monitors up with a
+  bar per monitor, 30-day availability against the objective, open problems with the last 14
+  days), **Act now** (every problem with acknowledge and mute), **Coming up** (maintenance windows,
+  expiries, late backups, disk forecasts, critical vulnerabilities, the update), **Services** with
+  their last checks, **Fleet by site** by category, and **Recent events**. The figures count the
+  same problems as Act now. New `GET /api/overview/widgets`.
+- **Status page discovery.** `GET /api/public/status` lists the published public pages; each page
+  has a "Show in the list of public pages" switch.
+- **WordPress plugin 2.0.0.** Follows the visitor's language (WordPress, Polylang or WPML) and
+  asks DumbMonit for the translated page; settings page with placement, when to show, services,
+  colours, texts per state, link, dismissible banner and cache; finds the status pages from the
+  DumbMonit address; shortcode and widget; translated into 14 languages.
+- **Active Backup: backup too old.** A new rule alerts when a device's last successful backup is
+  older than a number of days you set (3 by default).
+
+### Changed
+
+- **Thresholds in human units.** Rules about a duration or an age (certificates, backups, lag,
+  stale data, unreachable for…) are set in seconds, minutes, hours or days; on/off rules show
+  what makes them fire instead of a meaningless "> 0"; "Must last for" is a free duration.
+  Notifications write "2 d" instead of "172800 s".
+- The overview no longer has a manual refresh button.
+
+### Fixed
+
+- **Windows agents could not update themselves** ("syncing the copy: access denied"). Fixed from
+  this version on; Windows agents up to 0.20.1 need one manual reinstall, and the agent updates
+  page says so ("Reinstall needed") instead of retrying.
+- **Agents 0.15 to 0.20.0 refused signed updates** ("does not match any release key"): with
+  "Accept unsigned builds" on, they now get the update over the encrypted channel; otherwise the
+  page explains why they cannot update.
+- The "Send a test email" button lost its label and was misaligned.
+
 ## 0.20.1 — 2026-11-23
 
 ### Added

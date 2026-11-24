@@ -27,8 +27,7 @@ All counts are from `crates/server/src` (`*.rs`) unless noted, made with
   keys on, `busy_timeout` 5 s, `cache_size` 2 MB, `temp_store = MEMORY`
   (`db/mod.rs:103-145`), 4 connections by default (`DEFAULT_POOL_SIZE`,
   `DUMBMONIT_DB_POOL`, `config.rs:451`). The file path is fixed:
-  `/data/dumbmonit.db` (`config.rs:535`, `db/mod.rs:50`), with the legacy
-  `ezymonit.db` renamed on start (`db/mod.rs:56`).
+  `/data/dumbmonit.db` (`config.rs:535`, `db/mod.rs:50`).
 - **The pool type is concrete everywhere.** `SqlitePool` appears 1 066 times
   in 124 files (136 more in 64 test files); `sqlx::sqlite::SqliteRow` in 31
   files (row mappers such as `db/alerts.rs:109`); `Transaction<'_, Sqlite>` 82

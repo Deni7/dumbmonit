@@ -44,38 +44,8 @@ pub fn now() -> String {
 /// jamais se gêner, grâce au mode WAL.
 pub const DEFAULT_POOL_SIZE: u32 = 4;
 
-/// Nom du fichier de base de données avant le renommage du produit.
-const LEGACY_DATABASE_FILE: &str = "ezymonit.db";
 /// Nom courant du fichier de base de données.
 pub const DATABASE_FILE: &str = "dumbmonit.db";
-
-/// Reprend une base `ezymonit.db` laissée par une version antérieure au
-/// renommage : elle est déplacée sous son nouveau nom, avec son journal WAL et
-/// sa mémoire partagée s'ils existent, avant toute ouverture. Sans effet quand la
-/// nouvelle base existe déjà — on ne remplace jamais des données à l'aveugle.
-pub async fn adopt_legacy_database(data_dir: &Path) -> Result<()> {
-    let legacy = data_dir.join(LEGACY_DATABASE_FILE);
-    let current = data_dir.join(DATABASE_FILE);
-    if !legacy.is_file() || current.exists() {
-        return Ok(());
-    }
-    for suffix in ["", "-wal", "-shm"] {
-        let from = data_dir.join(format!("{LEGACY_DATABASE_FILE}{suffix}"));
-        if !from.exists() {
-            continue;
-        }
-        let to = data_dir.join(format!("{DATABASE_FILE}{suffix}"));
-        tokio::fs::rename(&from, &to)
-            .await
-            .with_context(|| format!("moving {} to {}", from.display(), to.display()))?;
-    }
-    tracing::warn!(
-        from = %legacy.display(),
-        to = %current.display(),
-        "database renamed after the product rename; nothing else to do"
-    );
-    Ok(())
-}
 
 /// Ouvre la base, applique les migrations et règle SQLite pour notre profil d'usage.
 pub async fn open(path: &Path) -> Result<SqlitePool> {

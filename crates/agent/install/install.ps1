@@ -5,8 +5,7 @@
 .DESCRIPTION
     Downloads the binary, writes the configuration with the token, registers the
     service and starts it. Running the script again updates the agent: it is also
-    the upgrade procedure. A machine still running the agent under its former
-    name (EzyMonitAgent) is migrated in place by the same command.
+    the upgrade procedure.
 
 .EXAMPLE
     & ([scriptblock]::Create((irm https://serveur:8080/install.ps1))) -Token dmon_xxx -Url https://serveur:8080 -Sha256 windows-x86_64:<hex>
@@ -92,13 +91,6 @@ $InstallDir  = Join-Path $env:ProgramFiles 'DumbMonit'
 $ConfigDir   = Join-Path $env:ProgramData 'DumbMonit'
 $ExePath     = Join-Path $InstallDir 'dumbmonit-agent.exe'
 $ConfigPath  = Join-Path $ConfigDir 'agent.yaml'
-
-# Noms d'avant le renommage EzyMonit → DumbMonit. Une installation qui les porte
-# encore est migrée sur place à l'installation, et -Uninstall en fait aussi le
-# ménage.
-$LegacyServiceName = 'EzyMonitAgent'
-$LegacyInstallDir  = Join-Path $env:ProgramFiles 'EzyMonit'
-$LegacyConfigDir   = Join-Path $env:ProgramData 'EzyMonit'
 
 function Write-Etape($message) { Write-Host "==> $message" }
 
@@ -205,23 +197,6 @@ function Test-CanalAgents {
     }
 }
 
-# Arrête et retire le service et le dossier d'installation de l'ancien agent.
-# Ne touche pas à sa configuration. Silencieux quand rien d'ancien n'est
-# présent ; renvoie $true si quelque chose a été retiré.
-function Remove-AncienAgent {
-    $retire = $false
-    if (Get-Service -Name $LegacyServiceName -ErrorAction SilentlyContinue) {
-        Stop-Service -Name $LegacyServiceName -Force -ErrorAction SilentlyContinue
-        & sc.exe delete $LegacyServiceName | Out-Null
-        $retire = $true
-    }
-    if (Test-Path $LegacyInstallDir) {
-        Remove-Item -Path $LegacyInstallDir -Recurse -Force -ErrorAction SilentlyContinue
-        $retire = $true
-    }
-    return $retire
-}
-
 # Propriétaires admis pour le dossier de configuration et ce qu'il contient :
 # SYSTEM, les administrateurs, TrustedInstaller, et le compte qui exécute
 # l'installateur (déjà administrateur, contrôlé plus bas).
@@ -274,22 +249,6 @@ function Protect-ConfigDir {
     }
 }
 
-# Migration sur place d'une installation d'avant le renommage : l'ancien service
-# est arrêté et retiré, et sa configuration reprend sa place sous le nouveau nom.
-# Elle est réécrite juste après depuis -Token/-Url, mais les clés qu'un
-# utilisateur y aurait ajoutées restent à portée de main. Sans rien d'ancien,
-# ne fait rien et ne dit rien.
-function Migrate-Legacy {
-    $migre = Remove-AncienAgent
-    if ((Test-Path $LegacyConfigDir) -and -not (Test-Path $ConfigDir)) {
-        # Sur un même volume, Move-Item est un renommage : les droits posés par
-        # icacls sur l'ancien fichier de configuration sont conservés.
-        Move-Item -Path $LegacyConfigDir -Destination $ConfigDir
-        $migre = $true
-    }
-    if ($migre) { Write-Etape "Migrating the $LegacyServiceName install to $ServiceName" }
-}
-
 # --------------------------------------------------------------- privilèges
 
 $identite = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -322,9 +281,6 @@ if ($Uninstall) {
     Remove-Item -Path $ConfigDir -Recurse -Force -ErrorAction SilentlyContinue
     # La règle du pare-feu de la passerelle, si ce relais en avait une.
     Remove-RegleParefeu
-    # Les restes d'une installation d'avant le renommage partent aussi.
-    Remove-AncienAgent | Out-Null
-    Remove-Item -Path $LegacyConfigDir -Recurse -Force -ErrorAction SilentlyContinue
     Write-Etape "Agent uninstalled"
     exit 0
 }
@@ -453,10 +409,6 @@ if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
 }
 Move-Item -Path $exeTemporaire -Destination $ExePath -Force
 
-# Le nouveau binaire est en place : l'ancien agent, s'il est là, peut être
-# arrêté et sa configuration déplacée avant que la nouvelle ne soit écrite. Pas
-# avant — un téléchargement raté ne doit pas laisser la machine sans agent.
-Migrate-Legacy
 Protect-ConfigDir
 
 # ------------------------------------------------------------ configuration

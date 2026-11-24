@@ -957,8 +957,6 @@
 	],
 	"console_breadcrumb": "Gezinti yolu",
 	"console_egg": "// dakikada {count} kontrol. Uyuyun, biz hallederiz.",
-	"console_kpi_alerts": "Açık uyarılar",
-	"console_kpi_alerts_note": "Kritik: {critical}, uyarı: {warning}",
 	"console_kpi_availability": "Erişilebilirlik 30 gün",
 	"console_kpi_availability_note": "Ölçülen monitör: {count}",
 	"console_kpi_none": "Henüz veri yok",
@@ -968,7 +966,6 @@
 	"console_live": "CANLI",
 	"console_live_off": "Canlı güncellemeler duraklatıldı. Sürdürmek için seçin.",
 	"console_live_on": "Canlı güncellemeler açık. Duraklatmak için seçin.",
-	"console_panel_attention": "Dikkat gerektirenler",
 	"console_panel_oncall_unknown": "Biri",
 	"console_paused": "DURAKLATILDI",
 	"console_range": "Zaman aralığı",
@@ -5709,9 +5706,6 @@
 	"overview_ack_err": "Bu monitör onaylanamadı.",
 	"overview_ack_hint": "Gördüm, ilgileniyorum: normale dönene kadar sessiz.",
 	"overview_ack_item": "Onayla",
-	"overview_all_good_text": "Hiçbir şey kapalı değil ve sizi bekleyen uyarı yok. Güvercin şekerleme yapıyor.",
-	"overview_all_good_title": "Her şey yolunda",
-	"overview_chart_error": "Bu grafik yüklenemedi. Bir dakika sonra yeniden dener.",
 	"overview_first_all_done": "Üçü de tamam. Bu kılavuz geri gelmeyecek.",
 	"overview_first_channel_action": "Kanal ekle",
 	"overview_first_channel_text": "E-posta, ntfy, Discord, Telegram, PagerDuty — zaten okuduğunuz neyse. Bir şeyler ters gidene kadar hiçbir şey gönderilmez.",
@@ -5735,21 +5729,6 @@
 	"overview_first_test_text": "Kanaldan bir test gönderin. Bu adım, biri gerçekten çıktığında yeşile döner.",
 	"overview_first_test_title": "Bir iletinin ulaştığını denetleyin",
 	"overview_first_title": "İlk beş dakikanız",
-	"overview_incidents_bars_label": "Günlük olaylar, en eskisi solda",
-	"overview_incidents_before": "Önceki hafta: {value}",
-	"overview_incidents_count_label": "Olaylar",
-	"overview_incidents_day_title": "{day}. Olaylar: {count}. Açık kalma süresi: {duration}.",
-	"overview_incidents_explain": "Tetiklenmeden çözülmeye. Gün başına bir çubuk.",
-	"overview_incidents_noisiest": "En gürültülü monitör",
-	"overview_incidents_none": "Son {days} günde olay yok.",
-	"overview_incidents_open_label": "Açık kalma süresi",
-	"overview_incidents_title": "Olaylar, son {days} gün",
-	"overview_latency_empty": "Bu aralıkta henüz ölçülmüş yanıt süresi yok.",
-	"overview_latency_hint": "Her yoklamanın p95 ve medyanı, son {range}",
-	"overview_latency_median": "Medyan",
-	"overview_latency_p95": "p95",
-	"overview_latency_slowest": "En yavaş monitörler (p95)",
-	"overview_latency_title": "Yanıt süresi",
 	"overview_mute_aria": "{name} sessize al",
 	"overview_mute_err_create": "Bu monitör sessize alınamadı.",
 	"overview_mute_err_lift": "Bu monitörün sesi açılamadı.",
@@ -5774,22 +5753,6 @@
 			"match": {
 				"countPlural=one": "+{count} bekletiliyor",
 				"countPlural=other": "+{count} bekletiliyor"
-			}
-		}
-	],
-	"overview_needs_more": "Uyarılar'da {count} öğenin tümünü gör",
-	"overview_needs_see_all": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} monitörü gör",
-				"countPlural=other": "{count} monitörün tümünü gör"
 			}
 		}
 	],
@@ -5986,15 +5949,7 @@
 	],
 	"overview_upcoming_due_now": "şimdi",
 	"overview_upcoming_due_today": "bugün",
-	"overview_upcoming_empty": "Önümüzdeki {days} günde vadesi gelen bir şey yok.",
-	"overview_upcoming_error": "Yaklaşanlar okunamadı.",
-	"overview_upcoming_kind_backup": "Yedekleme",
-	"overview_upcoming_kind_disk": "Disk",
-	"overview_upcoming_kind_update": "Güncelleme",
-	"overview_upcoming_kind_vulnerability": "Güvenlik açığı",
 	"overview_upcoming_list_label": "Yaklaşanlar, en acil olan önce",
-	"overview_upcoming_scope": "Sertifikalar, alan adları, diskler, yedeklemeler ve güvenlik açıkları izleniyor.",
-	"overview_upcoming_see_all": "Tümünü gör",
 	"overview_upcoming_t_backup": "{what} yedeklemesi gecikecek",
 	"overview_upcoming_t_backup_late": "{what} yedeklemesi gecikti",
 	"overview_upcoming_t_disk": "{what} dolacak",
@@ -6808,6 +6763,8 @@
 	"settings_agentupdates_hint_pending": "Bir sonraki raporunda güncellenecek.",
 	"settings_agentupdates_hint_read_only": "Ajan klasörüne yazamıyor: kurulum komutunu bir kez yeniden çalıştırın.",
 	"settings_agentupdates_hint_refused": "Ajan güncellemeyi reddetti.",
+	"settings_agentupdates_hint_reinstall": "Bu Windows ajanı sürümü kendi ikili dosyasını değiştiremez: kurulum komutunu makinede bir kez yeniden çalıştırın, sonraki sürümler kendini günceller.",
+	"settings_agentupdates_hint_unknown_key": "Bu ajan geçerli imzalama anahtarından eski olduğu için güncellemeyi doğrulayamıyor: güncellenene kadar İmzasız derlemeleri kabul et (geliştirme) seçeneğini açın ya da kurulum komutunu yeniden çalıştırın.",
 	"settings_agentupdates_hint_unsigned": "Bu sunucunun ajan derlemesi imzalı değil: ajanlar yalnızca imzalı güncellemeleri kurar.",
 	"settings_agentupdates_hint_unsupported": "Bu platform kurulum betiğiyle güncellenir (macOS).",
 	"settings_agentupdates_hint_up_to_date": "Güncel.",
@@ -6828,6 +6785,7 @@
 	"settings_agentupdates_policy_follow": "Genel ayarı izle",
 	"settings_agentupdates_policy_off": "Kapalı",
 	"settings_agentupdates_policy_on": "Açık",
+	"settings_agentupdates_reinstall_command": "Kurulum komutunu al",
 	"settings_agentupdates_resume": "Dağıtımı sürdür",
 	"settings_agentupdates_rollout_canaries": "Güncellenen kanaryalar: {total} içinde {updated}",
 	"settings_agentupdates_rollout_held": "Diğer ajanlar: bekletiliyor.",
@@ -6850,6 +6808,8 @@
 	"settings_agentupdates_status_pending": "Bekliyor",
 	"settings_agentupdates_status_read_only": "Salt okunur",
 	"settings_agentupdates_status_refused": "Reddedildi",
+	"settings_agentupdates_status_reinstall": "Yeniden kurulum gerekli",
+	"settings_agentupdates_status_unknown_key": "Bilinmeyen imzalama anahtarı",
 	"settings_agentupdates_status_unsigned": "Engellendi: imzasız derleme",
 	"settings_agentupdates_status_unsupported": "Desteklenmiyor",
 	"settings_agentupdates_status_up_to_date": "Güncel",
@@ -9517,6 +9477,9 @@
 	"upgrade_notice_keep": "Tut",
 	"upgrade_notice_title": "Uygulanacak yapılandırma değişiklikleri",
 	"upgrade_notice_view": "Görüntüle",
+	"w10hybrid_coming_empty": "Planlanmış ya da yakında süresi dolacak bir şey yok.",
+	"w10hybrid_kpi_problems": "Açık sorunlar",
+	"w10hybrid_services_p95": "p95 {value}",
 	"w1alerts_channels_copy_name": "{name} (kopya)",
 	"w1alerts_channels_disable_aria": "{name} kanalını devre dışı bırak",
 	"w1alerts_channels_duplicate": "Çoğalt",
@@ -9616,8 +9579,6 @@
 	"w1wall_notice_maintenance": "Bakım sürüyor: {title}",
 	"w1wall_notice_maintenance_until": "Bakım sürüyor: {title}, {time} saatine kadar",
 	"w1wall_notice_more": "+{count}",
-	"w1wall_overview_trend_days": "{days} g",
-	"w1wall_overview_trend_period": "Dönem",
 	"w1wall_settings_clock_12h": "12 sa",
 	"w1wall_settings_clock_24h": "24 sa",
 	"w1wall_settings_clock_label": "Saat biçimi",
@@ -10662,6 +10623,233 @@
 	"w6roles_users_custom_group": "Özel roller",
 	"w6roles_users_custom_help": "Özel rol, yerleşik rolün yerine geçer: hesap tam olarak bu rolün izinlerini alır.",
 	"w6roles_users_custom_title": "Özel rol",
+	"w8rules_editor_error_hold": "Koşulun ne kadar sürmesi gerektiğini girin: 0 veya daha büyük bir sayı.",
+	"w8rules_editor_flag_label": "Ne zaman tetiklenir",
+	"w8rules_editor_flag_nothing": "Bu kural açık/kapalı bir sinyal okur: ayarlanacak bir eşik yoktur. Yine de size bildirilmeden önce ne kadar sürmesi gerektiğini seçebilirsiniz.",
+	"w8rules_editor_hold_anomaly_help": "Size bildirilmeden önce anormalliğin ne kadar sürmesi gerektiği. 0 hemen bildirir.",
+	"w8rules_editor_hold_help": "Size bildirilmeden önce koşulun ne kadar sürmesi gerektiği. 0, onu gören ilk kontrolde bildirir.",
+	"w8rules_editor_hold_label": "Süresi",
+	"w8rules_editor_threshold_duration_help": "Bir yaş ya da gecikme: size uygun birimle girin.",
+	"w8rules_list_summary_flag": "açık/kapalı sinyal",
+	"w8rules_overrides_flag": "Açık/kapalı kural: cihaz başına ayarlanacak bir şey yok, yalnızca uygulanıp uygulanmayacağı.",
+	"w8rules_unitinput_aria": "{field}: birim",
+	"w8wp_discovery_label": "Herkese açık sayfalar listesinde göster",
+	"w8wp_discovery_off": "Herkese açık sayfalar listesinde değil. Sayfaya adresinden erişilmeye devam edilir.",
+	"w8wp_discovery_on": "WordPress banner'ı gibi site eklentileri bu sayfayı sunucunun herkese açık sayfalar listesinde bulabilir.",
+	"w8wp_discovery_private": "Gizli bir sayfa herkese açık sayfalar listesinde hiçbir zaman yer almaz.",
+	"w8wp_discovery_unpublished": "Herkese açık sayfalar listesinde yalnızca yayımlanmış sayfalar yer alır.",
+	"w9dash_common_error": "Bu rakamlar okunamadı.",
+	"w9dash_common_this_site": "Bu konum",
+	"w9dash_events_empty": "Son zamanlarda bir şey olmadı.",
+	"w9dash_events_title": "Son olaylar",
+	"w9dash_kpi_avail_note": "Hedef %{target}",
+	"w9dash_kpi_bars_label": "Her izleyici için bir çubuk, konuma göre gruplu; uzun çubuk çalışmayan bir izleyicidir",
+	"w9dash_kpi_budget_left": "Kalan hata bütçesi",
+	"w9dash_kpi_critical": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} kritik",
+				"countPlural=other": "{count} kritik"
+			}
+		}
+	],
+	"w9dash_kpi_opened_label": "Son {days} günde günlük açılan uyarılar",
+	"w9dash_kpi_paused": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} duraklatıldı",
+				"countPlural=other": "{count} duraklatıldı"
+			}
+		}
+	],
+	"w9dash_kpi_sites": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} konum",
+				"countPlural=other": "{count} konum"
+			}
+		}
+	],
+	"w9dash_kpi_warning": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} uyarı",
+				"countPlural=other": "{count} uyarı"
+			}
+		}
+	],
+	"w9dash_problems_ack_recovery": "Yeniden yanıt verene kadar",
+	"w9dash_problems_calm_since": "{time} itibarıyla açık sorun yok.",
+	"w9dash_problems_calm_text": "Tüm izleyiciler yanıt veriyor ve açık uyarı yok.",
+	"w9dash_problems_calm_title": "İlgilenmeniz gereken bir şey yok.",
+	"w9dash_problems_col_acked": "Onaylandı",
+	"w9dash_problems_col_age": "Süre",
+	"w9dash_problems_col_monitor": "İzleyici",
+	"w9dash_problems_col_problem": "Sorun",
+	"w9dash_problems_col_severity": "Önem",
+	"w9dash_problems_lasted": "{span} sürdü",
+	"w9dash_problems_no_answer": "Denetimlere yanıt vermiyor",
+	"w9dash_problems_not_acked": "Onaylanmadı",
+	"w9dash_problems_not_notified": "Bildirim gönderilmedi",
+	"w9dash_problems_notified": "{ago} bildirildi",
+	"w9dash_problems_place": "{kind}, {site}",
+	"w9dash_problems_resolved": "Son çözülenler",
+	"w9dash_problems_resolved_plate": "Çözüldü",
+	"w9dash_problems_since": "{time} itibarıyla",
+	"w9dash_status_degraded": "Düşük performans",
+	"w9dash_status_paused": "Duraklatıldı",
+	"w9dash_status_up": "Çalışıyor",
+	"w9layout_category_backups": "Yedekler",
+	"w9layout_category_network": "Ağ",
+	"w9layout_category_other": "Diğer",
+	"w9layout_category_servers": "Sunucular",
+	"w9layout_category_services": "Hizmetler",
+	"w9layout_category_storage": "Depolama",
+	"w9layout_count_up_of": "{up} / {total}",
+	"w9layout_fleet_empty": "Henüz monitör yok: bir tane ekleyin, burada görünür.",
+	"w9layout_health_degraded": "Düşük performans",
+	"w9layout_health_down": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "{count} çalışmıyor",
+				"countPlural=other": "{count} çalışmıyor"
+			}
+		}
+	],
+	"w9layout_health_healthy": "Sağlıklı",
+	"w9layout_health_idle": "İzlenen bir şey yok",
+	"w9layout_hybrid_act_now": "Hemen ilgilenin",
+	"w9layout_hybrid_band_label": "Şu anda ilgilenmeniz gerekenler",
+	"w9layout_monitor_title": "{name}, {kind}: {status}",
+	"w9layout_monitor_title_bare": "{name}: {status}",
+	"w9layout_ms": "{value} ms",
+	"w9layout_next_empty": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Önümüzdeki {count} gün içinde planlanmış ya da süresi dolan bir şey yok.",
+				"countPlural=other": "Önümüzdeki {count} gün içinde planlanmış ya da süresi dolan bir şey yok."
+			}
+		}
+	],
+	"w9layout_next_maint_active": "Bakım sürüyor",
+	"w9layout_next_maint_meta": "Bakım aralığı, {duration}",
+	"w9layout_next_now": "Şimdi",
+	"w9layout_next_title": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Önümüzdeki {count} gün",
+				"countPlural=other": "Önümüzdeki {count} gün"
+			}
+		}
+	],
+	"w9layout_next_until": "{time} saatine kadar",
+	"w9layout_pct": "%{value}",
+	"w9layout_services_beats_failed": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Son kontrol başarısız",
+				"countPlural=other": "Son {count} kontrolden {failed} tanesi başarısız"
+			}
+		}
+	],
+	"w9layout_services_beats_ok": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "Son kontrol başarılı",
+				"countPlural=other": "Son {count} kontrolün hepsi başarılı"
+			}
+		}
+	],
+	"w9layout_services_empty": "Henüz hizmet kontrolü yok: HTTP, DNS, TLS, SMTP veya ping kontrolleri burada görünür.",
+	"w9layout_services_title": "Hizmetler",
+	"w9layout_sites_up_of": [
+		{
+			"declarations": [
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": [
+				"countPlural"
+			],
+			"match": {
+				"countPlural=one": "/ {count} çalışıyor",
+				"countPlural=other": "/ {count} çalışıyor"
+			}
+		}
+	],
+	"w9layout_sites_wan": "WAN",
+	"w9layout_state_error": "Bu veriler yüklenemedi. Kısa süre içinde yeniden denenecek.",
+	"w9layout_status_degraded": "Düşük performans",
+	"w9layout_status_down": "Çalışmıyor",
+	"w9layout_status_paused": "Duraklatıldı",
+	"w9layout_status_up": "Çalışıyor",
+	"w9layout_sun_title": "Konuma göre filo",
+	"w9layout_when_today_bare": "Bugün",
+	"w9layout_when_tomorrow_bare": "Yarın",
+	"w9layout_when_yesterday_bare": "Dün",
 	"wall_band_problems": "Sorunlar",
 	"wall_band_problems_note": "Kritik uyarılar ve kapalı monitörler",
 	"wall_devices_aria": "Monitörler",

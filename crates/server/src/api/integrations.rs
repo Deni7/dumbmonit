@@ -19,28 +19,80 @@ use crate::state::AppState;
 /// Dossier racine du plugin dans l'archive : WordPress en tire le nom du plugin.
 const PLUGIN_DIR: &str = "dumbmonit-status-banner";
 
-const PLUGIN_FILES: &[(&str, &[u8])] = &[
-    (
-        "dumbmonit-status-banner.php",
-        include_bytes!(
-            "../../../../integrations/wordpress/dumbmonit-status-banner/dumbmonit-status-banner.php"
-        ),
-    ),
-    (
-        "uninstall.php",
-        include_bytes!("../../../../integrations/wordpress/dumbmonit-status-banner/uninstall.php"),
-    ),
-    (
-        "readme.txt",
-        include_bytes!("../../../../integrations/wordpress/dumbmonit-status-banner/readme.txt"),
-    ),
-    (
-        "languages/dumbmonit-status-banner.pot",
-        include_bytes!(
-            "../../../../integrations/wordpress/dumbmonit-status-banner/languages/dumbmonit-status-banner.pot"
-        ),
-    ),
+/// Un fichier du plugin : son chemin dans le dossier du plugin, et son contenu.
+macro_rules! plugin_file {
+    ($name:literal) => {
+        (
+            $name,
+            include_bytes!(concat!(
+                "../../../../integrations/wordpress/dumbmonit-status-banner/",
+                $name
+            )),
+        )
+    };
+}
+
+/// Une langue livrée : la source `.po` des traducteurs et le `.l10n.php` que
+/// lit WordPress 6.5.
+macro_rules! plugin_locale {
+    ($locale:literal) => {
+        [
+            (
+                concat!("languages/dumbmonit-status-banner-", $locale, ".po"),
+                include_bytes!(concat!(
+                    "../../../../integrations/wordpress/dumbmonit-status-banner/",
+                    "languages/dumbmonit-status-banner-",
+                    $locale,
+                    ".po"
+                )),
+            ),
+            (
+                concat!("languages/dumbmonit-status-banner-", $locale, ".l10n.php"),
+                include_bytes!(concat!(
+                    "../../../../integrations/wordpress/dumbmonit-status-banner/",
+                    "languages/dumbmonit-status-banner-",
+                    $locale,
+                    ".l10n.php"
+                )),
+            ),
+        ]
+    };
+}
+
+const PLUGIN_LOCALES: &[[(&str, &[u8]); 2]] = &[
+    plugin_locale!("de_DE"),
+    plugin_locale!("es_ES"),
+    plugin_locale!("fr_FR"),
+    plugin_locale!("it_IT"),
+    plugin_locale!("ja"),
+    plugin_locale!("ko_KR"),
+    plugin_locale!("nl_NL"),
+    plugin_locale!("pl_PL"),
+    plugin_locale!("pt_BR"),
+    plugin_locale!("pt_PT"),
+    plugin_locale!("ru_RU"),
+    plugin_locale!("tr_TR"),
+    plugin_locale!("zh_CN"),
 ];
+
+const PLUGIN_FILES: &[(&str, &[u8])] = &[
+    plugin_file!("dumbmonit-status-banner.php"),
+    plugin_file!("uninstall.php"),
+    plugin_file!("readme.txt"),
+    plugin_file!("includes/i18n.php"),
+    plugin_file!("includes/settings.php"),
+    plugin_file!("includes/client.php"),
+    plugin_file!("includes/render.php"),
+    plugin_file!("includes/admin.php"),
+    plugin_file!("includes/widget.php"),
+    plugin_file!("assets/admin.js"),
+    plugin_file!("languages/dumbmonit-status-banner.pot"),
+];
+
+/// Tous les fichiers du plugin, langues comprises.
+fn plugin_files() -> impl Iterator<Item = &'static (&'static str, &'static [u8])> {
+    PLUGIN_FILES.iter().chain(PLUGIN_LOCALES.iter().flatten())
+}
 
 const BANNER_PHP: &str = include_str!("../../../../integrations/php/banner.php");
 
@@ -53,7 +105,7 @@ pub fn routes() -> Router<AppState> {
 /// Le plugin, rangé sous son dossier racine.
 fn plugin_zip() -> Vec<u8> {
     let files: Vec<(String, &[u8])> =
-        PLUGIN_FILES.iter().map(|(name, body)| (format!("{PLUGIN_DIR}/{name}"), *body)).collect();
+        plugin_files().map(|(name, body)| (format!("{PLUGIN_DIR}/{name}"), *body)).collect();
     stored_zip(&files)
 }
 
@@ -192,12 +244,35 @@ mod tests {
     #[test]
     fn le_zip_contient_le_plugin_sous_son_dossier() {
         let entries = read_zip(&plugin_zip());
-        assert_eq!(entries.len(), PLUGIN_FILES.len());
+        assert_eq!(entries.len(), plugin_files().count());
         let main = entries
             .iter()
             .find(|(name, _)| name == "dumbmonit-status-banner/dumbmonit-status-banner.php")
             .expect("fichier principal du plugin");
         assert!(String::from_utf8_lossy(&main.1).contains("Plugin Name:"));
         assert!(entries.iter().all(|(name, _)| name.starts_with("dumbmonit-status-banner/")));
+    }
+
+    #[test]
+    fn le_zip_embarque_chaque_fichier_charge_par_le_plugin() {
+        let names: Vec<&str> = plugin_files().map(|(name, _)| *name).collect();
+        let main = String::from_utf8_lossy(PLUGIN_FILES[0].1);
+        // `require_once DMT_DIR . 'includes/….php'` : chacun doit être dans l'archive.
+        let required: Vec<&str> =
+            main.split("DMT_DIR . '").skip(1).filter_map(|rest| rest.split('\'').next()).collect();
+        assert!(required.len() >= 5, "{required:?}");
+        for path in required {
+            assert!(names.contains(&path), "{path} manque dans l'archive");
+        }
+        let admin = String::from_utf8_lossy(
+            plugin_files().find(|(name, _)| *name == "includes/admin.php").expect("admin.php").1,
+        )
+        .into_owned();
+        assert!(admin.contains("assets/admin.js") && names.contains(&"assets/admin.js"));
+        // Chaque fichier PHP, traductions comprises, commence par la balise PHP.
+        for (name, body) in plugin_files().filter(|(name, _)| name.ends_with(".php")) {
+            assert!(body.starts_with(b"<?php"), "{name}");
+        }
+        assert_eq!(names.iter().filter(|name| name.ends_with(".l10n.php")).count(), 13);
     }
 }

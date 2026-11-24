@@ -39,12 +39,10 @@ const RECENT_COMMANDS: i64 = 20;
 /// Les conteneurs du moniteur lui-même : il ne se redémarre ni ne se met à jour
 /// par son propre canal — il ne serait plus là pour en rendre compte.
 ///
-/// `ezymonit` reste de la partie : les conteneurs créés avant le renommage du
-/// produit portent encore ce nom, et sont tout aussi fatals à toucher. La même
-/// liste, mot pour mot, vit dans `crates/agent/src/commands.rs` : le serveur
+/// La même liste, mot pour mot, vit dans `crates/agent/src/commands.rs` : le serveur
 /// refuse d'émettre, l'agent refuse d'exécuter, et ni l'un ni l'autre ne fait
 /// confiance à l'autre pour cela.
-const RESERVED_PREFIXES: &[&str] = &["dumbmonit", "ezymonit"];
+const RESERVED_PREFIXES: &[&str] = &["dumbmonit"];
 
 // ------------------------------------------------------------- agent side
 
@@ -1227,11 +1225,9 @@ mod tests {
         assert!(validate_name("web;rm -rf").is_err());
         assert!(validate_name("../web").is_err());
         assert!(validate_name(&"a".repeat(129)).is_err());
-        // Le moniteur ne se touche pas lui-même, sous aucun de ses deux noms.
+        // Le moniteur ne se touche pas lui-même.
         assert!(validate_name("dumbmonit-dumbmonit-1").is_err());
         assert!(validate_name("DumbMonit").is_err());
-        assert!(validate_name("ezymonit-ezymonit-1").is_err(), "le nom d'avant le renommage");
-        assert!(validate_name("EzyMonit-agent").is_err());
         // Le contrôle porte sur un nom : un identifiant de conteneur y échappe
         // par construction, et c'est l'agent qui le rattrape après inspection.
         assert!(validate_name("9f4c1b2e3d5a").is_ok());

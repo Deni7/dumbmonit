@@ -753,9 +753,7 @@ pub fn is_https_url(url: &str) -> bool {
     url.len() > 8 && url.get(..8).is_some_and(|scheme| scheme.eq_ignore_ascii_case("https://"))
 }
 
-/// Lecture d'une variable `DUMBMONIT_*`, avec repli sur `EZYMONIT_*` (voir
-/// [`dumbmonit_proto::env`]). Tout le serveur passe par ici : c'est ce qui
-/// garantit que l'ancien nom est accepté partout, et signalé une seule fois.
+/// Lecture d'une variable `DUMBMONIT_*` (voir [`dumbmonit_proto::env`]).
 pub fn env_var(key: &str) -> Option<String> {
     dumbmonit_proto::env::var(key)
 }

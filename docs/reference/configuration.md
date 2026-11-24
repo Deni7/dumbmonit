@@ -135,16 +135,6 @@ which the interface then shows read-only.
 | `DUMBMONIT_SMTP_FROM` | *(required with the host)* | Sender address, `status@example.com`. |
 | `DUMBMONIT_SMTP_FROM_NAME` | *(empty)* | Sender name shown by mail clients. |
 
-### Former `EZYMONIT_*` names
-
-DumbMonit was called EzyMonit until September 2026. Every `DUMBMONIT_*`
-variable is also read under its old `EZYMONIT_*` name, as a fallback, with one
-warning at startup per variable still set that way (`EZYMONIT_X is deprecated,
-use DUMBMONIT_X`). The old database file `/data/ezymonit.db` is renamed to
-`dumbmonit.db` at startup, and agent tokens `ezym_…` remain valid (new enrolment
-secrets start with `dmon_`). The session cookie is now `__Host-dumbmonit_session`:
-the first start after the rename logs everyone out once.
-
 ### Embedded VictoriaMetrics
 
 The image ships the VictoriaMetrics binary. Unless `DUMBMONIT_VM_URL` is set,

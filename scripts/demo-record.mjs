@@ -67,7 +67,7 @@ const SAFE_KEYS = new Set(['credential_kind', 'token_id', 'secret_source']);
 /** Keys holding help text: an example value there is not a credential. */
 const TEXT_KEYS = new Set(['placeholder', 'help', 'hint', 'description', 'label']);
 /** Values that look like credentials, wherever they sit. */
-const SECRET_VALUE = [/\b(?:ezym|dumb|dm)_[A-Za-z0-9]{16,}/, /-----BEGIN [A-Z ]*(?:PRIVATE KEY|CERTIFICATE)/, /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\./, /\b(?:AKIA|ghp_|gho_|xox[bap]-|sk-)[A-Za-z0-9_-]{16,}/];
+const SECRET_VALUE = [/\b(?:dumb|dm)_[A-Za-z0-9]{16,}/, /-----BEGIN [A-Z ]*(?:PRIVATE KEY|CERTIFICATE)/, /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\./, /\b(?:AKIA|ghp_|gho_|xox[bap]-|sk-)[A-Za-z0-9_-]{16,}/];
 
 /** Returns a reason when the parsed body looks like it holds a secret, else null. */
 function suspicious(node, trail = '') {

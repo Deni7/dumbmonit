@@ -27,6 +27,7 @@ use sqlx::{Row, SqlitePool};
 use crate::alerting::silence;
 use crate::api::agent_files::{self, ShippedBinary};
 use crate::collectors::agent::rollout::{self, Hold, Member, MemberState, Plan, Rollout};
+use crate::collectors::agent::selfupdate_compat as compat;
 use crate::db;
 use crate::state::AppState;
 
@@ -567,6 +568,10 @@ fn canaries(hosts: &[HostRow], binaries: &Binaries, settings: &Settings) -> Vec<
         .filter(|host| host.state.ability.as_deref() == Some("ready"))
         .filter_map(|host| {
             let binary = binaries.get(host.state.platform.as_deref()?)?;
+            // Une machine qui ne peut pas aller au bout ne retient pas les autres.
+            if compat::stuck(&host.state, binary, settings).is_some() {
+                return None;
+            }
             let up_to_date = host.state.up_to_date(binary);
             Some(Canary {
                 name: host.name.clone(),
@@ -608,6 +613,9 @@ fn rollout_members(
                 return None;
             }
             let binary = binaries.get(state.platform.as_deref()?)?;
+            if compat::stuck(state, binary, settings).is_some() {
+                return None;
+            }
             let seen = host.last_seen_at.as_deref().and_then(seen_ms);
             if seen.is_some_and(|seen| now_ms - seen > ABANDONED_AFTER_MS) {
                 return None;
@@ -712,7 +720,7 @@ pub async fn offer_for(state: &AppState, target_id: TargetId) -> Result<Option<A
         Gate::from(plan.and_then(|plan| plan.hold_for(target_id)))
     };
     let verdict =
-        evaluate(&settings, &host.state, Some(&binary), server_version(), &gate, now_ms());
+        compat::verdict(&settings, &host.state, Some(&binary), server_version(), &gate, now_ms());
     if !verdict.offer {
         return Ok(None);
     }
@@ -730,17 +738,14 @@ pub async fn offer_for(state: &AppState, target_id: TargetId) -> Result<Option<A
     .execute(pool)
     .await
     .context("recording the update offer")?;
-    Ok(Some(AgentUpdateOffer {
-        version: server_version().to_string(),
-        build: server_build().map(str::to_string),
-        file: binary.file.clone(),
-        sha256: binary.sha256.clone(),
-        size: Some(binary.size),
-        signature: binary.signature.clone(),
-        allow_unsigned: settings.allow_unsigned,
-        allow_downgrade: verdict.allow_downgrade,
-        force: verdict.force,
-    }))
+    Ok(Some(compat::offer(
+        &binary,
+        &host.state,
+        &settings,
+        &verdict,
+        server_version(),
+        server_build(),
+    )))
 }
 
 /// Vrai si l'agent a rendu compte d'une tentative depuis la demande explicite.
@@ -884,6 +889,7 @@ pub async fn request(
 /// de machines concernées.
 pub async fn request_all(state: &AppState) -> Result<usize> {
     let binaries = binaries(&state.config.agent_dir).await;
+    let settings = settings(&state.pool).await?;
     let mut count = 0;
     for host in hosts(&state.pool).await? {
         if host.state.ability.as_deref() != Some("ready") {
@@ -894,6 +900,7 @@ pub async fn request_all(state: &AppState) -> Result<usize> {
         };
         if host.state.up_to_date(binary)
             || dumbmonit_proto::is_older(server_version(), &host.state.agent_version)
+            || compat::stuck(&host.state, binary, &settings).is_some()
         {
             continue;
         }
@@ -1078,7 +1085,8 @@ pub async fn overview(state: &AppState) -> Result<Overview> {
             Some(plan) => Gate::from(plan.hold_for(host.target_id)),
             None => legacy_gate.clone(),
         };
-        let verdict = evaluate(&settings, &host.state, binary, server_version(), &host_gate, now);
+        let verdict =
+            compat::verdict(&settings, &host.state, binary, server_version(), &host_gate, now);
         agents.push(AgentView {
             id: host.target_id,
             name: host.name.clone(),
@@ -1349,6 +1357,8 @@ mod tests {
     #[test]
     fn only_agents_that_can_and_want_to_update_are_ordered_in_waves() {
         let policy = Rollout::default();
+        // Agents d'avant la clé actuelle : sans « unsigned », ils seraient tenus à l'écart.
+        let settings = Settings { allow_unsigned: true, ..Settings::default() };
         let mut paris = row(1, host());
         paris.site = Some("Paris".into());
         paris.group = "prod".into();
@@ -1365,7 +1375,7 @@ mod tests {
         let pilot = row(9, HostState { canary: true, ..host() });
         let hosts = vec![paris, pinned, container, gone, current, newer, failed, forgiven, pilot];
 
-        let members = rollout_members(&hosts, &shipped(), &Settings::default(), &policy, NOW);
+        let members = rollout_members(&hosts, &shipped(), &settings, &policy, NOW);
         let by_id = |id: TargetId| members.iter().find(|member| member.id == id);
         for excluded in [2, 3, 4] {
             assert!(by_id(excluded).is_none(), "agent {excluded} ne fait partie d'aucune vague");
@@ -1382,7 +1392,7 @@ mod tests {
         assert!(by_id(9).unwrap().canary);
 
         let forgiving = Rollout { forgiven_before_ms: NOW, ..Rollout::default() };
-        let members = rollout_members(&hosts, &shipped(), &Settings::default(), &forgiving, NOW);
+        let members = rollout_members(&hosts, &shipped(), &settings, &forgiving, NOW);
         let state = |id: TargetId| members.iter().find(|member| member.id == id).unwrap().state;
         assert_eq!(state(8), MemberState::Idle, "un échec pardonné ne compte plus");
         assert_eq!(state(7), MemberState::Idle);
@@ -1396,7 +1406,7 @@ mod tests {
             max_failure_percent: 50,
             ..Rollout::default()
         };
-        let settings = Settings::default();
+        let settings = Settings { allow_unsigned: true, ..Settings::default() };
         let mut hosts: Vec<HostRow> = (1..=6).map(|id| row(id, host())).collect();
         let first = wave_plan(&hosts, &shipped(), &settings, &policy, NOW).expect("des vagues");
         assert_eq!(first.open_count, 1);

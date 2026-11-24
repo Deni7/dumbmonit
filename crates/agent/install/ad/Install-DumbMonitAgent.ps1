@@ -61,7 +61,7 @@ function Write-Journal([int]$Id, [string]$Type, [string]$Message) {
 # Le jeton ne doit jamais finir dans un journal, même si l'installateur
 # échoue en recopiant sa ligne de commande.
 function Hide-Secrets([string]$Text) {
-    return ($Text -replace '(dmon|dmab|ezym)_[0-9A-Za-z]{6,}', '$1_********')
+    return ($Text -replace '(dmon|dmab)_[0-9A-Za-z]{6,}', '$1_********')
 }
 
 function Get-Sha256([string]$Path) {
