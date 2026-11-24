@@ -349,3 +349,18 @@ fn un_parc_sans_moniteur_local_n_a_pas_de_site_local_vide() {
     assert_eq!(empty.sites[0].name, "Home");
     assert!(empty.monitors.is_empty());
 }
+
+#[test]
+fn un_meme_site_ecrit_avec_des_casses_differentes_ne_donne_qu_une_cle_par_nom() {
+    let entries = vec![
+        (Some("Lyon".to_string()), monitor(1, "a")),
+        (Some("lyon".to_string()), monitor(2, "b")),
+        (Some("Lyon".to_string()), monitor(3, "c")),
+    ];
+    let fleet = sites::group(entries, "Home");
+    let keys: Vec<&str> = fleet.sites.iter().map(|s| s.key.as_str()).collect();
+    assert_eq!(keys, ["relay:Lyon", "relay:lyon"]);
+    assert_eq!(fleet.site_of(1), "Lyon");
+    assert_eq!(fleet.site_of(3), "Lyon");
+    assert_eq!(fleet.site_of(2), "lyon");
+}

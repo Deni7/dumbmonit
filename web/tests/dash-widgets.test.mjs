@@ -1,26 +1,12 @@
-// Overview dashboards, widget helpers: durations, deltas, budgets, bar geometry, versions,
-// problem rows, recently resolved, sites, the maintenance strip and disk forecasts. Run: npm test
+// Overview helpers: durations, availability, the monitors strip, problem rows, recently
+// resolved, sites, disk forecasts and unique keys for keyed lists. Run: npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-	availabilityText,
-	barWidth,
-	budgetTone,
-	compareVersions,
-	daysLeftFill,
-	deltaOf,
-	durationParts,
-	monitorBars,
-	pointDelta,
-	signed,
-	stackBars,
-	versionShares
-} from '../src/lib/components/overview/dash/parts/format.ts';
+import { availabilityText, durationParts, monitorBars } from '../src/lib/components/overview/dash/parts/format.ts';
 import { actorName, initials, problemRows, recentResolved } from '../src/lib/components/overview/dash/parts/problems.ts';
 import { groupBySite, siteIndex } from '../src/lib/components/overview/dash/parts/site-index.ts';
-import { maintenanceStrip, nextOccurrences } from '../src/lib/components/overview/dash/parts/timeline.ts';
 import { withDiskForecasts } from '../src/lib/components/overview/dash/parts/expiries.ts';
-import { eventGroup } from '../src/lib/components/overview/dash/parts/plates.ts';
+import { uniqueKeys } from '../src/lib/components/overview/dash/parts/keys.ts';
 
 const close = (actual, expected, eps = 1e-6) => assert.ok(Math.abs(actual - expected) < eps, `${actual} ≈ ${expected}`);
 
@@ -35,86 +21,10 @@ test('durations keep their two most significant parts', () => {
 	assert.deepEqual(durationParts(-5), [{ n: 0, unit: 's' }]);
 });
 
-test('a delta says which way and whether it is good news', () => {
-	const fewer = deltaOf(30, 61, { lowerIsBetter: true });
-	assert.equal(fewer.diff, -31);
-	close(fewer.pct, (-31 / 61) * 100);
-	assert.equal(fewer.direction, 'down');
-	assert.equal(fewer.better, true);
-
-	const fromZero = deltaOf(5, 0);
-	assert.equal(fromZero.pct, null);
-	assert.equal(fromZero.direction, 'up');
-	assert.equal(fromZero.better, true);
-
-	const noise = deltaOf(100, 90, { lowerIsBetter: true, flatWithin: 30 });
-	assert.equal(noise.direction, 'flat');
-	assert.equal(noise.better, null);
-
-	assert.equal(deltaOf(null, 3), null);
-	assert.equal(deltaOf(3, undefined), null);
-	assert.equal(deltaOf(Number.NaN, 3), null);
-});
-
-test('availability points and their sign', () => {
-	assert.equal(pointDelta(99.96, 99.93), 0.03);
-	assert.equal(pointDelta(null, 99.9), null);
-	assert.equal(signed(0.03), '+0.03');
-	assert.equal(signed(-0.12), '−0.12');
-	assert.equal(signed(0), '0.00');
-	assert.equal(signed(-0.001), '0.00');
+test('availability is written with two decimals, 100 only when it is', () => {
 	assert.equal(availabilityText(99.9996), '100');
 	assert.equal(availabilityText(99.95), '99.95');
 	assert.equal(availabilityText(null), '—');
-});
-
-test('error budgets and bars', () => {
-	assert.equal(budgetTone(null), null);
-	assert.equal(budgetTone(0), 'spent');
-	assert.equal(budgetTone(-5), 'spent');
-	assert.equal(budgetTone(18), 'low');
-	assert.equal(budgetTone(62), 'ok');
-	assert.equal(barWidth(140), 100);
-	assert.equal(barWidth(-3), 0);
-	assert.equal(barWidth(null), 0);
-	assert.equal(daysLeftFill(null), 0);
-	assert.equal(daysLeftFill(0), 100);
-	assert.equal(daysLeftFill(90), 4);
-	assert.equal(daysLeftFill(45), 50);
-	assert.equal(daysLeftFill(9), 90);
-});
-
-test('stacked bars put critical at the bottom and mark empty days', () => {
-	const out = stackBars(
-		[
-			{ critical: 1, warning: 2, info: 0 },
-			{ critical: 0, warning: 0, info: 0 }
-		],
-		{ width: 20, height: 40, gap: 2, floor: 4 }
-	);
-	assert.equal(out.peak, 4);
-	assert.deepEqual(out.rects, [
-		{ x: 1, y: 30, w: 8, h: 10, severity: 'critical' },
-		{ x: 1, y: 10, w: 8, h: 20, severity: 'warning' }
-	]);
-	assert.deepEqual(out.empty, [{ x: 11, w: 8 }]);
-	assert.deepEqual(stackBars([], { width: 10, height: 10 }), { rects: [], empty: [], peak: 0 });
-});
-
-test('agent versions: newest first, ranked against the latest', () => {
-	assert.ok(compareVersions('v0.20.1', '0.20.0') < 0);
-	assert.equal(compareVersions('0.20.0', '0.20.0'), 0);
-	const shares = versionShares([
-		{ version: '0.19.2', count: 2, latest: false },
-		{ version: '0.20.1', count: 14, latest: true },
-		{ version: '0.20.0', count: 3, latest: false },
-		{ version: '0.18.0', count: 0, latest: false }
-	]);
-	assert.deepEqual(shares, [
-		{ version: '0.20.1', count: 14, rank: 'latest' },
-		{ version: '0.20.0', count: 3, rank: 'behind' },
-		{ version: '0.19.2', count: 2, rank: 'old' }
-	]);
 });
 
 test('the monitors strip groups bars by site, a down monitor stands tall', () => {
@@ -264,68 +174,6 @@ test('monitors gathered by site; unknown ones go to the first site', () => {
 	assert.deepEqual(groupBySite([], [], 'This site'), []);
 });
 
-// --- maintenance strip ----------------------------------------------------------------
-
-test('maintenance windows are placed on their site, every site for a global one', () => {
-	const from = Date.UTC(2026, 10, 23);
-	const h = 3600_000;
-	const iso = (ms) => new Date(ms).toISOString();
-	const occ = (silence_id, start, end, over = {}) => ({
-		silence_id,
-		name: `w${silence_id}`,
-		starts_at: iso(start),
-		ends_at: iso(end),
-		state: 'upcoming',
-		recurring: false,
-		enabled: true,
-		...over
-	});
-	const occurrences = [
-		occ(1, from + 24 * h, from + 26 * h),
-		occ(2, from - 2 * h, from + h, { state: 'active' }),
-		occ(1, from + 8 * 24 * h, from + 8 * 24 * h + h),
-		occ(1, from + 30 * h, from + 31 * h, { enabled: false })
-	];
-	const silences = [
-		{ id: 1, target_id: 3 },
-		{ id: 2, target_id: null }
-	];
-	const twoSites = [
-		{ key: 'a', name: 'A', monitors: [{ id: 1 }] },
-		{ key: 'b', name: 'B', monitors: [{ id: 3 }] }
-	];
-	const now = from + 12 * h;
-	const strip = maintenanceStrip({ occurrences, silences, sites: twoSites, from, now });
-	close(strip.nowPct, (12 / 168) * 100);
-	assert.equal(strip.rows.length, 2);
-	assert.deepEqual(
-		strip.rows[0].windows.map((w) => w.name),
-		['w2']
-	);
-	assert.deepEqual(
-		strip.rows[1].windows.map((w) => w.name),
-		['w2', 'w1']
-	);
-	const global = strip.rows[0].windows[0];
-	assert.equal(global.left, 0);
-	assert.equal(global.width, 0.9);
-	assert.equal(global.active, true);
-	const local = strip.rows[1].windows[1];
-	close(local.left, (24 / 168) * 100);
-	close(local.width, (2 / 168) * 100);
-
-	const lone = maintenanceStrip({ occurrences, silences, sites: [], from, now, fallback: 'Here' });
-	assert.deepEqual(
-		lone.rows.map((r) => [r.key, r.name, r.windows.length]),
-		[['all', 'Here', 2]]
-	);
-
-	assert.deepEqual(
-		nextOccurrences(occurrences, now).map((o) => o.starts_at),
-		[iso(from + 24 * h), iso(from + 8 * 24 * h)]
-	);
-});
-
 // --- expiries -------------------------------------------------------------------------
 
 test('disk forecasts join the expiries unless a deadline already names the disk', () => {
@@ -350,9 +198,35 @@ test('disk forecasts join the expiries unless a deadline already names the disk'
 	assert.equal(forecast.href, '/targets/4');
 });
 
-test('events split into alerts and changes', () => {
-	assert.equal(eventGroup('crit'), 'alerts');
-	assert.equal(eventGroup('ack'), 'alerts');
-	assert.equal(eventGroup('maint'), 'changes');
-	assert.equal(eventGroup('info'), 'changes');
+// --- keys of keyed lists ---------------------------------------------------------------
+
+test('unique keys: the first keeps its key, repeats get a suffix, nothing collides', () => {
+	assert.deepEqual(uniqueKeys([], (x) => x), []);
+	assert.deepEqual(
+		uniqueKeys(['a', 'b', 'c'], (x) => x),
+		['a', 'b', 'c']
+	);
+	// A certificate probed from two places: two deadlines with the same natural key.
+	assert.deepEqual(
+		uniqueKeys([{ key: 'certificate:12:nas' }, { key: 'certificate:12:nas' }, { key: 'disk:3:/' }], (r) => r.key),
+		['certificate:12:nas', 'certificate:12:nas#2', 'disk:3:/']
+	);
+	// A generated key never takes one the list already uses.
+	assert.deepEqual(
+		uniqueKeys(['a', 'a#2', 'a', 'a'], (x) => x),
+		['a', 'a#2', 'a#3', 'a#4']
+	);
+	assert.deepEqual(
+		uniqueKeys(['a', 'a', 'a#2'], (x) => x),
+		['a', 'a#3', 'a#2']
+	);
+	// Numbers (monitor ids) are keys too.
+	assert.deepEqual(
+		uniqueKeys([7, 7, 8], (x) => x),
+		['7', '7#2', '8']
+	);
+	for (const list of [['x', 'x', 'x#2', 'x#3', 'x'], ['', '', '#2']]) {
+		const keys = uniqueKeys(list, (x) => x);
+		assert.equal(new Set(keys).size, list.length);
+	}
 });

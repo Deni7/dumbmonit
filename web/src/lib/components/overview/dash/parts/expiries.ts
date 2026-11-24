@@ -1,7 +1,7 @@
 /**
  * "Expiries and forecasts": the rows of "Coming up" (`upcoming.ts`: deadlines,
  * critical vulnerabilities, the update) plus the disk forecasts of the
- * dashboards' top list that the deadlines do not already name. Pure on
+ * widgets' top list that the deadlines do not already name. Pure on
  * purpose (types only), so it runs under `node --test`.
  */
 import type { TopEntry } from '#lib/api/types/overview.js';

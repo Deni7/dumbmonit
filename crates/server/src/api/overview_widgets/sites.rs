@@ -160,7 +160,10 @@ pub fn site_name(
 /// il a des moniteurs, ou quand il n'y a rien d'autre), puis les relais par nom.
 pub fn group(entries: Vec<(Option<String>, Monitor)>, local_name: &str) -> Fleet {
     let mut remote: Vec<String> = entries.iter().filter_map(|(site, _)| site.clone()).collect();
-    remote.sort_by_key(|name| name.to_lowercase());
+    // Un ordre total (sans casse, puis exact) : deux noms égaux sont voisins et
+    // `dedup` les fusionne. Trier sur la seule forme en minuscules laissait
+    // « Lyon », « lyon », « Lyon » dans cet ordre, donc deux sites `relay:Lyon`.
+    remote.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()).then_with(|| a.cmp(b)));
     remote.dedup();
     let has_local = entries.iter().any(|(site, _)| site.is_none());
     let mut sites = Vec::new();

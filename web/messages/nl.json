@@ -957,8 +957,6 @@
 	],
 	"console_breadcrumb": "Kruimelpad",
 	"console_egg": "// {count} controles per minuut. Ga lekker slapen, wij houden het in de gaten.",
-	"console_kpi_alerts": "Openstaande alerts",
-	"console_kpi_alerts_note": "Kritiek: {critical}, waarschuwing: {warning}",
 	"console_kpi_availability": "Beschikbaarheid 30 d",
 	"console_kpi_availability_note": "Gemeten monitors: {count}",
 	"console_kpi_none": "Nog geen gegevens",
@@ -968,7 +966,6 @@
 	"console_live": "LIVE",
 	"console_live_off": "Live-updates gepauzeerd. Selecteer om te hervatten.",
 	"console_live_on": "Live-updates aan. Selecteer om te pauzeren.",
-	"console_panel_attention": "Vraagt aandacht",
 	"console_panel_oncall_unknown": "Iemand",
 	"console_paused": "GEPAUZEERD",
 	"console_range": "Tijdbereik",
@@ -5709,9 +5706,6 @@
 	"overview_ack_err": "Kan deze monitor niet bevestigen.",
 	"overview_ack_hint": "Gezien, ik ben ermee bezig: stil totdat het weer normaal is.",
 	"overview_ack_item": "Bevestigen",
-	"overview_all_good_text": "Niets is offline en geen alert wacht op je. De duif doet een dutje.",
-	"overview_all_good_title": "Alles in orde",
-	"overview_chart_error": "Kan deze grafiek niet laden. Hij probeert het over een minuut opnieuw.",
 	"overview_first_all_done": "Alle drie klaar. Deze gids komt niet meer terug.",
 	"overview_first_channel_action": "Een kanaal toevoegen",
 	"overview_first_channel_text": "E-mail, ntfy, Discord, Telegram, PagerDuty — wat je al leest. Er wordt niets verzonden totdat er iets mis is.",
@@ -5735,21 +5729,6 @@
 	"overview_first_test_text": "Verzend een test vanuit het kanaal. Deze stap wordt groen zodra er echt een vertrekt.",
 	"overview_first_test_title": "Controleer of een bericht aankomt",
 	"overview_first_title": "Je eerste vijf minuten",
-	"overview_incidents_bars_label": "Incidenten per dag, oudste links",
-	"overview_incidents_before": "Week ervoor: {value}",
-	"overview_incidents_count_label": "Incidenten",
-	"overview_incidents_day_title": "{day}. Incidenten: {count}. Open gedurende: {duration}.",
-	"overview_incidents_explain": "Van actief tot opgelost. Eén balk per dag.",
-	"overview_incidents_noisiest": "Luidruchtigste monitor",
-	"overview_incidents_none": "Geen incident in de laatste {days} dagen.",
-	"overview_incidents_open_label": "Open gedurende",
-	"overview_incidents_title": "Incidenten, laatste {days} dagen",
-	"overview_latency_empty": "Nog geen responstijd gemeten in dit bereik.",
-	"overview_latency_hint": "p95 en mediaan van elke probe, laatste {range}",
-	"overview_latency_median": "Mediaan",
-	"overview_latency_p95": "p95",
-	"overview_latency_slowest": "Traagste monitors (p95)",
-	"overview_latency_title": "Responstijd",
 	"overview_mute_aria": "{name} dempen",
 	"overview_mute_err_create": "Kan deze monitor niet dempen.",
 	"overview_mute_err_lift": "Kan het dempen van deze monitor niet opheffen.",
@@ -5774,22 +5753,6 @@
 			"match": {
 				"countPlural=one": "+{count} tegengehouden",
 				"countPlural=other": "+{count} tegengehouden"
-			}
-		}
-	],
-	"overview_needs_more": "Bekijk alle {count} bij Alerts",
-	"overview_needs_see_all": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} monitor bekijken",
-				"countPlural=other": "Alle {count} monitors bekijken"
 			}
 		}
 	],
@@ -5986,15 +5949,7 @@
 	],
 	"overview_upcoming_due_now": "nu",
 	"overview_upcoming_due_today": "vandaag",
-	"overview_upcoming_empty": "Niets verwacht in de komende {days} dagen.",
-	"overview_upcoming_error": "Kan niet lezen wat eraan komt.",
-	"overview_upcoming_kind_backup": "Back-up",
-	"overview_upcoming_kind_disk": "Schijf",
-	"overview_upcoming_kind_update": "Update",
-	"overview_upcoming_kind_vulnerability": "Kwetsbaarheid",
 	"overview_upcoming_list_label": "Wat eraan komt, het meest urgent eerst",
-	"overview_upcoming_scope": "Bewaakt certificaten, domeinen, schijven, back-ups en kwetsbaarheden.",
-	"overview_upcoming_see_all": "Alles bekijken",
 	"overview_upcoming_t_backup": "Back-up van {what} komt te laat",
 	"overview_upcoming_t_backup_late": "Back-up van {what} is te laat",
 	"overview_upcoming_t_disk": "{what} raakt vol",
@@ -9523,10 +9478,6 @@
 	"upgrade_notice_title": "Toe te passen configuratiewijzigingen",
 	"upgrade_notice_view": "Bekijken",
 	"w10hybrid_coming_empty": "Niets gepland en niets dat binnenkort verloopt.",
-	"w10hybrid_kpi_budget_left": "Resterend foutbudget: {pct}%",
-	"w10hybrid_kpi_budget_low": "Budget over: {pct}%",
-	"w10hybrid_kpi_budget_spent": "Foutbudget opgebruikt",
-	"w10hybrid_kpi_oldest": "Oudste: {age}",
 	"w10hybrid_kpi_problems": "Openstaande problemen",
 	"w10hybrid_services_p95": "p95 {value}",
 	"w1alerts_channels_copy_name": "{name} (kopie)",
@@ -9628,8 +9579,6 @@
 	"w1wall_notice_maintenance": "Onderhoud bezig: {title}",
 	"w1wall_notice_maintenance_until": "Onderhoud bezig: {title}, tot {time}",
 	"w1wall_notice_more": "+{count}",
-	"w1wall_overview_trend_days": "{days} d",
-	"w1wall_overview_trend_period": "Periode",
 	"w1wall_settings_clock_12h": "12 u",
 	"w1wall_settings_clock_24h": "24 u",
 	"w1wall_settings_clock_label": "Klokformaat",
@@ -10689,70 +10638,10 @@
 	"w8wp_discovery_on": "Websiteplug-ins, zoals de WordPress-banner, vinden deze pagina in de lijst met openbare pagina's van de server.",
 	"w8wp_discovery_private": "Een privépagina staat nooit in de lijst met openbare pagina's.",
 	"w8wp_discovery_unpublished": "Alleen gepubliceerde pagina's staan in de lijst met openbare pagina's.",
-	"w9dash_agents_connected": "Verbonden",
-	"w9dash_agents_disconnected": "Niet verbonden",
-	"w9dash_agents_empty": "Nog geen agent geïnstalleerd.",
-	"w9dash_agents_install": "Agent installeren",
-	"w9dash_agents_last_contact": "Laatste contact {ago}",
-	"w9dash_agents_manage": "Agents beheren",
-	"w9dash_agents_never_seen": "Nooit gezien",
-	"w9dash_agents_on_latest": "{count} op {version}, de nieuwste",
-	"w9dash_agents_on_version": "{count} op {version}",
-	"w9dash_agents_title": "Agents",
-	"w9dash_agents_total": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} agent",
-				"countPlural=other": "{count} agents"
-			}
-		}
-	],
-	"w9dash_agents_update": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} bijwerken",
-				"countPlural=other": "{count} bijwerken"
-			}
-		}
-	],
-	"w9dash_common_all_alerts": "Alle meldingen",
 	"w9dash_common_error": "Deze cijfers konden niet worden gelezen.",
-	"w9dash_common_last_30_days": "Laatste 30 dagen",
-	"w9dash_common_sev_critical": "Kritiek",
-	"w9dash_common_sev_warning": "Waarschuwing",
 	"w9dash_common_this_site": "Deze locatie",
-	"w9dash_common_today_at": "Vandaag {time}",
-	"w9dash_events_alerts": "Meldingen",
-	"w9dash_events_all": "Alles",
-	"w9dash_events_audit": "Auditlogboek",
-	"w9dash_events_changes": "Wijzigingen",
 	"w9dash_events_empty": "Er is de laatste tijd niets gebeurd.",
-	"w9dash_events_empty_filter": "De laatste tijd niets van dit soort.",
-	"w9dash_events_filter": "Tonen",
-	"w9dash_events_history": "Volledige geschiedenis",
 	"w9dash_events_title": "Recente gebeurtenissen",
-	"w9dash_expiries_all": "Alle vervaldata",
-	"w9dash_expiries_bar_hint": "Vult zich naarmate de datum nadert, op een schaal van {days} dagen",
-	"w9dash_expiries_more": "Alle {count} bekijken",
-	"w9dash_expiries_sub": "Komende {days} dagen",
-	"w9dash_expiries_title": "Vervaldata en prognoses",
-	"w9dash_expiries_vulns": "Kwetsbaarheden",
-	"w9dash_kpi_all_up": "Alles actief",
-	"w9dash_kpi_avail_delta": "{delta} pp t.o.v. de 30 dagen ervoor",
 	"w9dash_kpi_avail_note": "Doel {target}%",
 	"w9dash_kpi_bars_label": "Eén balk per monitor, per locatie gegroepeerd; een hoge balk is een monitor die uitvalt",
 	"w9dash_kpi_budget_left": "Resterend foutbudget",
@@ -10771,39 +10660,7 @@
 			}
 		}
 	],
-	"w9dash_kpi_down": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} uitgevallen",
-				"countPlural=other": "{count} uitgevallen"
-			}
-		}
-	],
-	"w9dash_kpi_last_closed": "Laatste gesloten {ago}",
-	"w9dash_kpi_none_open": "Geen open",
 	"w9dash_kpi_opened_label": "Geopende meldingen per dag, laatste {days} dagen",
-	"w9dash_kpi_opened_week": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} geopend deze week, {previous} de week ervoor",
-				"countPlural=other": "{count} geopend deze week, {previous} de week ervoor"
-			}
-		}
-	],
 	"w9dash_kpi_paused": [
 		{
 			"declarations": [
@@ -10834,7 +10691,6 @@
 			}
 		}
 	],
-	"w9dash_kpi_today": "Vandaag",
 	"w9dash_kpi_warning": [
 		{
 			"declarations": [
@@ -10850,86 +10706,6 @@
 			}
 		}
 	],
-	"w9dash_maint_empty": "Geen onderhoud gepland in de komende {days} dagen en geen monitor gepauzeerd.",
-	"w9dash_maint_error": "De onderhoudsvensters konden niet worden gelezen.",
-	"w9dash_maint_lasts": "Duurt {duration}",
-	"w9dash_maint_lasts_recurring": "Duurt {duration}, terugkerend",
-	"w9dash_maint_now": "Nu",
-	"w9dash_maint_running": "Bezig",
-	"w9dash_maint_schedule": "Plannen",
-	"w9dash_maint_strip_label": "Onderhoudsvensters van de komende {days} dagen, per locatie",
-	"w9dash_maint_sub": "Komende {days} dagen",
-	"w9dash_maint_title": "Onderhoud",
-	"w9dash_pages_all": "Alle statuspagina’s",
-	"w9dash_pages_create": "Statuspagina maken",
-	"w9dash_pages_draft": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "Concept, {count} dienst",
-				"countPlural=other": "Concept, {count} diensten"
-			}
-		}
-	],
-	"w9dash_pages_empty": "Nog geen statuspagina.",
-	"w9dash_pages_error": "De statuspagina’s konden niet worden gelezen.",
-	"w9dash_pages_maintenance": "Onderhoud",
-	"w9dash_pages_major": "Grote storing",
-	"w9dash_pages_operational": "Operationeel",
-	"w9dash_pages_partial": "Gedeeltelijke storing",
-	"w9dash_pages_password": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "Met wachtwoord, {count} dienst",
-				"countPlural=other": "Met wachtwoord, {count} diensten"
-			}
-		}
-	],
-	"w9dash_pages_post": "Update plaatsen",
-	"w9dash_pages_public": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "Openbaar, {count} dienst",
-				"countPlural=other": "Openbaar, {count} diensten"
-			}
-		}
-	],
-	"w9dash_pages_title": "Statuspagina’s",
-	"w9dash_pages_users": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "Alleen aangemelde gebruikers, {count} dienst",
-				"countPlural=other": "Alleen aangemelde gebruikers, {count} diensten"
-			}
-		}
-	],
 	"w9dash_problems_ack_recovery": "Tot hij weer antwoordt",
 	"w9dash_problems_calm_since": "Geen open probleem sinds {time}.",
 	"w9dash_problems_calm_text": "Elke monitor antwoordt en er is geen melding open.",
@@ -10940,9 +10716,7 @@
 	"w9dash_problems_col_problem": "Probleem",
 	"w9dash_problems_col_severity": "Ernst",
 	"w9dash_problems_lasted": "Duurde {span}",
-	"w9dash_problems_maintenance_link": "Stiltes en onderhoud",
 	"w9dash_problems_no_answer": "Reageert niet op de controles",
-	"w9dash_problems_no_site": "Geen locatie",
 	"w9dash_problems_not_acked": "Niet bevestigd",
 	"w9dash_problems_not_notified": "Geen melding verstuurd",
 	"w9dash_problems_notified": "Gemeld {ago}",
@@ -10950,139 +10724,9 @@
 	"w9dash_problems_resolved": "Recent opgelost",
 	"w9dash_problems_resolved_plate": "Opgelost",
 	"w9dash_problems_since": "sinds {time}",
-	"w9dash_problems_site_clear": "niets open",
-	"w9dash_problems_sub": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} open, ernstigste eerst",
-				"countPlural=other": "{count} open, ernstigste eerst"
-			}
-		}
-	],
-	"w9dash_problems_title": "Problemen",
-	"w9dash_response_acked_fast": "Binnen 15 min bevestigd",
-	"w9dash_response_alerts": "Meldingen",
-	"w9dash_response_before": "eerder {previous}",
-	"w9dash_response_before_pct": "eerder {previous}, {pct}%",
-	"w9dash_response_chart_label": "Meldingen per dag over {days} dagen, per ernst",
-	"w9dash_response_mtta": "MTTA",
-	"w9dash_response_mttr": "MTTR",
-	"w9dash_response_noisiest": "Luidruchtigste:",
-	"w9dash_response_noisiest_rule": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{rule}, {count} melding",
-				"countPlural=other": "{rule}, {count} meldingen"
-			}
-		}
-	],
-	"w9dash_response_title": "Meldingen en reactie",
-	"w9dash_response_tune": "Regel bijstellen",
-	"w9dash_slo_all": "Alle doelstellingen",
-	"w9dash_slo_create": "Doel instellen",
-	"w9dash_slo_empty": "Nog geen servicelevel-doelstelling.",
-	"w9dash_slo_error": "De doelstellingen konden niet worden gelezen.",
-	"w9dash_slo_fast": "Snel verbruik",
-	"w9dash_slo_left": "{percent}% budget over",
-	"w9dash_slo_more": "Alle {count} bekijken",
-	"w9dash_slo_slow": "Langzaam verbruik",
-	"w9dash_slo_spent": "Budget op",
-	"w9dash_slo_target": "Doel {target}%",
-	"w9dash_slo_title": "SLO’s",
-	"w9dash_slo_unmeasured": "Niet gemeten",
-	"w9dash_slo_window": "Over {days} dagen",
 	"w9dash_status_degraded": "Verminderd",
 	"w9dash_status_paused": "Gepauzeerd",
 	"w9dash_status_up": "Actief",
-	"w9layout_backups_changed": "Gewijzigd",
-	"w9layout_backups_duration": "Duur",
-	"w9layout_backups_empty": "Nog geen back-uptaak gemeld: taken van PBS, Synology, restic, borg en Veeam verschijnen hier.",
-	"w9layout_backups_engine": "Engine",
-	"w9layout_backups_failed": "Mislukt",
-	"w9layout_backups_job": "Taak",
-	"w9layout_backups_last_success": "Laatste succes",
-	"w9layout_backups_never": "Nooit",
-	"w9layout_backups_ok": "OK",
-	"w9layout_backups_reports": "Rapporten",
-	"w9layout_backups_running": "Bezig",
-	"w9layout_backups_runs": "Laatste 14 runs",
-	"w9layout_backups_runs_failed": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "Laatste run mislukt",
-				"countPlural=other": "Laatste {count} runs, {failed} mislukt"
-			}
-		}
-	],
-	"w9layout_backups_runs_ok": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "Laatste run geslaagd",
-				"countPlural=other": "Laatste {count} runs, allemaal geslaagd"
-			}
-		}
-	],
-	"w9layout_backups_stale": "Verouderd",
-	"w9layout_backups_status": "Status",
-	"w9layout_backups_sub_check": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} taak, {check} te controleren",
-				"countPlural=other": "{count} taken, {check} te controleren"
-			}
-		}
-	],
-	"w9layout_backups_sub_fresh": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} taak, actueel",
-				"countPlural=other": "{count} taken, allemaal actueel"
-			}
-		}
-	],
-	"w9layout_backups_title": "Back-ups",
 	"w9layout_category_backups": "Back-ups",
 	"w9layout_category_network": "Netwerk",
 	"w9layout_category_other": "Overig",
@@ -11109,82 +10753,11 @@
 	],
 	"w9layout_health_healthy": "Gezond",
 	"w9layout_health_idle": "Niets bewaakt",
-	"w9layout_hex_site_aria": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{site}: {up} van {count} monitor online, {down} offline",
-				"countPlural=other": "{site}: {up} van {count} monitors online, {down} offline"
-			}
-		}
-	],
-	"w9layout_hex_sub": "Eén cel per monitor, per locatie en categorie",
-	"w9layout_hex_title": "Vlootkaart",
 	"w9layout_hybrid_act_now": "Nu handelen",
 	"w9layout_hybrid_band_label": "Wat nu uw aandacht vraagt",
-	"w9layout_matrix_cell_degraded": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{up} / {total}, {count} verminderd",
-				"countPlural=other": "{up} / {total}, {count} verminderd"
-			}
-		}
-	],
-	"w9layout_matrix_cell_down": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{up} / {total}, {count} offline",
-				"countPlural=other": "{up} / {total}, {count} offline"
-			}
-		}
-	],
-	"w9layout_matrix_cell_paused": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{up} / {total}, {count} gepauzeerd",
-				"countPlural=other": "{up} / {total}, {count} gepauzeerd"
-			}
-		}
-	],
-	"w9layout_matrix_next_maintenance": "Volgend onderhoud",
-	"w9layout_matrix_none": "Geen",
-	"w9layout_matrix_site": "Locatie",
-	"w9layout_matrix_sub": "Eén markering per monitor",
-	"w9layout_matrix_title": "Status per locatie en categorie",
-	"w9layout_matrix_wan": "WAN-latentie, {range}",
-	"w9layout_matrix_wan_local": "Deze locatie",
-	"w9layout_matrix_wan_none": "Nog geen gegevens",
 	"w9layout_monitor_title": "{name}, {kind}: {status}",
 	"w9layout_monitor_title_bare": "{name}: {status}",
 	"w9layout_ms": "{value} ms",
-	"w9layout_next_deadlines_link": "Alle termijnen",
 	"w9layout_next_empty": [
 		{
 			"declarations": [
@@ -11202,7 +10775,6 @@
 	],
 	"w9layout_next_maint_active": "Onderhoud bezig",
 	"w9layout_next_maint_meta": "Onderhoudsvenster, {duration}",
-	"w9layout_next_maintenance_link": "Onderhoud",
 	"w9layout_next_now": "Nu",
 	"w9layout_next_title": [
 		{
@@ -11220,13 +10792,7 @@
 		}
 	],
 	"w9layout_next_until": "tot {time}",
-	"w9layout_noc_problems_title": "Problemen per locatie",
-	"w9layout_none_planned": "Niets gepland",
 	"w9layout_pct": "{value}%",
-	"w9layout_rate": "{value} {unit}",
-	"w9layout_services_30d": "30 dagen",
-	"w9layout_services_all": "Alle monitors",
-	"w9layout_services_beats": "Laatste controles",
 	"w9layout_services_beats_failed": [
 		{
 			"declarations": [
@@ -11257,30 +10823,8 @@
 			}
 		}
 	],
-	"w9layout_services_check": "Controle",
 	"w9layout_services_empty": "Nog geen dienstcontrole: HTTP-, DNS-, TLS-, SMTP- of pingcontroles verschijnen hier.",
-	"w9layout_services_p95": "p95",
-	"w9layout_services_state": "Status",
-	"w9layout_services_sub": "HTTP-, DNS-, TLS- en andere controles, slechtste eerst",
 	"w9layout_services_title": "Diensten",
-	"w9layout_sites_last_backup": "Laatste back-up",
-	"w9layout_sites_no_backup": "Geen gemeld",
-	"w9layout_sites_sub": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} monitor",
-				"countPlural=other": "{count} monitors"
-			}
-		}
-	],
-	"w9layout_sites_title": "Locatie",
 	"w9layout_sites_up_of": [
 		{
 			"declarations": [
@@ -11302,79 +10846,9 @@
 	"w9layout_status_down": "Offline",
 	"w9layout_status_paused": "Gepauzeerd",
 	"w9layout_status_up": "Online",
-	"w9layout_sun_aria": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{up} van {count} monitor online; {down} offline, {degraded} verminderd",
-				"countPlural=other": "{up} van {count} monitors online; {down} offline, {degraded} verminderd"
-			}
-		}
-	],
-	"w9layout_sun_category_title": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{site}, {category}: {count} monitor",
-				"countPlural=other": "{site}, {category}: {count} monitors"
-			}
-		}
-	],
-	"w9layout_sun_center": "monitors online",
-	"w9layout_sun_rings": "Binnenste ring: locatie · midden: categorie · buitenste: monitor",
-	"w9layout_sun_sub": "Locatie, categorie, monitor",
 	"w9layout_sun_title": "Vloot per locatie",
-	"w9layout_switch_classic": "Klassiek",
-	"w9layout_switch_command": "Commando",
-	"w9layout_switch_hybrid": "Hybride",
-	"w9layout_switch_legend": "Indeling van het overzicht",
-	"w9layout_switch_noc": "NOC",
-	"w9layout_top_cpu": "CPU",
-	"w9layout_top_disk": "Schijf",
-	"w9layout_top_empty": "Nog geen cijfers: agents en collectors melden hier CPU, geheugen, schijf en netwerk.",
-	"w9layout_top_forecast": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{site}, vol over ongeveer {count} dag",
-				"countPlural=other": "{site}, vol over ongeveer {count} dagen"
-			}
-		}
-	],
-	"w9layout_top_mem": "Geheugen",
-	"w9layout_top_metric": "Meetwaarde",
-	"w9layout_top_net": "Netwerk",
-	"w9layout_top_sub_pct": "% nu in gebruik, trend over {range}",
-	"w9layout_top_sub_rate": "Mb/s nu, trend over {range}",
-	"w9layout_top_title": "Grootste verbruikers",
-	"w9layout_top_title_cpu": "Top 5 CPU",
-	"w9layout_top_title_disk": "Top 5 schijf",
-	"w9layout_top_title_mem": "Top 5 geheugen",
-	"w9layout_top_title_net": "Top 5 netwerk",
-	"w9layout_when_today": "Vandaag {time}",
 	"w9layout_when_today_bare": "Vandaag",
-	"w9layout_when_tomorrow": "Morgen {time}",
 	"w9layout_when_tomorrow_bare": "Morgen",
-	"w9layout_when_weekday": "{day} {time}",
-	"w9layout_when_yesterday": "Gisteren {time}",
 	"w9layout_when_yesterday_bare": "Gisteren",
 	"wall_band_problems": "Problemen",
 	"wall_band_problems_note": "Kritieke alerts en monitors offline",

@@ -1,11 +1,10 @@
 /**
- * The rows of the dashboards' problems table, and what was resolved lately
+ * The rows of "Act now" (the overview's problems table), and what was resolved lately
  * (its calm state). Pure on purpose (types only), so it runs under
  * `node --test`.
  *
- * Unlike "Needs attention" on the classic overview, an acknowledged or
- * muted problem stays in the table, below the ones nobody has taken: the
- * table says who is on it.
+ * An acknowledged or muted problem stays in the table, below the ones
+ * nobody has taken: the table says who is on it.
  */
 import type { SkyRow } from '../../sky.js';
 
@@ -27,7 +26,7 @@ export interface ProblemRow {
  * sky's order (worst first); taken ones follow.
  *
  * `ackedTargets`: monitors acknowledged "until it answers again" (a recovery
- * silence), which "Needs attention" hides and this table keeps.
+ * silence), which other lists hide and this table keeps.
  */
 export function problemRows(rows: readonly SkyRow[], ackedTargets: ReadonlySet<number> = new Set()): ProblemRow[] {
 	const held = new Map<number, number>();

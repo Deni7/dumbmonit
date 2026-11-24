@@ -1,20 +1,18 @@
 <script lang="ts">
-	import { withBase } from '#lib/paths.js';
 	/**
-	 * The problems table of the dashboards: what is broken now, worst first,
-	 * one row each (see `parts/problems.ts`), with who took it and the quick
-	 * actions: acknowledge, snooze or mute. Unlike "Needs attention", a taken
-	 * problem stays listed, below the open ones, so the table says who is on
-	 * what. `bySite` groups the rows under their site. With nothing broken:
-	 * "Nothing needs you", and the last alerts that resolved.
-	 *
-	 * `fill` (Hybrid): the card takes its parent's height and scrolls inside,
-	 * lists more rows and leaves the count to the figure above it.
+	 * "Act now", the overview's largest panel: what is broken now, worst
+	 * first, one row each (see `parts/problems.ts`), with who took it and the
+	 * quick actions: acknowledge, snooze or mute. A taken problem stays
+	 * listed, below the open ones, so the table says who is on what. The count
+	 * is the "Open problems" figure above it; the title leads to the Alerts
+	 * page. With nothing broken: "Nothing needs you", and the last alerts
+	 * that resolved.
 	 *
 	 * Monitors and alerts come from the app-wide store; sites and kinds from
-	 * the dashboards' store; the history from the fleet store.
+	 * the widgets store; the history from the fleet store.
 	 */
 	import { untrack } from 'svelte';
+	import { CircleCheck } from 'lucide-svelte';
 	import { createSilence, listAlertRules, listSilences, toApiError, type AlertRule, type Silence, type Target } from '#lib/api/index.js';
 	import { recoverySilencePayload } from '#lib/components/alerts/helpers.js';
 	import { fleetStore } from '#lib/components/enterprise/fleet.svelte.js';
@@ -25,24 +23,17 @@
 	import { readSky } from '../../sky.js';
 	import WidgetCard from '../WidgetCard.svelte';
 	import { widgetsStore } from '../widgets.svelte.js';
-	import Glyph from '../parts/Glyph.svelte';
 	import ProblemLine from '../parts/ProblemLine.svelte';
+	import { uniqueKeys } from '../parts/keys.js';
 	import { problemRows, recentResolved, type ProblemRow } from '../parts/problems.js';
+	import { ROW, ROW_ICON, STATE_PAD, TEXT_MAIN, TEXT_SIDE, TEXT_SUB } from '../parts/scale.js';
 	import { siteIndex } from '../parts/site-index.js';
 	import { clockText, durationText } from '../parts/words.js';
 
-	type Span = 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 12;
-	interface Props {
-		span?: Span;
-		title?: string;
-		bySite?: boolean;
-		fill?: boolean;
-	}
+	let { class: cls = '' }: { class?: string } = $props();
 
-	let { span = 8, title, bySite = false, fill = false }: Props = $props();
-
-	/** Rows drawn; the rest is one link away. A card that scrolls inside can hold more. */
-	const LIMIT = $derived(fill ? 30 : 8);
+	/** Rows drawn (the panel scrolls); the rest is on the Alerts page. */
+	const LIMIT = 30;
 
 	$effect(() => untrack(() => fleetStore.start()));
 
@@ -113,32 +104,18 @@
 		return problem.row.target?.id ?? null;
 	}
 
-	/** Rows under their site, in the order of the sites; rows tied to no known site last. */
-	const groups = $derived.by(() => {
-		const sites = widgetsStore.data?.sites ?? [];
-		const out = sites.map((site) => ({ key: site.key, name: site.name, rows: [] as ProblemRow[] }));
-		const byKey = new Map(out.map((g) => [g.key, g]));
-		const other = { key: '_other', name: m.w9dash_problems_no_site(), rows: [] as ProblemRow[] };
-		for (const problem of shown) {
-			const id = targetOf(problem);
-			const place = id !== null ? places.get(id) : undefined;
-			const group = place ? byKey.get(place.siteKey) : undefined;
-			if (group) group.rows.push(problem);
-			else other.rows.push(problem);
-		}
-		if (other.rows.length > 0) out.push(other);
-		return out;
-	});
+	// A problem's key names its monitor or its alert; made unique all the same,
+	// so a row that comes twice can never stop the page (`parts/keys.ts`).
+	const keys = $derived(uniqueKeys(shown, (problem) => problem.row.key));
 
 	// --- Calm state -----------------------------------------------------------
 	const targetNames = $derived(new Map(alertsStore.targets.map((t) => [t.id, t.name])));
 	const ruleNames = $derived(new Map(rules.map((r) => [r.uid, r.name])));
 	const resolved = $derived(recentResolved(fleetStore.history, 3));
+	const resolvedKeys = $derived(uniqueKeys(resolved, (entry) => `${entry.fingerprint}@${entry.at}`));
 
 	const reading = $derived(alertsStore.loading && alertsStore.targets.length === 0);
 	const broken = $derived(!alertsStore.available && alertsStore.targets.length === 0 && alertsStore.lastError);
-	// The Hybrid layout's "Open problems" figure already says how many: no second count.
-	const sub = $derived(rows.length > 0 && !fill ? m.w9dash_problems_sub({ count: rows.length }) : undefined);
 </script>
 
 {#snippet line(problem: ProblemRow)}
@@ -161,43 +138,43 @@
 	/>
 {/snippet}
 
-<WidgetCard title={title ?? m.w9dash_problems_title()} {sub} {span} {fill} flush>
+<WidgetCard title={m.w9layout_hybrid_act_now()} href="/alerts" class={cls}>
 	{#if reading}
-		<div class="flex flex-col gap-2.5 px-4 pb-4" aria-hidden="true">
+		<div class={`flex flex-col gap-2.5 border-t border-line ${STATE_PAD}`} aria-hidden="true">
 			<Skeleton class="h-9 w-full" rows={3} />
 		</div>
 	{:else if broken}
-		<div class="px-4 pb-4">
+		<div class={`border-t border-line ${STATE_PAD}`}>
 			<ErrorNotice error={alertsStore.lastError} compact onretry={() => void alertsStore.refresh()} />
 		</div>
 	{:else if rows.length === 0}
-		<div class="state-in px-4 pb-4">
-			<div class="flex items-center gap-3 rounded-xl bg-signal-soft p-3.5 text-signal-ink">
-				<Glyph name="ack" class="size-8" />
+		<div class="state-in">
+			<div class={`flex items-center gap-3 bg-signal-soft ${ROW}`}>
+				<CircleCheck class={`${ROW_ICON} text-signal-ink`} aria-hidden="true" />
 				<div class="min-w-0">
-					<p class="m-0 text-base font-semibold text-ink">{m.w9dash_problems_calm_title()}</p>
-					<p class="m-0 text-[0.8125rem] text-ink-2">
+					<p class={`m-0 ${TEXT_MAIN}`}>{m.w9dash_problems_calm_title()}</p>
+					<p class={`m-0 ${TEXT_SUB}`}>
 						{resolved[0] ? m.w9dash_problems_calm_since({ time: clockText(resolved[0].at) }) : m.w9dash_problems_calm_text()}
 					</p>
 				</div>
 			</div>
 			{#if resolved.length > 0}
-				<h3 class="m-0 mt-3 mb-1 text-[0.8125rem] font-semibold text-ink">{m.w9dash_problems_resolved()}</h3>
+				<h3 class="m-0 border-t border-line px-4 pt-3 pb-1.5 text-xs font-medium text-ink-3">{m.w9dash_problems_resolved()}</h3>
 				<ul class="m-0 list-none p-0">
-					{#each resolved as entry, i (entry.fingerprint + entry.at)}
+					{#each resolved as entry, i (resolvedKeys[i])}
 						{@const name = (entry.target_id !== null ? targetNames.get(entry.target_id) : undefined) ?? ruleNames.get(entry.rule_uid) ?? ''}
-						<li class={`flex min-w-0 items-center gap-2.5 py-2 ${i > 0 ? 'border-t border-line' : ''}`}>
-							<Plate tone="signal" label={m.w9dash_problems_resolved_plate()} />
+						<li class={`flex min-w-0 items-center gap-3 ${ROW}`}>
+							<Plate tone="signal" label={m.w9dash_problems_resolved_plate()} class="shrink-0" />
 							<div class="min-w-0 flex-1">
 								<p class="m-0 truncate text-sm">
-									<span class="font-semibold text-ink">{name}</span>
-									{#if entry.target_id !== null && ruleNames.get(entry.rule_uid)}<span class="text-ink-3"> {ruleNames.get(entry.rule_uid)}</span>{/if}
+									<span class={TEXT_MAIN}>{name}</span>
+									{#if entry.target_id !== null && ruleNames.get(entry.rule_uid)}<span class="text-ink-2"> {ruleNames.get(entry.rule_uid)}</span>{/if}
 								</p>
 								{#if entry.lasted !== null}
-									<span class="block truncate text-[0.8125rem] text-ink-2">{m.w9dash_problems_lasted({ span: durationText(entry.lasted) })}</span>
+									<span class={`block truncate ${TEXT_SUB}`}>{m.w9dash_problems_lasted({ span: durationText(entry.lasted) })}</span>
 								{/if}
 							</div>
-							<span class="shrink-0 text-right text-[0.8125rem] whitespace-nowrap text-ink-3">{clockText(entry.at)}</span>
+							<span class={`shrink-0 text-right text-ink-2 ${TEXT_SIDE}`}>{clockText(entry.at)}</span>
 						</li>
 					{/each}
 				</ul>
@@ -205,7 +182,7 @@
 		</div>
 	{:else}
 		<div class="@container">
-			<div class={`hidden gap-3.5 px-4 pb-1.5 text-xs font-medium text-ink-3 @3xl:grid ${fill ? 'sticky top-0 z-[1] bg-surface' : ''} @3xl:grid-cols-[6.5rem_minmax(0,1.15fr)_minmax(0,1.7fr)_4.75rem_minmax(0,1.15fr)_auto]`} aria-hidden="true">
+			<div class="sticky top-0 z-[1] hidden gap-3.5 bg-surface px-4 pb-1.5 text-xs font-medium text-ink-3 @3xl:grid @3xl:grid-cols-[6.5rem_minmax(0,1.15fr)_minmax(0,1.7fr)_4.75rem_minmax(0,1.15fr)_auto]" aria-hidden="true">
 				<span>{m.w9dash_problems_col_severity()}</span>
 				<span>{m.w9dash_problems_col_monitor()}</span>
 				<span>{m.w9dash_problems_col_problem()}</span>
@@ -213,27 +190,9 @@
 				<span>{m.w9dash_problems_col_acked()}</span>
 				<span></span>
 			</div>
-			{#if bySite && (widgetsStore.data?.sites.length ?? 0) > 0}
-				{#each groups as group (group.key)}
-					<div class="flex items-center gap-2 border-t border-line bg-surface-2 px-4 py-2 text-[0.8125rem] font-semibold text-ink-2">
-						{group.name}
-						{#if group.rows.length === 0}<span class="font-normal text-ink-3">{m.w9dash_problems_site_clear()}</span>{/if}
-					</div>
-					{#if group.rows.length > 0}
-						<ul class="m-0 list-none p-0">
-							{#each group.rows as problem (problem.row.key)}{@render line(problem)}{/each}
-						</ul>
-					{/if}
-				{/each}
-			{:else}
-				<ul class="m-0 list-none p-0">
-					{#each shown as problem (problem.row.key)}{@render line(problem)}{/each}
-				</ul>
-			{/if}
+			<ul class="m-0 list-none p-0">
+				{#each shown as problem, i (keys[i])}{@render line(problem)}{/each}
+			</ul>
 		</div>
 	{/if}
-	{#snippet foot()}
-		<a href={withBase('/alerts')}>{rows.length > LIMIT ? m.overview_needs_more({ count: rows.length }) : m.w9dash_common_all_alerts()}</a>
-		{#if !fill}<a href={withBase('/alerts?tab=now&maintenance=1')}>{m.w9dash_problems_maintenance_link()}</a>{/if}
-	{/snippet}
 </WidgetCard>

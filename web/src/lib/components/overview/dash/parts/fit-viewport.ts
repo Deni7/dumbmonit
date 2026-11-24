@@ -1,7 +1,7 @@
 /**
  * The height that makes a box end exactly where the window does, so the page
- * itself never scrolls (the Hybrid dashboard): the window's height, less what
- * sits above the box (header, banners, the layout switcher: its top on the
+ * itself never scrolls (the overview): the window's height, less what
+ * sits above the box (header, banners, the "updated" line: its top on the
  * page) and what sits under it (the bottom padding of `<main>` and what the
  * shell puts after it, such as the version line). Fixed and hidden elements
  * take no room and are skipped.

@@ -1,108 +1,44 @@
 <script lang="ts">
 	import { withBase } from '#lib/paths.js';
 	/**
-	 * Overview: three figures, then what needs attention (only what is broken, with
-	 * its quick action) beside the incidents of the week and what is coming up
-	 * (expiries, disks, backups, vulnerabilities, update), then the fleet's
-	 * response time over the range. The whole fleet lives on Monitors. A fresh instance gets the first-run guide (administrators)
-	 * or a way in instead.
+	 * Overview: one screen, without scrolling the page on a wide window (see
+	 * `overview/dash/Dashboard.svelte`): three figures, what to act on now,
+	 * what is coming up, the recent events, the service checks and the fleet
+	 * by site. A fresh instance gets the first-run guide (administrators) or a
+	 * way in instead.
 	 *
 	 * Monitors, probes and alerts come from the app-wide store (polled every
-	 * 30 s); availability, latency and the alert history from the fleet
-	 * store (one set of queries, refreshed every minute while LIVE is on).
+	 * 30 s); the dashboard's own figures from the widgets store (one request,
+	 * every minute); the alert history from the fleet store.
 	 */
 	import { untrack } from 'svelte';
 	import { getOnboarding, listCollectors, type OnboardingState } from '#lib/api/index.js';
-	import { countAlertsByTarget, countsAsProblem } from '#lib/alerts-attention.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { alertsStore } from '#lib/stores/alerts.svelte.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import { consoleState } from '#lib/stores/console.svelte.js';
-	import { Button, EmptyState, ErrorNotice, calmMotion } from '#lib/ui/index.js';
+	import { Button, EmptyState, ErrorNotice } from '#lib/ui/index.js';
 	import FirstRun from '#lib/components/overview/FirstRun.svelte';
-	import NeedsAttention from '#lib/components/overview/NeedsAttention.svelte';
-	import FleetLatency from '#lib/components/overview/FleetLatency.svelte';
 	import UpdatedAgo from '#lib/components/alerts/UpdatedAgo.svelte';
-	import AlertTrend from '#lib/components/overview/AlertTrend.svelte';
-	import ComingUp from '#lib/components/overview/ComingUp.svelte';
-	import LayoutSwitcher from '#lib/components/overview/dash/LayoutSwitcher.svelte';
-	import LayoutCommand from '#lib/components/overview/dash/LayoutCommand.svelte';
-	import LayoutNoc from '#lib/components/overview/dash/LayoutNoc.svelte';
-	import LayoutHybrid from '#lib/components/overview/dash/LayoutHybrid.svelte';
-	import { layoutChoice, widgetsStore } from '#lib/components/overview/dash/widgets.svelte.js';
+	import Dashboard from '#lib/components/overview/dash/Dashboard.svelte';
+	import { widgetsStore } from '#lib/components/overview/dash/widgets.svelte.js';
 	import { fleetStore } from './fleet.svelte.js';
-	import { mean } from './fleet.js';
-	import { consoleStatus, type ConsoleStatus } from './status.js';
 
 	// One subscription for the life of the view; the range is followed separately.
 	$effect(() => untrack(() => fleetStore.start()));
-	// A new range reloads the figures at once.
+	$effect(() => untrack(() => widgetsStore.start()));
+	// A new range reloads the figures at once (the first load comes with `start`).
 	$effect(() => {
 		consoleState.range;
 		fleetStore.rangeChanged();
 	});
-
-	// The dashboards (Command, NOC, Hybrid) read one more route; polled only while one is shown.
-	const dashboard = $derived(layoutChoice.value !== 'classic');
-	$effect(() => {
-		if (!dashboard) return;
-		return untrack(() => widgetsStore.start());
-	});
-	// A new range reloads their figures at once (the first load comes with `start`).
 	let widgetsRange = untrack(() => consoleState.range);
 	$effect(() => {
 		const range = consoleState.range;
 		const changed = range !== widgetsRange;
 		widgetsRange = range;
-		if (changed && dashboard) untrack(() => void widgetsStore.refresh());
+		if (changed) untrack(() => void widgetsStore.refresh());
 	});
-
-	const alertCounts = $derived(countAlertsByTarget(alertsStore.alerts));
-
-	const monitors = $derived<{ id: number; name: string; status: ConsoleStatus }[]>(
-		alertsStore.targets.map((target) => ({
-			id: target.id,
-			name: target.name,
-			status: consoleStatus(target, alertsStore.probes.get(target.id), alertCounts.get(target.id))
-		}))
-	);
-
-	// --- The three figures (MTTR lives in Status › Reports) -----------------------
-	const total = $derived(monitors.filter((r) => r.status !== 'paused').length);
-	const up = $derived(monitors.filter((r) => r.status === 'up' || r.status === 'degraded').length);
-	const down = $derived(monitors.filter((r) => r.status === 'down').length);
-	const paused = $derived(monitors.filter((r) => r.status === 'paused').length);
-	const availability = $derived(mean(fleetStore.figures.uptime30.values()));
-	const firing = $derived(alertsStore.alerts.filter(countsAsProblem));
-	const critical = $derived(firing.filter((a) => a.severity === 'critical').length);
-
-	type Kpi = { id: string; label: string; value: string; unit: string; note: string; noteTone: string };
-	const kpis = $derived<Kpi[]>([
-		{
-			id: 'up',
-			label: m.console_kpi_up(),
-			value: String(up),
-			unit: m.console_kpi_up_unit({ total }),
-			note: m.console_kpi_up_note({ down, paused }),
-			noteTone: down > 0 ? 'text-warning-ink' : 'text-ink-2'
-		},
-		{
-			id: 'availability',
-			label: m.console_kpi_availability(),
-			value: availability === null ? '—' : availability >= 99.9995 ? '100' : availability.toFixed(2),
-			unit: availability === null ? '' : '%',
-			note: availability === null ? m.console_kpi_none() : m.console_kpi_availability_note({ count: fleetStore.figures.uptime30.size }),
-			noteTone: 'text-ink-2'
-		},
-		{
-			id: 'alerts',
-			label: m.console_kpi_alerts(),
-			value: String(firing.length),
-			unit: '',
-			note: m.console_kpi_alerts_note({ critical, warning: firing.length - critical }),
-			noteTone: critical > 0 ? 'text-warning-ink' : firing.length > 0 ? 'text-advisory-ink' : 'text-ink-2'
-		}
-	]);
 
 	// --- Empty state -------------------------------------------------------------
 	/** Nothing read yet: the line waits rather than say "nothing to watch". */
@@ -142,8 +78,6 @@
 			})
 			.split('\u0000')
 	);
-
-	const animate = !calmMotion();
 </script>
 
 <div class="flex min-h-0 flex-1 flex-col gap-4">
@@ -173,46 +107,8 @@
 			{/snippet}
 		</EmptyState>
 	{:else}
-		<!-- Height kept: the switcher is always there and the text appearing does not shift anything. -->
-		<div class="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-2">
-			<LayoutSwitcher />
-			<div class="ml-auto"><UpdatedAgo updatedAt={alertsStore.updatedAt} /></div>
-		</div>
-		{#if layoutChoice.value === 'command'}
-			<LayoutCommand />
-		{:else if layoutChoice.value === 'noc'}
-			<LayoutNoc />
-		{:else if layoutChoice.value === 'hybrid'}
-			<LayoutHybrid />
-		{:else}
-			<div class="grid grid-cols-2 gap-3 lg:grid-cols-3">
-				{#each kpis as kpi, i (kpi.id)}
-					<div class={`min-w-0 rounded-xl border border-line bg-surface px-4 py-3.5 max-lg:last:col-span-2 sm:px-[18px] sm:py-4 ${animate ? 'rise-in' : ''}`} style={`--rise-delay: ${i * 40}ms`}>
-						<p class="m-0 truncate text-sm font-medium text-ink-2">{kpi.label}</p>
-						<p class="m-0 mt-2 flex items-baseline gap-1.5">
-							{#key kpi.value}
-								<span class="state-in font-mono text-2xl leading-none font-medium tracking-[-0.03em] text-ink tabular-nums sm:text-[2rem]">{kpi.value}</span>
-							{/key}
-							{#if kpi.unit}<span class="truncate text-sm text-ink-3 sm:text-base">{kpi.unit}</span>{/if}
-						</p>
-						<p class={`m-0 mt-2 truncate text-xs font-medium ${kpi.noteTone}`}>{kpi.note}</p>
-					</div>
-				{/each}
-			</div>
-
-			{#if fleetStore.error}
-				<ErrorNotice error={fleetStore.error} />
-			{/if}
-
-			<div class="grid items-stretch gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-				<NeedsAttention />
-				<div class="flex min-w-0 flex-col gap-3">
-					<div class="flex min-h-0 flex-1 flex-col [&>section]:flex-1"><AlertTrend /></div>
-					<ComingUp />
-				</div>
-			</div>
-
-			<FleetLatency />
-		{/if}
+		<!-- Height kept: the line appearing after the first poll does not shift the panels. -->
+		<div class="-mb-2 flex min-h-5 justify-end"><UpdatedAgo updatedAt={alertsStore.updatedAt} /></div>
+		<Dashboard />
 	{/if}
 </div>

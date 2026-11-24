@@ -939,8 +939,6 @@
 	],
 	"console_breadcrumb": "パンくずリスト",
 	"console_egg": "// 1分あたり{count}回のチェック。おやすみなさい、あとは任せてください。",
-	"console_kpi_alerts": "未解決のアラート",
-	"console_kpi_alerts_note": "重大：{critical}、警告：{warning}",
 	"console_kpi_availability": "稼働率 30日",
 	"console_kpi_availability_note": "測定中のモニター：{count}",
 	"console_kpi_none": "データはまだありません",
@@ -950,7 +948,6 @@
 	"console_live": "ライブ",
 	"console_live_off": "ライブ更新は一時停止中です。選択すると再開します。",
 	"console_live_on": "ライブ更新はオンです。選択すると一時停止します。",
-	"console_panel_attention": "要確認",
 	"console_panel_oncall_unknown": "誰か",
 	"console_paused": "一時停止",
 	"console_range": "期間",
@@ -5660,9 +5657,6 @@
 	"overview_ack_err": "このモニターを確認済みにできませんでした。",
 	"overview_ack_hint": "確認しました、対応中です。正常に戻るまで静かになります。",
 	"overview_ack_item": "確認済みにする",
-	"overview_all_good_text": "停止しているものはなく、対応を待つアラートもありません。ハトは昼寝中です。",
-	"overview_all_good_title": "すべて順調",
-	"overview_chart_error": "このグラフを読み込めませんでした。1分後に再試行します。",
 	"overview_first_all_done": "3つともすべて完了しました。このガイドは、もう表示されません。",
 	"overview_first_channel_action": "チャンネルを追加",
 	"overview_first_channel_text": "メール、ntfy、Discord、Telegram、PagerDuty など、普段読んでいるものでかまいません。何かが起こるまで、何も送信されません。",
@@ -5686,21 +5680,6 @@
 	"overview_first_test_text": "チャンネルからテストを送信します。実際に1通届くと、このステップが緑になります。",
 	"overview_first_test_title": "メッセージが届くか確認",
 	"overview_first_title": "最初の5分間",
-	"overview_incidents_bars_label": "1日あたりのインシデント（古いものが左）",
-	"overview_incidents_before": "前の週：{value}",
-	"overview_incidents_count_label": "インシデント",
-	"overview_incidents_day_title": "{day}。インシデント：{count}件。未解決の時間：{duration}。",
-	"overview_incidents_explain": "発報から解決まで。1日あたり1本のバー。",
-	"overview_incidents_noisiest": "最も騒がしいモニター",
-	"overview_incidents_none": "過去{days}日間にインシデントはありません。",
-	"overview_incidents_open_label": "未解決の時間",
-	"overview_incidents_title": "インシデント（過去{days}日間）",
-	"overview_latency_empty": "この範囲では、まだ応答時間が測定されていません。",
-	"overview_latency_hint": "すべてのプローブのp95と中央値（過去{range}）",
-	"overview_latency_median": "中央値",
-	"overview_latency_p95": "p95",
-	"overview_latency_slowest": "最も遅いモニター（p95）",
-	"overview_latency_title": "応答時間",
 	"overview_mute_aria": "{name}をミュート",
 	"overview_mute_err_create": "このモニターをミュートできませんでした。",
 	"overview_mute_err_lift": "このモニターのミュートを解除できませんでした。",
@@ -5724,21 +5703,6 @@
 			],
 			"match": {
 				"countPlural=other": "ほか保留中{count}件"
-			}
-		}
-	],
-	"overview_needs_more": "アラートで{count}件すべてを見る",
-	"overview_needs_see_all": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "{count}件のモニターをすべて見る"
 			}
 		}
 	],
@@ -5924,15 +5888,7 @@
 	],
 	"overview_upcoming_due_now": "今すぐ",
 	"overview_upcoming_due_today": "今日",
-	"overview_upcoming_empty": "今後{days}日間に期限のものはありません。",
-	"overview_upcoming_error": "今後の予定を読み取れませんでした。",
-	"overview_upcoming_kind_backup": "バックアップ",
-	"overview_upcoming_kind_disk": "ディスク",
-	"overview_upcoming_kind_update": "更新",
-	"overview_upcoming_kind_vulnerability": "脆弱性",
 	"overview_upcoming_list_label": "今後の予定（緊急度の高い順）",
-	"overview_upcoming_scope": "証明書、ドメイン、ディスク、バックアップ、脆弱性を監視しています。",
-	"overview_upcoming_see_all": "すべて見る",
 	"overview_upcoming_t_backup": "{what}のバックアップが遅れる見込み",
 	"overview_upcoming_t_backup_late": "{what}のバックアップが遅れています",
 	"overview_upcoming_t_disk": "{what}が満杯になる見込み",
@@ -9429,10 +9385,6 @@
 	"upgrade_notice_title": "適用する設定の変更",
 	"upgrade_notice_view": "表示",
 	"w10hybrid_coming_empty": "予定や近く期限を迎えるものはありません。",
-	"w10hybrid_kpi_budget_left": "残りのエラーバジェット：{pct}%",
-	"w10hybrid_kpi_budget_low": "残りバジェット：{pct}%",
-	"w10hybrid_kpi_budget_spent": "エラーバジェットを使い切りました",
-	"w10hybrid_kpi_oldest": "最も古いもの：{age}",
 	"w10hybrid_kpi_problems": "未解決の問題",
 	"w10hybrid_services_p95": "p95 {value}",
 	"w1alerts_channels_copy_name": "{name}（コピー）",
@@ -9534,8 +9486,6 @@
 	"w1wall_notice_maintenance": "メンテナンス中：{title}",
 	"w1wall_notice_maintenance_until": "メンテナンス中：{title}、{time}まで",
 	"w1wall_notice_more": "+{count}",
-	"w1wall_overview_trend_days": "{days}日",
-	"w1wall_overview_trend_period": "期間",
 	"w1wall_settings_clock_12h": "12時間",
 	"w1wall_settings_clock_24h": "24時間",
 	"w1wall_settings_clock_label": "時計の形式",
@@ -10572,68 +10522,10 @@
 	"w8wp_discovery_on": "WordPress バナーなどのサイト用プラグインが、サーバーの公開ページ一覧からこのページを見つけられます。",
 	"w8wp_discovery_private": "非公開のページが公開ページの一覧に載ることはありません。",
 	"w8wp_discovery_unpublished": "公開ページの一覧に載るのは公開済みのページだけです。",
-	"w9dash_agents_connected": "接続中",
-	"w9dash_agents_disconnected": "切断",
-	"w9dash_agents_empty": "エージェントはまだインストールされていません。",
-	"w9dash_agents_install": "エージェントをインストール",
-	"w9dash_agents_last_contact": "最終接続 {ago}",
-	"w9dash_agents_manage": "エージェントを管理",
-	"w9dash_agents_never_seen": "未接続",
-	"w9dash_agents_on_latest": "{count} 台が {version}（最新）",
-	"w9dash_agents_on_version": "{count} 台が {version}",
-	"w9dash_agents_title": "エージェント",
-	"w9dash_agents_total": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "エージェント {count} 台"
-			}
-		}
-	],
-	"w9dash_agents_update": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "{count} 台を更新"
-			}
-		}
-	],
-	"w9dash_common_all_alerts": "すべてのアラート",
 	"w9dash_common_error": "これらの数値を読み込めませんでした。",
-	"w9dash_common_last_30_days": "過去 30 日",
-	"w9dash_common_sev_critical": "重大",
-	"w9dash_common_sev_warning": "警告",
 	"w9dash_common_this_site": "このサイト",
-	"w9dash_common_today_at": "今日 {time}",
-	"w9dash_events_alerts": "アラート",
-	"w9dash_events_all": "すべて",
-	"w9dash_events_audit": "監査ログ",
-	"w9dash_events_changes": "変更",
 	"w9dash_events_empty": "最近は何も起きていません。",
-	"w9dash_events_empty_filter": "最近この種類のイベントはありません。",
-	"w9dash_events_filter": "表示",
-	"w9dash_events_history": "全履歴",
 	"w9dash_events_title": "最近のイベント",
-	"w9dash_expiries_all": "すべての期限",
-	"w9dash_expiries_bar_hint": "期日が近づくほど満ちる（{days} 日スケール）",
-	"w9dash_expiries_more": "{count} 件すべて表示",
-	"w9dash_expiries_sub": "今後 {days} 日間",
-	"w9dash_expiries_title": "期限と予測",
-	"w9dash_expiries_vulns": "脆弱性",
-	"w9dash_kpi_all_up": "すべて稼働中",
-	"w9dash_kpi_avail_delta": "前の 30 日比 {delta} ポイント",
 	"w9dash_kpi_avail_note": "目標 {target}%",
 	"w9dash_kpi_bars_label": "モニターごとに 1 本、サイト別。高い棒はダウンしているモニター",
 	"w9dash_kpi_budget_left": "残りのエラーバジェット",
@@ -10651,37 +10543,7 @@
 			}
 		}
 	],
-	"w9dash_kpi_down": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "ダウン {count} 件"
-			}
-		}
-	],
-	"w9dash_kpi_last_closed": "最後のアラートは {ago} に解決",
-	"w9dash_kpi_none_open": "未解決なし",
 	"w9dash_kpi_opened_label": "過去 {days} 日間の 1 日あたりの新規アラート",
-	"w9dash_kpi_opened_week": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "今週 {count} 件、先週 {previous} 件"
-			}
-		}
-	],
 	"w9dash_kpi_paused": [
 		{
 			"declarations": [
@@ -10710,7 +10572,6 @@
 			}
 		}
 	],
-	"w9dash_kpi_today": "今日",
 	"w9dash_kpi_warning": [
 		{
 			"declarations": [
@@ -10725,82 +10586,6 @@
 			}
 		}
 	],
-	"w9dash_maint_empty": "今後 {days} 日間にメンテナンスの予定はなく、一時停止中のモニターもありません。",
-	"w9dash_maint_error": "メンテナンス期間を読み込めませんでした。",
-	"w9dash_maint_lasts": "所要 {duration}",
-	"w9dash_maint_lasts_recurring": "所要 {duration}、繰り返し",
-	"w9dash_maint_now": "現在",
-	"w9dash_maint_running": "実施中",
-	"w9dash_maint_schedule": "予定する",
-	"w9dash_maint_strip_label": "今後 {days} 日間のメンテナンス期間（サイト別）",
-	"w9dash_maint_sub": "今後 {days} 日間",
-	"w9dash_maint_title": "メンテナンス",
-	"w9dash_pages_all": "すべてのステータスページ",
-	"w9dash_pages_create": "ステータスページを作成",
-	"w9dash_pages_draft": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "下書き、{count} サービス"
-			}
-		}
-	],
-	"w9dash_pages_empty": "ステータスページはまだありません。",
-	"w9dash_pages_error": "ステータスページを読み込めませんでした。",
-	"w9dash_pages_maintenance": "メンテナンス",
-	"w9dash_pages_major": "大規模障害",
-	"w9dash_pages_operational": "稼働中",
-	"w9dash_pages_partial": "一部障害",
-	"w9dash_pages_password": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "パスワード保護、{count} サービス"
-			}
-		}
-	],
-	"w9dash_pages_post": "更新を投稿",
-	"w9dash_pages_public": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "公開、{count} サービス"
-			}
-		}
-	],
-	"w9dash_pages_title": "ステータスページ",
-	"w9dash_pages_users": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "サインイン済みユーザーのみ、{count} サービス"
-			}
-		}
-	],
 	"w9dash_problems_ack_recovery": "再び応答するまで",
 	"w9dash_problems_calm_since": "{time} 以降、未解決の問題はありません。",
 	"w9dash_problems_calm_text": "すべてのモニターが応答し、未解決のアラートはありません。",
@@ -10811,9 +10596,7 @@
 	"w9dash_problems_col_problem": "問題",
 	"w9dash_problems_col_severity": "重大度",
 	"w9dash_problems_lasted": "継続 {span}",
-	"w9dash_problems_maintenance_link": "サイレンスとメンテナンス",
 	"w9dash_problems_no_answer": "チェックに応答なし",
-	"w9dash_problems_no_site": "サイトなし",
 	"w9dash_problems_not_acked": "未確認",
 	"w9dash_problems_not_notified": "通知は未送信",
 	"w9dash_problems_notified": "{ago}に通知",
@@ -10821,133 +10604,9 @@
 	"w9dash_problems_resolved": "最近解決",
 	"w9dash_problems_resolved_plate": "解決",
 	"w9dash_problems_since": "{time} から",
-	"w9dash_problems_site_clear": "未解決なし",
-	"w9dash_problems_sub": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "未解決 {count} 件、深刻な順"
-			}
-		}
-	],
-	"w9dash_problems_title": "問題",
-	"w9dash_response_acked_fast": "15 分以内に確認",
-	"w9dash_response_alerts": "アラート",
-	"w9dash_response_before": "前回 {previous}",
-	"w9dash_response_before_pct": "前回 {previous}、{pct}%",
-	"w9dash_response_chart_label": "{days} 日間の 1 日あたりのアラート（重大度別）",
-	"w9dash_response_mtta": "MTTA",
-	"w9dash_response_mttr": "MTTR",
-	"w9dash_response_noisiest": "最多：",
-	"w9dash_response_noisiest_rule": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "{rule}、{count} 件"
-			}
-		}
-	],
-	"w9dash_response_title": "アラートと対応",
-	"w9dash_response_tune": "ルールを調整",
-	"w9dash_slo_all": "すべての目標",
-	"w9dash_slo_create": "目標を設定",
-	"w9dash_slo_empty": "サービスレベル目標はまだありません。",
-	"w9dash_slo_error": "目標を読み込めませんでした。",
-	"w9dash_slo_fast": "高速消費",
-	"w9dash_slo_left": "残りバジェット {percent}%",
-	"w9dash_slo_more": "{count} 件すべて表示",
-	"w9dash_slo_slow": "低速消費",
-	"w9dash_slo_spent": "バジェット超過",
-	"w9dash_slo_target": "目標 {target}%",
-	"w9dash_slo_title": "SLO",
-	"w9dash_slo_unmeasured": "未計測",
-	"w9dash_slo_window": "{days} 日間",
 	"w9dash_status_degraded": "低下",
 	"w9dash_status_paused": "一時停止",
 	"w9dash_status_up": "稼働中",
-	"w9layout_backups_changed": "変更量",
-	"w9layout_backups_duration": "所要時間",
-	"w9layout_backups_empty": "バックアップジョブの報告はまだありません。PBS、Synology、restic、borg、Veeam のジョブがここに表示されます。",
-	"w9layout_backups_engine": "エンジン",
-	"w9layout_backups_failed": "失敗",
-	"w9layout_backups_job": "ジョブ",
-	"w9layout_backups_last_success": "最終成功",
-	"w9layout_backups_never": "なし",
-	"w9layout_backups_ok": "OK",
-	"w9layout_backups_reports": "レポート",
-	"w9layout_backups_running": "実行中",
-	"w9layout_backups_runs": "直近 14 回の実行",
-	"w9layout_backups_runs_failed": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "直近 {count} 回の実行のうち {failed} 回失敗"
-			}
-		}
-	],
-	"w9layout_backups_runs_ok": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "直近 {count} 回の実行はすべて成功"
-			}
-		}
-	],
-	"w9layout_backups_stale": "古い",
-	"w9layout_backups_status": "状態",
-	"w9layout_backups_sub_check": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "{count} 件のジョブ、要確認 {check} 件"
-			}
-		}
-	],
-	"w9layout_backups_sub_fresh": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "{count} 件のジョブ、すべて最新"
-			}
-		}
-	],
-	"w9layout_backups_title": "バックアップ",
 	"w9layout_category_backups": "バックアップ",
 	"w9layout_category_network": "ネットワーク",
 	"w9layout_category_other": "その他",
@@ -10973,78 +10632,11 @@
 	],
 	"w9layout_health_healthy": "正常",
 	"w9layout_health_idle": "監視対象なし",
-	"w9layout_hex_site_aria": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "{site}：{count} 件中 {up} 件稼働、{down} 件停止"
-			}
-		}
-	],
-	"w9layout_hex_sub": "モニターごとに1セル、拠点・カテゴリ順",
-	"w9layout_hex_title": "フリートマップ",
 	"w9layout_hybrid_act_now": "今すぐ対応",
 	"w9layout_hybrid_band_label": "今対応が必要なこと",
-	"w9layout_matrix_cell_degraded": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "{up} / {total}、{count} 件低下"
-			}
-		}
-	],
-	"w9layout_matrix_cell_down": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "{up} / {total}、{count} 件停止"
-			}
-		}
-	],
-	"w9layout_matrix_cell_paused": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "{up} / {total}、{count} 件一時停止"
-			}
-		}
-	],
-	"w9layout_matrix_next_maintenance": "次回メンテナンス",
-	"w9layout_matrix_none": "なし",
-	"w9layout_matrix_site": "拠点",
-	"w9layout_matrix_sub": "モニターごとに1つの印",
-	"w9layout_matrix_title": "拠点・カテゴリ別の状態",
-	"w9layout_matrix_wan": "WAN 遅延（{range}）",
-	"w9layout_matrix_wan_local": "この拠点",
-	"w9layout_matrix_wan_none": "データはまだありません",
 	"w9layout_monitor_title": "{name}、{kind}：{status}",
 	"w9layout_monitor_title_bare": "{name}：{status}",
 	"w9layout_ms": "{value} ms",
-	"w9layout_next_deadlines_link": "すべての期限",
 	"w9layout_next_empty": [
 		{
 			"declarations": [
@@ -11061,7 +10653,6 @@
 	],
 	"w9layout_next_maint_active": "メンテナンス中",
 	"w9layout_next_maint_meta": "メンテナンス時間帯、{duration}",
-	"w9layout_next_maintenance_link": "メンテナンス",
 	"w9layout_next_now": "現在",
 	"w9layout_next_title": [
 		{
@@ -11078,13 +10669,7 @@
 		}
 	],
 	"w9layout_next_until": "{time} まで",
-	"w9layout_noc_problems_title": "拠点別の問題",
-	"w9layout_none_planned": "予定なし",
 	"w9layout_pct": "{value}%",
-	"w9layout_rate": "{value} {unit}",
-	"w9layout_services_30d": "30 日",
-	"w9layout_services_all": "すべてのモニター",
-	"w9layout_services_beats": "直近のチェック",
 	"w9layout_services_beats_failed": [
 		{
 			"declarations": [
@@ -11113,29 +10698,8 @@
 			}
 		}
 	],
-	"w9layout_services_check": "チェック",
 	"w9layout_services_empty": "サービスチェックはまだありません。HTTP・DNS・TLS・SMTP・ping のチェックがここに表示されます。",
-	"w9layout_services_p95": "p95",
-	"w9layout_services_state": "状態",
-	"w9layout_services_sub": "HTTP・DNS・TLS などのチェック、悪い順",
 	"w9layout_services_title": "サービス",
-	"w9layout_sites_last_backup": "最終バックアップ",
-	"w9layout_sites_no_backup": "報告なし",
-	"w9layout_sites_sub": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "モニター {count} 件"
-			}
-		}
-	],
-	"w9layout_sites_title": "拠点",
 	"w9layout_sites_up_of": [
 		{
 			"declarations": [
@@ -11156,76 +10720,9 @@
 	"w9layout_status_down": "停止",
 	"w9layout_status_paused": "一時停止",
 	"w9layout_status_up": "稼働中",
-	"w9layout_sun_aria": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "{count} 件中 {up} 件稼働、{down} 件停止、{degraded} 件低下"
-			}
-		}
-	],
-	"w9layout_sun_category_title": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "{site}、{category}：{count} 件のモニター"
-			}
-		}
-	],
-	"w9layout_sun_center": "モニター稼働",
-	"w9layout_sun_rings": "内側：拠点 · 中央：カテゴリ · 外側：モニター",
-	"w9layout_sun_sub": "拠点、カテゴリ、モニター",
 	"w9layout_sun_title": "拠点別フリート",
-	"w9layout_switch_classic": "クラシック",
-	"w9layout_switch_command": "コマンド",
-	"w9layout_switch_hybrid": "ハイブリッド",
-	"w9layout_switch_legend": "概要のレイアウト",
-	"w9layout_switch_noc": "NOC",
-	"w9layout_top_cpu": "CPU",
-	"w9layout_top_disk": "ディスク",
-	"w9layout_top_empty": "まだ数値がありません。エージェントとコレクターがここに CPU、メモリ、ディスク、ネットワークを報告します。",
-	"w9layout_top_forecast": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=other": "{site}、約 {count} 日で満杯"
-			}
-		}
-	],
-	"w9layout_top_mem": "メモリ",
-	"w9layout_top_metric": "指標",
-	"w9layout_top_net": "ネットワーク",
-	"w9layout_top_sub_pct": "現在の使用率（%）、{range} の推移",
-	"w9layout_top_sub_rate": "現在の Mb/s、{range} の推移",
-	"w9layout_top_title": "リソース使用上位",
-	"w9layout_top_title_cpu": "CPU 上位 5",
-	"w9layout_top_title_disk": "ディスク上位 5",
-	"w9layout_top_title_mem": "メモリ上位 5",
-	"w9layout_top_title_net": "ネットワーク上位 5",
-	"w9layout_when_today": "今日 {time}",
 	"w9layout_when_today_bare": "今日",
-	"w9layout_when_tomorrow": "明日 {time}",
 	"w9layout_when_tomorrow_bare": "明日",
-	"w9layout_when_weekday": "{day} {time}",
-	"w9layout_when_yesterday": "昨日 {time}",
 	"w9layout_when_yesterday_bare": "昨日",
 	"wall_band_problems": "問題",
 	"wall_band_problems_note": "重大なアラートと停止中のモニター",

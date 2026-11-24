@@ -1,7 +1,6 @@
 /**
- * The words of the dashboard widgets that several of them share: status
- * words, two-part durations, clock times and the lines of an upcoming row
- * (the same sentences as "Coming up" on the classic overview).
+ * The words that several overview panels share: status words, two-part
+ * durations, clock times and the lines of a "Coming up" row.
  */
 import { parseServerDate } from '#lib/format.js';
 import { m } from '#lib/paraglide/messages.js';
@@ -59,21 +58,6 @@ export function clockText(value: string | Date | null | undefined, now = new Dat
 	return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-/**
- * When something will happen, as short as it can be read: "Today 22:00",
- * "Wed 06:00" within the week, "Dec 2" after.
- */
-export function soonText(value: string | Date | null | undefined, now = new Date()): string {
-	const date = value instanceof Date ? value : parseServerDate(value);
-	if (!date) return '';
-	const time = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-	if (sameDay(date, now)) return m.w9dash_common_today_at({ time });
-	if (date.getTime() > now.getTime() && date.getTime() - now.getTime() < 6 * 86400_000) {
-		return `${date.toLocaleDateString(undefined, { weekday: 'short' })} ${time}`;
-	}
-	return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
 /** A day of a daily series (`YYYY-MM-DD`, UTC) as "Nov 10". */
 export function dayText(day: string): string {
 	const date = new Date(`${day}T12:00:00Z`);
@@ -81,34 +65,7 @@ export function dayText(day: string): string {
 	return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-// --- Upcoming rows (the same sentences as `ComingUp.svelte`) ------------------
-
-export function upcomingKind(row: UpcomingRow): string {
-	switch (row.kind) {
-		case 'certificate':
-			return m.deadlines_kind_certificate();
-		case 'domain':
-			return m.deadlines_kind_domain();
-		case 'credential':
-			return m.deadlines_kind_credential();
-		case 'product':
-			return m.deadlines_kind_product();
-		case 'key':
-			return m.deadlines_kind_key();
-		case 'license':
-			return m.deadlines_kind_license();
-		case 'disk':
-			return m.overview_upcoming_kind_disk();
-		case 'backup':
-			return m.overview_upcoming_kind_backup();
-		case 'vulnerability':
-			return m.overview_upcoming_kind_vulnerability();
-		case 'update':
-			return m.overview_upcoming_kind_update();
-		default:
-			return row.kind;
-	}
-}
+// --- "Coming up" rows ----------------------------------------------------------
 
 function dueDate(row: UpcomingRow): string {
 	const at = parseServerDate(row.at);

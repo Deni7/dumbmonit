@@ -1,11 +1,14 @@
 <script lang="ts">
 	import { withBase } from '#lib/paths.js';
 	/**
-	 * One row of the dashboards' problems table: severity, monitor (its kind
+	 * One row of "Act now": severity, monitor (its kind
 	 * and site), the problem, how long it has lasted, who took it (or that
 	 * nobody has, and whether anyone was told), and the quick actions. Wide
-	 * cards lay it out as a table row; narrow ones (a container query) stack it.
+	 * panels lay it out as a table row; narrow ones (a container query) stack
+	 * it. Sizes from `scale.ts`; the taken / not taken line has the alerts
+	 * page's icons.
 	 */
+	import { AlertTriangle, BellOff, CheckCheck } from 'lucide-svelte';
 	import AlertActions from '#lib/components/alerts/AlertActions.svelte';
 	import { alertDetail, severityTone, severityWord } from '#lib/components/alerts/helpers.js';
 	import type { Silence } from '#lib/api/index.js';
@@ -15,8 +18,8 @@
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import { Button, Plate } from '#lib/ui/index.js';
 	import MuteControl from '../../MuteControl.svelte';
-	import Glyph from './Glyph.svelte';
 	import { actorName, initials, type ProblemRow } from './problems.js';
+	import { INLINE_ICON, ROW, TEXT_BODY, TEXT_MAIN, TEXT_SUB } from './scale.js';
 	import type { MonitorPlace } from './site-index.js';
 	import { clockText, durationText } from './words.js';
 
@@ -56,15 +59,16 @@
 	const age = $derived(since ? durationText(Math.max(0, (now - since.getTime()) / 1000)) : '');
 	const who = $derived(actorName(problem.acked?.by));
 	const notifiedAt = $derived(row.kind === 'alert' ? row.alert.last_notified_at : null);
-	const meta = 'block truncate text-[0.8125rem] text-ink-2';
+	const meta = `block truncate ${TEXT_SUB}`;
+	const takenLine = 'inline-flex items-center gap-1.5 text-[0.8125rem] font-semibold';
 </script>
 
-<li class={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-1 border-t border-line px-4 py-2 @3xl:grid-cols-[6.5rem_minmax(0,1.15fr)_minmax(0,1.7fr)_4.75rem_minmax(0,1.15fr)_auto] ${problem.acked || problem.muted ? 'bg-surface-2/40' : ''}`}>
+<li class={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-1 ${ROW} @3xl:grid-cols-[6.5rem_minmax(0,1.15fr)_minmax(0,1.7fr)_4.75rem_minmax(0,1.15fr)_auto] ${problem.acked || problem.muted ? 'bg-surface-2/40' : ''}`}>
 	<div class="order-1 min-w-0 @3xl:order-none">
 		<Plate {tone} label={plate} class="max-w-full min-w-0 truncate" />
 	</div>
 	<div class="order-3 col-span-2 min-w-0 @3xl:order-none @3xl:col-span-1">
-		<a href={withBase(href)} class="block truncate text-sm font-semibold text-ink hover:underline">{name}</a>
+		<a href={withBase(href)} class={`block truncate hover:underline ${TEXT_MAIN}`}>{name}</a>
 		{#if place || problem.held > 0}
 			<span class={meta}>
 				{#if place}{m.w9dash_problems_place({ kind: place.kind, site: place.siteName })}{/if}
@@ -73,21 +77,21 @@
 		{/if}
 	</div>
 	<div class="order-4 col-span-2 min-w-0 @3xl:order-none @3xl:col-span-1">
-		<span class="block truncate text-sm font-medium text-ink" title={what}>{what}</span>
+		<span class={`block truncate ${TEXT_BODY}`} title={what}>{what}</span>
 		{#if detail}<span class={meta} title={detail}>{detail}</span>{/if}
 	</div>
 	<div class="order-2 min-w-0 text-right @3xl:order-none @3xl:text-left">
 		{#if since}
-			<span class="block font-mono text-sm font-medium whitespace-nowrap text-ink tabular-nums">{age}</span>
+			<span class="block text-sm font-medium whitespace-nowrap text-ink tabular-nums">{age}</span>
 			<span class={meta}>{m.w9dash_problems_since({ time: clockText(since) })}</span>
 		{/if}
 	</div>
 	<div class="order-5 col-span-2 min-w-0 @3xl:order-none @3xl:col-span-1">
 		{#if problem.acked}
-			<span class="inline-flex items-center gap-1.5 text-[0.8125rem] font-semibold text-ink-2">
-				<Glyph name="ack" />{m.overview_sky_plate_acked()}
+			<span class={`${takenLine} text-ink-2`}>
+				<CheckCheck class={INLINE_ICON} aria-hidden="true" />{m.overview_sky_plate_acked()}
 			</span>
-			<span class={`${meta} flex items-center gap-1`}>
+			<span class={`flex min-w-0 items-center gap-1 ${TEXT_SUB}`}>
 				{#if who}
 					<span aria-hidden="true" class="inline-grid size-5 shrink-0 place-items-center rounded-full bg-surface-2 text-[0.625rem] font-bold text-ink">{initials(who)}</span>
 					<span class="truncate">{who}</span>
@@ -96,12 +100,12 @@
 				{/if}
 			</span>
 		{:else if problem.muted}
-			<span class="inline-flex items-center gap-1.5 text-[0.8125rem] font-semibold text-ink-2">
-				<Glyph name="paused" />{m.overview_sky_plate_snoozed()}
+			<span class={`${takenLine} text-ink-2`}>
+				<BellOff class={INLINE_ICON} aria-hidden="true" />{m.overview_sky_plate_snoozed()}
 			</span>
 		{:else}
-			<span class="inline-flex items-center gap-1.5 text-[0.8125rem] font-semibold text-warning-ink">
-				<Glyph name="warn" />{m.w9dash_problems_not_acked()}
+			<span class={`${takenLine} text-warning-ink`}>
+				<AlertTriangle class={INLINE_ICON} aria-hidden="true" />{m.w9dash_problems_not_acked()}
 			</span>
 			<span class={meta}>
 				{notifiedAt ? m.w9dash_problems_notified({ ago: formatRelative(notifiedAt) }) : m.w9dash_problems_not_notified()}

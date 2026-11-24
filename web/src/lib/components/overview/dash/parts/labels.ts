@@ -1,10 +1,10 @@
 /**
- * Words of the site views: statuses, categories, a group's health, and the
- * dates of rows ("Today 22:00", "Wed 06:00", "Dec 2"). Kept apart from the
- * pure helpers, which stay free of Paraglide for `node --test`.
+ * Words of "Fleet by site", "Services" and "Coming up": statuses,
+ * categories, a group's health, and the day of a row ("Today", "Wed 25",
+ * "Dec 2"). Kept apart from the pure helpers, which stay free of Paraglide
+ * for `node --test`.
  */
 import type { WidgetCategory, WidgetStatus } from '#lib/api/index.js';
-import { parseServerDate } from '#lib/format.js';
 import { m } from '#lib/paraglide/messages.js';
 import { getLocale } from '#lib/paraglide/runtime.js';
 import { displayPrefs } from '#lib/stores/prefs.svelte.js';
@@ -23,13 +23,6 @@ export function statusWord(status: WidgetStatus): string {
 			return m.w9layout_status_paused();
 	}
 }
-
-export const STATUS_TONE: Record<WidgetStatus, Tone> = {
-	up: 'signal',
-	down: 'warning',
-	degraded: 'advisory',
-	paused: 'muted'
-};
 
 export function categoryLabel(category: WidgetCategory | string): string {
 	switch (category) {
@@ -99,10 +92,6 @@ export function clock(date: Date): string {
 	return format(date, { hour: '2-digit', minute: '2-digit', hour12: displayPrefs.hour12 });
 }
 
-function weekday(date: Date): string {
-	return format(date, { weekday: 'short' });
-}
-
 function shortDate(date: Date): string {
 	return format(date, { day: 'numeric', month: 'short' });
 }
@@ -114,29 +103,5 @@ export function dayLabel(date: Date, now: Date = new Date()): string {
 	if (diff === 1) return m.w9layout_when_tomorrow_bare();
 	if (diff === -1) return m.w9layout_when_yesterday_bare();
 	if (diff > 1 && diff < 7) return format(date, { weekday: 'short', day: 'numeric' });
-	return shortDate(date);
-}
-
-/** When something starts: "Today 22:00", "Tomorrow 06:00", "Wed 06:00", "Dec 2". Empty without a date. */
-export function futureWhen(value: string | null | undefined, now: Date = new Date()): string {
-	const date = parseServerDate(value);
-	if (!date) return '';
-	const diff = dayDiff(date, now);
-	const time = clock(date);
-	if (diff <= 0) return m.w9layout_when_today({ time });
-	if (diff === 1) return m.w9layout_when_tomorrow({ time });
-	if (diff < 7) return m.w9layout_when_weekday({ day: weekday(date), time });
-	return shortDate(date);
-}
-
-/** When something last happened: "02:14", "Yesterday 23:40", "Sun 03:00", "Nov 12". Empty without a date. */
-export function pastWhen(value: string | null | undefined, now: Date = new Date()): string {
-	const date = parseServerDate(value);
-	if (!date) return '';
-	const diff = dayDiff(date, now);
-	const time = clock(date);
-	if (diff >= 0) return time;
-	if (diff === -1) return m.w9layout_when_yesterday({ time });
-	if (diff > -7) return m.w9layout_when_weekday({ day: weekday(date), time });
 	return shortDate(date);
 }

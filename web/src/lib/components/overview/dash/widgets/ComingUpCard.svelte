@@ -3,13 +3,12 @@
 	 * Coming up: one list, in time order, of what is planned or due. The
 	 * maintenance windows of the next 14 days (running ones first), then the
 	 * expiries, late backups, disk forecasts (the deadlines and the
-	 * dashboards' forecasts) and critical vulnerabilities of the next 90 days,
-	 * and a DumbMonit update last (it has no date). It stands for the separate
-	 * "Next 14 days", "Maintenance" and "Expiries" cards.
+	 * widgets' forecasts) and critical vulnerabilities of the next 90 days,
+	 * and a DumbMonit update last (it has no date).
 	 *
-	 * Each row: the day and how far off, an icon whose shape says the kind,
-	 * what and where. Read every five minutes. `fill`: the card takes its
-	 * parent's height and scrolls inside.
+	 * Each row: an icon whose shape says the kind, what and where, then the
+	 * day and how far off. Read every five minutes; the panel scrolls, the
+	 * title leads to the deadlines (Reports).
 	 */
 	import { AlertTriangle, ArrowUpCircle, CalendarClock, CircleAlert, ShieldAlert, Wrench } from 'lucide-svelte';
 	import { listCves } from '#lib/api/cves.js';
@@ -26,16 +25,17 @@
 	import DataState from '../parts/DataState.svelte';
 	import { withDiskForecasts } from '../parts/expiries.js';
 	import { clock, dayLabel } from '../parts/labels.js';
-	import type { Span } from '../parts/sites.js';
+	import { uniqueKeys } from '../parts/keys.js';
+	import { ROW, ROW_ICON, TEXT_MAIN, TEXT_SIDE, TEXT_SUB } from '../parts/scale.js';
 	import { upcomingContext, upcomingDue, upcomingTitle } from '../parts/words.js';
 
-	let { span = 4, fill = false, class: cls = '' }: { span?: Span; fill?: boolean; class?: string } = $props();
+	let { class: cls = '' }: { class?: string } = $props();
 
 	const MAINTENANCE_DAYS = 14;
 	const DUE_DAYS = 90;
 	const REFRESH_MS = 5 * 60_000;
 	const MAINTENANCE_HREF = '/alerts?tab=now&maintenance=1';
-	const LIMIT = $derived(fill ? 20 : 7);
+	const LIMIT = 20;
 
 	let occurrences = $state<SilenceOccurrence[] | null>(null);
 	let deadlines = $state<Deadline[] | null>(null);
@@ -144,14 +144,17 @@
 		return out.sort((a, b) => a.sort - b.sort || a.key.localeCompare(b.key));
 	});
 	const shown = $derived(rows.slice(0, LIMIT));
+	// The natural keys can repeat: a certificate probed from two places (this
+	// site and a relay) is two deadlines with the same kind, monitor and name.
+	const keys = $derived(uniqueKeys(shown, (row) => row.key));
 
 	const ICON = { maint: Wrench, urgent: AlertTriangle, soon: CircleAlert, calm: CalendarClock, update: ArrowUpCircle };
-	const CHIP: Record<Tone, string> = {
-		maint: 'bg-info-soft text-info-ink',
-		urgent: 'bg-warning-soft text-warning-ink',
-		soon: 'bg-advisory-soft text-advisory-ink',
-		calm: 'bg-surface-2 text-ink-2',
-		update: 'bg-info-soft text-info-ink'
+	const INK: Record<Tone, string> = {
+		maint: 'text-info-ink',
+		urgent: 'text-warning-ink',
+		soon: 'text-advisory-ink',
+		calm: 'text-ink-3',
+		update: 'text-info-ink'
 	};
 	const WHEN: Record<Tone, string> = {
 		maint: 'text-ink-2',
@@ -163,28 +166,21 @@
 	const loading = $derived(occurrences === null && deadlines === null && !failed);
 </script>
 
-{#snippet foot()}
-	<a href={withBase('/reports')}>{rows.length > LIMIT ? m.w9dash_expiries_more({ count: rows.length }) : m.w9layout_next_deadlines_link()}</a>
-	{#if !fill}<a href={withBase(MAINTENANCE_HREF)}>{m.w9layout_next_maintenance_link()}</a>{/if}
-{/snippet}
-
-<WidgetCard {span} {fill} flush title={m.overview_upcoming_title()} {foot} class={cls}>
-	<DataState {loading} error={failed ? true : null} empty={rows.length === 0} emptyText={m.w10hybrid_coming_empty()} rows={4} class="px-4 pb-3">
+<WidgetCard title={m.overview_upcoming_title()} href="/reports" class={cls}>
+	<DataState {loading} error={failed ? true : null} empty={rows.length === 0} emptyText={m.w10hybrid_coming_empty()} rows={4}>
 		<ul class="m-0 list-none p-0" aria-label={m.overview_upcoming_list_label()}>
-			{#each shown as row (row.key)}
+			{#each shown as row, i (keys[i])}
 				{@const Icon = row.cve ? ShieldAlert : ICON[row.tone]}
-				<li class="border-t border-line">
-					<a href={withBase(row.href)} class="flex min-h-10 items-center gap-3 px-4 py-2 hover:bg-surface-2">
-						<span class={`grid size-6 shrink-0 place-items-center rounded-md ${CHIP[row.tone]}`} aria-hidden="true">
-							<Icon class="size-3.5" />
-						</span>
+				<li>
+					<a href={withBase(row.href)} class={`flex items-center gap-3 hover:bg-surface-2 ${ROW}`}>
+						<Icon class={`${ROW_ICON} ${INK[row.tone]}`} aria-hidden="true" />
 						<span class="min-w-0 flex-1">
-							<span class="block truncate text-sm font-semibold text-ink">{row.title}</span>
-							<span class="block truncate text-[0.8125rem] text-ink-2" title={row.meta}>{row.meta}</span>
+							<span class={`block truncate ${TEXT_MAIN}`}>{row.title}</span>
+							<span class={`block truncate ${TEXT_SUB}`} title={row.meta}>{row.meta}</span>
 						</span>
 						<span class="shrink-0 text-right">
-							{#if row.day}<span class="block text-[0.8125rem] font-medium whitespace-nowrap text-ink">{row.day}</span>{/if}
-							{#if row.when}<span class={`block text-xs whitespace-nowrap ${WHEN[row.tone]}`}>{row.when}</span>{/if}
+							{#if row.day}<span class={`block font-medium text-ink ${TEXT_SIDE}`}>{row.day}</span>{/if}
+							{#if row.when}<span class={`block ${TEXT_SIDE} ${WHEN[row.tone]}`}>{row.when}</span>{/if}
 						</span>
 					</a>
 				</li>

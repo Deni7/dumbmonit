@@ -1,17 +1,15 @@
 /**
- * The overview dashboards' extra figures (`GET /api/overview/widgets`), shared
- * by layouts A (command), B (noc) and C (hybrid). One request per refresh,
- * polled every minute while a dashboard is shown, again when the range changes.
- * Problems, silences, SLOs, deadlines and status pages keep their own stores.
+ * The overview's extra figures (`GET /api/overview/widgets`): sites, services,
+ * events, availability and the alerts opened per day. One request per
+ * refresh, polled every minute while the overview is shown, again when the
+ * range changes. Problems, silences and deadlines keep their own stores.
  */
 import { browser } from '$app/env';
-import { getOverviewWidgets, type OverviewLayout, type OverviewWidgets } from '#lib/api/index.js';
+import { getOverviewWidgets, type OverviewWidgets } from '#lib/api/index.js';
 import { consoleState } from '#lib/stores/console.svelte.js';
 import { startPolling } from '#lib/poll.js';
 
 const INTERVAL_MS = 60_000;
-const LAYOUT_KEY = 'dm.overview.layout';
-const LAYOUTS: OverviewLayout[] = ['classic', 'command', 'noc', 'hybrid'];
 
 class WidgetsStore {
 	data = $state<OverviewWidgets | null>(null);
@@ -59,29 +57,3 @@ class WidgetsStore {
 
 export const widgetsStore = new WidgetsStore();
 
-/** The dashboard this browser shows (per viewer, kept in localStorage). */
-class LayoutChoice {
-	value = $state<OverviewLayout>(read());
-
-	set(layout: OverviewLayout) {
-		this.value = layout;
-		try {
-			localStorage.setItem(LAYOUT_KEY, layout);
-		} catch {
-			// Private mode or blocked storage: the choice lasts for this page only.
-		}
-	}
-}
-
-function read(): OverviewLayout {
-	if (!browser) return 'classic';
-	try {
-		const stored = localStorage.getItem(LAYOUT_KEY) as OverviewLayout | null;
-		return stored && LAYOUTS.includes(stored) ? stored : 'classic';
-	} catch {
-		return 'classic';
-	}
-}
-
-export const layoutChoice = new LayoutChoice();
-export { LAYOUTS };

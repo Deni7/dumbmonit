@@ -1,32 +1,11 @@
 /**
- * Pure helpers of the site views (honeycomb, sunburst, matrix, site cards,
- * top consumers, backups, services): counting, grouping, ordering, and the
- * marks that keep a status readable without its colour. Types only as
- * imports, so it runs under `node --test`.
+ * Pure helpers of "Fleet by site" and "Services": counting, grouping and
+ * ordering. Types only as imports, so it runs under `node --test`.
  */
-import type { BackupJob, BackupRun, WidgetCategory, WidgetStatus } from '#lib/api/types.js';
-
-/** Columns of a widget on the 12-column dashboard grid. */
-export type Span = 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 12;
+import type { WidgetCategory, WidgetStatus } from '#lib/api/types.js';
 
 /** Site, then category: the order an on-call person thinks in. */
 export const CATEGORY_ORDER: readonly WidgetCategory[] = ['servers', 'storage', 'network', 'services', 'backups', 'other'];
-
-/** Fill of a monitor cell, token based. */
-export const STATUS_FILL: Record<WidgetStatus, string> = {
-	up: 'var(--c-river-up)',
-	degraded: 'var(--c-advisory)',
-	down: 'var(--c-warning)',
-	paused: 'var(--c-ink-3)'
-};
-
-/** The glyph drawn on a cell that is not up: colour never stands alone. */
-export const STATUS_GLYPH: Record<WidgetStatus, string> = {
-	up: '',
-	degraded: '!',
-	down: '×',
-	paused: '‖'
-};
 
 const STATUS_RANK: Record<WidgetStatus, number> = { down: 0, degraded: 1, paused: 2, up: 3 };
 
@@ -90,13 +69,6 @@ export function groupByCategory<T extends { category: WidgetCategory }>(
 	return [...groups].map(([category, list]) => ({ category, monitors: list }));
 }
 
-/** Categories present in at least one site: the matrix columns. */
-export function usedCategories(sites: readonly { monitors: readonly { category: WidgetCategory }[] }[]): WidgetCategory[] {
-	const seen = new Set<string>();
-	for (const site of sites) for (const monitor of site.monitors) seen.add(monitor.category);
-	return [...seen].sort((a, b) => categoryIndex(a) - categoryIndex(b)) as WidgetCategory[];
-}
-
 /** Worst first (down, degraded, paused, up), stable. */
 export function worstFirst<T extends { status: WidgetStatus }>(list: readonly T[]): T[] {
 	return list
@@ -113,48 +85,6 @@ export function lastValue(series: readonly (number | null)[] | null | undefined)
 		if (v !== null && Number.isFinite(v)) return v;
 	}
 	return null;
-}
-
-// --- Top consumers -------------------------------------------------------------
-
-export type Load = 'critical' | 'high' | 'normal';
-
-/** A percentage at 90 or more is critical, at 85 high; a rate (Mb/s) has no threshold. */
-export function loadOf(value: number, unit: string): Load {
-	if (unit !== '%') return 'normal';
-	if (value >= 90) return 'critical';
-	if (value >= 85) return 'high';
-	return 'normal';
-}
-
-/** Width of the bar, 2–100 %: a percentage as is, a rate against the largest of the list. */
-export function barWidth(value: number, unit: string, max: number): number {
-	const pct = unit === '%' ? value : max > 0 ? (value / max) * 100 : 0;
-	return Math.max(2, Math.min(100, Number.isFinite(pct) ? pct : 0));
-}
-
-// --- Backups -----------------------------------------------------------------
-
-/** The last `n` runs, oldest first, padded at the start with `null` for runs that never happened. */
-export function runCells(runs: readonly BackupRun[], n = 14): (boolean | null)[] {
-	const last = runs.slice(-n).map((run) => run.ok);
-	return [...Array(Math.max(0, n - last.length)).fill(null), ...last];
-}
-
-/** Jobs grouped by site, sites in the order they first appear. */
-export function jobsBySite(jobs: readonly BackupJob[]): { site: string; jobs: BackupJob[] }[] {
-	const groups = new Map<string, BackupJob[]>();
-	for (const job of jobs) {
-		const list = groups.get(job.site) ?? [];
-		list.push(job);
-		groups.set(job.site, list);
-	}
-	return [...groups].map(([site, list]) => ({ site, jobs: list }));
-}
-
-/** Jobs that need a look: failed or stale. */
-export function jobsToCheck(jobs: readonly BackupJob[]): number {
-	return jobs.filter((job) => job.status === 'failed' || job.status === 'stale').length;
 }
 
 // --- Services ----------------------------------------------------------------

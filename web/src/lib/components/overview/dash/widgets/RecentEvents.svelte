@@ -1,76 +1,65 @@
-<script lang="ts" module>
-	let instances = 0;
-</script>
-
 <script lang="ts">
-	import { withBase } from '#lib/paths.js';
 	/**
 	 * Recent events, newest first: alerts firing, resolving and acknowledged,
 	 * and the changes around them (agent installs, edits, maintenance). One
-	 * line each: when, a glyph in the event's tone, what happened (the
-	 * server's sentence). A small filter keeps only alerts or only changes.
-	 * The time column is as wide as its longest entry ("Wed 10:19 PM"), the
-	 * same for every line, so a time never runs into its glyph. `fill`: the
-	 * card takes its parent's height and scrolls inside. From the dashboards'
-	 * store.
+	 * row each: when, an icon in the event's tone (the alerts page's icons),
+	 * what happened (the server's sentence). The time column is as wide as its
+	 * longest entry ("Wed 10:19 PM"), the same for every row, so a time never
+	 * runs into its icon. The panel scrolls, the title leads to the alert
+	 * history. From the widgets store.
 	 */
+	import { AlertTriangle, CheckCheck, CircleAlert, CircleCheck, Info, Wrench } from 'lucide-svelte';
+	import type { WidgetEvent } from '#lib/api/index.js';
 	import { m } from '#lib/paraglide/messages.js';
-	import { auth } from '#lib/stores/auth.svelte.js';
-	import { ErrorNotice, Segmented, Skeleton } from '#lib/ui/index.js';
+	import { withBase } from '#lib/paths.js';
+	import { ErrorNotice, Skeleton } from '#lib/ui/index.js';
 	import WidgetCard from '../WidgetCard.svelte';
 	import { widgetsStore } from '../widgets.svelte.js';
-	import Glyph from '../parts/Glyph.svelte';
-	import { EVENT_GLYPH, EVENT_TONE, TONE_SOFT, eventGroup } from '../parts/plates.js';
+	import { EVENT_TONE, TONE_INK } from '../parts/plates.js';
+	import { ROW, ROW_ICON, STATE_PAD, TEXT_BODY, TEXT_SIDE, TEXT_SUB } from '../parts/scale.js';
 	import { clockText } from '../parts/words.js';
 
-	type Span = 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 12;
-	let { span = 8, limit = 8, fill = false }: { span?: Span; limit?: number; fill?: boolean } = $props();
+	let { limit = 20, class: cls = '' }: { limit?: number; class?: string } = $props();
 
-	const name = `dash-events-${(instances += 1)}`;
-	let filter = $state('all');
-	const options = $derived([
-		{ value: 'all', label: m.w9dash_events_all() },
-		{ value: 'alerts', label: m.w9dash_events_alerts() },
-		{ value: 'changes', label: m.w9dash_events_changes() }
-	]);
+	const ICON: Record<WidgetEvent['kind'], typeof Info> = {
+		crit: AlertTriangle,
+		warn: CircleAlert,
+		ok: CircleCheck,
+		info: Info,
+		maint: Wrench,
+		ack: CheckCheck
+	};
 
 	const events = $derived(widgetsStore.data?.events ?? null);
-	const shown = $derived(
-		(events ?? []).filter((e) => filter === 'all' || eventGroup(e.kind) === filter).slice(0, limit)
-	);
+	const shown = $derived((events ?? []).slice(0, limit));
 </script>
 
-<WidgetCard title={m.w9dash_events_title()} {span} {fill}>
-	{#snippet right()}
-		{#if events && events.length > 0}
-			<Segmented legend={m.w9dash_events_filter()} hideLegend {options} bind:value={filter} {name} class={fill ? '-my-1.5' : ''} />
-		{/if}
-	{/snippet}
+<WidgetCard title={m.w9dash_events_title()} href="/alerts?tab=history" class={cls}>
 	{#if !events && widgetsStore.loading}
-		<Skeleton class="h-5 w-full" rows={4} />
+		<div class={`flex flex-col gap-2.5 border-t border-line ${STATE_PAD}`} aria-busy="true">
+			<Skeleton class="h-4 w-full" rows={4} />
+		</div>
 	{:else if !events}
-		<ErrorNotice error={widgetsStore.error} title={m.w9dash_common_error()} compact onretry={() => void widgetsStore.refresh()} />
+		<div class={`border-t border-line ${STATE_PAD}`}>
+			<ErrorNotice error={widgetsStore.error} title={m.w9dash_common_error()} compact onretry={() => void widgetsStore.refresh()} />
+		</div>
 	{:else if shown.length === 0}
-		<p class="m-0 py-3 text-sm text-ink-2">{events.length === 0 ? m.w9dash_events_empty() : m.w9dash_events_empty_filter()}</p>
+		<p class={`m-0 border-t border-line ${STATE_PAD} ${TEXT_SUB}`}>{m.w9dash_events_empty()}</p>
 	{:else}
-		<ul class="m-0 grid list-none grid-cols-[max-content_1.125rem_minmax(0,1fr)] gap-x-2.5 p-0">
-			{#each shown as event, i (`${event.at}-${i}`)}
-				<li class={`col-span-3 grid grid-cols-subgrid items-start py-[7px] text-[0.8125rem] ${i > 0 ? 'border-t border-line' : ''}`}>
-					<time class="pt-px text-xs whitespace-nowrap text-ink-3 tabular-nums" datetime={event.at}>{clockText(event.at)}</time>
-					<span class={`grid size-[1.125rem] place-items-center rounded-[5px] ${TONE_SOFT[EVENT_TONE[event.kind]]}`}>
-						<Glyph name={EVENT_GLYPH[event.kind]} class="size-[11px]" />
-					</span>
+		<ul class="m-0 grid list-none grid-cols-[max-content_auto_minmax(0,1fr)] gap-x-3 p-0">
+			<!-- Events can share a time: keyed by position (the list is redrawn whole on each poll). -->
+			{#each shown as event, i (i)}
+				{@const Icon = ICON[event.kind]}
+				<li class={`col-span-3 grid grid-cols-subgrid items-center ${ROW}`}>
+					<time class={`text-ink-2 ${TEXT_SIDE}`} datetime={event.at}>{clockText(event.at)}</time>
+					<Icon class={`${ROW_ICON} ${TONE_INK[EVENT_TONE[event.kind]]}`} aria-hidden="true" />
 					{#if event.target_id !== null}
-						<a href={withBase(`/targets/${event.target_id}`)} class="min-w-0 text-ink hover:underline">{event.text}</a>
+						<a href={withBase(`/targets/${event.target_id}`)} class={`min-w-0 hover:underline ${TEXT_BODY}`}>{event.text}</a>
 					{:else}
-						<span class="min-w-0 text-ink">{event.text}</span>
+						<span class={`min-w-0 ${TEXT_BODY}`}>{event.text}</span>
 					{/if}
 				</li>
 			{/each}
 		</ul>
 	{/if}
-	{#snippet foot()}
-		<a href={withBase('/alerts?tab=history')}>{m.w9dash_events_history()}</a>
-		{#if auth.isAdmin && !fill}<a href={withBase('/settings/team#audit')}>{m.w9dash_events_audit()}</a>{/if}
-	{/snippet}
 </WidgetCard>

@@ -957,8 +957,6 @@
 	],
 	"console_breadcrumb": "Ruta de navegación",
 	"console_egg": "// {count} comprobaciones por minuto. Vete a dormir, nosotros vigilamos.",
-	"console_kpi_alerts": "Alertas abiertas",
-	"console_kpi_alerts_note": "Críticas: {critical}, avisos: {warning}",
 	"console_kpi_availability": "Disponibilidad 30 d",
 	"console_kpi_availability_note": "Monitores medidos: {count}",
 	"console_kpi_none": "Aún sin datos",
@@ -968,7 +966,6 @@
 	"console_live": "EN VIVO",
 	"console_live_off": "Actualización en vivo en pausa. Selecciona para reanudar.",
 	"console_live_on": "Actualización en vivo activa. Selecciona para pausar.",
-	"console_panel_attention": "Requiere atención",
 	"console_panel_oncall_unknown": "Alguien",
 	"console_paused": "EN PAUSA",
 	"console_range": "Intervalo de tiempo",
@@ -5709,9 +5706,6 @@
 	"overview_ack_err": "No se pudo reconocer este monitor.",
 	"overview_ack_hint": "Visto, me ocupo: en silencio hasta que vuelva a la normalidad.",
 	"overview_ack_item": "Reconocer",
-	"overview_all_good_text": "Nada está caído y ninguna alerta te espera. La paloma se echa una siesta.",
-	"overview_all_good_title": "Todo bien",
-	"overview_chart_error": "No se pudo cargar este gráfico. Se reintenta en un minuto.",
 	"overview_first_all_done": "Los tres hechos. Esta guía no volverá.",
 	"overview_first_channel_action": "Añadir un canal",
 	"overview_first_channel_text": "Correo, ntfy, Discord, Telegram, PagerDuty — lo que ya lees. No se envía nada hasta que algo falle.",
@@ -5735,21 +5729,6 @@
 	"overview_first_test_text": "Envía una prueba desde el canal. Este paso se pone en verde cuando sale un mensaje de verdad.",
 	"overview_first_test_title": "Comprueba que llega un mensaje",
 	"overview_first_title": "Tus primeros cinco minutos",
-	"overview_incidents_bars_label": "Incidentes por día, el más antiguo a la izquierda",
-	"overview_incidents_before": "Semana anterior: {value}",
-	"overview_incidents_count_label": "Incidentes",
-	"overview_incidents_day_title": "{day}. Incidentes: {count}. Tiempo abierto: {duration}.",
-	"overview_incidents_explain": "Desde la alerta hasta su resolución. Una barra por día.",
-	"overview_incidents_noisiest": "Monitor más ruidoso",
-	"overview_incidents_none": "Ningún incidente en los últimos {days} días.",
-	"overview_incidents_open_label": "Tiempo abierto",
-	"overview_incidents_title": "Incidentes, últimos {days} días",
-	"overview_latency_empty": "Aún no se midió ningún tiempo de respuesta en este periodo.",
-	"overview_latency_hint": "p95 y mediana de todas las sondas, últimas {range}",
-	"overview_latency_median": "Mediana",
-	"overview_latency_p95": "p95",
-	"overview_latency_slowest": "Monitores más lentos (p95)",
-	"overview_latency_title": "Tiempo de respuesta",
 	"overview_mute_aria": "Silenciar {name}",
 	"overview_mute_err_create": "No se pudo silenciar este monitor.",
 	"overview_mute_err_lift": "No se pudo reactivar este monitor.",
@@ -5774,22 +5753,6 @@
 			"match": {
 				"countPlural=one": "+{count} retenida",
 				"countPlural=other": "+{count} retenidas"
-			}
-		}
-	],
-	"overview_needs_more": "Ver los {count} en Alertas",
-	"overview_needs_see_all": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "Ver {count} monitor",
-				"countPlural=other": "Ver los {count} monitores"
 			}
 		}
 	],
@@ -5986,15 +5949,7 @@
 	],
 	"overview_upcoming_due_now": "ahora",
 	"overview_upcoming_due_today": "hoy",
-	"overview_upcoming_empty": "Nada vence en los próximos {days} días.",
-	"overview_upcoming_error": "No se pudo leer lo que se acerca.",
-	"overview_upcoming_kind_backup": "Copia de seguridad",
-	"overview_upcoming_kind_disk": "Disco",
-	"overview_upcoming_kind_update": "Actualización",
-	"overview_upcoming_kind_vulnerability": "Vulnerabilidad",
 	"overview_upcoming_list_label": "Próximamente, lo más urgente primero",
-	"overview_upcoming_scope": "Vigila certificados, dominios, discos, copias de seguridad y vulnerabilidades.",
-	"overview_upcoming_see_all": "Ver todo",
 	"overview_upcoming_t_backup": "La copia {what} se retrasará",
 	"overview_upcoming_t_backup_late": "La copia {what} está retrasada",
 	"overview_upcoming_t_disk": "{what} se llenará",
@@ -9523,10 +9478,6 @@
 	"upgrade_notice_title": "Cambios de configuración por aplicar",
 	"upgrade_notice_view": "Ver",
 	"w10hybrid_coming_empty": "Nada previsto ni a punto de vencer.",
-	"w10hybrid_kpi_budget_left": "Presupuesto de error restante: {pct} %",
-	"w10hybrid_kpi_budget_low": "Presupuesto restante: {pct} %",
-	"w10hybrid_kpi_budget_spent": "Presupuesto de error agotado",
-	"w10hybrid_kpi_oldest": "El más antiguo: {age}",
 	"w10hybrid_kpi_problems": "Problemas abiertos",
 	"w10hybrid_services_p95": "p95 {value}",
 	"w1alerts_channels_copy_name": "{name} (copia)",
@@ -9628,8 +9579,6 @@
 	"w1wall_notice_maintenance": "Mantenimiento en curso: {title}",
 	"w1wall_notice_maintenance_until": "Mantenimiento en curso: {title}, hasta las {time}",
 	"w1wall_notice_more": "+{count}",
-	"w1wall_overview_trend_days": "{days} d",
-	"w1wall_overview_trend_period": "Periodo",
 	"w1wall_settings_clock_12h": "12 h",
 	"w1wall_settings_clock_24h": "24 h",
 	"w1wall_settings_clock_label": "Formato del reloj",
@@ -10689,70 +10638,10 @@
 	"w8wp_discovery_on": "Los plugins para sitios web, como el banner de WordPress, encuentran esta página en la lista de páginas públicas del servidor.",
 	"w8wp_discovery_private": "Una página privada nunca aparece en la lista de páginas públicas.",
 	"w8wp_discovery_unpublished": "Solo las páginas publicadas aparecen en la lista de páginas públicas.",
-	"w9dash_agents_connected": "Conectado",
-	"w9dash_agents_disconnected": "Desconectado",
-	"w9dash_agents_empty": "Aún no hay ningún agente instalado.",
-	"w9dash_agents_install": "Instalar un agente",
-	"w9dash_agents_last_contact": "Último contacto {ago}",
-	"w9dash_agents_manage": "Gestionar agentes",
-	"w9dash_agents_never_seen": "Nunca visto",
-	"w9dash_agents_on_latest": "{count} en {version}, la última",
-	"w9dash_agents_on_version": "{count} en {version}",
-	"w9dash_agents_title": "Agentes",
-	"w9dash_agents_total": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} agente",
-				"countPlural=other": "{count} agentes"
-			}
-		}
-	],
-	"w9dash_agents_update": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "Actualizar {count}",
-				"countPlural=other": "Actualizar {count}"
-			}
-		}
-	],
-	"w9dash_common_all_alerts": "Todas las alertas",
 	"w9dash_common_error": "No se pudieron leer estas cifras.",
-	"w9dash_common_last_30_days": "Últimos 30 días",
-	"w9dash_common_sev_critical": "Crítica",
-	"w9dash_common_sev_warning": "Advertencia",
 	"w9dash_common_this_site": "Este sitio",
-	"w9dash_common_today_at": "Hoy {time}",
-	"w9dash_events_alerts": "Alertas",
-	"w9dash_events_all": "Todo",
-	"w9dash_events_audit": "Registro de auditoría",
-	"w9dash_events_changes": "Cambios",
 	"w9dash_events_empty": "No ha pasado nada últimamente.",
-	"w9dash_events_empty_filter": "Nada de este tipo últimamente.",
-	"w9dash_events_filter": "Mostrar",
-	"w9dash_events_history": "Historial completo",
 	"w9dash_events_title": "Eventos recientes",
-	"w9dash_expiries_all": "Todos los vencimientos",
-	"w9dash_expiries_bar_hint": "Se llena a medida que se acerca la fecha, en una escala de {days} días",
-	"w9dash_expiries_more": "Ver los {count}",
-	"w9dash_expiries_sub": "Próximos {days} días",
-	"w9dash_expiries_title": "Vencimientos y previsiones",
-	"w9dash_expiries_vulns": "Vulnerabilidades",
-	"w9dash_kpi_all_up": "Todos activos",
-	"w9dash_kpi_avail_delta": "{delta} p.p. frente a los 30 días anteriores",
 	"w9dash_kpi_avail_note": "Objetivo {target} %",
 	"w9dash_kpi_bars_label": "Una barra por monitor, agrupadas por sitio; una barra alta es un monitor caído",
 	"w9dash_kpi_budget_left": "Presupuesto de error restante",
@@ -10771,39 +10660,7 @@
 			}
 		}
 	],
-	"w9dash_kpi_down": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} caído",
-				"countPlural=other": "{count} caídos"
-			}
-		}
-	],
-	"w9dash_kpi_last_closed": "La última se cerró {ago}",
-	"w9dash_kpi_none_open": "Ninguna abierta",
 	"w9dash_kpi_opened_label": "Alertas abiertas por día, últimos {days} días",
-	"w9dash_kpi_opened_week": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} abierta esta semana, {previous} la anterior",
-				"countPlural=other": "{count} abiertas esta semana, {previous} la anterior"
-			}
-		}
-	],
 	"w9dash_kpi_paused": [
 		{
 			"declarations": [
@@ -10834,7 +10691,6 @@
 			}
 		}
 	],
-	"w9dash_kpi_today": "Hoy",
 	"w9dash_kpi_warning": [
 		{
 			"declarations": [
@@ -10850,86 +10706,6 @@
 			}
 		}
 	],
-	"w9dash_maint_empty": "No hay mantenimiento previsto en los próximos {days} días ni monitores en pausa.",
-	"w9dash_maint_error": "No se pudieron leer las ventanas de mantenimiento.",
-	"w9dash_maint_lasts": "Dura {duration}",
-	"w9dash_maint_lasts_recurring": "Dura {duration}, se repite",
-	"w9dash_maint_now": "Ahora",
-	"w9dash_maint_running": "En curso",
-	"w9dash_maint_schedule": "Programar",
-	"w9dash_maint_strip_label": "Ventanas de mantenimiento de los próximos {days} días, por sitio",
-	"w9dash_maint_sub": "Próximos {days} días",
-	"w9dash_maint_title": "Mantenimiento",
-	"w9dash_pages_all": "Todas las páginas de estado",
-	"w9dash_pages_create": "Crear una página de estado",
-	"w9dash_pages_draft": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "Borrador, {count} servicio",
-				"countPlural=other": "Borrador, {count} servicios"
-			}
-		}
-	],
-	"w9dash_pages_empty": "Aún no hay ninguna página de estado.",
-	"w9dash_pages_error": "No se pudieron leer las páginas de estado.",
-	"w9dash_pages_maintenance": "Mantenimiento",
-	"w9dash_pages_major": "Interrupción grave",
-	"w9dash_pages_operational": "Operativo",
-	"w9dash_pages_partial": "Interrupción parcial",
-	"w9dash_pages_password": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "Protegida con contraseña, {count} servicio",
-				"countPlural=other": "Protegida con contraseña, {count} servicios"
-			}
-		}
-	],
-	"w9dash_pages_post": "Publicar novedad",
-	"w9dash_pages_public": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "Pública, {count} servicio",
-				"countPlural=other": "Pública, {count} servicios"
-			}
-		}
-	],
-	"w9dash_pages_title": "Páginas de estado",
-	"w9dash_pages_users": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "Solo usuarios con sesión, {count} servicio",
-				"countPlural=other": "Solo usuarios con sesión, {count} servicios"
-			}
-		}
-	],
 	"w9dash_problems_ack_recovery": "Hasta que vuelva a responder",
 	"w9dash_problems_calm_since": "Ningún problema abierto desde {time}.",
 	"w9dash_problems_calm_text": "Todos los monitores responden y no hay alertas abiertas.",
@@ -10940,9 +10716,7 @@
 	"w9dash_problems_col_problem": "Problema",
 	"w9dash_problems_col_severity": "Gravedad",
 	"w9dash_problems_lasted": "Duró {span}",
-	"w9dash_problems_maintenance_link": "Silencios y mantenimiento",
 	"w9dash_problems_no_answer": "No responde a las comprobaciones",
-	"w9dash_problems_no_site": "Sin sitio",
 	"w9dash_problems_not_acked": "Sin reconocer",
 	"w9dash_problems_not_notified": "No se envió ninguna notificación",
 	"w9dash_problems_notified": "Notificado {ago}",
@@ -10950,139 +10724,9 @@
 	"w9dash_problems_resolved": "Resueltos recientemente",
 	"w9dash_problems_resolved_plate": "Resuelto",
 	"w9dash_problems_since": "desde {time}",
-	"w9dash_problems_site_clear": "nada abierto",
-	"w9dash_problems_sub": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} abierto, el peor primero",
-				"countPlural=other": "{count} abiertos, el peor primero"
-			}
-		}
-	],
-	"w9dash_problems_title": "Problemas",
-	"w9dash_response_acked_fast": "Reconocidas en menos de 15 min",
-	"w9dash_response_alerts": "Alertas",
-	"w9dash_response_before": "antes {previous}",
-	"w9dash_response_before_pct": "antes {previous}, {pct} %",
-	"w9dash_response_chart_label": "Alertas por día durante {days} días, por gravedad",
-	"w9dash_response_mtta": "MTTA",
-	"w9dash_response_mttr": "MTTR",
-	"w9dash_response_noisiest": "La más ruidosa:",
-	"w9dash_response_noisiest_rule": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{rule}, {count} alerta",
-				"countPlural=other": "{rule}, {count} alertas"
-			}
-		}
-	],
-	"w9dash_response_title": "Alertas y respuesta",
-	"w9dash_response_tune": "Ajustar la regla",
-	"w9dash_slo_all": "Todos los objetivos",
-	"w9dash_slo_create": "Definir un objetivo",
-	"w9dash_slo_empty": "Aún no hay ningún objetivo de nivel de servicio.",
-	"w9dash_slo_error": "No se pudieron leer los objetivos.",
-	"w9dash_slo_fast": "Consumo rápido",
-	"w9dash_slo_left": "Queda un {percent} % del presupuesto",
-	"w9dash_slo_more": "Ver los {count}",
-	"w9dash_slo_slow": "Consumo lento",
-	"w9dash_slo_spent": "Presupuesto agotado",
-	"w9dash_slo_target": "Objetivo {target} %",
-	"w9dash_slo_title": "SLO",
-	"w9dash_slo_unmeasured": "Sin medir",
-	"w9dash_slo_window": "En {days} días",
 	"w9dash_status_degraded": "Degradado",
 	"w9dash_status_paused": "En pausa",
 	"w9dash_status_up": "Activo",
-	"w9layout_backups_changed": "Cambiado",
-	"w9layout_backups_duration": "Duración",
-	"w9layout_backups_empty": "Aún no se ha registrado ninguna tarea de copia: aquí aparecen las de PBS, Synology, restic, borg y Veeam.",
-	"w9layout_backups_engine": "Motor",
-	"w9layout_backups_failed": "Fallida",
-	"w9layout_backups_job": "Tarea",
-	"w9layout_backups_last_success": "Último éxito",
-	"w9layout_backups_never": "Nunca",
-	"w9layout_backups_ok": "Correcto",
-	"w9layout_backups_reports": "Informes",
-	"w9layout_backups_running": "En curso",
-	"w9layout_backups_runs": "Últimas 14 ejecuciones",
-	"w9layout_backups_runs_failed": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "La última ejecución falló",
-				"countPlural=other": "Últimas {count} ejecuciones, {failed} fallidas"
-			}
-		}
-	],
-	"w9layout_backups_runs_ok": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "La última ejecución fue correcta",
-				"countPlural=other": "Últimas {count} ejecuciones, todas correctas"
-			}
-		}
-	],
-	"w9layout_backups_stale": "Desactualizada",
-	"w9layout_backups_status": "Estado",
-	"w9layout_backups_sub_check": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} tarea, {check} por revisar",
-				"countPlural=other": "{count} tareas, {check} por revisar"
-			}
-		}
-	],
-	"w9layout_backups_sub_fresh": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} tarea, al día",
-				"countPlural=other": "{count} tareas, todas al día"
-			}
-		}
-	],
-	"w9layout_backups_title": "Copias de seguridad",
 	"w9layout_category_backups": "Copias de seguridad",
 	"w9layout_category_network": "Red",
 	"w9layout_category_other": "Otros",
@@ -11109,82 +10753,11 @@
 	],
 	"w9layout_health_healthy": "En buen estado",
 	"w9layout_health_idle": "Nada vigilado",
-	"w9layout_hex_site_aria": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{site}: {up} de {count} monitor activo, {down} caídos",
-				"countPlural=other": "{site}: {up} de {count} monitores activos, {down} caídos"
-			}
-		}
-	],
-	"w9layout_hex_sub": "Una celda por monitor, por sede y categoría",
-	"w9layout_hex_title": "Mapa de la flota",
 	"w9layout_hybrid_act_now": "Actuar ahora",
 	"w9layout_hybrid_band_label": "Lo que requiere su atención ahora",
-	"w9layout_matrix_cell_degraded": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{up} / {total}, {count} degradado",
-				"countPlural=other": "{up} / {total}, {count} degradados"
-			}
-		}
-	],
-	"w9layout_matrix_cell_down": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{up} / {total}, {count} caído",
-				"countPlural=other": "{up} / {total}, {count} caídos"
-			}
-		}
-	],
-	"w9layout_matrix_cell_paused": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{up} / {total}, {count} en pausa",
-				"countPlural=other": "{up} / {total}, {count} en pausa"
-			}
-		}
-	],
-	"w9layout_matrix_next_maintenance": "Próximo mantenimiento",
-	"w9layout_matrix_none": "Ninguno",
-	"w9layout_matrix_site": "Sede",
-	"w9layout_matrix_sub": "Una marca por monitor",
-	"w9layout_matrix_title": "Estado por sede y categoría",
-	"w9layout_matrix_wan": "Latencia WAN, {range}",
-	"w9layout_matrix_wan_local": "Esta sede",
-	"w9layout_matrix_wan_none": "Aún sin datos",
 	"w9layout_monitor_title": "{name}, {kind}: {status}",
 	"w9layout_monitor_title_bare": "{name}: {status}",
 	"w9layout_ms": "{value} ms",
-	"w9layout_next_deadlines_link": "Todos los vencimientos",
 	"w9layout_next_empty": [
 		{
 			"declarations": [
@@ -11202,7 +10775,6 @@
 	],
 	"w9layout_next_maint_active": "Mantenimiento en curso",
 	"w9layout_next_maint_meta": "Ventana de mantenimiento, {duration}",
-	"w9layout_next_maintenance_link": "Mantenimiento",
 	"w9layout_next_now": "Ahora",
 	"w9layout_next_title": [
 		{
@@ -11220,13 +10792,7 @@
 		}
 	],
 	"w9layout_next_until": "hasta las {time}",
-	"w9layout_noc_problems_title": "Problemas por sede",
-	"w9layout_none_planned": "Ninguno previsto",
 	"w9layout_pct": "{value} %",
-	"w9layout_rate": "{value} {unit}",
-	"w9layout_services_30d": "30 días",
-	"w9layout_services_all": "Todos los monitores",
-	"w9layout_services_beats": "Últimas comprobaciones",
 	"w9layout_services_beats_failed": [
 		{
 			"declarations": [
@@ -11257,30 +10823,8 @@
 			}
 		}
 	],
-	"w9layout_services_check": "Comprobación",
 	"w9layout_services_empty": "Aún no hay comprobaciones de servicio: aquí aparecen las de HTTP, DNS, TLS, SMTP o ping.",
-	"w9layout_services_p95": "p95",
-	"w9layout_services_state": "Estado",
-	"w9layout_services_sub": "Comprobaciones HTTP, DNS, TLS y otras, las peores primero",
 	"w9layout_services_title": "Servicios",
-	"w9layout_sites_last_backup": "Última copia",
-	"w9layout_sites_no_backup": "Ninguna registrada",
-	"w9layout_sites_sub": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{count} monitor",
-				"countPlural=other": "{count} monitores"
-			}
-		}
-	],
-	"w9layout_sites_title": "Sede",
 	"w9layout_sites_up_of": [
 		{
 			"declarations": [
@@ -11302,79 +10846,9 @@
 	"w9layout_status_down": "Caído",
 	"w9layout_status_paused": "En pausa",
 	"w9layout_status_up": "Activo",
-	"w9layout_sun_aria": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{up} de {count} monitor activo; {down} caídos, {degraded} degradados",
-				"countPlural=other": "{up} de {count} monitores activos; {down} caídos, {degraded} degradados"
-			}
-		}
-	],
-	"w9layout_sun_category_title": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{site}, {category}: {count} monitor",
-				"countPlural=other": "{site}, {category}: {count} monitores"
-			}
-		}
-	],
-	"w9layout_sun_center": "monitores activos",
-	"w9layout_sun_rings": "Anillo interior: sede · centro: categoría · exterior: monitor",
-	"w9layout_sun_sub": "Sede, categoría, monitor",
 	"w9layout_sun_title": "Flota por sede",
-	"w9layout_switch_classic": "Clásico",
-	"w9layout_switch_command": "Mando",
-	"w9layout_switch_hybrid": "Híbrido",
-	"w9layout_switch_legend": "Diseño de la vista general",
-	"w9layout_switch_noc": "NOC",
-	"w9layout_top_cpu": "CPU",
-	"w9layout_top_disk": "Disco",
-	"w9layout_top_empty": "Aún no hay cifras: los agentes y recolectores informan aquí de CPU, memoria, disco y red.",
-	"w9layout_top_forecast": [
-		{
-			"declarations": [
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": [
-				"countPlural"
-			],
-			"match": {
-				"countPlural=one": "{site}, lleno en unos {count} día",
-				"countPlural=other": "{site}, lleno en unos {count} días"
-			}
-		}
-	],
-	"w9layout_top_mem": "Memoria",
-	"w9layout_top_metric": "Métrica",
-	"w9layout_top_net": "Red",
-	"w9layout_top_sub_pct": "% usado ahora, tendencia en {range}",
-	"w9layout_top_sub_rate": "Mb/s ahora, tendencia en {range}",
-	"w9layout_top_title": "Mayores consumidores",
-	"w9layout_top_title_cpu": "Top 5 CPU",
-	"w9layout_top_title_disk": "Top 5 disco",
-	"w9layout_top_title_mem": "Top 5 memoria",
-	"w9layout_top_title_net": "Top 5 red",
-	"w9layout_when_today": "Hoy {time}",
 	"w9layout_when_today_bare": "Hoy",
-	"w9layout_when_tomorrow": "Mañana {time}",
 	"w9layout_when_tomorrow_bare": "Mañana",
-	"w9layout_when_weekday": "{day} {time}",
-	"w9layout_when_yesterday": "Ayer {time}",
 	"w9layout_when_yesterday_bare": "Ayer",
 	"wall_band_problems": "Problemas",
 	"wall_band_problems_note": "Alertas críticas y monitores caídos",

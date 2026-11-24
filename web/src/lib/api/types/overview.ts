@@ -164,5 +164,3 @@ export interface OverviewWidgets {
 	alerts_opened: AlertsOpened;
 }
 
-/** Which overview dashboard a user sees. */
-export type OverviewLayout = 'classic' | 'command' | 'noc' | 'hybrid';
