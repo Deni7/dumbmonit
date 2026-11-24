@@ -1,9 +1,0 @@
-{
-	"w10hybrid_kpi_problems": "Problemas em aberto",
-	"w10hybrid_kpi_oldest": "O mais antigo: {age}",
-	"w10hybrid_kpi_budget_spent": "Orçamento de erro esgotado",
-	"w10hybrid_kpi_budget_low": "Orçamento restante: {pct}%",
-	"w10hybrid_kpi_budget_left": "Orçamento de erro restante: {pct}%",
-	"w10hybrid_coming_empty": "Nada planejado nem vencendo em breve.",
-	"w10hybrid_services_p95": "p95 {value}"
-}

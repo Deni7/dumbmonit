@@ -1,9 +1,0 @@
-{
-	"w10hybrid_kpi_problems": "Openstaande problemen",
-	"w10hybrid_kpi_oldest": "Oudste: {age}",
-	"w10hybrid_kpi_budget_spent": "Foutbudget opgebruikt",
-	"w10hybrid_kpi_budget_low": "Budget over: {pct}%",
-	"w10hybrid_kpi_budget_left": "Resterend foutbudget: {pct}%",
-	"w10hybrid_coming_empty": "Niets gepland en niets dat binnenkort verloopt.",
-	"w10hybrid_services_p95": "p95 {value}"
-}
