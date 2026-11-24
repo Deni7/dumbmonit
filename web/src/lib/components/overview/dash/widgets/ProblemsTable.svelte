@@ -182,12 +182,12 @@
 		</div>
 	{:else}
 		<div class="@container">
-			<div class="sticky top-0 z-[1] hidden gap-3.5 bg-surface px-4 pb-1.5 text-xs font-medium text-ink-3 @3xl:grid @3xl:grid-cols-[6.5rem_minmax(0,1.15fr)_minmax(0,1.7fr)_4.75rem_minmax(0,1.15fr)_auto]" aria-hidden="true">
+			<div class="sticky top-0 z-[1] hidden gap-3.5 bg-surface px-4 pb-1.5 text-xs font-medium text-ink-3 @3xl:grid @3xl:grid-cols-[6.5rem_minmax(0,1.15fr)_minmax(0,1.7fr)_4.75rem_auto] @5xl:grid-cols-[6.5rem_minmax(0,1.15fr)_minmax(0,1.7fr)_4.75rem_minmax(0,1.15fr)_auto]" aria-hidden="true">
 				<span>{m.w9dash_problems_col_severity()}</span>
 				<span>{m.w9dash_problems_col_monitor()}</span>
 				<span>{m.w9dash_problems_col_problem()}</span>
 				<span>{m.w9dash_problems_col_age()}</span>
-				<span>{m.w9dash_problems_col_acked()}</span>
+				<span class="hidden @5xl:block">{m.w9dash_problems_col_acked()}</span>
 				<span></span>
 			</div>
 			<ul class="m-0 list-none p-0">

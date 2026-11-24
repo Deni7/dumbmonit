@@ -63,7 +63,7 @@
 	const takenLine = 'inline-flex items-center gap-1.5 text-[0.8125rem] font-semibold';
 </script>
 
-<li class={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-1 ${ROW} @3xl:grid-cols-[6.5rem_minmax(0,1.15fr)_minmax(0,1.7fr)_4.75rem_minmax(0,1.15fr)_auto] ${problem.acked || problem.muted ? 'bg-surface-2/40' : ''}`}>
+<li class={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-1 ${ROW} @3xl:grid-cols-[6.5rem_minmax(0,1.15fr)_minmax(0,1.7fr)_4.75rem_auto] @5xl:grid-cols-[6.5rem_minmax(0,1.15fr)_minmax(0,1.7fr)_4.75rem_minmax(0,1.15fr)_auto] ${problem.acked || problem.muted ? 'bg-surface-2/40' : ''}`}>
 	<div class="order-1 min-w-0 @3xl:order-none">
 		<Plate {tone} label={plate} class="max-w-full min-w-0 truncate" />
 	</div>
@@ -86,7 +86,7 @@
 			<span class={meta}>{m.w9dash_problems_since({ time: clockText(since) })}</span>
 		{/if}
 	</div>
-	<div class="order-5 col-span-2 min-w-0 @3xl:order-none @3xl:col-span-1">
+	<div class="order-5 col-span-2 min-w-0 @3xl:order-none @3xl:col-span-1 @3xl:hidden @5xl:block">
 		{#if problem.acked}
 			<span class={`${takenLine} text-ink-2`}>
 				<CheckCheck class={INLINE_ICON} aria-hidden="true" />{m.overview_sky_plate_acked()}
@@ -123,6 +123,6 @@
 		{/if}
 	</div>
 	{#if failure}
-		<p class="order-7 col-span-2 m-0 text-xs text-warning-ink @3xl:col-span-6" role="alert">{failure}</p>
+		<p class="order-7 col-span-2 m-0 text-xs text-warning-ink @3xl:col-span-full" role="alert">{failure}</p>
 	{/if}
 </li>

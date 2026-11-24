@@ -19,7 +19,6 @@
 	import { consoleState } from '#lib/stores/console.svelte.js';
 	import { Button, EmptyState, ErrorNotice } from '#lib/ui/index.js';
 	import FirstRun from '#lib/components/overview/FirstRun.svelte';
-	import UpdatedAgo from '#lib/components/alerts/UpdatedAgo.svelte';
 	import Dashboard from '#lib/components/overview/dash/Dashboard.svelte';
 	import { widgetsStore } from '#lib/components/overview/dash/widgets.svelte.js';
 	import { fleetStore } from './fleet.svelte.js';
@@ -107,8 +106,6 @@
 			{/snippet}
 		</EmptyState>
 	{:else}
-		<!-- Height kept: the line appearing after the first poll does not shift the panels. -->
-		<div class="-mb-2 flex min-h-5 justify-end"><UpdatedAgo updatedAt={alertsStore.updatedAt} /></div>
 		<Dashboard />
 	{/if}
 </div>
