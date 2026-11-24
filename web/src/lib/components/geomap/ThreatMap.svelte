@@ -17,6 +17,7 @@
 	import { ErrorNotice, Panel, Plate, Skeleton } from '#lib/ui/index.js';
 	import { countryName } from '#lib/map/live.js';
 	import GeoMap from './GeoMap.svelte';
+	import { startPolling } from '#lib/poll.js';
 
 	interface Props {
 		/** One device's sources only (its own panel); every source when omitted. */
@@ -39,6 +40,7 @@
 		} catch (cause) {
 			if (signal?.aborted) return;
 			error = cause;
+			return false;
 		}
 	}
 
@@ -49,13 +51,10 @@
 		void getBasemap(controller.signal)
 			.then((b) => (basemap = b))
 			.catch(() => {});
-		void untrack(() => load(controller.signal));
-		const timer = setInterval(() => {
-			if (document.visibilityState === 'visible') void untrack(() => load(controller.signal));
-		}, 60_000);
+		const stop = startPolling((signal) => untrack(() => load(signal)), 60_000);
 		return () => {
 			controller.abort();
-			clearInterval(timer);
+			stop();
 		};
 	});
 

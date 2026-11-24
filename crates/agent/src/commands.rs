@@ -37,9 +37,7 @@ pub use dumbmonit_proto::COMMAND_RESULT_MAX_BYTES as RESULT_MAX_BYTES;
 
 /// Conteneurs que le serveur ne peut pas toucher : ceux de la supervision
 /// elle-même. Un « redémarre-toi » venu de l'interface finirait en boucle.
-// `ezymonit` reste réservé : des conteneurs créés avant le renommage portent
-// encore ce nom.
-const RESERVED_PREFIXES: [&str; 2] = ["dumbmonit", "ezymonit"];
+const RESERVED_PREFIXES: [&str; 1] = ["dumbmonit"];
 
 /// Suffixe du nom donné à l'ancien conteneur pendant la mise à jour.
 const PREVIOUS_SUFFIX: &str = ".previous";
@@ -1101,7 +1099,6 @@ mod tests {
     #[test]
     fn the_monitoring_stack_cannot_be_managed_remotely() {
         assert!(validate_name("dumbmonit-dumbmonit-1").is_err());
-        assert!(validate_name("ezymonit-ezymonit-1").is_err());
         // Un identifiant de conteneur passe ce contrôle-ci : rien dans sa forme
         // ne le distingue d'un nom. C'est l'inspection qui le rattrape.
         assert!(validate_name("9f4c1b2e3d5a").is_ok());
@@ -1356,10 +1353,6 @@ mod tests {
         });
         let error = refuse_reserved_container(&inspected, "9f4c1b2e3d5a").unwrap_err().to_string();
         assert!(error.contains("monitoring container"), "message inattendu : {error}");
-
-        // Sous son nom d'avant le renommage du produit, tout autant.
-        let legacy = json!({ "Id": "abc", "Name": "/EzyMonit" });
-        assert!(refuse_reserved_container(&legacy, "abc").is_err());
 
         // Un conteneur ordinaire passe, désigné par son nom comme par son id.
         let ordinary = json!({ "Id": "1234", "Name": "/nginx" });

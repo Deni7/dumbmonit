@@ -8,7 +8,7 @@
  * notifier reads "no recipient". The API types do not declare them yet, so
  * they are read here, defensively, and defaulted for older servers.
  */
-import type { ChannelField, ChannelKindInfo } from '#lib/api/index.js';
+import type { ChannelField, ChannelKindInfo, MessageTemplateFormat } from '#lib/api/index.js';
 import type { Icon as LucideIcon } from 'lucide-svelte';
 import {
 	Bell,
@@ -26,6 +26,9 @@ import {
 } from 'lucide-svelte';
 
 export type FieldShape = 'scalar' | 'list' | 'object';
+
+/** Formats of message templates this build knows; an unknown one hides the editor. */
+const TEMPLATE_FORMATS: MessageTemplateFormat[] = ['plain', 'slack_mrkdwn', 'html', 'telegram_markdown_v2'];
 
 export interface KindField extends ChannelField {
 	shape: FieldShape;
@@ -69,7 +72,11 @@ export function normalizeKind(raw: Partial<ChannelKindInfo> & { kind: string }):
 		summary: raw.summary?.trim() ?? '',
 		doc_url: raw.doc_url?.trim() ?? '',
 		settings: fields(raw.settings),
-		secrets: fields(raw.secrets)
+		secrets: fields(raw.secrets),
+		actions: typeof raw.actions === 'string' ? raw.actions : undefined,
+		template_format: TEMPLATE_FORMATS.includes(raw.template_format as MessageTemplateFormat)
+			? (raw.template_format as MessageTemplateFormat)
+			: ''
 	};
 }
 

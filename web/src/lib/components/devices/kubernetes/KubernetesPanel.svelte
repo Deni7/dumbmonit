@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { m } from '#lib/paraglide/messages.js';
+	import { startPolling } from '#lib/poll.js';
 	/**
 	 * A Kubernetes cluster as its last probe left it: one sentence saying what
 	 * is wrong, the counts, then only what needs attention — nodes not ready or
@@ -11,7 +12,6 @@
 	 * Everything is read from the stored `dumbmonit_k8s_*` series: opening the
 	 * page never calls the API server.
 	 */
-	import { untrack } from 'svelte';
 	import { queryInstant, type Target } from '#lib/api/index.js';
 	import { ErrorNotice, Panel, Plate, type Tone } from '#lib/ui/index.js';
 	import Figure from '../Figure.svelte';
@@ -168,6 +168,7 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
+			return false;
 		} finally {
 			loading = false;
 		}
@@ -177,13 +178,7 @@
 		void target.id;
 		loading = true;
 		cluster = null;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 
 	function plural(n: number, one: () => string, many: () => string): string {

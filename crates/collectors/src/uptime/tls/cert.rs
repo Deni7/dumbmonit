@@ -77,14 +77,14 @@ pub(crate) mod fixtures {
     /// écrits en dur sans jamais devenir faux avec le temps qui passe.
     pub const EXEMPLE_PEM: &[u8] = b"-----BEGIN CERTIFICATE-----
 MIIB3TCCAYOgAwIBAgIUPrThYnCoLHWKJ1gB+aNd0EFjKyowCgYIKoZIzj0EAwIw
-MzEeMBwGA1UEAwwVZXhlbXBsZS5lenltb25pdC50ZXN0MREwDwYDVQQKDAhFenlN
-b25pdDAeFw0yNDAxMDEwMDAwMDBaFw0zNDAxMDEwMDAwMDBaMDMxHjAcBgNVBAMM
-FWV4ZW1wbGUuZXp5bW9uaXQudGVzdDERMA8GA1UECgwIRXp5TW9uaXQwWTATBgcq
+MzEeMBwGA1UEAwwVZXhlbXBsZS5pbnRlcm5hbC50ZXN0MREwDwYDVQQKDAhJbnRl
+cm5hbDAeFw0yNDAxMDEwMDAwMDBaFw0zNDAxMDEwMDAwMDBaMDMxHjAcBgNVBAMM
+FWV4ZW1wbGUuaW50ZXJuYWwudGVzdDERMA8GA1UECgwISW50ZXJuYWwwWTATBgcq
 hkjOPQIBBggqhkjOPQMBBwNCAAQlAdXfeT+lyG2yrazQnAyWUw3cGCgeiFGYAI7p
 pybwcD1iP0VCFWYTWoRQToevUl8OqTJSfJiqSyWtZwso8etCo3UwczAdBgNVHQ4E
 FgQUzKS4It78XOSHKRFG0thbm5PYNJ8wHwYDVR0jBBgwFoAUzKS4It78XOSHKRFG
-0thbm5PYNJ8wDwYDVR0TAQH/BAUwAwEB/zAgBgNVHREEGTAXghVleGVtcGxlLmV6
-eW1vbml0LnRlc3QwCgYIKoZIzj0EAwIDSAAwRQIgGrbVXybGCSX1bWDVn5SzIRO8
+0thbm5PYNJ8wDwYDVR0TAQH/BAUwAwEB/zAgBgNVHREEGTAXghVleGVtcGxlLmlu
+dGVybmFsLnRlc3QwCgYIKoZIzj0EAwIDSAAwRQIgGrbVXybGCSX1bWDVn5SzIRO8
 Y8hXRVqX4c1jdAOU2F0CIQC/D+i11EuIbgAgDXGdbGKS7i+Zzx6A2z8U550Jq3iX
 9A==
 -----END CERTIFICATE-----
@@ -93,9 +93,9 @@ Y8hXRVqX4c1jdAOU2F0CIQC/D+i11EuIbgAgDXGdbGKS7i+Zzx6A2z8U550Jq3iX
     /// Certificat déjà périmé : valide du 1ᵉʳ janvier 2020 au 1ᵉʳ janvier 2021.
     pub const PERIME_PEM: &[u8] = b"-----BEGIN CERTIFICATE-----
 MIIBuDCCAV+gAwIBAgIUI03fm9MJN138/G5I5MbURr8N0FswCgYIKoZIzj0EAwIw
-MjEdMBsGA1UEAwwUcGVyaW1lLmV6eW1vbml0LnRlc3QxETAPBgNVBAoMCEV6eU1v
-bml0MB4XDTIwMDEwMTAwMDAwMFoXDTIxMDEwMTAwMDAwMFowMjEdMBsGA1UEAwwU
-cGVyaW1lLmV6eW1vbml0LnRlc3QxETAPBgNVBAoMCEV6eU1vbml0MFkwEwYHKoZI
+MjEdMBsGA1UEAwwUcGVyaW1lLmludGVybmFsLnRlc3QxETAPBgNVBAoMCEludGVy
+bmFsMB4XDTIwMDEwMTAwMDAwMFoXDTIxMDEwMTAwMDAwMFowMjEdMBsGA1UEAwwU
+cGVyaW1lLmludGVybmFsLnRlc3QxETAPBgNVBAoMCEludGVybmFsMFkwEwYHKoZI
 zj0CAQYIKoZIzj0DAQcDQgAEYHzhqtK8RcPnCqBgwHGSt0MrXPAvLqkLb+TBRiqg
 NC/V7sgJsXkqIUl2xEe9QIoakE81JQC90sIbWyvfGoV/VaNTMFEwHQYDVR0OBBYE
 FG8aBTfIIQUZ9qQKVgyqTNGcrLDAMB8GA1UdIwQYMBaAFG8aBTfIIQUZ9qQKVgyq
@@ -129,10 +129,8 @@ mod tests {
         let info = parse_der(&der(EXEMPLE_PEM)).unwrap();
         assert_eq!(info.not_before_s, DEBUT_2024);
         assert_eq!(info.not_after_s, DEBUT_2034);
-        // Le certificat de test a été émis avant le renommage du produit : son
-        // sujet est figé dans le PEM ci-dessus.
-        assert_eq!(info.subject, "exemple.ezymonit.test");
-        assert_eq!(info.issuer, "exemple.ezymonit.test", "certificat auto-signé");
+        assert_eq!(info.subject, "exemple.internal.test");
+        assert_eq!(info.issuer, "exemple.internal.test", "certificat auto-signé");
     }
 
     #[test]

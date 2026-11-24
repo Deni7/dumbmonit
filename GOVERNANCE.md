@@ -34,8 +34,17 @@ and contribute.
   maintainer decides after the discussion and explains the decision in the
   issue.
 - The project follows its [Code of Conduct](CODE_OF_CONDUCT.md).
-- Direction is visible on the public
-  [roadmap board](https://github.com/users/laupernoe/projects/2).
+- What shipped is in the [changelog](CHANGELOG.md) and the
+  [release notes](https://github.com/selfhostr/dumbmonit/releases); ideas and
+  bugs live in the [issue tracker](https://github.com/selfhostr/dumbmonit/issues).
+
+## What DumbMonit does not intend to do
+
+- Become a log, trace or APM platform: it monitors devices and services.
+- Offer a paid edition or a hosted service: it stays 100 % open source.
+- Send telemetry about your instance anywhere.
+- Target fleets of thousands of devices: it is built for homelabs, small teams
+  and MSPs, on one container.
 
 ## Becoming a maintainer
 

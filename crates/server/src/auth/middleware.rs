@@ -11,7 +11,10 @@
 //! une route d'écriture qui n'y figure pas reste réservée à l'administrateur).
 //! Les lectures sont ouvertes aux trois rôles ; les quelques lectures réservées
 //! (liste des comptes, réglages SSO) le disent elles-mêmes avec l'extracteur
-//! [`AdminUser`].
+//! [`AdminUser`]. Le quatrième rôle, `wall` (écran mural), n'a droit qu'à la
+//! liste blanche [`wall::WALL_ROUTES`] : le reste lui répond 403, lectures
+//! comprises. Un compte à rôle personnalisé est un lecteur à qui ses
+//! permissions ouvrent leurs routes, et rien d'autre ([`permissions`]).
 //!
 //! Deux façons de se présenter : le cookie de session d'un navigateur, ou un
 //! jeton d'API (`Authorization: Bearer dmt_…`) pour les scripts et les
@@ -26,15 +29,16 @@ use std::net::IpAddr;
 
 use axum::extract::{Extension, FromRequestParts, Request, State};
 use axum::http::request::Parts;
-use axum::http::{HeaderMap, Method};
+use axum::http::{HeaderMap, Method, header};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use sqlx::SqlitePool;
 
+use crate::auth::permissions::{self, Delegated};
 use crate::auth::session::SessionToken;
 use crate::auth::token::{self, ApiToken, Scope};
 use crate::auth::users::{self, User};
-use crate::auth::{AuthError, AuthState, clients, cookie, session, teams};
+use crate::auth::{AuthError, AuthState, clients, cookie, policy, session, teams, wall};
 use crate::state::AppState;
 
 /// Session validée, déposée dans la requête pour les gestionnaires qui en ont
@@ -77,6 +81,11 @@ impl Principal {
         }
     }
 
+    /// Un compte d'écran mural (jamais un jeton : voir `token::authenticate`).
+    pub fn is_wall(&self) -> bool {
+        matches!(self, Self::User(user) if user.role.is_wall())
+    }
+
     /// Peut traiter les alertes : administrateur ou opérateur, ou jeton `write`.
     /// Un jeton `read` ne le peut pas, quel que soit son propriétaire.
     pub fn can_operate(&self) -> bool {
@@ -107,6 +116,10 @@ const SELF_SERVICE: &[&str] = &[
     "/auth/totp/verify",
     "/auth/passkeys/register/begin",
     "/auth/passkeys/register/finish",
+    "/auth/sessions/revoke-others",
+    "/auth/totp/recovery-codes",
+    "/auth/notifications",
+    "/auth/notifications/test",
     "/music/speaker/report",
     "/music/speaker/play",
     "/music/spotify/playback",
@@ -132,6 +145,7 @@ pub const OPERATOR_ROUTES: &[(&str, &str)] = &[
     ("POST", "/alerts/*/dismiss"),
     ("DELETE", "/alerts/*/dismiss"),
     ("POST", "/alerts/silences"),
+    ("PUT", "/alerts/silences/*"),
     ("DELETE", "/alerts/silences/*"),
     ("POST", "/alerts/history/dismiss-resolved"),
     ("POST", "/alerts/history/*/dismiss"),
@@ -144,6 +158,11 @@ pub const OPERATOR_ROUTES: &[(&str, &str)] = &[
     // Lancer à la main une action de remédiation définie par un
     // administrateur, depuis une alerte en cours (`api::remediation::run_action`).
     ("POST", "/remediation/actions/*/run"),
+    // Repères de changement : documenter un déploiement ou une maintenance est un
+    // geste d'exploitation (`api::annotations`).
+    ("POST", "/annotations"),
+    ("PATCH", "/annotations/*"),
+    ("DELETE", "/annotations/*"),
 ];
 
 /// Préfixes de routes interdits aux jetons d'API, quelle que soit leur portée :
@@ -155,6 +174,7 @@ pub const TOKEN_DENIED: &[&str] = &[
     "/users",
     "/teams",
     "/clients",
+    "/roles",
     "/tokens",
     "/agent/tokens",
     "/agent/ad-kit",
@@ -259,13 +279,34 @@ pub async fn require_session(
         return response;
     }
 
-    let (token, user) = match current_session(&state.pool, request.headers()).await {
+    let found = current_session_details(&state.pool, request.headers()).await;
+    let (token, user, verified) = match found {
         Ok(Some(found)) => found,
         Ok(None) => {
             return AuthError::Unauthorized("Authentication required.".into()).into_response();
         }
         Err(error) => return error.into_response(),
     };
+
+    // Un écran mural ne joint que ce que lit le mur : tout le reste, lecture
+    // comprise, est refusé avant même le calcul de ses droits.
+    if user.role.is_wall() && !wall::is_wall_route(request.method(), request.uri().path()) {
+        return AuthError::Forbidden(wall::WALL_ONLY_MESSAGE.into()).into_response();
+    }
+
+    // Politique « second facteur obligatoire » : un administrateur ou un
+    // opérateur qui n'en a pas ne peut plus que l'enrôler. Le réglage n'est lu
+    // que pour les comptes qu'il pourrait viser (jamais un écran mural).
+    if !policy::allowed_while_blocked(request.method(), request.uri().path()) {
+        match policy::setup_required(&state.pool, &user, verified.via).await {
+            Ok(false) => {}
+            Ok(true) => return AuthError::totp_setup_required().into_response(),
+            Err(error) => return AuthError::from(error).into_response(),
+        }
+    }
+
+    // Rôle personnalisé : la permission qui ouvre cette route, s'il y en a une.
+    let delegated = permissions::granted(&user, request.method(), request.uri().path());
 
     let access = match teams::access_for_user(&state.pool, &user).await {
         Ok(access) => access,
@@ -291,6 +332,7 @@ pub async fn require_session(
         // après, par le garde des équipes.
         let allowed = user.role.is_admin()
             || is_self_service(path)
+            || delegated.is_some()
             || (user.role.can_operate() && is_operator_route(request.method(), path))
             || (user.role.can_operate()
                 && access.is_scoped()
@@ -307,11 +349,38 @@ pub async fn require_session(
     }
 
     request.extensions_mut().insert(teams::CurrentAccess(access));
+    if let Some(permission) = delegated {
+        request.extensions_mut().insert(Delegated(permission));
+    }
+
+    // Dernière activité, pour la liste « mes sessions » : au plus une écriture
+    // toutes les quelques minutes, et seulement pour une requête admise. Un
+    // échec ne coûte que l'horodatage. Un écran mural renouvelle au passage sa
+    // session et son cookie (voir `session::touch`) : il reste connecté tant
+    // qu'il affiche le mur.
+    let mut renewed = None;
+    if verified.needs_touch(chrono::Utc::now()) {
+        let ip = token::request_ip(request.extensions(), request.headers());
+        let slide = user.role.is_wall();
+        match session::touch(&state.pool, token.id(), ip, slide).await {
+            Ok(()) if slide => renewed = Some(cookie::set(&token)),
+            Ok(()) => {}
+            Err(error) => tracing::warn!(?error, "activité de la session non notée"),
+        }
+    }
 
     request.extensions_mut().insert(CurrentSession(token));
     request.extensions_mut().insert(CurrentPrincipal(Principal::User(user.clone())));
     request.extensions_mut().insert(CurrentUser(user));
-    next.run(request).await
+    let mut response = next.run(request).await;
+    // Le cookie renouvelé ne passe pas devant celui que la route pose ou
+    // efface elle-même (déconnexion) : le dernier posé l'emporterait.
+    if let Some(value) = renewed
+        && !response.headers().contains_key(header::SET_COOKIE)
+    {
+        response.headers_mut().append(header::SET_COOKIE, value);
+    }
+    response
 }
 
 /// Vérifie le jeton d'API d'une requête et ce qu'il a le droit de faire ici.
@@ -384,6 +453,12 @@ fn same_origin(headers: &HeaderMap) -> Result<(), &'static str> {
     Err(NO_PROOF)
 }
 
+/// La même preuve d'origine, exigée par les routes publiques qui écrivent sans
+/// session : réinitialisation du mot de passe, acceptation d'une invitation.
+pub fn require_same_origin(headers: &HeaderMap) -> Result<(), AuthError> {
+    same_origin(headers).map_err(|reason| AuthError::Forbidden(reason.into()))
+}
+
 const CROSS_SITE: &str = "Cross-site request refused.";
 const NO_PROOF: &str = "State-changing requests must carry the header \
                         `X-Requested-With: DumbMonit` (browsers add it automatically \
@@ -401,6 +476,14 @@ fn is_self_service(path: &str) -> bool {
         || is_own_push_device(path)
         || is_own_oncall_profile(path)
         || is_own_passkey(path)
+        || is_own_session(path)
+}
+
+/// Sessions : chacun ferme *les siennes* (`api::sessions` filtre par compte).
+/// L'identifiant est la partie publique du cookie, en hexadécimal.
+fn is_own_session(path: &str) -> bool {
+    path.strip_prefix("/auth/sessions/")
+        .is_some_and(|id| !id.is_empty() && id.bytes().all(|b| b.is_ascii_hexdigit()))
 }
 
 /// Contacts, heures calmes et lien de calendrier d'astreinte : chacun gère les
@@ -464,10 +547,19 @@ pub async fn current_session(
     pool: &SqlitePool,
     headers: &HeaderMap,
 ) -> Result<Option<(SessionToken, User)>, AuthError> {
+    Ok(current_session_details(pool, headers).await?.map(|(token, user, _)| (token, user)))
+}
+
+/// Comme [`current_session`], avec ce que la base dit de la session : façon
+/// dont elle a été ouverte, dernière activité notée.
+pub async fn current_session_details(
+    pool: &SqlitePool,
+    headers: &HeaderMap,
+) -> Result<Option<(SessionToken, User, session::Verified)>, AuthError> {
     let Some(token) = cookie::extract(headers) else { return Ok(None) };
-    let Some(user_id) = session::authenticate(pool, &token).await? else { return Ok(None) };
-    match users::get(pool, user_id).await? {
-        Some(user) if !user.disabled => Ok(Some((token, user))),
+    let Some(verified) = session::authenticate(pool, &token).await? else { return Ok(None) };
+    match users::get(pool, verified.user_id).await? {
+        Some(user) if !user.disabled => Ok(Some((token, user, verified))),
         _ => {
             session::delete(pool, token.id()).await?;
             Ok(None)
@@ -505,7 +597,8 @@ impl<S: Send + Sync> FromRequestParts<S> for Identity {
     }
 }
 
-/// Extracteur : une identité d'administrateur — compte `admin` ou jeton `write`.
+/// Extracteur : une identité d'administrateur — compte `admin` ou jeton `write`
+/// — ou un compte dont le rôle personnalisé ouvre cette route ([`Delegated`]).
 pub struct AdminIdentity(pub Principal);
 
 impl<S: Send + Sync> FromRequestParts<S> for AdminIdentity {
@@ -513,7 +606,7 @@ impl<S: Send + Sync> FromRequestParts<S> for AdminIdentity {
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let Identity(principal) = Identity::from_request_parts(parts, state).await?;
-        if !principal.is_admin() {
+        if !principal.is_admin() && parts.extensions.get::<Delegated>().is_none() {
             return Err(AuthError::admin_required());
         }
         Ok(Self(principal))
@@ -530,7 +623,7 @@ impl<S: Send + Sync> FromRequestParts<S> for OperatorIdentity {
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let Identity(principal) = Identity::from_request_parts(parts, state).await?;
-        if !principal.can_operate() {
+        if !principal.can_operate() && parts.extensions.get::<Delegated>().is_none() {
             return Err(AuthError::operator_required());
         }
         Ok(Self(principal))
@@ -586,6 +679,16 @@ mod tests {
         assert!(is_self_service("/music/spotify/playback"));
         assert!(!is_self_service("/music/spotify/authorize"));
         assert!(!is_self_service("/music/link"));
+        assert!(is_self_service("/api/auth/sessions/revoke-others"));
+        assert!(is_self_service("/auth/sessions/0123abcdef"));
+        assert!(!is_self_service("/auth/sessions/"));
+        assert!(!is_self_service("/auth/sessions/12/../../users"));
+        assert!(is_self_service("/auth/totp/recovery-codes"));
+        assert!(is_self_service("/api/auth/notifications"));
+        assert!(is_self_service("/auth/notifications/test"));
+        assert!(!is_self_service("/auth/recovery"));
+        assert!(!is_self_service("/auth/policy"));
+        assert!(!is_self_service("/users/3/sessions"));
     }
 
     #[test]
@@ -597,12 +700,16 @@ mod tests {
         yes(Method::POST, "/alerts/abc123/dismiss");
         yes(Method::DELETE, "/api/alerts/abc123/dismiss");
         yes(Method::POST, "/alerts/silences");
+        yes(Method::PUT, "/alerts/silences/4");
         yes(Method::DELETE, "/alerts/silences/4");
         yes(Method::POST, "/alerts/history/dismiss-resolved");
         yes(Method::POST, "/alerts/history/9/dismiss");
         yes(Method::PUT, "/alerts/rules/2/overrides/7");
         yes(Method::DELETE, "/alerts/rules/2/overrides/7");
         yes(Method::POST, "/remediation/actions/3/run");
+        yes(Method::POST, "/annotations");
+        yes(Method::PATCH, "/annotations/4");
+        yes(Method::DELETE, "/api/annotations/4");
 
         no(Method::PUT, "/alerts/abc123/ack");
         no(Method::POST, "/alerts//ack");
@@ -613,7 +720,7 @@ mod tests {
         no(Method::PUT, "/alerts/rules/2");
         no(Method::DELETE, "/alerts/rules/2");
         no(Method::POST, "/alerts/rules/2/enable");
-        no(Method::PUT, "/alerts/silences/4");
+        no(Method::PATCH, "/alerts/silences/4");
         no(Method::POST, "/targets");
         no(Method::PUT, "/targets/1");
         no(Method::POST, "/targets/1/probe");
@@ -631,6 +738,8 @@ mod tests {
         no(Method::POST, "/remediation/policies/1/arm");
         no(Method::POST, "/remediation/policies/1/confirm");
         no(Method::POST, "/runbooks");
+        no(Method::PUT, "/annotations/4");
+        no(Method::POST, "/annotations/4");
     }
 
     #[test]

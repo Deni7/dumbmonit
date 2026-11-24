@@ -544,6 +544,7 @@ pub async fn map_identity(
             &identity.groups,
             &config.admin_groups,
             &config.operator_groups,
+            &config.wall_groups,
             current,
         )
     };

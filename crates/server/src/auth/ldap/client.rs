@@ -256,6 +256,7 @@ pub async fn test(
                             &config.admin_groups,
                             &config.operator_groups,
                             &config.viewer_groups,
+                            &config.wall_groups,
                             None,
                         ) {
                             Decision::Role(role) => (Some(role), true),

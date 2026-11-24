@@ -10,20 +10,27 @@
 	 * validate the obvious mistakes here so the operator hears them without a
 	 * round trip.
 	 */
-	import type { NthWeekday, Target, SilencePayload } from '#lib/api/index.js';
+	import type { NthWeekday, Silence, Target, SilencePayload } from '#lib/api/index.js';
 	import { Button, DateTimeField, Field, Panel, TimeField } from '#lib/ui/index.js';
+	import { untrack } from 'svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { pad2 } from '#lib/format.js';
 	import { dayName } from './helpers';
+	import { localDay, prefillStart } from './calendar-layout';
 
 	interface Props {
 		targets: Target[];
 		/** Creates the silence and resolves when the list has been refreshed. */
 		oncreate: (payload: SilencePayload) => Promise<void>;
 		oncancel: () => void;
+		/** An existing window to edit, or to copy into a new one (prefills the form). */
+		source?: { mode: 'edit' | 'duplicate'; silence: Silence } | null;
+		/** A day (`YYYY-MM-DD`) clicked on the calendar: a new one-off window starts there. */
+		day?: string | null;
 	}
 
-	let { targets, oncreate, oncancel }: Props = $props();
+	let { targets, oncreate, oncancel, source = null, day = null }: Props = $props();
+	const editing = $derived(source?.mode === 'edit');
 
 	const DAYS = $derived([0, 1, 2, 3, 4, 5, 6].map((index) => ({ index, label: dayName(index) })));
 
@@ -36,7 +43,7 @@
 		{ value: -1, label: m.alerts_form_rank_last() }
 	]);
 
-	const DURATIONS = $derived([
+	const DURATIONS_BASE = $derived([
 		{ value: 30, label: m.alerts_span_min({ minutes: 30 }) },
 		{ value: 60, label: m.alerts_span_h({ hours: 1 }) },
 		{ value: 120, label: m.alerts_span_h({ hours: 2 }) },
@@ -44,6 +51,29 @@
 		{ value: 480, label: m.alerts_span_h({ hours: 8 }) },
 		{ value: 1440, label: m.alerts_span_h({ hours: 24 }) }
 	]);
+
+	/** Quick lengths for a one-off window: they set its end from its start. */
+	const ONCE_PRESETS = $derived(DURATIONS_BASE.slice(0, 4));
+
+	/** A copied or edited window may last a length the list does not offer. */
+	const DURATIONS = $derived(
+		DURATIONS_BASE.some((option) => option.value === monthlyDuration)
+			? DURATIONS_BASE
+			: [
+					...DURATIONS_BASE,
+					{ value: monthlyDuration, label: m.alerts_span_min({ minutes: monthlyDuration }) }
+				].sort((a, b) => a.value - b.value)
+	);
+
+	function applyPreset(minutes: number) {
+		const start = new Date(startAt);
+		const from = Number.isNaN(start.getTime()) ? new Date() : start;
+		endAt = localInput(new Date(from.getTime() + minutes * 60_000));
+	}
+
+	function clock(minute: number): string {
+		return `${pad2(Math.floor(minute / 60))}:${pad2(minute % 60)}`;
+	}
 
 	/** "2026-09-14T22:00" in local time, for a datetime-local default. */
 	function localInput(date: Date): string {
@@ -83,6 +113,57 @@
 
 	let saving = $state(false);
 	let error = $state<string | null>(null);
+
+	// Prefill from the window being edited or copied. The page remounts the form
+	// (`{#key}`) when the source changes, so this runs once per opening.
+	function prefill(silence: Silence, how: 'edit' | 'duplicate') {
+		name = how === 'duplicate' ? m.w1alerts_form_copy_name({ name: silence.name }) : silence.name;
+		comment = silence.comment;
+		targetId = silence.target_id === null ? '' : String(silence.target_id);
+		const schedule = silence.schedule;
+		if (schedule.kind === 'once') {
+			mode = 'once';
+			const first = new Date(schedule.starts_at);
+			const last = new Date(schedule.ends_at);
+			if (how === 'duplicate') {
+				// A copy of a past window is for the next one: same length, starting now.
+				const length = last.getTime() - first.getTime();
+				startAt = localInput(new Date());
+				endAt = localInput(new Date(Date.now() + length));
+			} else {
+				startAt = localInput(first);
+				endAt = localInput(last);
+			}
+		} else if (schedule.kind === 'weekly') {
+			mode = 'weekly';
+			days = [...schedule.days];
+			weeklyStart = clock(schedule.start_minute);
+			weeklyEnd = clock(schedule.end_minute);
+			timezone = schedule.timezone || timezone;
+		} else if (schedule.kind === 'monthly') {
+			mode = 'monthly';
+			monthlyBy = schedule.days.length > 0 ? 'dates' : 'weekday';
+			monthlyDates = schedule.days.join(', ') || '1';
+			const nth = schedule.nth_weekdays[0];
+			if (nth) {
+				monthlyRank = nth.nth;
+				monthlyWeekday = nth.weekday;
+			}
+			monthlyStart = clock(schedule.start_minute);
+			monthlyDuration = schedule.duration_minutes;
+			timezone = schedule.timezone || timezone;
+		}
+	}
+	untrack(() => {
+		if (source) prefill(source.silence, source.mode);
+		else if (day) {
+			const first = new Date(prefillStart(day, localDay(new Date())));
+			if (!Number.isNaN(first.getTime())) {
+				startAt = localInput(first);
+				endAt = localInput(new Date(first.getTime() + 2 * 3600_000));
+			}
+		}
+	});
 
 	function toggleDay(index: number) {
 		days = days.includes(index) ? days.filter((d) => d !== index) : [...days, index];
@@ -216,7 +297,7 @@
 	}
 </script>
 
-<Panel title={m.alerts_silences_schedule()} description={m.alerts_form_description()}>
+<Panel title={editing ? m.w1alerts_form_edit_title() : m.alerts_silences_schedule()} description={m.alerts_form_description()}>
 	<form class="grid gap-4" onsubmit={submit}>
 		<Field label={m.alerts_form_name()} for="silence-name" required help={m.alerts_form_name_help()}>
 			<input
@@ -272,6 +353,14 @@
 				<Field label={m.alerts_form_end()} for="silence-end">
 					<DateTimeField id="silence-end" bind:value={endAt} min={startAt} label={m.alerts_form_end()} />
 				</Field>
+			</div>
+			<div>
+				<span class="mb-1.5 block text-sm font-semibold text-ink">{m.w1alerts_form_duration()}</span>
+				<div class="flex flex-wrap gap-2">
+					{#each ONCE_PRESETS as preset (preset.value)}
+						<Button size="sm" variant="ghost" onclick={() => applyPreset(preset.value)}>{preset.label}</Button>
+					{/each}
+				</div>
 			</div>
 		{:else if mode === 'weekly'}
 			<div>
@@ -374,7 +463,7 @@
 		{/if}
 
 		<div class="flex flex-wrap items-center gap-2">
-			<Button type="submit" variant="primary" loading={saving}>{m.alerts_form_submit()}</Button>
+			<Button type="submit" variant="primary" loading={saving}>{editing ? m.w1alerts_form_save() : m.alerts_form_submit()}</Button>
 			<Button type="button" variant="ghost" onclick={oncancel} disabled={saving}>{m.alerts_form_cancel()}</Button>
 		</div>
 	</form>

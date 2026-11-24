@@ -84,6 +84,12 @@ tokio-rustls = "0.26"
 # des agents, et son adaptateur tokio. Déjà compilés pour axum.
 hyper = { version = "1.12", features = ["http1", "server"] }
 hyper-util = { version = "0.1.21", features = ["tokio"] }
+# Canal des agents par WebSocket, à l'adresse de l'interface (Cloudflare
+# Tunnel, mandataire inverse) : le flux d'octets de la session TLS de l'agent
+# dans des messages binaires (`agent_tls::websocket`). Sans pile TLS ni client
+# de la crate : la mise à niveau passe par hyper (serveur) et reqwest (essai du
+# canal) ; seuls le cadrage et `handshake` (clés de la mise à niveau) servent.
+tokio-tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
 # Canal chiffré des agents (`agent_tls`) : TLS 1.3 seulement, échange de clés
 # hybride post-quantique X25519MLKEM768, certificats clients. Le moteur
 # aws-lc-rs est celui que rustls compile déjà (via reqwest) ; `rcgen` fabrique
@@ -143,6 +149,18 @@ roxmltree = "0.20"
 # version : une 0.14 donnerait des types que son constructeur refuse.
 web-push-native = { version = "0.5", default-features = false }
 p256 = { version = "0.13", features = ["ecdsa"] }
+
+# Copies hors site des sauvegardes (`backup::offsite`). SFTP : la même crate
+# et les mêmes fonctions que la sauvegarde des configurations réseau
+# (`dumbmonit-collectors`), donc rien de neuf dans le verrou ; le protocole
+# SFTP lui-même (v3, cinq requêtes) est écrit ici plutôt que de tirer
+# `russh-sftp` et ses dépendances. Les clés privées RSA sont refusées (voir
+# `deny.toml`). `http-body` et `http-body-util` (déjà compilés pour reqwest) :
+# corps de requête lu depuis le fichier au fil de l'envoi, sans la fonction
+# `stream` de reqwest.
+russh = { version = "0.65", default-features = false, features = ["flate2", "ring", "rsa"] }
+http-body = "1"
+http-body-util = "0.1"
 
 [target.'cfg(unix)'.dependencies]
 # SIGTERM vers le VictoriaMetrics embarqué : tokio ne sait envoyer que SIGKILL.

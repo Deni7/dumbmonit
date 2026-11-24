@@ -7,6 +7,8 @@
 //! défaut reproduit le rapport d'avant ces options (détaillé, A4, tout inclus,
 //! toute l'instance).
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use super::collect::UNGROUPED;
@@ -16,6 +18,8 @@ pub const MAX_TITLE_CHARS: usize = 120;
 pub const MAX_NOTES_CHARS: usize = 2000;
 pub const MAX_SCOPE_TARGETS: usize = 1000;
 pub const MAX_SCOPE_GROUPS: usize = 200;
+/// Objectifs propres à un rapport : autant que de moniteurs et de groupes qu'il peut cadrer.
+pub const MAX_OBJECTIVES: usize = MAX_SCOPE_TARGETS + MAX_SCOPE_GROUPS;
 
 /// Gabarit du PDF.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -185,7 +189,59 @@ impl Sections {
 }
 
 /// Mise en page complète.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Objectifs de disponibilité (pour cent) propres à un groupe ou à un moniteur :
+/// ils remplacent celui du rapport pour les lignes concernées. Le moniteur
+/// l'emporte sur son groupe. Les clés sont des noms (portables d'une
+/// sauvegarde à l'autre) ; « Ungrouped » désigne les moniteurs sans groupe.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Objectives {
+    pub groups: BTreeMap<String, f64>,
+    pub monitors: BTreeMap<String, f64>,
+}
+
+impl Objectives {
+    pub fn is_empty(&self) -> bool {
+        self.groups.is_empty() && self.monitors.is_empty()
+    }
+
+    /// Objectif propre au moniteur `name` du groupe `group`, s'il en a un.
+    pub fn for_monitor(&self, name: &str, group: &str) -> Option<f64> {
+        self.monitors.get(name).or_else(|| self.groups.get(group)).copied()
+    }
+
+    /// Objectif propre au groupe `name`, s'il en a un.
+    pub fn for_group(&self, name: &str) -> Option<f64> {
+        self.groups.get(name).copied()
+    }
+
+    /// Noms nettoyés, valeurs dans ]0 ; 100], listes bornées.
+    pub fn validate(self) -> Result<Self, String> {
+        if self.groups.len() + self.monitors.len() > MAX_OBJECTIVES {
+            return Err(format!("A report has at most {MAX_OBJECTIVES} objective overrides."));
+        }
+        let clean = |map: BTreeMap<String, f64>| -> Result<BTreeMap<String, f64>, String> {
+            let mut out = BTreeMap::new();
+            for (name, goal) in map {
+                let name = name.trim().to_string();
+                if name.is_empty()
+                    || name.chars().any(char::is_control)
+                    || name.chars().count() > 200
+                {
+                    return Err("A name in the objective overrides is not valid.".to_string());
+                }
+                if !(goal.is_finite() && goal > 0.0 && goal <= 100.0) {
+                    return Err("An objective must be above 0 and at most 100 percent.".to_string());
+                }
+                out.insert(name, goal);
+            }
+            Ok(out)
+        };
+        Ok(Self { groups: clean(self.groups)?, monitors: clean(self.monitors)? })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Layout {
     pub template: Template,
@@ -201,6 +257,8 @@ pub struct Layout {
     pub show_logo: bool,
     /// D'où vient le logo.
     pub logo: LogoSource,
+    /// Objectifs propres à des groupes ou à des moniteurs, qui remplacent celui du rapport.
+    pub objectives: Objectives,
 }
 
 impl Default for Layout {
@@ -213,6 +271,7 @@ impl Default for Layout {
             notes: String::new(),
             show_logo: true,
             logo: LogoSource::Auto,
+            objectives: Objectives::default(),
         }
     }
 }
@@ -251,6 +310,7 @@ impl Layout {
                 Some(title.to_string())
             }
         };
+        self.objectives = self.objectives.validate()?;
         self.notes = clean_notes(&self.notes);
         if self.notes.chars().count() > MAX_NOTES_CHARS {
             return Err(format!("The notes must be {MAX_NOTES_CHARS} characters at most."));
@@ -331,6 +391,36 @@ mod tests {
         assert!(layout.sections.monitors && layout.sections.notes && layout.show_logo);
         assert_eq!(Layout::from_json("not json"), Layout::default());
         assert!(Scope::from_json("{}").is_empty());
+    }
+
+    #[test]
+    fn a_monitor_objective_beats_its_group_and_the_group_beats_nothing() {
+        let mut objectives = Objectives::default();
+        objectives.groups.insert("Edge".into(), 99.0);
+        objectives.monitors.insert("Gateway".into(), 99.99);
+        assert_eq!(objectives.for_monitor("Gateway", "Edge"), Some(99.99));
+        assert_eq!(objectives.for_monitor("Switch", "Edge"), Some(99.0));
+        assert_eq!(objectives.for_monitor("Switch", "Core"), None);
+        assert_eq!(objectives.for_group("Edge"), Some(99.0));
+        assert_eq!(objectives.for_group("Core"), None);
+    }
+
+    #[test]
+    fn objective_overrides_are_checked() {
+        let mut objectives = Objectives::default();
+        objectives.groups.insert("  Edge ".into(), 99.5);
+        let clean = objectives.validate().expect("valid");
+        assert_eq!(clean.groups.get("Edge"), Some(&99.5));
+        for bad in [0.0, -1.0, 100.5, f64::NAN] {
+            let mut objectives = Objectives::default();
+            objectives.monitors.insert("A".into(), bad);
+            assert!(objectives.validate().is_err(), "{bad}");
+        }
+        let mut blank = Objectives::default();
+        blank.groups.insert("   ".into(), 99.0);
+        assert!(blank.validate().is_err());
+        let old = Layout::from_json(r#"{"template":"summary"}"#);
+        assert!(old.objectives.is_empty(), "a layout from before has none");
     }
 
     #[test]

@@ -132,7 +132,7 @@
 				<h2 class="text-sm font-bold text-ink">{m.topology_legend_title()}</h2>
 				<button
 					type="button"
-					class="-my-2 -mr-2 inline-flex size-10 items-center justify-center rounded-lg text-ink-2 hover:bg-surface-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-signal"
+					class="-my-2 -mr-2 inline-flex size-10 items-center justify-center rounded-lg text-ink-2 hover:bg-surface-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
 					aria-label={m.topology_legend_close()}
 					onclick={() => (open = false)}
 				>

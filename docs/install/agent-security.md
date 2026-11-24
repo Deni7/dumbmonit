@@ -281,6 +281,21 @@ tunnel through it and its TLS session stays end to end, client certificate and
 pinning included; a proxy that intercepts TLS is refused. See
 [Outbound proxy](../devices/agent.md#outbound-proxy).
 
+When only the web address is reachable (Cloudflare Tunnel, a reverse proxy that
+terminates TLS, a network where only web traffic goes out), the agent opens a
+WebSocket to `/api/agent/ws` on that address and carries the same TLS session
+inside it. The proxy terminates its own TLS and sees opaque messages; the
+agent's client certificate and the pinned authority still go end to end, and
+without a valid handshake inside, nothing reaches a route. The route has no
+login of its own and needs none: the session inside is what is authenticated.
+A session without a client certificate only reaches enrolment (token, attempts
+counted per address) and is closed after one minute; install scripts are not
+served there; a request with an `Origin` header (a browser page) or the session
+cookie is refused, so a web page cannot open it on a logged-in admin's behalf;
+connections per address, the incoming rate, message size and idle time are
+bounded. `DUMBMONIT_AGENT_WEBSOCKET=off` closes the route. See
+[Agents behind a proxy](agents-behind-proxy.md).
+
 ## Rotating the certificate authority
 
 In **Settings → Agents → Agent channel → Certificate authority rotation**:

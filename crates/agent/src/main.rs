@@ -35,6 +35,7 @@ mod tls;
 mod uninstall;
 #[cfg(windows)]
 mod winsvc;
+mod ws;
 
 use std::path::PathBuf;
 
@@ -78,7 +79,6 @@ fn main() -> Result<()> {
 
     let config = Config::load(&args.config_path())?;
     init_tracing(config.log_level);
-    config.warn_deprecated_env();
 
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -190,6 +190,8 @@ ENVIRONMENT VARIABLES (override the file):
     DUMBMONIT_AGENT_CONFIG           Configuration file path
     DUMBMONIT_AGENT_URL              Server URL, https:// only, for example https://server:8080
     DUMBMONIT_AGENT_SERVER_PIN       Public key pin (sha256//...) of a self-signed server certificate
+    DUMBMONIT_AGENT_TRANSPORT        Encrypted channel: auto (default), direct (agent port) or
+                                     websocket (through the server URL: Cloudflare Tunnel, proxy)
     DUMBMONIT_AGENT_TOKEN            Enrollment token
     DUMBMONIT_AGENT_INTERVAL_SECS    Sampling period
     DUMBMONIT_AGENT_HOSTNAME         Hostname announced to the server

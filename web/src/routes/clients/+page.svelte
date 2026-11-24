@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { docTitle } from '#lib/stores/page-title.svelte.js';
 	/**
 	 * MSP mode: the clients at a glance. The MSP administrator sees one row per
 	 * client — its LED, what is alerting, how full its quota is — and opens a
@@ -81,7 +82,7 @@
 	const initial = (name: string) => [...name.trim()][0]?.toUpperCase() ?? '?';
 </script>
 
-<svelte:head><title>{m.msp_overview_title()} · DumbMonit</title></svelte:head>
+<svelte:head><title>{docTitle(m.msp_overview_title())}</title></svelte:head>
 
 <PageHeader title={m.msp_overview_title()} description={admin ? m.msp_overview_description_admin() : m.msp_overview_description_member()} />
 

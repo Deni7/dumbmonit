@@ -11,7 +11,8 @@
 //!
 //! 1. chaque règle active est une requête MetricsQL instantanée ([`source`]) ;
 //! 2. chaque série obtenue devient une empreinte, dont l'état avance selon `for`
-//!    ([`machine`]) ;
+//!    ([`machine`]), par le pas d'évaluation ([`evaluation`]) que partage le
+//!    rejeu d'une règle sur l'historique ([`replay`]) ;
 //! 3. les alertes des équipements situés derrière un équipement injoignable sont
 //!    supprimées ([`suppress`]) ;
 //! 4. les fenêtres de maintenance font taire ce qu'elles couvrent ([`silence`]) ;
@@ -34,6 +35,10 @@
 //! ([`forecast`], sur les familles de [`capacity`]) rend un nombre de jours, la
 //! dérive de baseline ([`drift`]) un rapport à la normale, et ces séries passent
 //! ensuite par les étapes 2 à 6 comme les autres.
+//!
+//! Le rapport de bruit ([`noise`]) relit l'historique des transitions : règles
+//! qui parlent trop, alertes qui battent, délais d'acquittement et de
+//! résolution.
 
 pub mod baseline;
 pub mod capacity;
@@ -41,18 +46,22 @@ pub mod cycle;
 pub mod derived;
 pub mod drift;
 pub mod engine;
+pub mod evaluation;
 pub mod forecast;
 pub mod group;
 pub mod log_source;
 pub mod machine;
 pub mod matcher;
 pub mod model;
+pub mod noise;
 pub mod notify_policy;
 pub mod overrides;
+pub mod replay;
 pub mod rules;
 pub mod silence;
 pub mod source;
 pub mod suppress;
+pub mod units;
 
 pub use engine::{AlertingConfig, EvalReport, evaluate_once, spawn};
 pub use group::{AlertGroup, AlertOutcome, NotifyReason};

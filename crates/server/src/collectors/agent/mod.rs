@@ -22,12 +22,14 @@ pub mod catalog;
 pub mod commands;
 pub mod enrolment;
 pub mod eventlog;
+pub mod gateway;
 pub mod logs;
 pub mod modules;
 pub mod policy;
 mod receive;
 pub mod rollout;
 pub mod selfupdate;
+pub mod selfupdate_compat;
 pub mod sentinel;
 mod store;
 mod token;
@@ -321,6 +323,7 @@ mod tests {
             self_update: None,
             relay_gateway: None,
             relay_gateway_check: None,
+            relay_gateway_state: None,
             server_link: None,
             remediation: None,
         };

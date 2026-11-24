@@ -13,7 +13,7 @@
 	 * With `traffic` (weathermap), clicking a link that has port counters opens
 	 * its traffic panel: rates each way, errors, the last hour.
 	 */
-	import type { Snippet } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { Maximize, Minus, Plus, X } from 'lucide-svelte';
 	import MapContent from './MapContent.svelte';
@@ -37,6 +37,8 @@
 		edgePanel?: Snippet<[string]>;
 		/** Weathermap: links show their load and open a traffic panel. */
 		traffic?: boolean;
+		/** Centres the view on a node (a search, a deep link); a new `n` asks again. */
+		centerRequest?: { id: string; n: number } | null;
 	}
 
 	let {
@@ -49,7 +51,8 @@
 		onattach,
 		editor,
 		edgePanel,
-		traffic = false
+		traffic = false,
+		centerRequest = null
 	}: Props = $props();
 
 	/** Key of the link whose traffic panel is open. */
@@ -157,6 +160,21 @@
 			const k = Math.max(view.k, Math.min(1, MAX));
 			view = { k, x: width / 2 - p.x * k, y: height / 3 - p.y * k };
 		}
+	});
+
+	// A node asked for by name or by link: centred in the part of the map the panel leaves free.
+	let centered = 0;
+	$effect(() => {
+		const request = centerRequest;
+		if (!request || !width || !height || request.n === centered) return;
+		const p = layout.nodes.find((n) => n.node.id === request.id);
+		if (!p) return;
+		untrack(() => {
+			centered = request.n;
+			const k = Math.min(MAX, Math.max(view.k, 1));
+			const free = width >= 640 ? width - 336 : width;
+			view = { k, x: free / 2 - p.x * k, y: (width >= 640 ? height / 2 : height / 3) - p.y * k };
+		});
 	});
 
 	function inPanel(target: EventTarget | null): boolean {
@@ -296,7 +314,7 @@
 	}
 
 	const controlClass =
-		'inline-flex size-10 items-center justify-center rounded-lg border border-line-strong bg-surface text-ink-2 shadow-lift hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-signal';
+		'inline-flex size-10 items-center justify-center rounded-lg border border-line-strong bg-surface text-ink-2 shadow-lift hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus';
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
@@ -304,7 +322,7 @@
 	bind:this={host}
 	bind:clientWidth={width}
 	bind:clientHeight={height}
-	class={`topo-canvas relative touch-none overflow-hidden rounded-[var(--radius-card)] border bg-canvas select-none focus-visible:outline-2 focus-visible:outline-signal ${editing ? 'topo-editing border-signal' : 'border-line'} ${className}`}
+	class={`topo-canvas relative touch-none overflow-hidden rounded-[var(--radius-card)] border bg-canvas select-none focus-visible:outline-2 focus-visible:outline-focus ${editing ? 'topo-editing border-primary' : 'border-line'} ${className}`}
 	role="group"
 	aria-label={m.topology_canvas_label()}
 	tabindex="0"
@@ -344,8 +362,8 @@
 			/>
 			{#if drag?.active && dragFrom}
 				<!-- The node follows the pointer; a dashed line says where it came from. -->
-				<line x1={dragFrom.x} y1={dragFrom.y} x2={drag.x} y2={drag.y} class="stroke-signal" stroke-width="1.6" stroke-dasharray="4 4" />
-				<circle cx={drag.x} cy={drag.y} r={dragFrom.r} class="fill-surface stroke-signal" stroke-width="2.5" opacity="0.9" />
+				<line x1={dragFrom.x} y1={dragFrom.y} x2={drag.x} y2={drag.y} class="stroke-primary" stroke-width="1.6" stroke-dasharray="4 4" />
+				<circle cx={drag.x} cy={drag.y} r={dragFrom.r} class="fill-surface stroke-primary" stroke-width="2.5" opacity="0.9" />
 			{/if}
 		</g>
 	</svg>
@@ -376,7 +394,7 @@
 		>
 			<header class="flex items-center justify-between gap-2 border-b border-line px-4 py-2">
 				<h2 class="text-sm font-bold text-ink">{m.topology_traffic_panel_label()}</h2>
-				<button type="button" class="inline-flex size-10 items-center justify-center rounded-lg text-ink-2 hover:bg-surface-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-signal" aria-label={m.topology_traffic_close()} onclick={() => (selectedLink = null)}>
+				<button type="button" class="inline-flex size-10 items-center justify-center rounded-lg text-ink-2 hover:bg-surface-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-focus" aria-label={m.topology_traffic_close()} onclick={() => (selectedLink = null)}>
 					<X class="size-4" aria-hidden="true" />
 				</button>
 			</header>

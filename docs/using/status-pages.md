@@ -29,6 +29,7 @@ links forward here.
 | **Daily calendar** | Off by default. Adds a 90-day calendar under the services: one small cell per day, all services combined. See [The 90-day calendar](#the-90-day-calendar). |
 | **Response times** | Off by default. Adds a small response-time graph (24 h / 7 days) to each service that has latency data. See [Response times](#response-times). |
 | **Published** | Off = draft: the page, its badges and its logo answer "not found" to visitors until you switch it on. |
+| **Show in the list of public pages** | On by default. A published page that anyone may read appears in the server's list of public pages (`GET /api/public/status`), where website plugins such as the [WordPress banner](../integrations/website-banner.md#wordpress) offer it. Switch it off to keep the page out of that list; it stays readable at its address. A draft or [private page](#private) is never listed. |
 
 Then tick the monitors to show. For each one, set the **label** visitors will
 read (it defaults to the monitor name — you may prefer "Website" to
@@ -70,6 +71,27 @@ There is deliberately no custom CSS or HTML: a status page is public and lives
 on the same origin as your admin interface, under the same
 [content security policy](../reference/api.md).
 
+### Languages {#languages}
+
+The page's fixed texts ("All systems operational", headings, buttons) follow the
+visitor's language: their saved choice, then their browser language, among the
+fourteen interface languages. A **Language** picker at the bottom of the page lets
+them change it; only the chosen language is downloaded. When the browser speaks
+none of the fourteen, the page uses its **Default language**.
+
+The texts you wrote can be translated too. In the page editor, **Translations**
+(available once the page is saved) lets you pick a language and override the
+title, description, footer text and the names of services and groups. A field
+left empty keeps the text as written. Visitors get the translation matching their
+interface language (`?lang=` on `GET /api/public/status/{slug}`, else the
+`Accept-Language` header, else the page's default language). Translations are
+saved on their own with `PUT /api/status-pages/{id}/languages` and travel in the
+backup.
+
+**Incident and maintenance messages are shown exactly as written; they are never
+translated.** Write them in the language your audience reads, or post one per
+language.
+
 ## 2. What visitors see
 
 - A banner with the one-second answer, read from the services: **All systems
@@ -81,9 +103,19 @@ on the same origin as your admin interface, under the same
 - Each service with its state plate (Operational, Degraded, Down, Maintenance,
   No data), its uptime over the bar's period and its **history bar** — one
   square per day — and the response time for uptime probes.
-- **Past incidents**, by day, for the last 30 days.
-- **Get updates**: the RSS feed, and an email subscription form when you set
-  one up (see [Email subscribers](#email-subscribers)).
+- **Past incidents**, by day, for the last 30 days. **Show older** loads the
+  earlier ones, twenty at a time. A resolved incident says how long it lasted
+  ("resolved in 42min").
+- **Get updates**: the RSS feed (and one feed per service), and an email
+  subscription form when you set one up (see
+  [Email subscribers](#email-subscribers)).
+
+Dates and "checked" times carry the visitor's own timezone (for example
+`UTC+1`). A **Refresh** button reloads the page's data on demand; it still
+refreshes by itself every minute. Past 8 services, a search box and an **Only
+with problems** switch help find one. Every announcement has an anchor
+(`#incident-<id>`) and a **Copy link** button: the link opens the page scrolled
+to that incident, and the RSS items point to it.
 
 ### The history bar
 
@@ -180,6 +212,13 @@ private.
 
 An announcement is shown on one page or on **all pages**.
 
+**Post update** offers **templates** (Investigating, Identified, Monitoring,
+Resolved; for a maintenance, Scheduled, In progress, Completed) that fill the
+message and propose the matching status, and a **Preview** that draws the
+announcement as the public page will show it. Tick **Do not notify
+subscribers** to publish an update (a correction, a typo) without sending
+anything.
+
 ### Past incidents
 
 When you set DumbMonit up, enter the incidents you already had. In **New
@@ -195,6 +234,31 @@ day-by-day bars and calendar at its real date. When you post an update to an
 existing incident, **Date and time** works the same way: empty means now (and
 subscribers are told); a past date completes the history without notifying
 anyone. Times are stored in UTC.
+
+### Post-mortems {#postmortems}
+
+An incident can carry a post-mortem: in **Incidents and maintenance**, open the
+incident and choose **Write post-mortem**. It has a **summary**, the
+**impact**, the **root cause**, a **timeline** and **action items**:
+
+- The timeline starts from the incident's updates, oldest first. Change, add or
+  remove steps freely; times are typed in your local time and stored in UTC.
+- Each action item has a text and a **done** box, so the list doubles as a
+  follow-up checklist.
+- The text is plain text: a blank line starts a new paragraph, and nothing is
+  read as HTML or Markdown.
+
+A post-mortem is a **draft** until you turn on **Publish on the status page**.
+You can write the draft while the incident is still open; publishing needs the
+incident to be **resolved** and a summary. Once published, visitors see a
+folded **Post-mortem** section under the resolved incident, with the date it was
+first published (later edits keep that date). Turning the switch off, or
+deleting the post-mortem, removes it from the page. If the incident is
+reopened, the post-mortem stays saved but is hidden until the incident is
+resolved again.
+
+Maintenance windows have no post-mortem. Post-mortems are part of the
+[configuration backup](../install/backup.md), with their incident.
 
 ### Email subscribers
 
@@ -286,8 +350,10 @@ preview.
 
 ### Badges
 
-Every published page serves SVG badges — flat, with white text on solid
-colour, readable on both the light and dark themes of a GitHub README:
+Every published page serves SVG badges — with white text on solid colour,
+readable on both the light and dark themes of a GitHub README. `?style=` picks
+the shape: `flat` (default), `flat-square` or `for-the-badge` (larger, in
+capitals); the **Show it elsewhere** panel of the editor has the same choice.
 
 | Badge | URL |
 | --- | --- |
@@ -543,7 +609,14 @@ pages.
 ### Feed and document
 
 - `GET /api/public/status/<address>/rss` — an RSS feed of incidents and
-  maintenance windows, one item per announcement with its latest update.
+  maintenance windows, one item per announcement with its latest update, each
+  linking to the incident's permalink. `?component=<service>` keeps only the
+  announcements that touch that service (and those for the whole page).
+- `GET /api/public/status/<address>/incidents` — resolved announcements older
+  than the 30 days of the document, newest first, paged with the `next` cursor
+  passed back as `?before=`.
+- `GET /api/public/status` — the list of public pages (address, title, link,
+  languages) that leave **Show in the list of public pages** on.
 - `GET /api/public/status/<address>` — the JSON document the page is built
   from, if you want to build your own: the page's title, description and look,
   the overall state, each service's `key`, `label`, `state`, uptime

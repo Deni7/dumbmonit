@@ -72,6 +72,8 @@ test('range shortcuts include both ends', () => {
 	assert.deepEqual(presetRange('last_month', today), { from: '2026-10-01', to: '2026-10-31' });
 	assert.deepEqual(presetRange('last_quarter', today), { from: '2026-07-01', to: '2026-09-30' });
 	assert.deepEqual(presetRange('last_quarter', '2026-02-10'), { from: '2025-10-01', to: '2025-12-31' });
+	assert.deepEqual(presetRange('this_year', '2026-11-22'), { from: '2026-01-01', to: '2026-11-22' });
+	assert.deepEqual(presetRange('this_year', '2026-01-01'), { from: '2026-01-01', to: '2026-01-01' });
 	assert.equal(matchingPreset('2026-10-01', '2026-10-31', today), 'last_month');
 	assert.equal(matchingPreset('2026-10-02', '2026-10-31', today), null);
 });

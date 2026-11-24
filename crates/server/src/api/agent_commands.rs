@@ -39,12 +39,10 @@ const RECENT_COMMANDS: i64 = 20;
 /// Les conteneurs du moniteur lui-même : il ne se redémarre ni ne se met à jour
 /// par son propre canal — il ne serait plus là pour en rendre compte.
 ///
-/// `ezymonit` reste de la partie : les conteneurs créés avant le renommage du
-/// produit portent encore ce nom, et sont tout aussi fatals à toucher. La même
-/// liste, mot pour mot, vit dans `crates/agent/src/commands.rs` : le serveur
+/// La même liste, mot pour mot, vit dans `crates/agent/src/commands.rs` : le serveur
 /// refuse d'émettre, l'agent refuse d'exécuter, et ni l'un ni l'autre ne fait
 /// confiance à l'autre pour cela.
-const RESERVED_PREFIXES: &[&str] = &["dumbmonit", "ezymonit"];
+const RESERVED_PREFIXES: &[&str] = &["dumbmonit"];
 
 // ------------------------------------------------------------- agent side
 
@@ -287,10 +285,21 @@ pub struct AgentHostView {
     pub gateway_tunnels: usize,
     /// Dernier essai de sa passerelle par le relais lui-même.
     pub gateway_check: Option<dumbmonit_proto::GatewayCheck>,
+    /// Passerelle telle que le relais l'a vraiment ouverte (adresse liée, ou
+    /// cause de l'échec).
+    pub gateway_state: Option<dumbmonit_proto::GatewayState>,
+    /// Ce qui l'empêche d'accepter le site, hors relais muet (la page le dit
+    /// déjà) : fermée, relais trop ancien, port impossible à ouvrir, boucle
+    /// locale, pas de canal chiffré.
+    pub gateway_problem: Option<agent::gateway::GatewayProblem>,
     /// Serveur que l'agent emploie quand il en connaît plusieurs
     /// (`server_urls`) : primaire ou secours, depuis quand. `None` : une
     /// seule adresse.
     pub server_link: Option<dumbmonit_proto::ServerLink>,
+    /// Vrai si son dernier lot chiffré est arrivé par la WebSocket de
+    /// l'interface (`GET /api/agent/ws`) plutôt qu'en direct sur le port des
+    /// agents : constaté par le serveur.
+    pub via_websocket: bool,
 }
 
 impl AgentHostView {
@@ -301,6 +310,10 @@ impl AgentHostView {
             gateway_host: info.relay_gateway_host.clone(),
             gateway_tunnels: tunnels,
             gateway_check: info.relay_gateway_check.clone(),
+            gateway_problem: (info.relay || info.relay_wanted)
+                .then(|| agent::gateway::problem(&info, false))
+                .flatten(),
+            gateway_state: info.relay_gateway_state.clone(),
             commands_supported: info.commands_supported(),
             binding: info.binding_state(),
             hostname: info.hostname,
@@ -321,6 +334,7 @@ impl AgentHostView {
             rebind_until: info.rebind_until,
             last_seen_at: info.last_seen_at,
             server_link: info.server_link,
+            via_websocket: info.via_websocket,
         }
     }
 }
@@ -1211,11 +1225,9 @@ mod tests {
         assert!(validate_name("web;rm -rf").is_err());
         assert!(validate_name("../web").is_err());
         assert!(validate_name(&"a".repeat(129)).is_err());
-        // Le moniteur ne se touche pas lui-même, sous aucun de ses deux noms.
+        // Le moniteur ne se touche pas lui-même.
         assert!(validate_name("dumbmonit-dumbmonit-1").is_err());
         assert!(validate_name("DumbMonit").is_err());
-        assert!(validate_name("ezymonit-ezymonit-1").is_err(), "le nom d'avant le renommage");
-        assert!(validate_name("EzyMonit-agent").is_err());
         // Le contrôle porte sur un nom : un identifiant de conteneur y échappe
         // par construction, et c'est l'agent qui le rattrape après inspection.
         assert!(validate_name("9f4c1b2e3d5a").is_ok());

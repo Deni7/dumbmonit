@@ -83,6 +83,9 @@
 	const floor = $derived(chartFloor(shownBars.map((b) => b.value), report.objective));
 	const objectiveShare = $derived(report && report.objective !== null && report.objective > floor ? chartShare(report.objective, floor) : null);
 
+	// An "Objective" column only when a group or a monitor has an objective of its own.
+	const ownGroups = $derived(report.groups.some((g) => g.own_objective));
+	const ownMonitors = $derived(report.monitors.some((d) => d.own_objective));
 	const metCount = $derived(report.monitors.filter((d) => d.uptime !== null && d.status === 'Met').length);
 	const measuredCount = $derived(report.monitors.filter((d) => d.uptime !== null).length);
 
@@ -196,6 +199,7 @@
 							<th scope="col">{m.reports_print_col_group()}</th>
 							<th scope="col" class="num">{m.reports_print_col_monitors()}</th>
 							<th scope="col" class="num">{m.reports_print_col_availability()}</th>
+							{#if ownGroups}<th scope="col" class="num">{m.reports_print_col_objective()}</th>{/if}
 							<th scope="col">{m.reports_print_col_status()}</th>
 							<th scope="col" class="num">{m.reports_print_col_previous()}</th>
 						</tr>
@@ -206,6 +210,7 @@
 								<td>{groupLabel(group.name)}</td>
 								<td class="num">{group.monitors}</td>
 								<td class="num font-semibold">{pct(group.uptime)}</td>
+								{#if ownGroups}<td class="num text-ink-2">{group.objective === null ? m.reports_print_no_value() : pct(group.objective)}</td>{/if}
 								<td class:sla-bad={bad(group.status)}>{statusLabel(group.status)}</td>
 								<td class="num text-ink-2">{pct(group.previous_uptime)}</td>
 							</tr>
@@ -229,6 +234,7 @@
 								<th scope="col">{m.reports_print_col_monitor()}</th>
 								<th scope="col">{m.reports_print_col_group()}</th>
 								<th scope="col" class="num">{m.reports_print_col_availability()}</th>
+								{#if ownMonitors}<th scope="col" class="num">{m.reports_print_col_objective()}</th>{/if}
 								<th scope="col">{m.reports_print_col_status()}</th>
 								<th scope="col" class="num">{m.reports_print_col_incidents()}</th>
 								<th scope="col" class="num">{m.reports_print_col_downtime()}</th>
@@ -240,6 +246,7 @@
 									<td>{monitor.name}</td>
 									<td class="text-ink-2">{groupLabel(monitor.group)}</td>
 									<td class="num font-semibold">{pct(monitor.uptime)}</td>
+									{#if ownMonitors}<td class="num text-ink-2">{monitor.objective === null ? m.reports_print_no_value() : pct(monitor.objective)}</td>{/if}
 									<td class:sla-bad={bad(monitor.status)}>{statusLabel(monitor.status)}</td>
 									<td class="num">{monitor.incidents}</td>
 									<td class="num">{formatDuration(monitor.downtime_secs)}</td>

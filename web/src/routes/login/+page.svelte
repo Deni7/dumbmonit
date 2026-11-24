@@ -13,7 +13,7 @@
 	import { page } from '$app/state';
 	import { ApiError } from '#lib/api/index.js';
 	import { auth, safeDestination } from '#lib/stores/auth.svelte.js';
-	import { Button, ClickSpark, DotField, ErrorNotice, Field, shake } from '#lib/ui/index.js';
+	import { Button, ClickSpark, DocLink, DotField, ErrorNotice, Field, shake } from '#lib/ui/index.js';
 	import { KeyRound, FingerprintPattern, Info } from 'lucide-svelte';
 	import { passkeysSupported } from '#lib/api/passkeys.js';
 	import { tick } from 'svelte';
@@ -22,9 +22,27 @@
 	import LanguageSelect from '#lib/components/LanguageSelect.svelte';
 	import PasswordInput from '#lib/components/settings/PasswordInput.svelte';
 	import Mascot from '#lib/components/Mascot.svelte';
+	import ForgotPassword from '#lib/components/account/ForgotPassword.svelte';
+	import { onMount } from 'svelte';
 
+	// The last name that signed in on this browser, offered again next time.
+	const LAST_USER_KEY = 'dumbmonit-last-username';
 	let username = $state('');
 	let password = $state('');
+	onMount(() => {
+		try {
+			const last = localStorage.getItem(LAST_USER_KEY);
+			if (last && !username) username = last;
+		} catch {
+			// Storage blocked: nothing to prefill.
+		}
+	});
+
+	// Caps Lock is on while the password field has focus (read from the keyboard, so only once a key was pressed).
+	let capsLock = $state(false);
+	function trackCaps(event: KeyboardEvent) {
+		if (typeof event.getModifierState === 'function') capsLock = event.getModifierState('CapsLock');
+	}
 	let passwordForm = $state<HTMLFormElement | null>(null);
 
 	// Public demo: the account is shared and read-only, one click signs in.
@@ -35,6 +53,8 @@
 		passwordForm?.requestSubmit();
 	}
 	let sending = $state(false);
+	// "Forgot password?" by email, when the instance can send the link.
+	let forgotOpen = $state(false);
 	// Second step: the server accepted the password and waits for a one-time
 	// code. `pending` is the short-lived token that ties the two steps together.
 	let pending = $state<string | null>(null);
@@ -127,6 +147,11 @@
 		try {
 			pending = await auth.login(username.trim(), password);
 			password = '';
+			try {
+				localStorage.setItem(LAST_USER_KEY, username.trim());
+			} catch {
+				// Not remembered: the field is just empty next time.
+			}
 			// Without a second factor, the layout guard notices the open session
 			// and sends us to `destination`. Otherwise the code form takes over.
 		} catch (cause) {
@@ -271,6 +296,8 @@
 						{m.auth_login_back()}
 					</Button>
 				</form>
+			{:else if forgotOpen}
+				<ForgotPassword initial={username} onback={() => (forgotOpen = false)} />
 			{:else}
 			<h1 id="gate-title" class="display mt-6 text-[1.75rem] text-ink sm:text-3xl">{m.auth_login_title()}</h1>
 			<p class="mt-2 text-sm text-ink-2">
@@ -358,14 +385,32 @@
 				</Field>
 
 				<Field label={m.auth_login_password()} for="password" error={localError}>
-					<PasswordInput
-						id="password"
-						bind:value={password}
-						autocomplete="current-password"
-						disabled={sending}
-						invalid={localError !== null}
-						oninput={() => (localError = null)}
-					/>
+					<!-- Key events bubble up from the input; the wrapper is no control. -->
+					<div role="presentation" onkeydown={trackCaps} onkeyup={trackCaps} onfocusout={() => (capsLock = false)}>
+						<PasswordInput
+							id="password"
+							bind:value={password}
+							autocomplete="current-password"
+							disabled={sending}
+							invalid={localError !== null}
+							oninput={() => (localError = null)}
+						/>
+					</div>
+					<p role="status" class="text-[0.8125rem] text-warning-ink empty:hidden">{#if capsLock}{m.w2global_login_caps_lock()}{/if}</p>
+					{#if auth.passwordReset}
+						<button
+							type="button"
+							class="accent-link inline-flex min-h-10 items-center justify-self-start text-[0.8125rem] font-medium text-ink-2 transition-colors hover:text-signal-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
+							onclick={() => {
+								failure = null;
+								forgotOpen = true;
+							}}
+						>
+							{m.w2global_login_forgot()}
+						</button>
+					{:else}
+						<DocLink page="faq/#i-lost-the-password" label={m.w2global_login_forgot()} />
+					{/if}
 				</Field>
 
 				{#if failure}

@@ -199,6 +199,7 @@ fn plain_message(title: String, text: String, now: DateTime<Utc>) -> Message {
         count: 1,
         link: None,
         actions: Vec::new(),
+        context: Default::default(),
     }
 }
 

@@ -33,6 +33,11 @@
 //! [`crate::single_port`]) s'appuie sur la même marque pour séparer les agents
 //! de l'interface.
 //!
+//! **Par l'adresse de l'interface** : derrière Cloudflare Tunnel ou un
+//! mandataire inverse qui termine TLS, un agent ouvre une WebSocket
+//! (`/api/agent/ws`, [`websocket`]) et y fait passer la même session TLS ;
+//! le flux rejoint la file de ce port, avec les mêmes contrôles.
+//!
 //! L'ancien canal (les mêmes routes sur le port de l'interface, en clair ou
 //! derrière un mandataire) reste accepté tant que le réglage « exiger mTLS »
 //! n'est pas posé — il l'est d'office sur une installation neuve. Ses réponses
@@ -44,6 +49,7 @@ pub mod pki;
 pub mod probe;
 mod routes;
 mod tunnel;
+pub mod websocket;
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -59,6 +65,7 @@ use sqlx::SqlitePool;
 pub use listener::{AgentIo, AgentListener, AgentPeer, Transport, listen};
 pub(crate) use listener::{Ready, peer_of};
 pub use routes::{AgentCert, router};
+pub use websocket::WsIo;
 
 use crate::auth::rate_limit::Buckets;
 use crate::state::AppState;
@@ -125,6 +132,9 @@ pub struct AgentTls {
     tunnels: Arc<Mutex<HashMap<TargetId, usize>>>,
     /// Plafond de tunnels par relais (`DUMBMONIT_RELAY_MAX_TUNNELS`).
     max_tunnels: AtomicUsize,
+    /// Connexions par WebSocket à l'adresse de l'interface : places par
+    /// adresse, poignées de main en cours ([`websocket`]).
+    ws: websocket::Limits,
 }
 
 impl Default for AgentTls {
@@ -143,6 +153,7 @@ impl AgentTls {
             ready: Mutex::new(None),
             tunnels: Arc::new(Mutex::new(HashMap::new())),
             max_tunnels: AtomicUsize::new(tunnel::DEFAULT_MAX_TUNNELS_PER_RELAY),
+            ws: websocket::Limits::default(),
         }
     }
 
@@ -198,6 +209,11 @@ impl AgentTls {
     /// son plafond. La place se libère quand la connexion se ferme.
     fn reserve_tunnel(&self, relay: TargetId) -> Option<tunnel::Slot> {
         tunnel::Slot::reserve(&self.tunnels, relay, self.max_tunnels())
+    }
+
+    /// Bornes des connexions par WebSocket.
+    pub fn ws_limits(&self) -> &websocket::Limits {
+        &self.ws
     }
 
     /// Tunnels ouverts par un relais en ce moment.
@@ -391,12 +407,16 @@ pub async fn note_channel(
     note_route(pool, target_id, cert.and_then(|cert| cert.via_relay)).await?;
     match cert {
         Some(cert) => {
-            sqlx::query("UPDATE agent_hosts SET tls_seen_ms = ?, tls_group = ? WHERE target_id = ?")
-                .bind(now)
-                .bind(cert.group.as_deref())
-                .bind(target_id)
-                .execute(pool)
-                .await?
+            sqlx::query(
+                "UPDATE agent_hosts SET tls_seen_ms = ?, tls_group = ?, tls_websocket = ?
+                 WHERE target_id = ?",
+            )
+            .bind(now)
+            .bind(cert.group.as_deref())
+            .bind(cert.via_websocket)
+            .bind(target_id)
+            .execute(pool)
+            .await?
         }
         None => {
             sqlx::query("UPDATE agent_hosts SET legacy_seen_ms = ? WHERE target_id = ?")

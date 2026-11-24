@@ -303,13 +303,7 @@ macro_rules! select_record {
 /// Crée un jeton et renvoie sa forme en clair — la seule et unique fois.
 pub async fn create(pool: &SqlitePool, new: &NewToken) -> Result<(TokenRecord, String)> {
     let clear = generate();
-    let networks: Option<String> = if new.allowed_networks.is_empty() {
-        None
-    } else {
-        Some(serde_json::to_string(
-            &new.allowed_networks.iter().map(ToString::to_string).collect::<Vec<_>>(),
-        )?)
-    };
+    let networks = encode_networks(&new.allowed_networks)?;
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO api_tokens
              (name, prefix, token_hash, scope, user_id, expires_at, allowed_networks)
@@ -345,6 +339,78 @@ pub async fn list(pool: &SqlitePool) -> Result<Vec<TokenRecord>> {
         .await
         .context("listing API tokens")?;
     rows.iter().map(row_to_record).collect()
+}
+
+/// Changements d'un jeton existant ; `None` : inchangé. Le secret et la portée,
+/// eux, ne changent jamais : un autre secret ou une autre portée, c'est un
+/// autre jeton.
+#[derive(Debug, Clone, Default)]
+pub struct TokenChanges {
+    pub name: Option<String>,
+    pub allowed_networks: Option<Vec<IpNet>>,
+    /// `Some(None)` : le jeton n'expire plus.
+    pub expires_at: Option<Option<DateTime<Utc>>>,
+}
+
+fn encode_networks(networks: &[IpNet]) -> Result<Option<String>> {
+    if networks.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(serde_json::to_string(&networks.iter().map(ToString::to_string).collect::<Vec<_>>())?))
+}
+
+/// Applique des changements à un jeton non révoqué et le relit ; `None` s'il
+/// n'existe pas ou a été révoqué.
+pub async fn update(
+    pool: &SqlitePool,
+    id: i64,
+    changes: &TokenChanges,
+) -> Result<Option<TokenRecord>> {
+    let networks = changes.allowed_networks.as_deref().map(encode_networks).transpose()?;
+    let result = sqlx::query(
+        "UPDATE api_tokens SET
+             name = COALESCE(?, name),
+             allowed_networks = CASE WHEN ? THEN ? ELSE allowed_networks END,
+             expires_at = CASE WHEN ? THEN ? ELSE expires_at END
+         WHERE id = ? AND revoked_at IS NULL",
+    )
+    .bind(changes.name.as_deref())
+    .bind(networks.is_some())
+    .bind(networks.flatten())
+    .bind(changes.expires_at.is_some())
+    .bind(changes.expires_at.flatten().map(rfc3339))
+    .bind(id)
+    .execute(pool)
+    .await
+    .context("updating the API token")?;
+    if result.rows_affected() == 0 {
+        return Ok(None);
+    }
+    get(pool, id).await
+}
+
+/// Nombre de jetons encore valides qui expirent d'ici `days` jours : de quoi
+/// prévenir avant qu'un script ne se retrouve refusé (`selfmon`).
+pub async fn expiring_within(pool: &SqlitePool, days: i64) -> Result<usize> {
+    let rows: Vec<String> = sqlx::query_scalar(
+        "SELECT expires_at FROM api_tokens WHERE revoked_at IS NULL AND expires_at IS NOT NULL",
+    )
+    .fetch_all(pool)
+    .await
+    .context("reading API token expiries")?;
+    let now = Utc::now();
+    Ok(count_expiring(rows.iter().map(String::as_str).filter_map(parse_time), now, days))
+}
+
+/// Les échéances qui tombent entre maintenant (exclu : déjà expiré, le jeton
+/// est refusé et la plaque le dit) et `days` jours.
+fn count_expiring(
+    expiries: impl Iterator<Item = DateTime<Utc>>,
+    now: DateTime<Utc>,
+    days: i64,
+) -> usize {
+    let horizon = now + chrono::TimeDelta::days(days);
+    expiries.filter(|at| *at > now && *at <= horizon).count()
 }
 
 /// Révoque un jeton. Seule la première révocation renvoie « vrai ».
@@ -420,6 +486,12 @@ pub async fn authenticate(pool: &SqlitePool, clear: &str, ip: Option<IpAddr>) ->
         let owner_role: Option<String> = row.try_get("owner_role")?;
         let owner_disabled: Option<bool> = row.try_get("owner_disabled")?;
         if user_id.is_some() && owner.is_none() {
+            return Ok(Outcome::Unknown);
+        }
+        // Un écran mural ne lit que le mur, en session : un jeton dont le
+        // propriétaire est passé au rôle `wall` vaudrait un lecteur, plus que
+        // son propriétaire. Il n'ouvre plus rien.
+        if owner_role.as_deref() == Some("wall") {
             return Ok(Outcome::Unknown);
         }
         if owner_disabled == Some(true) {
@@ -769,6 +841,15 @@ pub async fn check(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_tokens_expiring_within_the_week_are_counted() {
+        let now = Utc::now();
+        let day = chrono::TimeDelta::days(1);
+        let expiries = [now - day, now + day, now + day * 7, now + day * 8, now + day * 365];
+        assert_eq!(count_expiring(expiries.into_iter(), now, 7), 2);
+        assert_eq!(count_expiring(std::iter::empty(), now, 7), 0);
+    }
 
     #[test]
     fn a_generated_token_is_recognisable_and_unique() {

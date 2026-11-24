@@ -14,6 +14,7 @@ import { listAlerts, listTargets, onMutation, type Alert, type Target } from '#l
 import { countsAsProblem } from '#lib/alerts-attention.js';
 import { displayState, type ProbeStatus } from '#lib/format.js';
 import { loadProbeStatuses } from '#lib/metrics.js';
+import { startPolling as poll } from '#lib/poll.js';
 
 const INTERVAL_MS = 30_000;
 
@@ -90,31 +91,20 @@ class AlertsStore {
 	}
 
 	/**
-	 * Starts polling. Counts its callers so that a single timer runs, and
-	 * returns the stop function to hand to an `$effect`. Skips a tick while
-	 * the tab is hidden, and refreshes once immediately when it becomes
-	 * visible again so the display catches up without waiting for the next
-	 * interval.
+	 * Starts polling and returns the stop function to hand to an `$effect`.
+	 * The shared poller (`#lib/poll`) pauses while the tab is hidden, catches
+	 * up once when it is visible again, and backs off while refreshes fail.
 	 */
 	startPolling(): () => void {
 		if (!browser) return () => {};
 		this.#subscribers += 1;
-		const controller = new AbortController();
-		const tick = () => {
-			if (document.visibilityState === 'hidden') return;
-			void this.refresh(controller.signal);
-		};
-		tick();
-		const timer = setInterval(tick, INTERVAL_MS);
-		const onVisibilityChange = () => {
-			if (document.visibilityState === 'visible') tick();
-		};
-		document.addEventListener('visibilitychange', onVisibilityChange);
+		const stop = poll(async (signal) => {
+			await this.refresh(signal);
+			return this.available;
+		}, INTERVAL_MS);
 		return () => {
 			this.#subscribers -= 1;
-			controller.abort();
-			clearInterval(timer);
-			document.removeEventListener('visibilitychange', onVisibilityChange);
+			stop();
 		};
 	}
 }

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { m } from '#lib/paraglide/messages.js';
+	import { startPolling } from '#lib/poll.js';
 	/**
 	 * What the Windows agent reads on a mail server: the Windows services, the
 	 * queues, the sessions, the 24-hour message totals and the disk space.
@@ -14,7 +15,6 @@
 	 * Renders nothing until the agent has reported something: a machine without
 	 * the product, or an agent too old to read it, shows no empty box.
 	 */
-	import { untrack } from 'svelte';
 	import { queryInstant, type TargetId } from '#lib/api/index.js';
 	import { formatDuration } from '#lib/format.js';
 	import { formatBytes } from '#lib/components/devices/proxmox/format.js';
@@ -62,6 +62,7 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
+			return false;
 		} finally {
 			loading = false;
 		}
@@ -73,13 +74,7 @@
 		loading = true;
 		reading = EMPTY_COUNTERS;
 		mail = EMPTY_AGENT_MAIL;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 
 	const QUEUE_ORDER = ['inbound', 'local', 'remote', 'retry', 'bad', 'holding', 'lan', 'quarantine', 'raw'];

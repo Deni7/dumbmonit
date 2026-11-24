@@ -7,16 +7,18 @@
 	 * plainly before the download, and says just as plainly that the file that
 	 * decrypts device credentials on this server is `/data/secret.key`.
 	 */
-	import { Archive, Download, HardDriveDownload, KeyRound, Upload } from 'lucide-svelte';
+	import { Archive, Download, FileCode, HardDriveDownload, KeyRound, Upload } from 'lucide-svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import {
 		exportBackup,
 		getBackupStatus,
+		localBackupUrl,
 		restoreBackup,
 		runLocalBackup,
-		saveBundle
+		saveBundle,
+		setBackupSchedule
 	} from '#lib/api/backup.js';
-	import type { BackupEnvelope, BackupStatus, RestoreReport } from '#lib/api/index.js';
+	import type { BackupEnvelope, BackupSchedule, BackupStatus, RestoreReport } from '#lib/api/index.js';
 	import { formatDateTime, formatRelative } from '#lib/format.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import {
@@ -30,6 +32,7 @@
 		Skeleton,
 		Toggle, Disclosure, DocLink } from '#lib/ui/index.js';
 	import PasswordInput from './PasswordInput.svelte';
+	import BackupDestinations from './BackupDestinations.svelte';
 
 	let status = $state<BackupStatus | null>(null);
 	let loading = $state(true);
@@ -40,6 +43,7 @@
 		error = null;
 		try {
 			status = await getBackupStatus(signal);
+			syncSchedule(status.schedule);
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
@@ -55,6 +59,42 @@
 	});
 
 	const minLength = $derived(status?.min_passphrase_length ?? 16);
+
+	// --- Schedule form (the values an environment variable fixes stay read-only) ---
+
+	let schedEnabled = $state(true);
+	let schedHours = $state(24);
+	let schedKeep = $state(7);
+	let schedSaving = $state(false);
+	let schedError = $state<unknown>(null);
+
+	function syncSchedule(schedule: BackupSchedule) {
+		schedEnabled = schedule.enabled;
+		schedHours = schedule.interval_hours;
+		schedKeep = schedule.keep;
+	}
+
+	const schedValid = $derived(
+		Number.isInteger(schedHours) && schedHours >= 1 && schedHours <= 8760 && Number.isInteger(schedKeep) && schedKeep >= 1 && schedKeep <= 365
+	);
+
+	async function saveSchedule(event: SubmitEvent): Promise<boolean> {
+		event.preventDefault();
+		if (!status || !schedValid) return false;
+		schedSaving = true;
+		schedError = null;
+		try {
+			const schedule = await setBackupSchedule({ enabled: schedEnabled, interval_hours: schedHours, keep: schedKeep });
+			status = { ...status, schedule };
+			syncSchedule(schedule);
+			return true;
+		} catch (cause) {
+			schedError = cause;
+			return false;
+		} finally {
+			schedSaving = false;
+		}
+	}
 
 	function bytes(value: number): string {
 		if (value <= 0) return '0 B';
@@ -84,7 +124,10 @@
 		packs: m.settings_backup_section_packs,
 		netconfig_host_keys: m.settings_backup_section_netconfig_host_keys,
 		netconfig_versions: m.settings_backup_section_netconfig_versions,
-		netscan_schedules: m.settings_backup_section_netscan_schedules
+		netscan_schedules: m.settings_backup_section_netscan_schedules,
+		slos: m.settings_backup_section_slos,
+		backup_destinations: m.w5backups_section_destinations,
+		accounts: m.w6accounts_backup_section_accounts
 	};
 	function sectionText(key: string, fallback: string): string {
 		return SECTION_TEXT[key]?.() ?? fallback;
@@ -200,6 +243,8 @@
 
 	let running = $state(false);
 	let runError = $state<unknown>(null);
+	/** Bumped after "Back up now": the off-site list reloads and follows the upload. */
+	let runs = $state(0);
 
 	async function runNow(): Promise<boolean> {
 		running = true;
@@ -207,6 +252,7 @@
 		try {
 			const schedule = await runLocalBackup();
 			if (status) status = { ...status, schedule };
+			runs += 1;
 			return true;
 		} catch (cause) {
 			runError = cause;
@@ -446,7 +492,58 @@
 
 			<!-- Scheduled local backups -->
 			<Disclosure title={m.settings_backup_scheduled_title()} summary={status.schedule.enabled ? m.settings_backup_plate_every({ hours: status.schedule.interval_hours, keep: status.schedule.keep }) : m.settings_backup_disabled()}>
-				<p class="mt-1 text-sm text-ink-2">
+				<form class="mt-3 grid max-w-md gap-4" onsubmit={saveSchedule} novalidate>
+					<Field label={m.w2ops_backup_enabled()} for="backup-sched-enabled" inline>
+						<div class="flex flex-wrap items-center justify-end gap-2">
+							{#if status.schedule.env_managed.enabled}
+								<span title={m.w2ops_backup_env_hint()}>
+									<Plate tone="info">
+										<FileCode class="size-3.5" aria-hidden="true" />
+										{m.w2ops_backup_env_badge()}
+									</Plate>
+								</span>
+							{/if}
+							<Toggle id="backup-sched-enabled" bind:checked={schedEnabled} disabled={schedSaving || status.schedule.env_managed.enabled} />
+						</div>
+					</Field>
+					<Field label={m.w2ops_backup_interval()} for="backup-sched-hours">
+						<div class="flex flex-wrap items-center gap-2">
+							<input id="backup-sched-hours" type="number" min="1" max="8760" step="1" class="input tnum max-w-[8rem]" bind:value={schedHours} disabled={schedSaving || status.schedule.env_managed.interval_hours} />
+							{#if status.schedule.env_managed.interval_hours}
+								<span title={m.w2ops_backup_env_hint()}>
+									<Plate tone="info">
+										<FileCode class="size-3.5" aria-hidden="true" />
+										{m.w2ops_backup_env_badge()}
+									</Plate>
+								</span>
+							{/if}
+						</div>
+					</Field>
+					<Field label={m.w2ops_backup_keep()} for="backup-sched-keep">
+						<div class="flex flex-wrap items-center gap-2">
+							<input id="backup-sched-keep" type="number" min="1" max="365" step="1" class="input tnum max-w-[8rem]" bind:value={schedKeep} disabled={schedSaving || status.schedule.env_managed.keep} />
+							{#if status.schedule.env_managed.keep}
+								<span title={m.w2ops_backup_env_hint()}>
+									<Plate tone="info">
+										<FileCode class="size-3.5" aria-hidden="true" />
+										{m.w2ops_backup_env_badge()}
+									</Plate>
+								</span>
+							{/if}
+						</div>
+					</Field>
+					{#if status.schedule.env_managed.enabled || status.schedule.env_managed.interval_hours || status.schedule.env_managed.keep}
+						<p class="text-[0.8125rem] text-ink-2">{m.w2ops_backup_env_hint()}</p>
+					{/if}
+					{#if schedError}
+						<ErrorNotice error={schedError} title={m.w2ops_backup_save_error()} />
+					{/if}
+					<div>
+						<Button type="submit" variant="secondary" loading={schedSaving} disabled={!schedValid}>{m.w2ops_backup_save()}</Button>
+					</div>
+				</form>
+
+				<p class="mt-4 text-sm text-ink-2">
 					{status.schedule.includes_secret_key ? m.settings_backup_schedule_intro_key({ directory: status.schedule.directory }) : m.settings_backup_schedule_intro_nokey({ directory: status.schedule.directory })}
 						{m.settings_backup_schedule_same_volume()}
 						{#if !status.schedule.includes_secret_key}
@@ -486,6 +583,10 @@
 								{#if !file.with_secret && status.schedule.includes_secret_key}
 									<Plate tone="warning" label={m.settings_backup_without_key()} />
 								{/if}
+								<Button class="ml-auto" variant="ghost" size="sm" href={localBackupUrl(file.name)} download aria-label={m.w2ops_backup_download_label({ name: file.name })}>
+									<Download class="size-4" aria-hidden="true" />
+									{m.w2ops_backup_download()}
+								</Button>
 							</li>
 						{/each}
 					</ul>
@@ -506,6 +607,9 @@
 					</Button>
 				</div>
 			</Disclosure>
+
+			<!-- Off-site copies of the scheduled local backups -->
+			<BackupDestinations refresh={runs} />
 		</div>
 	{/if}
 </Panel>

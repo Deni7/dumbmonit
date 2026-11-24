@@ -7,6 +7,7 @@ use axum::http::StatusCode;
 use dumbmonit_proto::{Credential, CredentialInput, Target, TargetId};
 use serde::{Deserialize, Serialize};
 
+use crate::api::targets_bulk::{WithChannels, check_channels};
 use crate::api::{ApiError, ApiResult};
 use crate::auth::clients;
 use crate::auth::middleware::Identity;
@@ -20,6 +21,10 @@ use crate::state::AppState;
 /// plus qu'on ne l'observe — et la contrainte est aussi posée en base.
 const MIN_INTERVAL_SECS: u64 = 10;
 const DEFAULT_INTERVAL_SECS: u64 = 60;
+/// Période maximale : une semaine. Au-delà, l'équipement passerait pour muet.
+const MAX_INTERVAL_SECS: u64 = 7 * 24 * 3600;
+/// Longueur maximale de la note libre d'un moniteur.
+const MAX_NOTE_CHARS: usize = 2000;
 
 /// Longueur maximale d'un nom, en caractères. Un nom devient une étiquette
 /// `host` sur chaque échantillon : VictoriaMetrics plafonne les valeurs
@@ -64,6 +69,10 @@ pub struct TargetView {
     pub credential_public: BTreeMap<String, String>,
     /// Dossier plat et libre, affiché sur `/targets`. Vide : aucun dossier.
     pub group_name: String,
+    /// Note libre, pour les humains (migration 0263). Vide : aucune.
+    pub note: String,
+    /// Date de création (UTC, sans suffixe).
+    pub created_at: Option<String>,
     /// Rang manuel (drag, Haut/Bas), départagé par l'interface seulement entre
     /// cibles de même état et de même dossier.
     pub position: i64,
@@ -77,6 +86,9 @@ pub struct TargetView {
     pub multisite: Option<MultisiteConfig>,
     /// Mode MSP : le client de l'équipement (client par défaut, `1`, sinon).
     pub client_id: i64,
+    /// Canaux de notification propres au moniteur (migration 0282) ; vide :
+    /// ceux de ses règles (voir `db::target_channels`).
+    pub channels: Vec<i64>,
     pub last_probe_at: Option<String>,
     pub last_error: Option<String>,
     /// Nature de `last_error` : `down` (équipement injoignable) ou `config`
@@ -109,11 +121,16 @@ fn error_kind(message: &str) -> &'static str {
 
 impl TargetView {
     fn new(target: Target, status: Option<db::targets::TargetStatus>) -> Self {
-        let (last_probe_at, last_error, via_agent, managed) = match status {
-            Some(status) => {
-                (status.last_probe_at, status.last_error, status.via_agent, status.managed)
-            }
-            None => (None, None, None, None),
+        let (last_probe_at, last_error, via_agent, managed, note, created_at) = match status {
+            Some(status) => (
+                status.last_probe_at,
+                status.last_error,
+                status.via_agent,
+                status.managed,
+                status.note,
+                status.created_at,
+            ),
+            None => (None, None, None, None, String::new(), None),
         };
         let error_kind = last_error.as_deref().map(error_kind);
         Self {
@@ -138,11 +155,14 @@ impl TargetView {
                 .map(|(key, value)| (key.to_owned(), value))
                 .collect(),
             group_name: target.group_name,
+            note,
+            created_at,
             position: target.position,
             managed,
             location_id: None,
             multisite: None,
             client_id: crate::auth::clients::DEFAULT_CLIENT,
+            channels: Vec::new(),
             last_probe_at,
             last_error,
             error_kind,
@@ -185,6 +205,9 @@ pub struct TargetPayload {
     /// pas sortir la cible de son dossier en la modifiant.
     #[serde(default, deserialize_with = "deserialize_present")]
     pub group_name: Option<Option<String>>,
+    /// Note libre. Absente lors d'une modification : conservée ; vide : effacée.
+    #[serde(default)]
+    pub note: Option<String>,
     /// Emplacement de la carte du monde ; `null` : aucun. Absent lors d'une
     /// modification : conserver l'affectation, comme pour `group_name`.
     #[serde(default, deserialize_with = "deserialize_present")]
@@ -210,6 +233,18 @@ pub struct TargetPayload {
     /// le change.
     #[serde(default)]
     pub client_id: Option<i64>,
+}
+
+/// Note libre nettoyée (espaces de bord retirés) ; `None` : absente, à conserver.
+fn clean_note(note: Option<&String>) -> ApiResult<Option<String>> {
+    let Some(note) = note else { return Ok(None) };
+    let note = note.trim();
+    if note.chars().count() > MAX_NOTE_CHARS {
+        return Err(ApiError::BadRequest(format!(
+            "The note must be at most {MAX_NOTE_CHARS} characters."
+        )));
+    }
+    Ok(Some(note.to_string()))
 }
 
 impl TargetPayload {
@@ -279,6 +314,11 @@ impl TargetPayload {
         if interval_secs < MIN_INTERVAL_SECS {
             return Err(ApiError::BadRequest(format!(
                 "The polling interval must be at least {MIN_INTERVAL_SECS} seconds."
+            )));
+        }
+        if interval_secs > MAX_INTERVAL_SECS {
+            return Err(ApiError::BadRequest(format!(
+                "The polling interval must be at most {MAX_INTERVAL_SECS} seconds (7 days)."
             )));
         }
 
@@ -384,11 +424,14 @@ pub async fn list(
     let mut multisite = db::multisite::all(&state.pool).await?;
     let owners = clients::target_clients(&state.pool).await?;
     let cve_off = db::targets::cve_scan_off(&state.pool).await?;
+    let mut channels = db::target_channels::all(&state.pool).await?;
     let admin = who.is_admin();
+    let wall = who.is_wall();
     Ok(Json(
         targets
             .into_iter()
             .map(|target| {
+                let target_id = target.id;
                 let status = statuses.remove(&target.id);
                 let location = places.get(&target.id).copied();
                 let sites = multisite.remove(&target.id);
@@ -399,7 +442,9 @@ pub async fn list(
                     .sites(sites)
                     .client(client)
                     .cve(cve_scan)
+                    .with_channels(channels.remove(&target_id).unwrap_or_default())
                     .for_reader(admin)
+                    .for_wall(wall)
             })
             .collect(),
     ))
@@ -416,12 +461,14 @@ pub async fn get_one(
     let sites = db::multisite::get(&state.pool, id).await?;
     let client = clients::target_client(&state.pool, id).await?;
     let cve_scan = db::targets::cve_scan_of(&state.pool, id).await?;
+    let channels = db::target_channels::of(&state.pool, id).await?;
     Ok(Json(
         TargetView::new(target, status)
             .at(location)
             .sites(sites)
             .client(client)
             .cve(cve_scan)
+            .with_channels(channels)
             .for_reader(who.is_admin()),
     ))
 }
@@ -452,6 +499,22 @@ impl TargetView {
         self
     }
 
+    /// Version de la vue destinée à un écran mural (rôle `wall`) : le mur
+    /// affiche le nom, le type et l'état d'un équipement, jamais son adresse,
+    /// ses options, sa note ni l'origine de sa déclaration. Ce qu'il ne montre
+    /// pas ne lui est pas envoyé ; la forme de la réponse, elle, ne change pas.
+    fn for_wall(mut self, wall: bool) -> Self {
+        if !wall {
+            return self;
+        }
+        self.address = String::new();
+        self.tags.clear();
+        self.credential_public.clear();
+        self.note = String::new();
+        self.managed = None;
+        self
+    }
+
     /// Version de la vue destinée à un lecteur : les options dont la clé nomme
     /// un secret (`api_key`, `password`…), les en-têtes d'un moniteur HTTP (un
     /// `Authorization` s'y glisse vite) et le mot de passe d'une adresse
@@ -477,12 +540,37 @@ pub fn reader_tags(tags: &BTreeMap<String, String>) -> BTreeMap<String, String> 
             let shown = if dumbmonit_proto::looks_secret(key) || key.eq_ignore_ascii_case("headers")
             {
                 REDACTED.to_string()
+            } else if key == "steps" {
+                reader_steps(value)
             } else {
                 redact_userinfo(value)
             };
             (key.clone(), shown)
         })
         .collect()
+}
+
+/// Les étapes d'un scénario HTTP (`http_steps`) telles qu'un lecteur les voit :
+/// le nom, la méthode et l'URL de chacune, de quoi suivre le dernier passage sur
+/// la page du moniteur. En-têtes, corps, vérifications et extractions sont
+/// retirés : un jeton ou un mot de passe s'y glisse vite. Un texte illisible est
+/// masqué en entier.
+fn reader_steps(value: &str) -> String {
+    let Ok(steps) = serde_json::from_str::<Vec<serde_json::Value>>(value) else {
+        return REDACTED.to_string();
+    };
+    let shown: Vec<serde_json::Value> = steps
+        .iter()
+        .map(|step| {
+            let field = |key: &str| step.get(key).and_then(|v| v.as_str()).unwrap_or_default();
+            serde_json::json!({
+                "name": field("name"),
+                "method": field("method"),
+                "url": redact_userinfo(field("url")),
+            })
+        })
+        .collect();
+    serde_json::Value::Array(shown).to_string()
 }
 
 /// Masque le mot de passe d'une URL `schéma://user:pass@hôte…`, sans toucher au
@@ -507,12 +595,13 @@ pub fn redact_userinfo(text: &str) -> String {
 pub async fn create(
     TeamAccess(access): TeamAccess,
     State(state): State<AppState>,
-    Json(payload): Json<TargetPayload>,
+    Json(WithChannels { target: payload, channels }): Json<WithChannels>,
 ) -> ApiResult<(StatusCode, Json<TargetView>)> {
     let location = payload.location_id.flatten();
     let multisite = payload.multisite.clone().flatten();
     let wanted_client = payload.client_id;
     let cve_scan = payload.cve_scan.unwrap_or(true);
+    let note = clean_note(payload.note.as_ref())?;
     let input = payload.validate(&state, None)?;
     let client = clients::target_client_for(&state.pool, &access, wanted_client)
         .await
@@ -524,6 +613,7 @@ pub async fn create(
     check_pack_relay(&input)?;
     let multisite = check_multisite(&state, None, &input, multisite).await?;
     check_client_links(&state, client, &input, multisite.as_ref()).await?;
+    let channels = check_channels(&state, client, channels.as_deref()).await?.unwrap_or_default();
     let id = db::targets::create_in(&state.pool, &state.cipher, &input, client)
         .await
         .map_err(duplicate_address_to_conflict)?;
@@ -535,6 +625,12 @@ pub async fn create(
     }
     if !cve_scan {
         db::targets::set_cve_scan(&state.pool, &[id], false).await?;
+    }
+    if let Some(note) = note.filter(|note| !note.is_empty()) {
+        db::targets::set_note(&state.pool, id, &note).await?;
+    }
+    if !channels.is_empty() {
+        db::target_channels::set(&state.pool, id, &channels).await?;
     }
     let target = load(&state, id).await?;
     crate::packs::apply_thresholds(&state.pool, &target).await;
@@ -552,15 +648,17 @@ pub async fn create(
         .at(location)
         .sites(multisite)
         .client(Some(client))
-        .cve(cve_scan);
+        .cve(cve_scan)
+        .with_channels(channels);
     Ok((StatusCode::CREATED, Json(view)))
 }
 
 pub async fn update(
+    Identity(who): Identity,
     TeamAccess(access): TeamAccess,
     State(state): State<AppState>,
     Path(id): Path<TargetId>,
-    Json(payload): Json<TargetPayload>,
+    Json(WithChannels { target: mut payload, channels }): Json<WithChannels>,
 ) -> ApiResult<Json<TargetView>> {
     let keep_profile = payload.profile_id.is_none();
     let keep_relay = payload.via_agent.is_none();
@@ -569,7 +667,12 @@ pub async fn update(
     let new_multisite = payload.multisite.clone();
     let wanted_client = payload.client_id;
     let new_cve_scan = payload.cve_scan;
+    let new_note = clean_note(payload.note.as_ref())?;
     let before = load(&state, id).await?;
+    // Qui n'administre pas a lu des options masquées : il les renvoie telles quelles.
+    if !who.is_admin() {
+        super::targets_redaction::restore(&mut payload, &before);
+    }
     let current_client =
         clients::target_client(&state.pool, id).await?.ok_or_else(|| not_found(id))?;
     let client = wanted_client.unwrap_or(current_client);
@@ -627,6 +730,7 @@ pub async fn update(
     check_parent(&state, input.parent_id).await?;
     check_relay(&state, input.via_agent).await?;
     check_client_links(&state, client, &input, multisite.as_ref()).await?;
+    let channels = check_channels(&state, client, channels.as_deref()).await?;
     let updated = db::targets::update(&state.pool, &state.cipher, id, &input)
         .await
         .map_err(duplicate_address_to_conflict)?;
@@ -640,6 +744,12 @@ pub async fn update(
     }
     if let Some(location) = new_location {
         super::locations::set_location(&state.pool, &[id], location).await?;
+    }
+    if let Some(note) = new_note {
+        db::targets::set_note(&state.pool, id, &note).await?;
+    }
+    if let Some(channels) = &channels {
+        db::target_channels::set(&state.pool, id, channels).await?;
     }
     if let Some(cve_scan) = new_cve_scan {
         db::targets::set_cve_scan(&state.pool, &[id], cve_scan).await?;
@@ -660,12 +770,14 @@ pub async fn update(
     let status = db::targets::statuses(&state.pool).await?.remove(&id);
     let location = super::locations::location_of(&state.pool, id).await?;
     let cve_scan = db::targets::cve_scan_of(&state.pool, id).await?;
+    let channels = db::target_channels::of(&state.pool, id).await?;
     Ok(Json(
         TargetView::new(target, status)
             .at(location)
             .sites(multisite)
             .client(Some(client))
-            .cve(cve_scan),
+            .cve(cve_scan)
+            .with_channels(channels),
     ))
 }
 
@@ -695,8 +807,10 @@ async fn check_client_links(
 }
 
 /// Étiquettes qui changent l'endroit (ou la manière) dont le secret est envoyé.
+/// `steps` : les étapes d'un scénario HTTP disent elles-mêmes où partent les
+/// secrets qu'elles citent (`{{secret.…}}`).
 const DESTINATION_TAGS: &[&str] =
-    &["scheme", "port", "insecure_tls", "tls", "path", "base_path", "url", "host"];
+    &["scheme", "port", "insecure_tls", "tls", "path", "base_path", "url", "host", "steps"];
 
 /// Un secret enregistré ne part jamais vers une destination qu'il n'a pas
 /// connue sans être ressaisi.
@@ -1459,5 +1573,30 @@ mod public_tests {
         assert!(!is_short_public("-----BEGIN CERTIFICATE-----MIIB"));
         assert!(!is_short_public("a\nb"));
         assert!(!is_short_public(&"x".repeat(MAX_PUBLIC_LEN + 1)));
+    }
+}
+
+#[cfg(test)]
+mod reader_tests {
+    use super::*;
+
+    /// Un lecteur voit le nom, la méthode et l'URL de chaque étape, jamais ses
+    /// en-têtes ni son corps.
+    #[test]
+    fn un_lecteur_ne_voit_que_le_squelette_des_etapes() {
+        let steps = r#"[{"name":"Login","method":"POST","url":"https://u:motdepasse@app.test/login",
+            "headers":[{"name":"Authorization","value":"Bearer JETON"}],"body":"p=SECRET"}]"#;
+        let tags = BTreeMap::from([("steps".to_string(), steps.to_string())]);
+        let reader = reader_tags(&tags);
+        let shown = &reader["steps"];
+        for hidden in ["JETON", "SECRET", "motdepasse", "headers", "body"] {
+            assert!(!shown.contains(hidden), "{hidden} : {shown}");
+        }
+        let parsed: serde_json::Value = serde_json::from_str(shown).unwrap();
+        assert_eq!(parsed[0]["name"], "Login");
+        assert_eq!(parsed[0]["method"], "POST");
+        assert!(parsed[0]["url"].as_str().unwrap().ends_with("@app.test/login"), "{shown}");
+        let illisible = BTreeMap::from([("steps".to_string(), "pas du json".to_string())]);
+        assert_eq!(reader_tags(&illisible)["steps"], REDACTED);
     }
 }

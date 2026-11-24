@@ -26,6 +26,7 @@
 		publicApi,
 		serviceKeys,
 		type BadgeKind,
+		type BadgeStyle,
 		type EmbedTheme
 	} from './share';
 
@@ -70,10 +71,16 @@
 	/** `''` is the whole page; otherwise a service key. */
 	let component = $state('');
 	let format = $state<'markdown' | 'html'>('markdown');
+	let badgeStyle = $state<BadgeStyle>('flat');
+	const STYLES = (): { value: BadgeStyle; label: string }[] => [
+		{ value: 'flat', label: m.status_share_style_flat() },
+		{ value: 'flat-square', label: m.status_share_style_square() },
+		{ value: 'for-the-badge', label: m.status_share_style_large() }
+	];
 	const components = $derived(serviceKeys(page.items.map((item) => item.label)));
 	const windows = $derived(WINDOWS.filter((d) => d <= page.show_uptime_days));
-	const badgeImage = $derived(badgeUrl(origin, page.slug, kind, component, days));
-	const badgePreview = $derived(badgeUrl(here, page.slug, kind, component, days));
+	const badgeImage = $derived(badgeUrl(origin, page.slug, kind, component, days, badgeStyle));
+	const badgePreview = $derived(badgeUrl(here, page.slug, kind, component, days, badgeStyle));
 	const alt = $derived(
 		m.status_share_alt({
 			name: component ? (components.find((c) => c.key === component)?.label ?? m.status_share_service()) : page.title,
@@ -168,6 +175,11 @@
 							<select id="share-component" class="input" bind:value={component}>
 								<option value="">{m.status_share_whole_page()}</option>
 								{#each components as option (option.key)}<option value={option.key}>{option.label}</option>{/each}
+							</select>
+						</Field>
+						<Field label={m.status_share_style()} for="share-style">
+							<select id="share-style" class="input" bind:value={badgeStyle}>
+								{#each STYLES() as option (option.value)}<option value={option.value}>{option.label}</option>{/each}
 							</select>
 						</Field>
 						{#if kind === 'uptime'}

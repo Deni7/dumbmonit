@@ -5,8 +5,8 @@
 	 * ran. Disabled by default — nothing is shown until `speedtest: true` and a
 	 * download address are set in agent.yaml and a first test has completed.
 	 */
-	import { untrack } from 'svelte';
 	import { m } from '#lib/paraglide/messages.js';
+	import { startPolling } from '#lib/poll.js';
 	import { queryInstant, type Target } from '#lib/api/index.js';
 	import { ErrorNotice, Panel, Plate } from '#lib/ui/index.js';
 	import { formatAge, formatBytes } from '../docker/api';
@@ -71,6 +71,7 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
+			return false;
 		} finally {
 			loading = false;
 		}
@@ -80,13 +81,7 @@
 		void target.id;
 		loading = true;
 		stat = null;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 
 	const belowThreshold = $derived(

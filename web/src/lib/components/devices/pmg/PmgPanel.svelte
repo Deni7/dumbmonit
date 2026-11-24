@@ -6,8 +6,8 @@
 	 * signature databases. Three reads of what the probe stored, refreshed
 	 * every minute; the gateway itself is never asked.
 	 */
-	import { untrack } from 'svelte';
 	import { getPmgHealth, getPmgQueues, getPmgTraffic } from '#lib/api/pmg.js';
+	import { startPolling } from '#lib/poll.js';
 	import type { PmgHealth, PmgQueues, PmgTraffic, Target } from '#lib/api/index.js';
 	import { ErrorNotice, Panel, Plate, Skeleton } from '#lib/ui/index.js';
 	import GatewayHealth from './GatewayHealth.svelte';
@@ -48,6 +48,7 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
+			return false;
 		} finally {
 			loading = false;
 		}
@@ -59,13 +60,7 @@
 		queues = null;
 		traffic = null;
 		health = null;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 </script>
 

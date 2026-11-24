@@ -11,8 +11,9 @@ Under **Settings → Team & access → SCIM**, admins only:
 
 1. Turn SCIM on and generate the **secret token**. It is **shown once**: copy
    it now. **Rotate** it to issue a new one (the old one stops working).
-2. Pick the **default role** of created accounts: viewer or operator. SCIM
-   **never creates an admin**.
+2. Pick the **default role** of created accounts: viewer, operator or
+   [wall display](settings.md#wall-display-accounts) (for an IdP application
+   dedicated to room screens). SCIM **never creates an admin**.
 3. Give your IdP the base URL `https://<host>/api/scim/v2` and the token
    (sent as `Authorization: Bearer <token>`).
 

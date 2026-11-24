@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { m } from '#lib/paraglide/messages.js';
+	import { startPolling } from '#lib/poll.js';
 	/**
 	 * Home Assistant: whether the core runs, then what needs a hand — low
 	 * batteries, updates, open repairs, unavailable entities — then the
 	 * entities by domain. Read from the latest stored measurement; opening the
 	 * page never connects to Home Assistant.
 	 */
-	import { untrack } from 'svelte';
 	import { queryInstant, type Target } from '#lib/api/index.js';
 	import { ErrorNotice, Panel, Plate, type Tone } from '#lib/ui/index.js';
 	import ClientDevicesTable from '../ClientDevicesTable.svelte';
@@ -146,6 +146,7 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
+			return false;
 		} finally {
 			loading = false;
 		}
@@ -155,13 +156,7 @@
 		void target.id;
 		loading = true;
 		view = EMPTY;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 
 	function severityTone(severity: string): Tone {
@@ -268,7 +263,7 @@
 						{/each}
 					</ul>
 					{#if view.unavailable.length >= 50}
-						<p class="mt-2 text-[0.8rem] text-ink-3">{m.devices_ha_first_50()}</p>
+						<p class="mt-2 text-[0.8125rem] text-ink-3">{m.devices_ha_first_50()}</p>
 					{/if}
 				</div>
 			{/if}
@@ -301,7 +296,7 @@
 						</div>
 					{/if}
 					{#if quietDomains.length > 0}
-						<p class="mt-2 text-[0.8rem] text-ink-3">
+						<p class="mt-2 text-[0.8125rem] text-ink-3">
 							{m.devices_ha_all_available({ list: quietDomains.map((d) => `${d.name} (${formatCount(d.total)})`).join(', ') })}
 						</p>
 					{/if}

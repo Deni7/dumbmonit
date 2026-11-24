@@ -25,6 +25,7 @@
 		type ProbeStatus
 	} from '#lib/format.js';
 	import { alertDetail, coveringSilence, formatAlertValue } from './helpers';
+	import { isFlagUnit } from './rules/units';
 	import { operatorSymbol, recentTransitions, secondsSince } from './facts';
 	import { fingerprintsOf, type Folded } from './list';
 	import { m } from '#lib/paraglide/messages.js';
@@ -140,9 +141,9 @@
 		// One series: the measured value reads next to the line it crossed.
 		return limit && alert?.value !== null && alert?.value !== undefined ? `${details[0]} (${m.alerts_row_limit({ limit })})` : details[0];
 	});
-	/** The rule's line, "> 90%": what the value is compared with. */
+	/** The rule's line, "> 90%": what the value is compared with. An on/off rule has none. */
 	const limit = $derived(
-		row.kind === 'alert' && row.rule
+		row.kind === 'alert' && row.rule && !isFlagUnit(row.rule.unit)
 			? `${operatorSymbol(row.rule.operator)} ${formatAlertValue(row.rule.threshold, row.rule.unit)}`
 			: ''
 	);
@@ -225,7 +226,7 @@
 	}
 </script>
 
-<li class={`group/row relative ${selected ? 'row-selected bg-signal-soft/60' : ''}`}>
+<li data-list-row class={`group/row relative ${selected ? 'row-selected bg-signal-soft/60' : ''}`}>
 	<div class={`flex min-h-14 items-center gap-1 pr-1.5 pl-3 sm:gap-2 sm:pr-2 sm:pl-4 ${selecting ? '' : 'max-sm:flex-wrap'}`}>
 		{#if selecting}
 			<label class="-ml-1 inline-flex size-10 shrink-0 cursor-pointer items-center justify-center">
@@ -361,9 +362,19 @@
 							<span class="text-ink-2"> · {target.address}</span>
 						</dd>
 					{/if}
+					{#if alert.labels.slo_id && /^\d+$/.test(alert.labels.slo_id)}
+						<dt class="text-ink-3">{m.w3tech_alerts_detail_slo()}</dt>
+						<dd class="break-words text-ink">
+							<a
+								href={withBase(`/status?tab=slo&slo=${alert.labels.slo_id}`)}
+								class="font-medium underline decoration-line-strong underline-offset-2 hover:decoration-ink"
+								>{alert.labels.slo || `#${alert.labels.slo_id}`}</a
+							>
+						</dd>
+					{/if}
 					<dt class="text-ink-3">{m.alerts_detail_rule()}</dt>
 					<dd class="break-words text-ink">{title}</dd>
-					{#if alert.value !== null && Number.isFinite(alert.value)}
+					{#if alert.value !== null && Number.isFinite(alert.value) && !isFlagUnit(row.rule?.unit)}
 						<dt class="text-ink-3">{m.alerts_detail_value()}</dt>
 						<dd class="tnum text-ink">
 							{formatAlertValue(alert.value, row.rule?.unit)}{#if limit}<span class="text-ink-2">
@@ -463,6 +474,10 @@
 						until: timeOf(snoozeUntil) ? m.alerts_row_until({ time: timeOf(snoozeUntil) }) : ''
 					})}
 				</p>
+			{/if}
+
+			{#if alert?.after_change}
+				<p class="mt-2 text-ink-2">{m.w5annot_alert_after_change({ title: alert.after_change.title })}</p>
 			{/if}
 
 			{#if tickets.length > 0}

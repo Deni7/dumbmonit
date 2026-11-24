@@ -1,4 +1,5 @@
-//! Moniteurs de disponibilité : HTTP, TCP, DNS, ICMP, expiration de certificat,
+//! Moniteurs de disponibilité : HTTP (page seule ou scénario en plusieurs
+//! étapes), TCP, DNS, ICMP, expiration de certificat,
 //! SMTP, PostgreSQL, MySQL/MariaDB, MQTT, WebSocket, NTP, UDP, SSH, IMAP, POP3, lecture d'un
 //! OID SNMP, RADIUS et gRPC.
 //!
@@ -108,6 +109,9 @@
 //! | `probe_grpc_check_seconds` | grpc | Durée de l'appel `Health/Check`. |
 //! | `probe_grpc_serving_status` | grpc | `ServingStatus` renvoyé : 1 SERVING, 2 NOT_SERVING, 3 SERVICE_UNKNOWN. |
 //! | `probe_grpc_status_code` | grpc | Code `grpc-status` de la réponse (0 : OK). |
+//! | `probe_step_duration_seconds` | http_steps | Durée de chaque étape ; étiquette `step` (rang). |
+//! | `probe_step_status_code` | http_steps | Statut de la dernière réponse de chaque étape. |
+//! | `probe_step_result` | http_steps | 1 réussie, 0 en échec, 2 non jouée. |
 //!
 //! Toutes sont des jauges : rien ici n'est cumulatif, chaque interrogation mesure
 //! un instant. Le préfixe `dumbmonit_` est ajouté à l'écriture, comme partout.
@@ -144,6 +148,7 @@ pub(crate) mod websocket;
 pub use dns::DnsCollector;
 pub use grpc::GrpcCollector;
 pub use http::HttpCollector;
+pub use http::HttpStepsCollector;
 pub use http::security_headers::security_headers;
 pub use imap::ImapCollector;
 pub use mqtt::MqttCollector;
@@ -190,6 +195,7 @@ mod tests {
     #[test]
     fn les_types_de_sonde_sont_ceux_annonces() {
         assert_eq!(HttpCollector::new().kind(), "http");
+        assert_eq!(HttpStepsCollector::new().kind(), "http_steps");
         assert_eq!(TcpCollector::new().kind(), "tcp");
         assert_eq!(DnsCollector::new().kind(), "dns");
         assert_eq!(PingCollector::new().kind(), "ping");
@@ -214,6 +220,7 @@ mod tests {
     fn chaque_sonde_a_son_type_bien_a_elle() {
         let kinds = [
             HttpCollector::new().kind().to_owned(),
+            HttpStepsCollector::new().kind().to_owned(),
             TcpCollector::new().kind().to_owned(),
             DnsCollector::new().kind().to_owned(),
             PingCollector::new().kind().to_owned(),

@@ -23,6 +23,12 @@
 	let { children, label, for: htmlFor, help, error = null, required = false, inline = false, class: className = '' }: Props = $props();
 
 	let root = $state<HTMLDivElement | null>(null);
+	// Phones: the help shows once the field has been focused, then stays. Collapsing it
+	// on blur would shift everything below while the next tap is still in flight
+	// (touch taps blur on the synthesized mousedown, then hit-test mouseup after the
+	// reflow), so the tap would land beside the control it aimed at.
+	let revealed = $state(false);
+	const helpClass = $derived(`text-[0.8125rem] text-ink-2 ${revealed ? '' : 'max-sm:hidden'}`);
 	let shownError: string | null = untrack(() => error ?? null);
 	$effect(() => {
 		const next = error ?? null;
@@ -33,13 +39,19 @@
 	});
 </script>
 
-<!-- Phones keep the help out of the way until the field is in use: it shows on focus. -->
-<div bind:this={root} class={`group/field ${inline ? 'flex items-center justify-between gap-4' : 'grid content-start gap-1.5'} ${className}`}>
+<!-- Phones keep the help out of the way until the field is in use: it shows on first focus
+     and never collapses on blur. Inline rows with help pin the control to the top on phones,
+     so the help appearing under the label does not move the control being tapped. -->
+<div
+	bind:this={root}
+	onfocusin={() => (revealed = true)}
+	class={`${inline ? `flex items-center justify-between gap-4 ${help ? 'max-sm:items-start' : ''}` : 'grid content-start gap-1.5'} ${className}`}
+>
 	<div class={inline ? 'min-w-0' : ''}>
 		<label for={htmlFor} class="block text-sm font-semibold text-ink">
 			{label}{#if required}<span class="ml-0.5 text-warning" aria-hidden="true">*</span>{/if}
 		</label>
-		{#if inline && help}<p class="mt-0.5 text-[0.8125rem] text-ink-2 max-sm:hidden max-sm:group-focus-within/field:block">{help}</p>{/if}
+		{#if inline && help}<p class={`mt-0.5 ${helpClass}`}>{help}</p>{/if}
 	</div>
 	<div class={inline ? 'shrink-0' : 'contents'}>
 		{@render children()}
@@ -47,6 +59,6 @@
 	{#if !inline && error}
 		<p class="text-[0.8125rem] font-medium text-warning-ink" role="alert">{error}</p>
 	{:else if !inline && help}
-		<p class="text-[0.8125rem] text-ink-2 max-sm:hidden max-sm:group-focus-within/field:block">{help}</p>
+		<p class={helpClass}>{help}</p>
 	{/if}
 </div>

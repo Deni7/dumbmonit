@@ -235,7 +235,7 @@
 
 <Panel id="notifications-policy" title={m.notifications_policy_title()} description={m.notifications_policy_description()}>
 	{#snippet aside()}
-		{#if !auth.isAdmin}
+		{#if !auth.can('notifications.manage')}
 			<Plate tone="ghost" label={auth.readOnlyLabel} />
 		{/if}
 	{/snippet}
@@ -248,24 +248,24 @@
 		<form class="grid gap-5" onsubmit={save} aria-label={m.notifications_policy_title()}>
 			<div class="grid gap-4 sm:grid-cols-2">
 				<Field label={m.notifications_policy_group()} for="policy-window" help={m.notifications_policy_group_help()}>
-					<select id="policy-window" class="input" bind:value={batchWindow} disabled={saving || !auth.isAdmin}>
+					<select id="policy-window" class="input" bind:value={batchWindow} disabled={saving || !auth.can('notifications.manage')}>
 						{#each withCurrent(WINDOWS, batchWindow) as option (option.value)}
 							<option value={option.value}>{option.label}</option>
 						{/each}
 					</select>
 				</Field>
 				<Field label={m.notifications_policy_cap()} for="policy-cap" help={m.notifications_policy_cap_help()}>
-					<input id="policy-cap" type="number" min="0" step="1" class="input tnum" bind:value={maxPerHour} placeholder={m.notifications_policy_cap_placeholder()} disabled={saving || !auth.isAdmin} />
+					<input id="policy-cap" type="number" min="0" step="1" class="input tnum" bind:value={maxPerHour} placeholder={m.notifications_policy_cap_placeholder()} disabled={saving || !auth.can('notifications.manage')} />
 				</Field>
 			</div>
 
 			<Field label={m.notifications_policy_url()} for="policy-url" help={m.notifications_policy_url_help()}>
-				<input id="policy-url" type="url" class="input" bind:value={publicUrl} placeholder="https://monit.example.lan" autocomplete="off" disabled={saving || !auth.isAdmin} />
+				<input id="policy-url" type="url" class="input" bind:value={publicUrl} placeholder="https://monit.example.lan" autocomplete="off" disabled={saving || !auth.can('notifications.manage')} />
 			</Field>
 
 			<div class="grid gap-1">
 				<Field label={m.notifications_policy_actions()} for="policy-actions" inline>
-					<Toggle id="policy-actions" bind:checked={actionLinks} disabled={saving || !auth.isAdmin} label={m.notifications_policy_actions()} />
+					<Toggle id="policy-actions" bind:checked={actionLinks} disabled={saving || !auth.can('notifications.manage')} label={m.notifications_policy_actions()} />
 				</Field>
 				{#if actionLinks && publicUrl.trim() === ''}
 					<p class="text-[0.8125rem] text-ink-2">{m.notifications_policy_actions_needs_url()}</p>
@@ -273,20 +273,20 @@
 			</div>
 
 			<Field label={m.notifications_policy_silence_resolutions()} for="policy-silence-resolutions" inline>
-				<Toggle id="policy-silence-resolutions" bind:checked={silenceRecoveries} disabled={saving || !auth.isAdmin} label={m.notifications_policy_silence_resolutions()} />
+				<Toggle id="policy-silence-resolutions" bind:checked={silenceRecoveries} disabled={saving || !auth.can('notifications.manage')} label={m.notifications_policy_silence_resolutions()} />
 			</Field>
 
 			<div class="grid gap-2">
 				<div class="grid gap-4 sm:grid-cols-2">
 					<Field label={m.notifications_policy_escalate_label()} for="policy-escalate-after" help={m.notifications_policy_escalate_help()}>
-						<select id="policy-escalate-after" class="input" bind:value={escalateAfter} disabled={saving || !auth.isAdmin}>
+						<select id="policy-escalate-after" class="input" bind:value={escalateAfter} disabled={saving || !auth.can('notifications.manage')}>
 							{#each withCurrent(ESCALATIONS, escalateAfter) as option (option.value)}
 								<option value={option.value}>{option.label}</option>
 							{/each}
 						</select>
 					</Field>
 					<Field label={m.notifications_policy_also_tell()} for="policy-escalate-channel" help={m.notifications_policy_also_tell_help()}>
-						<select id="policy-escalate-channel" class="input" bind:value={escalateChannel} disabled={saving || !auth.isAdmin || escalateAfter === 0}>
+						<select id="policy-escalate-channel" class="input" bind:value={escalateChannel} disabled={saving || !auth.can('notifications.manage') || escalateAfter === 0}>
 							<option value="">{m.notifications_policy_no_channel()}</option>
 							{#each channels as channel (channel.id)}
 								<option value={String(channel.id)}>{channel.name}</option>
@@ -312,22 +312,22 @@
 				{#if showMore}
 					<div id="policy-more" class="grid gap-4 rounded-lg border border-line bg-surface-2 p-4">
 						<Field label={m.notifications_policy_flap()} for="policy-flap" inline>
-							<Toggle id="policy-flap" bind:checked={flapOn} disabled={saving || !auth.isAdmin} label={m.notifications_policy_flap()} />
+							<Toggle id="policy-flap" bind:checked={flapOn} disabled={saving || !auth.can('notifications.manage')} label={m.notifications_policy_flap()} />
 						</Field>
 						{#if flapOn}
 							<div class="grid gap-4 sm:grid-cols-3">
 								<Field label={m.notifications_policy_flap_changes()} for="policy-flap-events" help={m.notifications_policy_flap_changes_help()}>
-									<input id="policy-flap-events" type="number" min="2" step="1" class="input tnum" bind:value={flapEvents} disabled={saving || !auth.isAdmin} />
+									<input id="policy-flap-events" type="number" min="2" step="1" class="input tnum" bind:value={flapEvents} disabled={saving || !auth.can('notifications.manage')} />
 								</Field>
 								<Field label={m.notifications_policy_flap_within()} for="policy-flap-window">
-									<select id="policy-flap-window" class="input" bind:value={flapWindow} disabled={saving || !auth.isAdmin}>
+									<select id="policy-flap-window" class="input" bind:value={flapWindow} disabled={saving || !auth.can('notifications.manage')}>
 										{#each withCurrent(MINUTES, flapWindow) as option (option.value)}
 											<option value={option.value}>{option.label}</option>
 										{/each}
 									</select>
 								</Field>
 								<Field label={m.notifications_policy_flap_hold()} for="policy-flap-hold">
-									<select id="policy-flap-hold" class="input" bind:value={flapHold} disabled={saving || !auth.isAdmin}>
+									<select id="policy-flap-hold" class="input" bind:value={flapHold} disabled={saving || !auth.can('notifications.manage')}>
 										{#each withCurrent(MINUTES, flapHold) as option (option.value)}
 											<option value={option.value}>{option.label}</option>
 										{/each}
@@ -346,7 +346,7 @@
 				<ErrorNotice error={saveError} title={m.notifications_policy_error_save()} />
 			{/if}
 
-			{#if auth.isAdmin}
+			{#if auth.can('notifications.manage')}
 				<div class="flex flex-wrap items-center gap-3" aria-live="polite">
 					<ClickSpark>
 						<Button type="submit" variant="primary" loading={saving} success={saved} disabled={!dirty}>{m.alerts_rules_edit_save()}</Button>

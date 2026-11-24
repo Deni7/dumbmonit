@@ -9,11 +9,12 @@ use axum::Json;
 use axum::extract::State;
 use serde::{Deserialize, Serialize};
 
+use crate::auth::client_ip::ClientIp;
 use crate::auth::ldap::client::{self, TestReport};
 use crate::auth::ldap::{self, GroupMode, LdapConfig};
 use crate::auth::middleware::AdminUser;
 use crate::auth::oidc::Source;
-use crate::auth::{AuthError, AuthResult};
+use crate::auth::{AuthError, AuthResult, audit};
 use crate::state::AppState;
 
 /// La configuration telle que l'écran des réglages la montre : sans le mot de
@@ -43,6 +44,7 @@ pub struct ConfigView {
     admin_groups: Vec<String>,
     operator_groups: Vec<String>,
     viewer_groups: Vec<String>,
+    wall_groups: Vec<String>,
     timeout_seconds: u64,
 }
 
@@ -70,6 +72,7 @@ fn view(state: &AppState, resolved: ldap::Resolved) -> ConfigView {
         admin_groups: config.admin_groups,
         operator_groups: config.operator_groups,
         viewer_groups: config.viewer_groups,
+        wall_groups: config.wall_groups,
         timeout_seconds: config.timeout_seconds,
     }
 }
@@ -110,6 +113,7 @@ pub struct ConfigPayload {
     admin_groups: Vec<String>,
     operator_groups: Vec<String>,
     viewer_groups: Vec<String>,
+    wall_groups: Vec<String>,
     timeout_seconds: u64,
 }
 
@@ -144,6 +148,7 @@ impl ConfigPayload {
             admin_groups: self.admin_groups,
             operator_groups: self.operator_groups,
             viewer_groups: self.viewer_groups,
+            wall_groups: self.wall_groups,
             timeout_seconds: self.timeout_seconds,
         }
         .normalized()
@@ -153,7 +158,8 @@ impl ConfigPayload {
 /// `PUT /api/auth/ldap/config`
 pub async fn put_config(
     State(state): State<AppState>,
-    _: AdminUser,
+    AdminUser(me): AdminUser,
+    ClientIp(ip): ClientIp,
     Json(payload): Json<ConfigPayload>,
 ) -> AuthResult<Json<ConfigView>> {
     let config = payload.into_config();
@@ -175,6 +181,7 @@ pub async fn put_config(
     }
     ldap::save(&state.pool, &state.cipher, config).await?;
     tracing::info!("LDAP settings saved");
+    audit::record(&state.pool, Some(&me.username), "settings.ldap", None, ip).await;
     let resolved = effective(&state).await?;
     Ok(Json(view(&state, resolved)))
 }
@@ -188,10 +195,12 @@ fn same_account(saved: &LdapConfig, next: &LdapConfig) -> bool {
 /// l'environnement reprend la main, ou l'annuaire s'éteint.
 pub async fn delete_config(
     State(state): State<AppState>,
-    _: AdminUser,
+    AdminUser(me): AdminUser,
+    ClientIp(ip): ClientIp,
 ) -> AuthResult<Json<ConfigView>> {
     ldap::clear(&state.pool).await?;
     tracing::info!("LDAP settings cleared");
+    audit::record(&state.pool, Some(&me.username), "settings.ldap.cleared", None, ip).await;
     let resolved = effective(&state).await?;
     Ok(Json(view(&state, resolved)))
 }

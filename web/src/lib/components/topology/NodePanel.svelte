@@ -10,7 +10,9 @@
 	import { kindLabel } from '#lib/kind-label.js';
 	import { STATE_LABEL, type TargetState } from '#lib/format.js';
 	import type { Snippet } from 'svelte';
-	import { Box, Monitor, Server, X } from 'lucide-svelte';
+	import { Box, Check, Link, Monitor, Server, X } from 'lucide-svelte';
+	import { page } from '$app/state';
+	import { copyText } from '#lib/clipboard.js';
 	import { Button } from '#lib/ui/index.js';
 	import { ancestors, blockers, descendants, type Graph, type NodeState } from './layout';
 	import { guestLabel, sourceShort, zoneLabel } from './legend';
@@ -39,6 +41,17 @@
 
 	const SHOWN = 8;
 
+	/** The address of the map centred on this node, its panel open. */
+	let copied = $state(false);
+	async function copyLink() {
+		const url = new URL(page.url);
+		url.search = '';
+		url.searchParams.set('tab', 'map');
+		url.searchParams.set('node', id);
+		copied = await copyText(url.toString());
+		if (copied) setTimeout(() => (copied = false), 2000);
+	}
+
 	function stateText(state: NodeState): string {
 		if (state === 'running') return m.topology_state_running();
 		if (state === 'stopped') return m.topology_state_stopped();
@@ -50,7 +63,7 @@
 	}
 
 	const chip =
-		'inline-flex min-h-10 max-w-full items-center gap-1.5 rounded-lg border border-line bg-surface-2 px-2.5 text-left text-sm text-ink hover:border-line-strong focus-visible:outline-2 focus-visible:outline-signal';
+		'inline-flex min-h-10 max-w-full items-center gap-1.5 rounded-lg border border-line bg-surface-2 px-2.5 text-left text-sm text-ink hover:border-line-strong focus-visible:outline-2 focus-visible:outline-focus';
 </script>
 
 {#snippet nodeChip(other: string)}
@@ -91,7 +104,16 @@
 		</div>
 		<button
 			type="button"
-			class="-mt-1 -mr-2 inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-ink-2 hover:bg-surface-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-signal"
+			class="-mt-1 inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-ink-2 hover:bg-surface-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
+			aria-label={copied ? m.w1wall_topo_link_copied() : m.w1wall_topo_copy_link()}
+			title={copied ? m.w1wall_topo_link_copied() : m.w1wall_topo_copy_link()}
+			onclick={() => void copyLink()}
+		>
+			{#if copied}<Check class="size-4" aria-hidden="true" />{:else}<Link class="size-4" aria-hidden="true" />{/if}
+		</button>
+		<button
+			type="button"
+			class="-mt-1 -mr-2 inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-ink-2 hover:bg-surface-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
 			aria-label={m.topology_panel_close()}
 			title={m.topology_panel_close()}
 			onclick={onclose}

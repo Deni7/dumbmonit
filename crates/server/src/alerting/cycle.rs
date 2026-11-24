@@ -13,8 +13,9 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use chrono::{DateTime, Utc};
 
 use crate::alerting::baseline::{self, Bucket, SeriesBaseline};
+use crate::alerting::evaluation;
 use crate::alerting::group::{self, AlertGroup, AlertOutcome};
-use crate::alerting::machine::{self, AlertState, Phase, Transition};
+use crate::alerting::machine::{AlertState, Phase, Transition};
 use crate::alerting::model::{
     self, Rule, TARGET_ADDRESS_LABELS, TARGET_ID_LABELS, TARGET_NAME_LABELS, TargetId, TargetNode,
 };
@@ -183,15 +184,16 @@ pub struct CycleOutcome {
     pub carried_over: Vec<String>,
 }
 
-/// Index de résolution série → cible.
-struct TargetIndex {
+/// Index de résolution série → cible. Partagé avec le rejeu sur l'historique
+/// ([`crate::alerting::replay`]), qui rattache ses séries de la même façon.
+pub(crate) struct TargetIndex {
     by_id: HashMap<TargetId, TargetNode>,
     by_name: HashMap<String, TargetId>,
     by_address: HashMap<String, TargetId>,
 }
 
 impl TargetIndex {
-    fn new(targets: &[TargetNode]) -> Self {
+    pub(crate) fn new(targets: &[TargetNode]) -> Self {
         Self {
             by_id: targets.iter().map(|t| (t.id, t.clone())).collect(),
             by_name: targets.iter().map(|t| (t.name.clone(), t.id)).collect(),
@@ -207,7 +209,7 @@ impl TargetIndex {
     /// autres conventions d'étiquettes : l'identité posée sur les échantillons
     /// relève des collecteurs, et une règle écrite à la main par l'utilisateur
     /// peut parfaitement agréger en ne gardant que `host`.
-    fn resolve(&self, labels: &BTreeMap<String, String>) -> Option<&TargetNode> {
+    pub(crate) fn resolve(&self, labels: &BTreeMap<String, String>) -> Option<&TargetNode> {
         if model::carries_target_id(labels) {
             return TARGET_ID_LABELS.iter().find_map(|label| {
                 labels.get(*label)?.parse::<TargetId>().ok().and_then(|id| self.by_id.get(&id))
@@ -463,7 +465,7 @@ pub fn plan_cycle(input: CycleInput, baselines: &mut BaselineStore) -> CycleOutc
 
             // Hystérésis : la condition était vraie au cycle précédent si elle est
             // datée, que l'alerte soit encore en attente ou déjà partie.
-            let active = before.condition_since.is_some();
+            let active = evaluation::was_active(&before);
             let annotation = input.annotations.get(&fingerprint);
             let (condition, score, learning) = evaluate_point(
                 rule,
@@ -476,8 +478,7 @@ pub fn plan_cycle(input: CycleInput, baselines: &mut BaselineStore) -> CycleOutc
                 baselines,
             );
             let dismissed_by = dismissal_author(&before);
-            let (mut state, transition) =
-                machine::advance(&before, condition, now, rule.for_duration);
+            let (mut state, transition) = evaluation::step(&before, condition, now, rule);
             state.value = Some(point.value);
             state.score = score;
             state.learning = learning;
@@ -495,7 +496,9 @@ pub fn plan_cycle(input: CycleInput, baselines: &mut BaselineStore) -> CycleOutc
             });
             // Une prévision qui franchit un palier (14 puis 7 jours) reparle sous
             // la même identité, avec sa nouvelle sévérité.
-            let tier_rose = rule.kind == model::RuleKind::Forecast
+            // Une consommation de budget qui passe de lente à rapide aussi.
+            let tiered = matches!(rule.kind, model::RuleKind::Forecast | model::RuleKind::SloBurn);
+            let tier_rose = tiered
                 && transition.is_none()
                 && state.phase == Phase::Firing
                 && alert_severity(rule, Some(point.value)) > alert_severity(rule, before.value);
@@ -510,6 +513,8 @@ pub fn plan_cycle(input: CycleInput, baselines: &mut BaselineStore) -> CycleOutc
             let target_name = target
                 .map(|t| t.name.clone())
                 .or_else(|| TARGET_NAME_LABELS.iter().find_map(|l| point.labels.get(*l).cloned()))
+                // Une série de SLO ne parle d'aucun équipement : son nom en tient lieu.
+                .or_else(|| point.labels.get(model::SLO_LABEL).cloned())
                 .unwrap_or_else(|| UNKNOWN_TARGET.to_string());
 
             evaluated.push(Evaluated {
@@ -541,7 +546,7 @@ pub fn plan_cycle(input: CycleInput, baselines: &mut BaselineStore) -> CycleOutc
             before.suppressed_by = None;
             before.silenced = false;
             let dismissed_by = dismissal_author(&before);
-            let (state, transition) = machine::advance(&before, false, now, rule.for_duration);
+            let (state, transition) = evaluation::step(&before, false, now, rule);
 
             // Une empreinte revenue au repos et jamais notifiée n'a plus rien à dire :
             // on la laisse sortir de la table plutôt que d'y accumuler du passé.
@@ -557,6 +562,7 @@ pub fn plan_cycle(input: CycleInput, baselines: &mut BaselineStore) -> CycleOutc
                     .target_id
                     .and_then(|id| index.by_id.get(&id))
                     .map(|t| t.name.clone())
+                    .or_else(|| stored.labels.get(model::SLO_LABEL).cloned())
                     .unwrap_or_else(|| UNKNOWN_TARGET.to_string()),
                 series_key: stored.series_key.clone(),
                 labels: stored.labels.clone(),
@@ -727,12 +733,18 @@ fn history_reason(state: &AlertState, dismissed_by: Option<&str>, now: DateTime<
 }
 
 /// Sévérité d'une alerte : celle de la règle, relevée par les paliers de jours
-/// restants pour une prévision (voir [`crate::alerting::forecast::tier`]).
+/// restants pour une prévision (voir [`crate::alerting::forecast::tier`]), et
+/// critique (« Warning » à l'écran) pour une consommation rapide de budget
+/// d'erreur (valeur 2, voir [`crate::slo::Burn::level`]).
 fn alert_severity(rule: &Rule, value: Option<f64>) -> crate::alerting::model::Severity {
-    if rule.kind == model::RuleKind::Forecast {
-        crate::alerting::forecast::tier(rule.severity, value, &rule.params)
-    } else {
-        rule.severity
+    match rule.kind {
+        model::RuleKind::Forecast => {
+            crate::alerting::forecast::tier(rule.severity, value, &rule.params)
+        }
+        model::RuleKind::SloBurn if value.is_some_and(|v| v >= 2.0) => {
+            rule.severity.max(crate::alerting::model::Severity::Critical)
+        }
+        _ => rule.severity,
     }
 }
 
@@ -756,25 +768,17 @@ fn evaluate_point(
         // Une règle prédictive n'est qu'un seuil sur une requête `predict_linear` :
         // c'est VictoriaMetrics qui extrapole, pas nous. Une règle de prévision
         // est un seuil sur un nombre de jours déjà calculé (`derived`).
-        RuleKind::Threshold | RuleKind::Predict | RuleKind::LogPattern | RuleKind::Forecast => (
-            rule.operator.holds(
-                point.value,
-                effective.threshold,
-                effective.clear_threshold,
-                active,
-            ),
-            None,
-            false,
-        ),
+        RuleKind::Threshold
+        | RuleKind::Predict
+        | RuleKind::LogPattern
+        | RuleKind::Forecast
+        | RuleKind::SloBurn => {
+            (evaluation::threshold_holds(rule, effective, point.value, active), None, false)
+        }
         // Dérive : un seuil sur le rapport à la normale, qui ne s'ouvre que si
         // l'écart est aussi statistiquement net (voir `Annotation::armed`).
         RuleKind::Drift => {
-            let holds = rule.operator.holds(
-                point.value,
-                effective.threshold,
-                effective.clear_threshold,
-                active,
-            );
+            let holds = evaluation::threshold_holds(rule, effective, point.value, active);
             let armed = annotation.is_some_and(|annotation| annotation.armed);
             (holds && (active || armed), annotation.and_then(|annotation| annotation.score), false)
         }

@@ -24,9 +24,18 @@
 	import { demo } from '#lib/stores/demo.svelte.js';
 	import { calmMotion } from '#lib/ui/index.js';
 	import { SHORTCUTS } from '#lib/palette/shortcuts.js';
+	import { handlePageKey } from '#lib/palette/page-keys.js';
+	import { displayPrefs } from '#lib/stores/prefs.svelte.js';
+	import { connection } from '#lib/stores/connection.svelte.js';
+	import ConnectionBanner from '#lib/components/ConnectionBanner.svelte';
+	import { countsAsProblem } from '#lib/alerts-attention.js';
+	import { dottedFaviconHref, withCount } from '#lib/tab-title.js';
+	import { docTitle } from '#lib/stores/page-title.svelte.js';
 	import { createSequenceMatcher, isTypingTarget } from '#lib/palette/logic.js';
 	import { hostedStatusSlug } from '#lib/status-host.js';
 	import PublicStatusPage from '#lib/components/status/PublicStatusPage.svelte';
+	import TotpSetupGate from '#lib/components/security/TotpSetupGate.svelte';
+	import { wallDestination } from '#lib/wall/route.js';
 
 	let { children } = $props();
 
@@ -72,13 +81,59 @@
 			}
 			const id = sequences.feed(event, Date.now());
 			const shortcut = SHORTCUTS.find((s) => s.id === id);
-			if (!shortcut || (shortcut.admin && !auth.isAdmin)) return;
+			if (!shortcut) {
+				// Not a sequence: a key of the current page (`/`, `j`, `k`, `a`).
+				if (!id && handlePageKey(event)) event.preventDefault();
+				return;
+			}
+			if (shortcut.admin && !auth.isAdmin) return;
 			event.preventDefault();
 			if (shortcut.href) void goto(shortcut.href);
 			else if (shortcut.id === 'help') palette.openHelp();
 		}
 		window.addEventListener('keydown', onKeydown);
 		return () => window.removeEventListener('keydown', onKeydown);
+	});
+
+	// Display preferences (density, reduced motion) are classes on <html>.
+	$effect(() => {
+		displayPrefs.apply();
+	});
+	// "Connection lost" banner: the browser's online state and the request layer's failures.
+	$effect(() => connection.watch());
+
+	// Tab title: `(n)` open critical alerts in front of whatever title the page
+	// sets, and a red dot on the icon. Read from the alerts store the nav badge
+	// already polls: no request of its own.
+	const criticalCount = $derived(
+		statusHost || !auth.canUseApi
+			? 0
+			: alertsStore.alerts.filter((a) => countsAsProblem(a) && a.severity === 'critical').length
+	);
+	$effect(() => {
+		const count = criticalCount;
+		const apply = () => {
+			const next = withCount(document.title, count);
+			if (next !== document.title) document.title = next;
+		};
+		apply();
+		// Pages set their own title after this runs: stamp the count on those too.
+		const observer = new MutationObserver(apply);
+		observer.observe(document.head, { childList: true, subtree: true, characterData: true });
+		const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+		const original = link?.dataset.dmHref ?? link?.getAttribute('href') ?? null;
+		if (link && original) {
+			link.dataset.dmHref = original;
+			link.setAttribute('href', count > 0 ? dottedFaviconHref() : original);
+		}
+		return () => observer.disconnect();
+	});
+
+	// Printing keeps only the content on the alerts list and the public status page.
+	$effect(() => {
+		const path = routePath(page.url);
+		const clean = !!statusHost || path.startsWith('/alerts') || path.startsWith('/s/');
+		document.documentElement.toggleAttribute('data-print-clean', clean);
 	});
 
 	// The system theme can flip during a session (a status page in automatic
@@ -99,7 +154,7 @@
 	// Asked once per page load; "Skip" or the last step marks it done on the server.
 	let wizardOffered = false;
 	$effect(() => {
-		if (!auth.canUseApi || !auth.isAdmin || auth.demo || instanceStore.setupCompleted !== false) return;
+		if (!auth.canUseApi || auth.totpSetupRequired || !auth.isAdmin || auth.demo || instanceStore.setupCompleted !== false) return;
 		if (wizardOffered || onWelcome || onWall || isPublicRoute(routePath(page.url))) return;
 		wizardOffered = true;
 		void goto('/welcome', { replace: true });
@@ -114,7 +169,7 @@
 
 	const publicPath = $derived(isPublicRoute(routePath(page.url)));
 	// The branch below that renders `EnterpriseShell`.
-	const inShell = $derived(!statusHost && !publicPath && auth.canUseApi && !onWelcome);
+	const inShell = $derived(!statusHost && !publicPath && auth.canUseApi && !auth.totpSetupRequired && !auth.isWall && !onWelcome);
 
 	// Three situations: fresh instance, no session, valid session.
 	$effect(() => {
@@ -138,6 +193,15 @@
 				const target = path + page.url.search;
 				void goto(`/login?redirect=${encodeURIComponent(target)}`, { replace: true });
 			}
+			return;
+		}
+		// Right after sign-in the account is not read yet: its role decides where it lands.
+		if (!auth.user) return;
+		// A wall-display account has the wall and nothing else, teams or not
+		// (the server refuses the rest): every page, sign-in included, leads there.
+		if (auth.isWall) {
+			const to = wallDestination(path, isPublicRoute(path) ? page.url.searchParams.get('redirect') : null);
+			if (to) void goto(to, { replace: true });
 			return;
 		}
 		// An account limited by its teams has no overview or wall: devices first.
@@ -195,15 +259,23 @@
 		});
 	});
 
+	// A wall-display account never gets the shell, which would otherwise read the
+	// instance name for the wall's heading.
+	$effect(() => {
+		if (statusHost || !auth.canUseApi || !auth.isWall) return;
+		void instanceStore.loadSettings();
+	});
+
 	// The alert count is shared by the whole app; it only polls once a session exists.
 	$effect(() => {
-		if (statusHost || !auth.canUseApi) return;
+		// Held at two-factor enrolment, every other route answers 403: nothing to poll.
+		if (statusHost || !auth.canUseApi || auth.totpSetupRequired) return;
 		return alertsStore.startPolling();
 	});
 </script>
 
 <svelte:head>
-	<title>DumbMonit</title>
+	<title>{docTitle('')}</title>
 </svelte:head>
 
 <div class="flex min-h-dvh flex-col pr-[var(--safe-right)] pl-[var(--safe-left)] max-sm:pt-[var(--safe-top)]">
@@ -228,6 +300,15 @@
 				{auth.checked ? m.app_layout_signing_in() : m.app_layout_checking()}
 			</p>
 		</main>
+	{:else if auth.totpSetupRequired}
+		<!-- The instance policy requires two-factor first: the server refuses everything else. -->
+		<CleartextBanner />
+		<TotpSetupGate />
+	{:else if auth.isWall}
+		<!-- A wall display: the wall alone, no shell, no palette, no notes (the layout guard keeps it on /wall). -->
+		{#if onWall}
+			{@render children()}
+		{/if}
 	{:else}
 		{#snippet banners()}
 			{#if auth.demo}
@@ -265,6 +346,9 @@
 	{/if}
 	{#if auth.demo}
 		<DemoNotice />
+	{/if}
+	{#if !onWall}
+		<ConnectionBanner />
 	{/if}
 	<!-- Inside the shell the tag sits in the page column (see EnterpriseShell): under the shell it would shorten the rail's sticky course. -->
 	{#if !onWall && !statusHost && !routePath(page.url).startsWith('/status') && !routePath(page.url).startsWith('/s/') && !inShell}

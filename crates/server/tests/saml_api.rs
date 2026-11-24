@@ -367,6 +367,30 @@ async fn okta_sign_in_with_signed_response_and_assertion() {
     assert_eq!(user["role"], "operator");
 }
 
+/// Un groupe d'écrans muraux donne le rôle `wall` : le compte voit le mur et
+/// rien d'autre, et la liste revient telle quelle dans les réglages.
+#[tokio::test]
+async fn a_wall_group_signs_in_a_wall_display() {
+    let app = app_at(NOW).await;
+    let admin = configure_ok(
+        &app,
+        OKTA,
+        "okta-cert.pem",
+        json!({ "wall_groups": ["dumbmonit-operators"] }),
+    )
+    .await;
+    let settings = app.get("/api/auth/saml/config", Some(&admin)).await;
+    assert_eq!(settings.body["wall_groups"], json!(["dumbmonit-operators"]), "{}", settings.body);
+
+    let session = sign_in(&app, "okta-response.xml").await.expect("connexion");
+    let user = me(&app, &session).await;
+    assert_eq!(user["username"], "bob@okta.example");
+    assert_eq!(user["role"], "wall");
+    assert_eq!(app.get("/api/targets", Some(&session)).await.status, StatusCode::OK);
+    let refused = app.get("/api/users", Some(&session)).await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN, "{}", refused.body);
+}
+
 #[tokio::test]
 async fn keycloak_groups_give_the_role_and_the_teams() {
     let app = app_at(NOW).await;

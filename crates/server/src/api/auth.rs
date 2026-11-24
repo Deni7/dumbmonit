@@ -13,12 +13,14 @@ use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 
 use crate::auth::client_ip::ClientIp;
-use crate::auth::middleware::{Authenticated, CurrentSession, current_session};
+use crate::auth::middleware::{Authenticated, CurrentSession, current_session_details};
+use crate::auth::permissions::Permission;
 use crate::auth::rate_limit::Key;
+use crate::auth::session::{SignIn, UserAgent, Via};
 use crate::auth::teams::TeamAccess;
 use crate::auth::users::{self, Role, User};
 use crate::auth::{
-    AuthError, AuthResult, AuthState, audit, cookie, ldap, oidc, password, saml, session,
+    AuthError, AuthResult, AuthState, audit, cookie, ldap, oidc, password, policy, saml, session,
 };
 use crate::state::AppState;
 
@@ -36,11 +38,30 @@ pub struct UserView {
     pub totp_enabled: bool,
     pub created_at: String,
     pub last_login_at: Option<String>,
+    /// Adresse électronique facultative, jamais un moyen de connexion.
+    pub email: Option<String>,
+    /// Rôle personnalisé du compte (son `role` est alors `viewer`).
+    pub custom_role: Option<CustomRoleRef>,
+    /// Ce que le compte peut faire, dans les termes du catalogue
+    /// (`GET /api/roles/permissions`) : l'interface masque le reste.
+    pub permissions: Vec<Permission>,
+}
+
+/// Le rôle personnalisé d'un compte, désigné.
+#[derive(Debug, Clone, Serialize)]
+pub struct CustomRoleRef {
+    pub id: i64,
+    pub name: String,
 }
 
 impl From<User> for UserView {
     fn from(user: User) -> Self {
+        let permissions = crate::auth::permissions::effective(&user);
+        let custom_role =
+            user.custom_role.as_ref().map(|r| CustomRoleRef { id: r.id, name: r.name.clone() });
         Self {
+            custom_role,
+            permissions,
             auth: user.auth_method(),
             totp_enabled: user.totp_enabled,
             id: user.id,
@@ -50,6 +71,7 @@ impl From<User> for UserView {
             disabled: user.disabled,
             created_at: user.created_at,
             last_login_at: user.last_login_at,
+            email: user.email,
         }
     }
 }
@@ -98,6 +120,12 @@ pub struct StatusView {
     demo: bool,
     /// HTTPS du port de l'interface, pour la bannière « session en clair ».
     https: HttpsStatus,
+    /// La politique de l'instance retient ce compte à l'enrôlement du second
+    /// facteur : l'interface n'affiche rien d'autre (voir `auth::policy`).
+    totp_setup_required: bool,
+    /// « Mot de passe oublié ? » envoie un lien par courriel ; faux, l'écran
+    /// de connexion renvoie à la documentation (voir `api::recovery`).
+    password_reset: bool,
 }
 
 /// Ce que l'interface doit savoir du HTTPS avant même la connexion : rien de
@@ -194,12 +222,19 @@ pub async fn status(
     headers: HeaderMap,
 ) -> AuthResult<Json<StatusView>> {
     let configured = auth.is_configured(&state.pool).await?;
-    let user = if configured {
-        current_session(&state.pool, &headers).await?.map(|(_, user)| UserView::from(user))
+    let session = if configured {
+        current_session_details(&state.pool, &headers).await?
     } else {
         // Instance vierge : il n'y a pas encore de compte, donc pas de session.
         None
     };
+    let totp_setup_required = match &session {
+        Some((_, user, verified)) => {
+            policy::setup_required(&state.pool, user, verified.via).await?
+        }
+        None => false,
+    };
+    let user = session.map(|(_, user, _)| UserView::from(user));
     let resolved = oidc::resolve(&state.pool, &state.cipher, &state.config.oidc).await?;
     let directory = ldap::resolve(&state.pool, &state.cipher, &state.config.ldap).await?;
     let saml_config = saml::load(&state.pool).await?;
@@ -216,6 +251,10 @@ pub async fn status(
         saml: SamlStatus { enabled: saml_config.usable(), label: saml_config.label().to_string() },
         passkeys: configured && crate::auth::passkeys::count(&state.pool, None).await? > 0,
         demo: state.config.demo,
+        totp_setup_required,
+        password_reset: configured
+            && !state.config.demo
+            && super::recovery::self_service_available(&state).await,
         https: {
             let summary = state.web_tls().summary();
             HttpsStatus {
@@ -368,6 +407,7 @@ pub async fn login(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthState>,
     ClientIp(ip): ClientIp,
+    UserAgent(user_agent): UserAgent,
     Json(payload): Json<LoginPayload>,
 ) -> AuthResult<Response> {
     if !auth.is_configured(&state.pool).await? {
@@ -399,6 +439,7 @@ pub async fn login(
     {
         let directory = ldap::resolve(&state.pool, &state.cipher, &state.config.ldap).await?;
         if directory.config.enabled() {
+            let origin = SignIn { via: Via::Ldap, ip, user_agent: user_agent.as_deref() };
             return ldap_login(
                 &state,
                 &auth,
@@ -406,7 +447,7 @@ pub async fn login(
                 username,
                 &payload.password,
                 keys,
-                ip,
+                origin,
             )
             .await;
         }
@@ -443,7 +484,8 @@ pub async fn login(
     }
     auth.limiter().lock().await.record_success(&keys);
 
-    open_session(&state, &user, ip).await
+    let origin = SignIn { via: Via::Password, ip, user_agent: user_agent.as_deref() };
+    open_session(&state, &user, &origin).await
 }
 
 /// Connexion par l'annuaire : l'identifiant et le mot de passe sont vérifiés
@@ -461,8 +503,9 @@ async fn ldap_login(
     username: &str,
     password: &str,
     keys: Vec<Key>,
-    ip: Option<std::net::IpAddr>,
+    origin: SignIn<'_>,
 ) -> AuthResult<Response> {
+    let ip = origin.ip;
     let refuse = |reason: &str| {
         tracing::warn!(user = username, reason, "LDAP login refused");
         AuthError::Unauthorized("Wrong username or password.".into())
@@ -500,17 +543,18 @@ async fn ldap_login(
         );
     }
     auth.limiter().lock().await.record_success(&keys);
-    open_session(state, &user, ip).await
+    open_session(state, &user, &origin).await
 }
 
 /// Ouvre la session d'un compte dont l'identité vient d'être établie et pose le
-/// cookie. Partagé avec le second facteur.
+/// cookie. Partagé avec le second facteur et les clés d'accès.
 pub async fn open_session(
     state: &AppState,
     user: &User,
-    ip: Option<std::net::IpAddr>,
+    origin: &SignIn<'_>,
 ) -> AuthResult<Response> {
-    let token = session::create(&state.pool, user.id).await?;
+    let ip = origin.ip;
+    let token = session::create(&state.pool, user.id, origin).await?;
     users::touch_login(&state.pool, user.id).await?;
     audit::record(&state.pool, Some(&user.username), "login", None, ip).await;
     tracing::info!(user = %user.username, "login succeeded");
@@ -538,10 +582,14 @@ const DUMMY_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$c2VsLWRlLXJlbXBsaXNzYWd
 /// `POST /api/auth/logout` — ferme la session courante et efface le cookie.
 pub async fn logout(
     State(state): State<AppState>,
+    ClientIp(ip): ClientIp,
+    user: Option<Extension<crate::auth::middleware::CurrentUser>>,
     current: Option<Extension<CurrentSession>>,
 ) -> AuthResult<Response> {
     if let Some(Extension(CurrentSession(token))) = current {
         session::delete(&state.pool, token.id()).await?;
+        let actor = user.as_ref().map(|Extension(user)| user.0.username.as_str());
+        audit::record(&state.pool, actor, "logout", None, ip).await;
     }
     // Le cookie est effacé même sans session en base : c'est la seule façon de se
     // débarrasser d'un cookie devenu inutilisable.

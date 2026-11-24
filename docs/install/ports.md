@@ -33,6 +33,12 @@ the public status pages (`/s/<slug>`). Change it with `DUMBMONIT_BIND`.
 - **Safer:** put a reverse proxy in front (see the third scenario), or reach
   the interface through a VPN such as Tailscale or WireGuard. Allow only your
   own IPs on the proxy.
+- **Agent WebSocket:** `/api/agent/ws` on this port carries the agent channel
+  for agents that cannot reach 8443 (Cloudflare Tunnel, a reverse proxy that
+  terminates TLS, a network where only web traffic goes out). The agent's own
+  TLS session travels inside it, end to end; the route needs the agent channel
+  enabled (`DUMBMONIT_AGENT_LISTEN`), not 8443 published. `DUMBMONIT_AGENT_WEBSOCKET=off`
+  closes it. See [Agents behind a proxy](agents-behind-proxy.md).
 
 ### 8443: agent channel
 
@@ -47,15 +53,45 @@ the Internet, but it still deserves a source filter. Change it with
   install command shown for a relay uses this port only, so a remote site
   never needs 8080. The command pins the key of the port's certificate and the
   SHA-256 of each binary.
-- **Closed:** agents on other networks cannot report. Agents on the same
-  network as the server can still use the web port.
+- **Closed:** agents on other networks cannot report on this port. They can
+  still go through the web address, their channel inside a WebSocket
+  (`transport: websocket`, or `auto` which falls back to it on its own), as
+  long as the channel stays enabled (`DUMBMONIT_AGENT_LISTEN` not `off`): an
+  unpublished 8443 is enough.
 - **Open on the Internet:** anyone can try a TLS handshake, but without an
   agent certificate they get nothing. Restrict it to your agents' IPs anyway.
 - **Relay gateway:** a relay agent opens its own gateway, also on 8443 by
   default, as soon as it connects. Its install command opens that port on the
   relay's firewall (firewalld, ufw or the Windows firewall) to the local subnet
   only, and `--uninstall` closes it again. A relay in Docker publishes it
-  through `docker-compose.agent.yml`.
+  through `docker-compose.agent.yml`. The relay reports the address it really
+  listens on, or why it cannot (see
+  [Monitor a remote site](remote-site.md#5-install-agents-behind-the-relay)).
+
+#### Troubleshooting the agent channel
+
+**The port is not published.** The most common case: the web interface is
+published (`8090:8080` for instance) but the agent channel is not. Agents and
+TLS enrolment then fail with *Connection refused*. Before it shows an install
+command, the add screen dials the channel at the address the command will
+carry and says *Port 8443 is not published*, with the line to add under
+`ports:` in `docker-compose.yml`:
+
+```yaml
+    ports:
+      - "8090:8080"
+      - "8443:8443"   # agent channel (DUMBMONIT_AGENT_PUBLIC_PORT if published as another number)
+```
+
+then `docker compose up -d`. The install scripts print the same hint when the
+TLS connection is refused, and *no answer* (timeout) when a firewall drops it.
+The check runs from the server itself: behind a NAT without hairpin it can fail
+although machines outside connect fine (**Show the command anyway**).
+
+**Through a relay**, the port the site's machines need is the relay's gateway,
+not the server's: see the table in
+[Monitor a remote site](remote-site.md#5-install-agents-behind-the-relay). The
+relay itself still needs the server's 8443.
 
 See [Agent channel security](agent-security.md).
 
@@ -86,7 +122,9 @@ also reaches the server through it; its gateway on the site does not change.
 It does not make a reverse proxy that terminates TLS possible (Cloudflare
 Tunnel, a plain `reverse_proxy`): the agent's certificate must still reach
 DumbMonit untouched. A TCP proxy that passes the connection through (SNI
-passthrough) works.
+passthrough) works. Behind a proxy that terminates TLS, agents go through the
+web address instead, their TLS session inside a WebSocket: see
+[Agents behind a proxy](agents-behind-proxy.md).
 
 ### 5514: syslog
 

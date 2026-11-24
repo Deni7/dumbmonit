@@ -13,6 +13,10 @@
 	 *
 	 * An agent whose configuration lists backup servers (`server_urls`) says which
 	 * one it reports to: the primary, or a backup since a given time.
+	 *
+	 * An agent whose encrypted channel goes through the web address (WebSocket,
+	 * behind Cloudflare Tunnel or a reverse proxy) says so; the server sees it,
+	 * the agent does not declare it.
 	 */
 	import { ShieldCheck, ShieldAlert } from 'lucide-svelte';
 	import { getAgentHost, type AgentHost, type Target } from '#lib/api/index.js';
@@ -73,6 +77,11 @@
 					{:else}
 						<span class="text-ink">{m.devices_agent_server_primary()}</span>
 					{/if}
+				</span>
+			{/if}
+			{#if host.via_websocket}
+				<span class="min-w-0 break-words text-ink-2" title={m.devices_agent_channel_websocket_detail()}>
+					{m.devices_agent_channel()} <span class="text-ink">{m.devices_agent_channel_websocket()}</span>
 				</span>
 			{/if}
 			<span class="inline-flex items-center gap-1.5 sm:ml-auto">

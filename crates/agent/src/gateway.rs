@@ -179,6 +179,53 @@ pub async fn bind(addr: SocketAddr) -> std::io::Result<TcpListener> {
     TcpListener::bind(addr).await
 }
 
+/// Cause d'un échec d'ouverture, en anglais, telle que l'interface l'affiche :
+/// ce qu'il faut faire, puis le message du système.
+pub fn describe_bind_error(error: &std::io::Error) -> String {
+    use std::io::ErrorKind;
+    let hint = match error.kind() {
+        ErrorKind::AddrInUse => {
+            Some("the port is already used by another program on the relay (or a second agent)")
+        }
+        ErrorKind::PermissionDenied => {
+            Some("permission denied: a port below 1024 needs administrator rights")
+        }
+        ErrorKind::AddrNotAvailable => {
+            Some("the relay has no such address: fix or remove gateway_listen")
+        }
+        _ => None,
+    };
+    let text = match hint {
+        Some(hint) => format!("{hint} ({error})"),
+        None => error.to_string(),
+    };
+    text.chars().take(dumbmonit_proto::MAX_GATEWAY_CHECK_ERROR).collect()
+}
+
+/// État de la passerelle annoncé au serveur : l'adresse demandée, celle
+/// réellement liée, ou la cause de l'échec. `None` sans passerelle demandée.
+pub fn state(
+    wanted: Option<SocketAddr>,
+    local: bool,
+    bound: Option<SocketAddr>,
+    failed: Option<&str>,
+    encrypted: bool,
+) -> Option<dumbmonit_proto::GatewayState> {
+    let wanted = wanted?;
+    let limit = dumbmonit_proto::MAX_GATEWAY_CHECK_ERROR;
+    Some(dumbmonit_proto::GatewayState {
+        wanted: wanted.to_string(),
+        listen: bound.map(|addr| addr.to_string()),
+        // Une passerelle qui écoute n'a pas d'erreur, quelle que soit la
+        // tentative ratée qui l'a précédée.
+        error: failed
+            .filter(|_| bound.is_none())
+            .map(|cause| cause.chars().take(limit).collect::<String>()),
+        local,
+        encrypted,
+    })
+}
+
 /// Accepte les agents du site jusqu'à l'arrêt. Abandonner ce futur (arrêt du
 /// mode relais depuis l'interface) ferme aussi toutes les connexions en cours.
 pub async fn serve<U: Upstream>(
@@ -426,6 +473,44 @@ mod tests {
         assert_eq!(check_address(Some("[fd00::5]"), 9443), "[fd00::5]:9443");
         assert_eq!(check_address(Some("  "), 8443), "127.0.0.1:8443", "à défaut, la boucle");
         assert_eq!(check_address(None, 8443), "127.0.0.1:8443");
+    }
+
+    #[test]
+    fn the_state_says_what_listens_or_why_nothing_does() {
+        let wanted: SocketAddr = "0.0.0.0:8443".parse().unwrap();
+        assert_eq!(state(None, false, None, Some("busy"), true), None, "rien de demandé");
+
+        let open = state(Some(wanted), false, Some(wanted), None, true).expect("état");
+        assert_eq!(open.wanted, "0.0.0.0:8443");
+        assert_eq!(open.listen.as_deref(), Some("0.0.0.0:8443"));
+        assert_eq!(open.error, None);
+        assert!(open.encrypted && !open.local);
+
+        let failed = state(Some(wanted), true, None, Some("port in use"), false).expect("état");
+        assert_eq!(failed.listen, None);
+        assert_eq!(failed.error.as_deref(), Some("port in use"));
+        assert!(failed.local && !failed.encrypted);
+
+        // Écoute rétablie : l'ancienne erreur ne la suit pas.
+        let back = state(Some(wanted), false, Some(wanted), Some("port in use"), true).unwrap();
+        assert_eq!(back.error, None);
+
+        let long = "x".repeat(1000);
+        let clipped = state(Some(wanted), false, None, Some(&long), true).unwrap();
+        assert_eq!(clipped.error.unwrap().len(), dumbmonit_proto::MAX_GATEWAY_CHECK_ERROR);
+    }
+
+    #[tokio::test]
+    async fn a_port_already_taken_is_reported_not_swallowed() {
+        // Un port tenu par un autre programme : l'ouverture échoue, et la cause
+        // dit quoi faire avant le message du système.
+        let held = std::net::TcpListener::bind("127.0.0.1:0").expect("port");
+        let addr = held.local_addr().expect("adresse");
+        let error = bind(addr).await.expect_err("port déjà pris");
+        let cause = describe_bind_error(&error);
+        assert!(cause.contains("already used by another program"), "{cause}");
+        let other = std::io::Error::other("strange");
+        assert_eq!(describe_bind_error(&other), "strange");
     }
 
     #[tokio::test]

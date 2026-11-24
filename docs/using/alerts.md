@@ -8,8 +8,9 @@ right, opens the form for a window from any tab.
 |---|---|
 | **Now** | The live list of problems, one line each. See [The Now list](#the-now-list). The badge on the tab, and on Alerts in the top bar, is the count of what still needs you. |
 | **Maintenance** | Maintenance windows, *Active now* or *Scheduled*, one-off, weekly or monthly, each with the next occurrence (`#scheduled`). See [Maintenance windows](../alerting/maintenance.md). |
-| **History** | The last 200 transitions, each naming the monitor, the rule and what happened; resolved ones can be cleared. |
-| **Rules** | Every rule with its severity, a *Built-in* mark and, if any monitor ignores it, *Ignored on N monitors*; enable, edit inline, delete your own, create a threshold rule. See [Rules](../alerting/rules.md). |
+| **History** | The last 200 transitions, each naming the monitor, the rule (a link to it in *Rules*) and what happened; filter by monitor, rule, severity or free text; resolved ones can be cleared. |
+| **Noise** | Admins and operators: the noisiest rules, the alerts that keep firing again, and how long alerts take to be acknowledged and resolved. See [Alert noise](#alert-noise). |
+| **Rules** | Every rule with its severity, a *Built-in* mark and, if any monitor ignores it, *Ignored on N monitors*; enable, edit inline, clone, reset a built-in rule to its defaults, delete your own, create a threshold rule; each rule shows when it last fired and the list sorts by name, severity or last fired. See [Rules](../alerting/rules.md). |
 
 Notification channels and the notification policy are under
 **Settings → Notifications** (see [Notifications](#notifications)).
@@ -95,7 +96,7 @@ Channels and the policy live in **Settings → Notifications**
 *Disabled*, when it last sent something, and its last error if any. **Add
 channel** opens a form built from the server's description of the chosen kind:
 settings (visible) and secrets (write-only). **Send test** sends a test message
-and shows the result inline. Each channel's **Delivery options** hold its
+and shows the result inline, with a note on what would hold back a real alert. Each channel's **Delivery options** hold its
 minimum severity, whether it hears resolutions, a minimum interval per alert,
 and its **quiet hours** (weekly, in your time zone: only Warning-level alerts
 come through, the rest waits for a digest).
@@ -127,6 +128,36 @@ hop. See [Notification policy](../alerting/notifications.md).
 
 The former links (`/alerts#notifications`, `/alerts#notifications-policy`,
 `/settings#notifications`) forward here.
+
+## Alert noise
+
+The **Noise** tab reads the alert history over the last 7, 30 or 90 days and
+answers two questions: which rules talk too much, and how fast alerts get an
+answer. It is shown to admins and operators.
+
+- **Alerts fired** and **Notifications sent**, for the whole instance. An
+  alert counts once per occurrence, from the moment it fires; its
+  notifications are everything the engine sent for that occurrence: the first
+  announcement, reminders, escalations and the resolution.
+- **Mean time to acknowledge** (MTTA): from firing to the first
+  **Acknowledge** or **Dismiss** on that occurrence, over the occurrences that
+  had one. An acknowledgement given while the alert was still building up
+  counts as immediate.
+- **Mean time to resolve** (MTTR): from firing to resolution, over the
+  resolved occurrences.
+- **Noisiest rules**: the 20 rules that sent the most notifications, each with
+  its own counts and delays. For an admin, each links to **Edit rule** and, when
+  the rule can be replayed, to **Test on history**, which opens the editor and
+  runs the [history test](../alerting/rules.md#test-on-history) at once.
+- **Flapping alerts**: alerts that fired at least 3 times in the period, with
+  their number of state changes. A clear threshold or a longer hold duration
+  usually calms them.
+- **By team**: the same figures per team, counting the occurrences on the
+  monitors in the team's folders. A monitor in two teams' folders counts for
+  both.
+
+A team-restricted account sees the occurrences of its own monitors and the
+lines of its own teams only. Through the API: `GET /api/alerts/noise?days=30`.
 
 ## Operators and viewers
 

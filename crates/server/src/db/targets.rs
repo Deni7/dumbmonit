@@ -621,13 +621,28 @@ pub struct TargetStatus {
     pub last_error: Option<String>,
     /// Agent relais, recopié ici pour que l'API l'expose sans relire la cible.
     pub via_agent: Option<TargetId>,
+    /// Note libre de l'équipement (migration 0263), tenue hors de [`Target`].
+    pub note: String,
+    /// Date de création (UTC, sans suffixe), pour le tri par ancienneté.
+    pub created_at: Option<String>,
+}
+
+/// Enregistre la note libre d'un équipement (vide : l'efface).
+pub async fn set_note(pool: &SqlitePool, id: TargetId, note: &str) -> Result<()> {
+    sqlx::query("UPDATE targets SET note = ? WHERE id = ?")
+        .bind(note)
+        .bind(id)
+        .execute(pool)
+        .await
+        .context("enregistrement de la note d'une cible")?;
+    Ok(())
 }
 
 /// Statut de toutes les cibles, indexé par identifiant.
 pub async fn statuses(pool: &SqlitePool) -> Result<HashMap<TargetId, TargetStatus>> {
     let rows = sqlx::query(
         "SELECT id, last_probe_at, last_error, via_agent, managed_by, managed_source,
-                managed_key, managed_missing_since FROM targets",
+                managed_key, managed_missing_since, note, created_at FROM targets",
     )
     .fetch_all(pool)
     .await
@@ -641,6 +656,8 @@ pub async fn statuses(pool: &SqlitePool) -> Result<HashMap<TargetId, TargetStatu
                     last_probe_at: row.try_get("last_probe_at")?,
                     last_error: row.try_get("last_error")?,
                     via_agent: row.try_get("via_agent")?,
+                    note: row.try_get("note")?,
+                    created_at: row.try_get("created_at")?,
                     managed: managed_from_row(&row)?,
                 },
             ))

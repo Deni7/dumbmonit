@@ -20,6 +20,7 @@
 	 * server-side from the last probe.
 	 */
 	import { listProxmoxNodes } from '#lib/api/proxmox.js';
+	import { startPolling } from '#lib/poll.js';
 	import type { ProxmoxNode, ProxmoxNodes, Target } from '#lib/api/index.js';
 	import { formatDuration } from '#lib/format.js';
 	import { EmptyState, ErrorNotice, Led, Plate, Skeleton, type Tone } from '#lib/ui/index.js';
@@ -45,20 +46,15 @@
 		} catch (cause) {
 			if (signal?.aborted) return;
 			error = cause;
+			return false;
 		} finally {
 			if (!signal?.aborted) loading = false;
 		}
 	}
 
 	$effect(() => {
-		const controller = new AbortController();
 		loading = true;
-		void load(controller.signal);
-		const timer = setInterval(() => void load(controller.signal), 30_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 30_000);
 	});
 
 	/** How many nodes have something the reader should act on. */
@@ -145,7 +141,7 @@
 			{#each nodes as node, i (node.name)}
 				{@const down = node.services_down}
 				{@const offline = node.interfaces_offline}
-				<article class="rise-in rounded-[var(--radius-card)] border border-line bg-surface-2/40 px-4 py-3" style="--rise-delay: {Math.min(i, 8) * 40}ms">
+				<article class="rise-in rounded-[var(--radius-card)] border border-line bg-surface-2 px-4 py-3" style="--rise-delay: {Math.min(i, 8) * 40}ms">
 					<header class="flex flex-wrap items-center gap-x-2 gap-y-1">
 						<Led tone={node.up ? 'signal' : 'warning'} label={node.up ? m.devicesb_proxmox_nodes_online() : m.devicesb_proxmox_nodes_offline()} size="sm" />
 						<h4 class="text-sm font-semibold text-ink">{node.name}</h4>
@@ -217,7 +213,7 @@
 						<div class="mt-3 overflow-x-auto">
 						<table class="table-stack w-full border-collapse text-[0.8125rem] [--stack-inset:0] sm:min-w-[20rem]">
 							<thead>
-								<tr class="text-left text-[0.7rem] uppercase tracking-wide text-ink-3">
+								<tr class="text-left text-[0.75rem] uppercase tracking-wide text-ink-3">
 									<th scope="col" class="py-1 font-semibold">{m.devicesb_proxmox_nodes_th_storage()}</th>
 									<th scope="col" class="py-1 text-right font-semibold">{m.devicesb_proxmox_nodes_th_size()}</th>
 									<th scope="col" class="py-1 text-right font-semibold">{m.devicesb_proxmox_nodes_th_used()}</th>

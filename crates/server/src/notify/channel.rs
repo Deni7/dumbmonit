@@ -236,6 +236,11 @@ pub struct ChannelSummary {
     /// Sévérité minimale, résolutions, délai minimal, heures calmes.
     #[serde(default)]
     pub policy: ChannelPolicy,
+    /// Adresse où la plateforme renvoie les clics des boutons interactifs
+    /// (Slack : à coller dans l'application ; Telegram : posée d'office).
+    /// Absente sans boutons interactifs ou sans adresse publique.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub callback_url: Option<String>,
 }
 
 #[cfg(test)]

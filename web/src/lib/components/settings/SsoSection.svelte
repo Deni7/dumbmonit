@@ -34,6 +34,7 @@
 		auto_create: false,
 		admin_groups: '',
 		operator_groups: '',
+		wall_groups: '',
 		groups_claim: '',
 		public_url: ''
 	});
@@ -58,6 +59,7 @@
 			auto_create: next.auto_create,
 			admin_groups: next.admin_groups.join(', '),
 			operator_groups: (next.operator_groups ?? []).join(', '),
+			wall_groups: (next.wall_groups ?? []).join(', '),
 			groups_claim: next.groups_claim,
 			// Prefilled from the browser: it is the address people use to reach this page.
 			public_url: next.public_url || (typeof window !== 'undefined' ? window.location.origin : '')
@@ -126,6 +128,7 @@
 				auto_create: form.auto_create,
 				admin_groups: form.admin_groups.split(',').map((g) => g.trim()).filter(Boolean),
 				operator_groups: form.operator_groups.split(',').map((g) => g.trim()).filter(Boolean),
+				wall_groups: form.wall_groups.split(',').map((g) => g.trim()).filter(Boolean),
 				groups_claim: form.groups_claim.trim(),
 				public_url: form.public_url.trim()
 			});
@@ -245,6 +248,9 @@
 					</Field>
 					<Field label={m.settings_sso_operator_groups()} for="sso-operator-groups" help={m.settings_sso_operator_groups_help()} class="sm:col-span-2">
 						<input id="sso-operator-groups" type="text" class="input" bind:value={form.operator_groups} placeholder="noc, on-call" autocomplete="off" disabled={saving} />
+					</Field>
+					<Field label={m.settings_sso_wall_groups()} for="sso-wall-groups" help={m.settings_sso_wall_groups_help()} class="sm:col-span-2">
+						<input id="sso-wall-groups" type="text" class="input" bind:value={form.wall_groups} placeholder="lobby-screens" autocomplete="off" disabled={saving} />
 					</Field>
 					<div class="sm:col-span-2">
 						<Field label={m.settings_sso_autocreate_label()} for="sso-auto-create" inline help={m.settings_sso_autocreate_help()}>

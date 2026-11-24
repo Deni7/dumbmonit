@@ -24,6 +24,7 @@
 	import { Button, ErrorNotice, Field, Led, Plate, Skeleton } from '#lib/ui/index.js';
 	import { formatRelative } from '#lib/format.js';
 	import { m } from '#lib/paraglide/messages.js';
+	import { startPolling } from '#lib/poll.js';
 
 	interface Props {
 		/** Called with the new name after a rename, so the section can say it. */
@@ -46,23 +47,14 @@
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			if (cause && typeof cause === 'object' && 'missing' in cause && cause.missing) missing = true;
 			else error = cause;
+			return false;
 		} finally {
 			loading = false;
 		}
 	}
 
 	// Walls report every minute: refreshed every 20 s while the page is open.
-	$effect(() => {
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => {
-			if (document.visibilityState === 'visible') void load(controller.signal);
-		}, 20_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
-	});
+	$effect(() => startPolling(load, 20_000));
 
 	// --- Name -----------------------------------------------------------------
 

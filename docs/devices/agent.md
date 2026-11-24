@@ -18,6 +18,12 @@ A remote site can do without 8080: the agent port also serves the install
 script and the binaries, and the command shown for a relay uses 8443 only (see
 [Monitor a remote site](../install/remote-site.md)).
 
+The other way round, a machine that can only reach the web address (Cloudflare
+Tunnel, a reverse proxy that terminates TLS, a network where only web traffic
+goes out) can do without 8443: the agent then carries its encrypted channel
+inside a WebSocket on 8080 (or 443). See
+[Agents behind a proxy](../install/agents-behind-proxy.md).
+
 The direction is deliberate: the agent calls the server, never the other way
 round. It crosses NAT and home firewalls, and requires opening **no port** on
 the monitored machine.
@@ -433,6 +439,7 @@ Windows) in place of its other flags does the same.
 | `--pinned-key=sha256//…` | `-PinnedKey` | Public key of the server's self-signed certificate. The download of the script and of the binary is accepted from that key only, and the agent keeps it. Included in the command DumbMonit shows when the server uses its own certificate. |
 | `--tls-url=URL` | `-TlsUrl` | Address of the encrypted agent channel (default: the host of `--url`, port 8443). |
 | `--ca-pin=SHA256` | `-CaPin` | Fingerprint of the server's certificate authority: the agent then only talks to that server, never in clear. |
+| `--transport=MODE` | `-Transport` | How the agent reaches its encrypted channel: `auto` (default: the agent port, then the server URL if that port is unreachable), `direct` or `websocket` (through the server URL, behind Cloudflare Tunnel or a reverse proxy). Written to `agent.yaml` as `transport`; the command shown through a proxy carries `websocket`. See [Agents behind a proxy](../install/agents-behind-proxy.md). |
 | `--hostname=NAME` | `-HostName` | Name announced to the server (default: the machine's). |
 | `--modules=a,b` | `-Modules a,b` | Optional modules to run — see [Choosing the modules](#choosing-the-modules). Without it, every module detects itself; `none` keeps system metrics only. The install command shown by DumbMonit adds it when you tick modules. |
 | `--plakar-klosets=a,b` | | Plakar klosets to read (`@name` or a path); default: every kloset found. |
@@ -445,6 +452,8 @@ Windows) in place of its other flags does the same.
 | `--no-firewall` | `-NoFirewall` | Leave the local firewall alone. |
 | `--proxy=URL` | `-Proxy` | Outbound HTTP proxy to reach the server, `http://[user:password@]host:port` or `none` (`-Proxy` also takes `system`). Used for the downloads and written to `agent.yaml`. See [Outbound proxy](#outbound-proxy). |
 | `--no-proxy=LIST` | `-NoProxy` | Hosts reached without the proxy, comma-separated. |
+| `--version=X.Y.Z` | `-Version` | Install only if the agent binary is exactly this version. The server ships its own binary, so this refuses to install anything else (after a server upgrade, for instance) and leaves the agent already in place untouched. |
+| `--dry-run` | `-DryRun` | Print what would be done (system, source of the binary, checksum check, files written, service) and stop: nothing is downloaded, written or started, and no administrator rights are needed. The token is never printed. Works with `--uninstall` too. |
 | `--uninstall` | `-Uninstall` | Uninstall the agent and delete its configuration. |
 | `--help` | | Show the help. |
 
@@ -462,14 +471,6 @@ token and URL, replaces the binary, rewrites the configuration and restarts the
 service. That is the upgrade procedure. Take the command from the current
 server (add a monitor, **Server with the agent**): its `--sha256` must match the binaries of the
 server version you upgraded to.
-
-The same command migrates a machine still running the EzyMonit agent, on Linux
-and on Windows. The installer stops and removes the old service
-(`ezymonit-agent`, or `EzyMonitAgent` on Windows), moves the configuration to
-the new path (`/etc/dumbmonit/agent.yaml`, `C:\ProgramData\DumbMonit\agent.yaml`)
-and installs `dumbmonit-agent` in its place. The old `ezym_…` token stays
-valid, so the command shown when the token was created still works; nothing
-has to be revoked first.
 
 ## Automatic updates {#automatic-updates}
 
@@ -547,7 +548,8 @@ cannot change these settings). The same settings are available through
 The agent list shows the version and an update status for each agent: up to
 date, pending, updating, failed (with the reason), refused, disabled, manual,
 waiting for window, waiting for canaries, newer than server, legacy, container,
-read-only, disabled locally, unsupported, no binary.
+read-only, disabled locally, unsupported, no binary, reinstall needed, unknown
+signing key (see [Agents that cannot update themselves](#automatic-updates-old-agents)).
 
 ### Rollout waves {#automatic-updates-waves}
 
@@ -590,6 +592,12 @@ The agents no wave takes form a last wave. Agents marked **canary** are always i
   the plain channel anyone in the middle could set the flag, so signatures are
   mandatory there. A refusal is reported (status *refused*) without downloading
   anything, and is evaluated again when the setting changes.
+- **Agents older than the signing key** (before 0.20.1) cannot check the
+  current signature. With *Accept unsigned builds* on, and only then, the server
+  sends them the offer without a signature, which they treat as an unsigned
+  build (encrypted channel only). Agents from 0.20.1 on always receive the
+  signature and verify it. See
+  [Agents that cannot update themselves](#automatic-updates-old-agents).
 - Signatures are separate files (`<binary>.sig`, 64 raw bytes, also served at
   `/download/<binary>.sig`), so the binaries stay bit-for-bit
   [reproducible](../development/reproducible-builds.md).
@@ -618,6 +626,53 @@ That build is then not retried automatically on that machine, neither by the
 agent nor by the server, until an administrator clicks **Update now**, which
 retries once. OpenRC without supervision does not restart a crashed agent: the
 rollback then happens at its next start.
+
+### Agents that cannot update themselves {#automatic-updates-old-agents}
+
+Two kinds of older agents cannot finish an automatic update. The server knows
+them by their version, offers them nothing that would fail, and says what to do
+in the agent list.
+
+**Windows agents up to 0.20.1: *Reinstall needed*.** Every attempt ended with
+
+```
+cannot install the new binary: syncing the copy: Access is denied. (os error 5)
+```
+
+(the last part is in the language of Windows, `Accès refusé.` in French). The
+agent flushed its copy of the binary to disk through a read-only handle, which
+Windows refuses. That step is on the only Windows install path, so no server
+setting avoids it: the agent has to be reinstalled **once**. Re-run the install
+command on the machine (**Get the install command** next to the agent, or add a
+monitor, **Server with the agent**). It replaces the binary in place and keeps
+the binding secret; from 0.20.2 on, the agent updates itself.
+
+**Agents 0.15.0 to 0.20.0: *Unknown signing key*.** Release builds are signed
+since 0.20.1 with a new key (see
+[Signing the agent binaries](../development/agent-signing.md#the-first-key)).
+Those agents only know the first key, which never signed anything, so they
+reject the signature (`the signature does not match any release key of this
+agent`); agents before 0.15.0 know no key at all. Two ways out:
+
+- turn on **Accept unsigned builds (development)** until they have updated: the
+  server then offers these agents, and only them, the build **without** its
+  signature. They accept it only over the encrypted agent channel, where the
+  server is authenticated by its pinned CA (see
+  [Security](#automatic-updates-security)). Once on 0.20.1 or later they check
+  signatures again, and agents that know the key always get the signature
+  whatever the setting. Turn the setting off afterwards;
+- or re-run the install command on the machine.
+
+A Windows agent in that range is in the first case: the unsigned build would
+still fail at the same step.
+
+On the machine, the agent's log (see [Managing the service](#managing-the-service))
+tells each step of an attempt: `updating the agent` (with `from` and `to`),
+`agent update signature verified` or `installing an unsigned agent build
+(allowed by the server)`, then `agent update confirmed` once the new binary has
+had a batch accepted. A problem shows as `agent update refused` or `agent update
+failed, keeping this version`, with the `reason` the agent list also shows, or
+`restoring the previous agent` after a failed trial.
 
 ### Docker and other cases {#automatic-updates-other-cases}
 
@@ -795,8 +850,15 @@ perf_counters:             # Windows: performance counters to publish
     name: cpu_total        # value of the "counter" label; the path when omitted
 max_buffered_samples: 20000
 buffer_max_mb: 256         # disk buffer for outages, in MB (0 = memory only)
+transport: auto            # encrypted channel: auto, direct (agent port) or websocket (web address)
 log_level: info
 ```
+
+`transport` (or `DUMBMONIT_AGENT_TRANSPORT`) says how the agent reaches its
+encrypted channel: `auto` (default) tries the agent port first and, after
+repeated connection failures, the WebSocket of `server_url`, then keeps the one
+that answers; `direct` and `websocket` force one. A typo stops the agent at
+startup. See [Agents behind a proxy](../install/agents-behind-proxy.md).
 
 `sensors`, `smart`, `zfs` and `libvirt` are detected, never assumed: left at
 `true` on a machine with no probe, no `smartctl`, no pool or no `virsh`, they
@@ -1038,6 +1100,10 @@ server_urls:
   in turn.
 - The machine page shows **Server: primary**, or **Backup** with the address
   in use, since when, and the last error seen on the primary.
+- An agent that goes through the WebSocket of the web address
+  (`transport: websocket`, or `auto` after a fallback) follows the server in
+  use: the WebSocket moves to the backup's address, and the primary is tried
+  through its own WebSocket, which a standby does not open.
 - Only `https://` addresses (or the loopback) are accepted.
 
 ## Outbound proxy {#outbound-proxy}
@@ -1087,6 +1153,12 @@ netsh winhttp import proxy source=ie   # or copy the Internet Explorer settings
 The agent logs the proxy it uses at startup (`outbound proxy to the server`),
 never its credentials.
 
+A proxy that only lets web traffic out, or inspects TLS, cannot carry the agent
+port: set `transport: websocket` (or keep `auto`) and the agent goes through
+the server URL instead, its TLS session inside a WebSocket that the proxy
+forwards like any HTTPS request. See
+[Agents behind a proxy](../install/agents-behind-proxy.md).
+
 ## Run the agent in Docker / on another network
 
 The agent is also published as a container image, with the same tags as the
@@ -1131,6 +1203,14 @@ a customer's network thus show up in the one DumbMonit you already have,
 without a VPN and with nothing to open on the remote side.
 
 How to set it up, step by step, is in [Monitor a remote site](../install/remote-site.md).
+
+A relay can also be a **gateway** for the agents of its site that cannot reach
+the server (TCP 8443 by default, every interface, `gateway_listen` to change
+it). The relay reports what it really opened — the bound address, or why it
+cannot listen — and its page shows it under *Relay*. The add screen shows the
+*Through &lt;relay&gt;* install command only once the gateway listens and has
+passed the relay's own test; otherwise it says why and how to fix it. See
+[Install agents behind the relay](../install/remote-site.md#5-install-agents-behind-the-relay).
 
 ## Binding: one machine, one agent
 
@@ -1295,6 +1375,8 @@ tail -f /var/log/dumbmonit-agent.log   # service log (OpenRC)
 | Symptom | Likely cause |
 |---|---|
 | Installer says "could not reach the server" | Wrong URL or token. The configuration is written: fix `agent.yaml`, then restart the service. |
+| Installer says "the encrypted agent channel … refuses the connection" | The agent port (8443) is not published or not open on the server: add `"8443:8443"` under `ports:` in `docker-compose.yml`, then `docker compose up -d`, and open the port in the firewall. See [Network ports](../install/ports.md#troubleshooting-the-agent-channel). |
+| `irm https://<relay>:8443/install.ps1` or `curl` fails with *Unable to connect* / *Failed to connect* | Installing through a relay whose gateway does not accept the machine. The relay's page says whether its gateway listens and why not; see [Install agents behind the relay](../install/remote-site.md#5-install-agents-behind-the-relay). |
 | Download fails with 404 | The server has no agent binaries (`DUMBMONIT_AGENT_DIR` empty). Use `--bin=PATH` with a binary you built. |
 | Installer stops with "checksum mismatch" | The command was copied before a server upgrade (copy a fresh one when adding a server with the agent), or the binary received is not the one the server serves: a proxy or a cache in the way, or a tampered download. |
 | Installer stops with "no expected checksum" | The command has no `--sha256` for this platform: an old command, or a macOS binary (not shipped by the server). Copy a fresh command, or pass `--sha256=<platform>-<arch>:<hex>` from the release's `.sha256`. |
@@ -1412,7 +1494,7 @@ Automatic actions show in "Recent actions" as requested by `policy`.
   uses.
 - An update that does not come back healthy is rolled back to the previous
   container, and the old image is only removed once the new container runs.
-- Containers named `dumbmonit*` or `ezymonit*` are refused, by hand or by
+- Containers named `dumbmonit*` are refused, by hand or by
   policy: the monitor never acts on its own containers. The check is made twice
   — the server refuses to queue the command, and the agent refuses to run it —
   and the agent makes it again on the name Docker reports after inspecting the

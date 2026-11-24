@@ -40,6 +40,11 @@ monitor. Nothing is written when a probe fails: the series simply stops, and the
 of each monitor (`bottomk by (target) (1, …)`): a series no longer written after
 a tag or label change stays in the 7-day window and must not count.
 
+The monitor list's "Last 24 h" bars read that silence the same way: for a
+device checked at least twice an hour, an hour without any `dumbmonit_up`
+sample after its first measurement of the day is shown as down, not as "no
+data".
+
 For services (`http`, `tcp`, `dns`, `ping`, `tls`), `dumbmonit_up = 1` means
 "the monitor ran", and `dumbmonit_probe_success` says whether the service is
 fine. The two signals are kept apart on purpose: a `probe_success` of 0 says
@@ -76,12 +81,6 @@ of each monitor whose kind has security checks, and writes
 
 Identity labels always win over collector labels, and for agents they are set
 on reception: a machine cannot write into another machine's series.
-
-!!! note "Prefix before September 2026"
-    Series written by EzyMonit are named `ezymonit_…`. The prefix changed with
-    the product name and nothing reads the old series: they stay in
-    VictoriaMetrics until the retention removes them, graphs and rules restart
-    from the upgrade, and custom rules still naming `ezymonit_…` must be edited.
 
 ## Retention and storage
 
@@ -255,6 +254,12 @@ Everything `GET /metrics` exposes. Values are read when you scrape; the
 | `dumbmonit_notifications_failed_total{kind}` | counter | Notifications the channel refused, by kind. They are requeued and retried; a steadily rising value is a broken webhook or SMTP account. |
 | `dumbmonit_agents` | gauge | Machines that have registered an agent. |
 | `dumbmonit_agents_stale` | gauge | Agents that have pushed nothing for five minutes. |
+| `dumbmonit_targets{state}` | gauge | Monitors by state: `ok`, `error` (last probe failed), `pending` (never probed yet), `disabled`. |
+| `dumbmonit_sessions_active` | gauge | Web sessions that have not expired. |
+| `dumbmonit_api_tokens_expiring` | gauge | API tokens, not revoked, that expire within seven days. |
+| `dumbmonit_backup_last_success_timestamp_seconds` | gauge | Unix time of the last successful scheduled local backup. Absent until one has been tried. Alert on `time() - …`. |
+| `dumbmonit_backup_last_run_ok` | gauge | 1 when the last scheduled local backup succeeded, 0 when it failed. Absent until one has been tried. |
+| `dumbmonit_backup_offsite_last_success_timestamp_seconds{destination}` | gauge | Unix time of the last successful upload to each off-site backup destination (`destination` = its name). Absent for a destination that never succeeded. |
 | `dumbmonit_database_up` | gauge | 1 when SQLite answers — the same check as `/api/health`. |
 | `dumbmonit_database_bytes` | gauge | Size of `dumbmonit.db` and its write-ahead log. Does not include `/data/vm`. |
 | `dumbmonit_victoriametrics_up` | gauge | 1 when VictoriaMetrics answers — the same check as `/api/health`. 0 while the embedded child is restarting. |

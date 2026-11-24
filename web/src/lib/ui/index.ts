@@ -1,6 +1,7 @@
 export { default as Button } from './Button.svelte';
 export { default as Plate } from './Plate.svelte';
 export { default as Chip } from './Chip.svelte';
+export { default as Tag } from './Tag.svelte';
 export type { Tone } from './Plate.svelte';
 export { default as Led } from './Led.svelte';
 export { default as StatusMark } from './StatusMark.svelte';

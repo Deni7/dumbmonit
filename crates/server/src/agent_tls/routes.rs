@@ -19,6 +19,10 @@
 //! travers lui : leur commande vise `https://relais:8443`, la passerelle du
 //! relais la porte jusqu'ici, et la session TLS (épinglée par la commande) va
 //! de la machine au serveur — le relais ne voit que du chiffré.
+//!
+//! Les connexions arrivées par la WebSocket de l'interface
+//! ([`super::websocket`]) sont servies ici aussi, à une différence près : les
+//! fichiers d'installation n'y sont pas servis.
 
 use std::net::SocketAddr;
 use std::time::Instant;
@@ -53,6 +57,9 @@ pub struct AgentCert {
     pub group: Option<String>,
     /// Agent relais dont le tunnel porte la connexion, s'il y en a un.
     pub via_relay: Option<TargetId>,
+    /// Connexion arrivée par la WebSocket de l'interface (`websocket.rs`) :
+    /// constaté par le serveur, jamais déclaré par l'agent.
+    pub via_websocket: bool,
 }
 
 /// Chemin d'une route sous `/api`, depuis sa constante partagée.
@@ -117,8 +124,10 @@ async fn require_certificate(
                     }
                 }
             }
+            let via_websocket = peer.as_ref().is_some_and(|peer| peer.via_websocket);
             let group = peer.and_then(|peer| peer.group);
-            request.extensions_mut().insert(AgentCert { target_id, group, via_relay });
+            let cert = AgentCert { target_id, group, via_relay, via_websocket };
+            request.extensions_mut().insert(cert);
             next.run(request).await
         }
         Ok(None) => error(StatusCode::UNAUTHORIZED, CERT_REFUSED),
@@ -264,7 +273,14 @@ async fn open_tunnel(
 /// demande, comme sur le port de l'interface : rien n'y est secret (le jeton
 /// voyage dans les arguments de la commande, jamais dans l'URL). À travers le
 /// tunnel d'un relais, seulement si celui-ci l'est encore. `None` : servi.
+///
+/// Jamais par la WebSocket de l'interface : la même adresse les sert déjà
+/// en HTTPS ordinaire, et une session sans certificat n'y a droit qu'à
+/// l'enrôlement.
 async fn site_files_refused(state: &AppState, peer: Option<&AgentPeer>) -> Option<Response> {
+    if peer.is_some_and(|peer| peer.via_websocket) {
+        return Some(error(StatusCode::NOT_FOUND, "Not found."));
+    }
     let relay = peer.and_then(|peer| peer.via_relay)?;
     match is_relay(state, relay).await {
         Ok(true) => None,

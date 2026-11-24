@@ -9,8 +9,8 @@
 	 * their rhythm. Two reads of what the probe stored, refreshed every minute;
 	 * the NAS is never asked.
 	 */
-	import { untrack } from 'svelte';
 	import { getSynologyAbb, getSynologyOverview } from '#lib/api/synology.js';
+	import { startPolling } from '#lib/poll.js';
 	import type { SynologyAbb, SynologyDisk, SynologyOverview, SynologyPool, SynologyVolume, Target } from '#lib/api/index.js';
 	import { ApiError } from '#lib/api/index.js';
 	import { formatDuration } from '#lib/format.js';
@@ -49,6 +49,7 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
+			return false;
 		} finally {
 			loading = false;
 		}
@@ -59,13 +60,7 @@
 		loading = true;
 		overview = null;
 		abb = null;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 
 	// --- Presentation -----------------------------------------------------------

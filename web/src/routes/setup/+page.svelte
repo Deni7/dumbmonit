@@ -12,6 +12,7 @@
 	import { Button, ClickSpark, DotField, ErrorNotice, Field } from '#lib/ui/index.js';
 	import Logo from '#lib/components/Logo.svelte';
 	import PasswordInput from '#lib/components/settings/PasswordInput.svelte';
+	import PasswordStrength from '#lib/components/settings/PasswordStrength.svelte';
 	import Mascot from '#lib/components/Mascot.svelte';
 
 	let setupCode = $state('');
@@ -135,6 +136,7 @@
 						invalid={passwordError !== null}
 						oninput={() => (passwordError = null)}
 					/>
+					<PasswordStrength value={password} />
 				</Field>
 
 				<Field label={m.auth_setup_confirm()} for="confirm-password" error={confirmError}>

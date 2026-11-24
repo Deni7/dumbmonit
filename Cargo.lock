@@ -380,7 +380,7 @@ dependencies = [
  "sha1 0.10.7",
  "sync_wrapper",
  "tokio",
- "tokio-tungstenite",
+ "tokio-tungstenite 0.29.0",
  "tower",
  "tower-layer",
  "tower-service",
@@ -1304,7 +1304,7 @@ checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 
 [[package]]
 name = "dumbmonit-agent"
-version = "0.19.0"
+version = "0.20.2"
 dependencies = [
  "anyhow",
  "aws-lc-rs",
@@ -1314,6 +1314,7 @@ dependencies = [
  "dumbmonit-collectors",
  "dumbmonit-proto",
  "flate2",
+ "futures-util",
  "hex",
  "libc",
  "rcgen",
@@ -1326,6 +1327,8 @@ dependencies = [
  "sysinfo",
  "tempfile",
  "tokio",
+ "tokio-rustls",
+ "tokio-tungstenite 0.30.0",
  "tokio-util",
  "tracing",
  "tracing-subscriber",
@@ -1336,7 +1339,7 @@ dependencies = [
 
 [[package]]
 name = "dumbmonit-cli"
-version = "0.19.0"
+version = "0.20.2"
 dependencies = [
  "serde",
  "serde-saphyr",
@@ -1346,7 +1349,7 @@ dependencies = [
 
 [[package]]
 name = "dumbmonit-collectors"
-version = "0.19.0"
+version = "0.20.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1392,7 +1395,7 @@ dependencies = [
 
 [[package]]
 name = "dumbmonit-pack"
-version = "0.19.0"
+version = "0.20.2"
 dependencies = [
  "async-trait",
  "axum",
@@ -1413,7 +1416,7 @@ dependencies = [
 
 [[package]]
 name = "dumbmonit-proto"
-version = "0.19.0"
+version = "0.20.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1426,7 +1429,7 @@ dependencies = [
 
 [[package]]
 name = "dumbmonit-server"
-version = "0.19.0"
+version = "0.20.2"
 dependencies = [
  "aes-gcm 0.11.1",
  "anyhow",
@@ -1443,6 +1446,7 @@ dependencies = [
  "futures",
  "hex",
  "hmac 0.13.0",
+ "http-body",
  "http-body-util",
  "hyper",
  "hyper-util",
@@ -1459,6 +1463,7 @@ dependencies = [
  "regex",
  "reqwest",
  "roxmltree",
+ "russh",
  "rust-embed",
  "rustix",
  "rustls",
@@ -1474,6 +1479,7 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "tokio-rustls",
+ "tokio-tungstenite 0.30.0",
  "tokio-util",
  "tower",
  "tower-http 0.7.1",
@@ -1794,9 +1800,9 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
 name = "form_urlencoded"
-version = "1.2.2"
+version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
+checksum = "afa489199eaffb1211795df1c6236ce1ad0d41a6fa45250add73e3b02420f06e"
 dependencies = [
  "percent-encoding",
 ]
@@ -1929,7 +1935,6 @@ version = "1.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "337d46834ee672ab3e48caca2cb0c78cc174fb12b3a68d0d88f99a0519a5e36e"
 dependencies = [
- "generic-array 0.14.7",
  "rustversion",
  "typenum",
 ]
@@ -3867,9 +3872,9 @@ dependencies = [
 
 [[package]]
 name = "russh"
-version = "0.65.0"
+version = "0.65.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3bb77a4b259312b2abbc541bca1c13cb4e9b61c560a7fd894068c3b92e0c9dc3"
+checksum = "94be3d86c71b9ed220a675c405e35c7a02565a009bf8da2e9cc13a700320a5c5"
 dependencies = [
  "aes 0.9.3",
  "bitflags",
@@ -4267,7 +4272,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a253edfdea34032da21af84e16fcc94f4c7a6ba237f9f3bc2dbf43cea8535c44"
 dependencies = [
  "annotate-snippets",
- "base64 0.22.1",
+ "base64 0.23.1",
  "encoding_rs_io",
  "granit-parser",
  "nohash-hasher",
@@ -5013,7 +5018,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
@@ -5236,7 +5241,19 @@ dependencies = [
  "futures-util",
  "log",
  "tokio",
- "tungstenite",
+ "tungstenite 0.29.0",
+]
+
+[[package]]
+name = "tokio-tungstenite"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17a073bfed563fa236697a068031408a93cd9522e08abf9933ead3e73411bd71"
+dependencies = [
+ "futures-util",
+ "log",
+ "tokio",
+ "tungstenite 0.30.0",
 ]
 
 [[package]]
@@ -5431,6 +5448,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "tungstenite"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e48ac77174b19c110a50ab2128b24215ac9cb40e0e12e093fb602d175c569d22"
+dependencies = [
+ "bytes",
+ "data-encoding",
+ "http",
+ "httparse",
+ "log",
+ "rand 0.10.3",
+ "sha1 0.11.0",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "typenum"
 version = "1.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5544,9 +5577,9 @@ dependencies = [
 
 [[package]]
 name = "url"
-version = "2.5.8"
+version = "2.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff67a8a4397373c3ef660812acab3268222035010ab8680ec4215f38ba3d0eed"
+checksum = "f00cd2407bb42c0ef17be88d4cf020f5cceffd121665bac9b8b9493a369b3b1a"
 dependencies = [
  "form_urlencoded",
  "idna",

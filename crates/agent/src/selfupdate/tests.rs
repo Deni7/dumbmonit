@@ -110,8 +110,11 @@ async fn a_binary_still_open_for_writing_is_tried_again_rather_than_refused() {
     let binary = dir.path().join("dumbmonit-agent.new");
     stage(&binary, NEW_BINARY.as_bytes()).unwrap();
     let writer = std::fs::OpenOptions::new().write(true).open(&binary).unwrap();
+    // Le test tourne sur un seul fil : cette tâche ne passe qu'à la première
+    // pause de l'essai, c'est-à-dire après un premier lancement refusé, et
+    // rend le descripteur sans dépendre de l'heure (une attente fixe pouvait
+    // dépasser, sur une machine chargée, les essais que l'agent s'accorde).
     let release = tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_millis(200)).await;
         drop(writer);
     });
     assert_eq!(preflight(&binary, "9.9.9").await, Ok(()));
@@ -240,4 +243,22 @@ fn the_platform_names_a_file_the_server_ships() {
     let platform = platform().expect("plateforme de test connue");
     let file = dumbmonit_proto::agent_file_name(&platform);
     assert!(file.starts_with("dumbmonit-agent-"), "{file}");
+}
+
+#[test]
+fn the_copy_of_the_binary_is_synced_even_when_read_only() {
+    // La copie de l'ancien binaire (`.previous`, assistant Windows) est
+    // synchronisée par un descripteur qui convient à la plateforme : en
+    // écriture sous Windows (`FlushFileBuffers`), en lecture ailleurs — un
+    // binaire en 0555 se copie et se synchronise aussi.
+    let dir = tempfile::tempdir().unwrap();
+    let exe = installed(dir.path());
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o555)).unwrap();
+    }
+    let copy = backup_path(&exe);
+    copy_synced(&exe, &copy).unwrap();
+    assert_eq!(std::fs::read_to_string(&copy).unwrap(), OLD_BINARY);
 }

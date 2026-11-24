@@ -30,3 +30,19 @@ test('a local export failure names its step', () => {
 	assert.equal(error.step, 'image');
 	assert.ok(error instanceof Error);
 });
+
+import { csvCell, listCsv } from '../src/lib/components/topology/export.ts';
+
+test('CSV cells are quoted and formulas defused', () => {
+	assert.equal(csvCell('plain'), 'plain');
+	assert.equal(csvCell('a,b'), '"a,b"');
+	assert.equal(csvCell('say "hi"'), '"say ""hi"""');
+	assert.equal(csvCell('=1+1'), "'=1+1");
+	assert.equal(csvCell('two\nlines'), 'two lines');
+});
+
+test('the list CSV starts with a BOM and the header', () => {
+	const head = { site: 'Site', name: 'Name', type: 'Type', state: 'State', folder: 'Folder', network: 'Network', parent: 'Parent' };
+	const csv = listCsv(head, [{ site: '', name: 'nas', type: 'NAS', state: 'Online', folder: '', network: '', parent: 'router' }]);
+	assert.equal(csv, '﻿Site,Name,Type,State,Folder,Network,Parent\r\n,nas,NAS,Online,,,router\r\n');
+});

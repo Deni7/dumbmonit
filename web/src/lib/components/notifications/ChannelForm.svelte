@@ -14,6 +14,9 @@
 	import {
 		createChannel,
 		updateChannel,
+		INTERACTIVE_KEY,
+		MESSAGE_BODY_TEMPLATE_KEY,
+		MESSAGE_TITLE_TEMPLATE_KEY,
 		type AlertSeverity,
 		type Channel,
 		type ChannelMatcher,
@@ -25,6 +28,10 @@
 	import ChannelFieldInput from './ChannelFieldInput.svelte';
 	import QuietHoursEditor from './QuietHoursEditor.svelte';
 	import MatcherEditor from './MatcherEditor.svelte';
+	import MessageTemplateEditor from './MessageTemplateEditor.svelte';
+	import InteractiveCallback from './InteractiveCallback.svelte';
+	import UnsavedBadge from '#lib/components/settings/UnsavedBadge.svelte';
+	import { useDirtyTracker } from '#lib/settings/unsaved.svelte.js';
 	import { matcherIsEmpty } from '#lib/components/alerts/helpers.js';
 	import { m } from '#lib/paraglide/messages.js';
 
@@ -32,6 +39,8 @@
 		kinds: KindInfo[];
 		/** Present when editing, absent when adding. */
 		channel?: Channel;
+		/** Adding: the channel to copy. Its settings and policy are prefilled; secrets are never copied. */
+		copyOf?: Channel;
 		/** Adding: opens straight on this kind's fields (the setup wizard's one-click kinds). */
 		initialKind?: string;
 		/** Adding: values typed in advance, by setting key (an ntfy topic, for one). */
@@ -40,7 +49,7 @@
 		oncancel: () => void;
 	}
 
-	let { kinds, channel, initialKind, initialSettings, onsaved, oncancel }: Props = $props();
+	let { kinds, channel, copyOf, initialKind, initialSettings, onsaved, oncancel }: Props = $props();
 	const editing = $derived(channel !== undefined);
 
 	type Value = string | boolean;
@@ -55,10 +64,11 @@
 	}
 
 	function startingSettings(): Record<string, Value> {
-		if (!channel) return { ...(initialSettings ?? {}) };
-		const fields = kinds.find((k) => k.kind === channel.kind)?.settings ?? [];
+		const seed = channel ?? copyOf;
+		if (!seed) return { ...(initialSettings ?? {}) };
+		const fields = kinds.find((k) => k.kind === seed.kind)?.settings ?? [];
 		const initial: Record<string, Value> = {};
-		for (const field of fields) initial[field.key] = toField(field, channel.settings?.[field.key]);
+		for (const field of fields) initial[field.key] = toField(field, seed.settings?.[field.key]);
 		return initial;
 	}
 
@@ -66,12 +76,21 @@
 	// refreshes while the user types. `untrack` says this one-time read is meant.
 	/** A preset kind counts only when the catalogue has it: otherwise the picker shows. */
 	const presetKind = untrack(() => (!channel && initialKind && kinds.some((k) => k.kind === initialKind) ? initialKind : ''));
-	let kind = $state(untrack(() => channel?.kind ?? presetKind));
-	let name = $state(untrack(() => channel?.name ?? ''));
-	let enabled = $state(untrack(() => channel?.enabled ?? true));
-	let settings = $state<Record<string, Value>>(untrack(() => (presetKind || channel ? startingSettings() : {})));
+	/** What the fields start from: the channel being edited, or the one being copied. */
+	const seed = untrack(() => channel ?? copyOf);
+	let kind = $state(untrack(() => seed?.kind ?? presetKind));
+	let name = $state(untrack(() => (channel ? channel.name : copyOf ? m.w1alerts_channels_copy_name({ name: copyOf.name }) : '')));
+	let enabled = $state(untrack(() => seed?.enabled ?? true));
+	let settings = $state<Record<string, Value>>(untrack(() => (presetKind || seed ? startingSettings() : {})));
 	let secrets = $state<Record<string, string>>({});
 	let clearSecrets = $state(false);
+	/** Message templates, kept outside the catalogue fields; empty = the usual message. */
+	function seedTemplate(key: string): string {
+		const raw = seed?.settings?.[key];
+		return typeof raw === 'string' ? raw : '';
+	}
+	let titleTemplate = $state(untrack(() => seedTemplate(MESSAGE_TITLE_TEMPLATE_KEY)));
+	let bodyTemplate = $state(untrack(() => seedTemplate(MESSAGE_BODY_TEMPLATE_KEY)));
 
 	// Delivery policy: what this channel accepts and when. The bulletin's ladder
 	// words map onto the API severities (Advisory = warning, Warning = critical).
@@ -87,22 +106,22 @@
 		{ value: 3600, label: m.alerts_span_h({ hours: 1 }) },
 		{ value: 21600, label: m.alerts_span_h({ hours: 6 }) }
 	]);
-	let minSeverity = $state<AlertSeverity>(untrack(() => channel?.policy?.min_severity ?? 'info'));
-	let notifyResolved = $state(untrack(() => channel?.policy?.notify_resolved ?? true));
-	let minInterval = $state(untrack(() => channel?.policy?.min_interval_secs ?? 0));
-	let quietHours = $state<QuietHours | null>(untrack(() => channel?.policy?.quiet_hours ?? null));
+	let minSeverity = $state<AlertSeverity>(untrack(() => seed?.policy?.min_severity ?? 'info'));
+	let notifyResolved = $state(untrack(() => seed?.policy?.notify_resolved ?? true));
+	let minInterval = $state(untrack(() => seed?.policy?.min_interval_secs ?? 0));
+	let quietHours = $state<QuietHours | null>(untrack(() => seed?.policy?.quiet_hours ?? null));
 	let matcher = $state<ChannelMatcher | null>(
-		untrack(() => (matcherIsEmpty(channel?.policy?.matcher) ? null : channel!.policy.matcher))
+		untrack(() => (matcherIsEmpty(seed?.policy?.matcher) ? null : seed!.policy.matcher))
 	);
 	let showDelivery = $state(
 		untrack(
 			() =>
-				channel !== undefined &&
-				(channel.policy?.min_severity !== 'info' ||
-					channel.policy?.notify_resolved === false ||
-					(channel.policy?.min_interval_secs ?? 0) > 0 ||
-					channel.policy?.quiet_hours != null ||
-					!matcherIsEmpty(channel.policy?.matcher))
+				seed !== undefined &&
+				(seed.policy?.min_severity !== 'info' ||
+					seed.policy?.notify_resolved === false ||
+					(seed.policy?.min_interval_secs ?? 0) > 0 ||
+					seed.policy?.quiet_hours != null ||
+					!matcherIsEmpty(seed.policy?.matcher))
 		)
 	);
 	const intervalOptions = $derived(
@@ -111,7 +130,7 @@
 			: [...INTERVALS, { value: minInterval, label: m.notifications_form_interval_current({ seconds: minInterval }) }].sort((a, b) => a.value - b.value)
 	);
 
-	let step = $state<'kind' | 'fields'>(untrack(() => (channel || presetKind ? 'fields' : 'kind')));
+	let step = $state<'kind' | 'fields'>(untrack(() => (seed || presetKind ? 'fields' : 'kind')));
 	let search = $state('');
 	let searchBox = $state<HTMLInputElement | null>(null);
 	// The picker opens with the cursor in the search box, every time it shows.
@@ -121,6 +140,8 @@
 
 	const info = $derived(kinds.find((k) => k.kind === kind));
 	const settingFields = $derived(info?.settings ?? []);
+	const templateFormat = $derived(info?.template_format || '');
+	const interactiveOn = $derived((kind === 'slack' || kind === 'telegram') && settings[INTERACTIVE_KEY] === true);
 	const secretFields = $derived(info?.secrets ?? []);
 	/** Normalised for comparison: blank and absent are the same (the server's default). */
 	function destinationValue(field: KindField, value: Value | undefined): string {
@@ -247,6 +268,14 @@
 			}
 			outSettings[field.key] = toServer(field, value ?? '');
 		}
+		const templates: [string, string][] = [
+			[MESSAGE_TITLE_TEMPLATE_KEY, titleTemplate],
+			[MESSAGE_BODY_TEMPLATE_KEY, bodyTemplate]
+		];
+		for (const [key, value] of templates) {
+			if (templateFormat && value.trim() !== '') outSettings[key] = value;
+			else delete outSettings[key];
+		}
 
 		const typed: Record<string, unknown> = {};
 		for (const field of secretFields) {
@@ -286,6 +315,7 @@
 		try {
 			const payload = buildPayload();
 			const saved = channel ? await updateChannel(channel.id, payload) : await createChannel(payload);
+			tracker.markClean();
 			onsaved(saved);
 		} catch (cause) {
 			apiError = cause;
@@ -295,6 +325,25 @@
 	}
 
 	const KindIcon = $derived(kindIcon(kind));
+
+	// Warns before leaving with unsaved edits (navigation, reload, tab close).
+	// Secrets count as one flag each, so a typed token is never copied into the snapshot.
+	const tracker = useDirtyTracker(() => ({
+		kind,
+		name,
+		enabled,
+		settings,
+		typedSecrets: Object.keys(secrets).filter((key) => secrets[key] !== ''),
+		clearSecrets,
+		titleTemplate,
+		bodyTemplate,
+		minSeverity,
+		notifyResolved,
+		minInterval,
+		quietHours,
+		matcher
+	}));
+	tracker.markClean();
 </script>
 
 <div class="rounded-[var(--radius-card)] border border-signal/40 bg-surface shadow-lift" role="region" aria-label={editing ? m.alerts_rules_edit_aria({ name: channel?.name ?? '' }) : m.notifications_channels_add()}>
@@ -376,6 +425,7 @@
 					</div>
 				</div>
 				<div class="flex flex-wrap items-center gap-1">
+					<UnsavedBadge dirty={tracker.dirty} />
 					<Button variant="ghost" size="sm" onclick={() => (step = 'kind')} disabled={saving}>
 						<ChevronLeft class="size-4" aria-hidden="true" />
 						{m.notifications_form_change_type()}
@@ -421,6 +471,10 @@
 					</fieldset>
 				{/if}
 
+				{#if interactiveOn}
+					<InteractiveCallback {kind} {channel} />
+				{/if}
+
 				{#if secretFields.length > 0}
 					<fieldset class="grid gap-4 border-t border-line pt-5">
 						<legend class="mb-1 text-sm font-semibold text-ink">{m.notifications_form_secrets()}</legend>
@@ -448,6 +502,22 @@
 							</Field>
 						{/if}
 					</fieldset>
+				{/if}
+
+				{#if templateFormat}
+					<div class="border-t border-line pt-5">
+						<MessageTemplateEditor
+							{kind}
+							format={templateFormat}
+							title={titleTemplate}
+							body={bodyTemplate}
+							disabled={saving}
+							onchange={(nextTitle, nextBody) => {
+								titleTemplate = nextTitle;
+								bodyTemplate = nextBody;
+							}}
+						/>
+					</div>
 				{/if}
 
 				<div class="border-t border-line pt-5">

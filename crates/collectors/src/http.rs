@@ -296,7 +296,8 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status(), 302, "the cross-host redirect must not be followed");
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        // Laisse à un éventuel appel le temps d'arriver, même sur une machine chargée.
+        tokio::time::sleep(Duration::from_millis(500)).await;
         assert!(hit.try_recv().is_err(), "the redirect target must never be contacted");
     }
 }

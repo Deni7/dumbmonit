@@ -16,10 +16,12 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
+use crate::auth::client_ip::ClientIp;
 use crate::auth::middleware::AdminUser;
 use crate::auth::oidc::flow::{self, CallbackParams, FlowError};
 use crate::auth::oidc::{self, OidcConfig, Source, discovery};
-use crate::auth::{AuthResult, AuthState, cookie, session};
+use crate::auth::session::{SignIn, Via};
+use crate::auth::{AuthResult, AuthState, audit, cookie, session};
 use crate::state::AppState;
 
 #[derive(Debug, Deserialize)]
@@ -100,6 +102,7 @@ pub async fn start(
 pub async fn callback(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthState>,
+    ClientIp(ip): ClientIp,
     headers: HeaderMap,
     Query(params): Query<CallbackParams>,
 ) -> Response {
@@ -114,7 +117,9 @@ pub async fn callback(
         Ok(found) => found,
         Err(error) => return failure(error),
     };
-    let token = match session::create(&state.pool, user.id).await {
+    let user_agent = session::user_agent(&headers);
+    let signin = SignIn { via: Via::Oidc, ip, user_agent: user_agent.as_deref() };
+    let token = match session::create(&state.pool, user.id, &signin).await {
         Ok(token) => token,
         Err(error) => return failure(FlowError::Internal(error)),
     };
@@ -251,6 +256,7 @@ pub struct ConfigView {
     auto_create_defaulted: bool,
     admin_groups: Vec<String>,
     operator_groups: Vec<String>,
+    wall_groups: Vec<String>,
     groups_claim: String,
     public_url: String,
     redirect_uri: String,
@@ -272,6 +278,7 @@ fn view(state: &AppState, resolved: oidc::Resolved, origin: &str) -> ConfigView 
         auto_create_defaulted: resolved.auto_create_defaulted,
         admin_groups: config.admin_groups,
         operator_groups: config.operator_groups,
+        wall_groups: config.wall_groups,
         groups_claim: config.groups_claim,
         public_url: config.public_url,
     }
@@ -306,6 +313,8 @@ pub struct ConfigPayload {
     #[serde(default)]
     operator_groups: Vec<String>,
     #[serde(default)]
+    wall_groups: Vec<String>,
+    #[serde(default)]
     groups_claim: String,
     #[serde(default)]
     public_url: String,
@@ -325,7 +334,8 @@ impl std::fmt::Debug for ConfigPayload {
 pub async fn put_config(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthState>,
-    _: AdminUser,
+    AdminUser(me): AdminUser,
+    ClientIp(ip): ClientIp,
     origin: Origin,
     Json(payload): Json<ConfigPayload>,
 ) -> AuthResult<Json<ConfigView>> {
@@ -338,6 +348,7 @@ pub async fn put_config(
         auto_create: payload.auto_create,
         admin_groups: payload.admin_groups,
         operator_groups: payload.operator_groups,
+        wall_groups: payload.wall_groups,
         groups_claim: payload.groups_claim,
         public_url: payload.public_url,
     }
@@ -366,6 +377,7 @@ pub async fn put_config(
     // Le fournisseur a pu changer : le document mis en cache ne vaut plus rien.
     *auth.discovery_cache().lock().await = None;
     tracing::info!("OIDC settings saved");
+    audit::record(&state.pool, Some(&me.username), "settings.oidc", None, ip).await;
 
     let resolved = oidc::resolve(&state.pool, &state.cipher, &state.config.oidc).await?;
     Ok(Json(view(&state, resolved, &origin.0)))
@@ -376,12 +388,14 @@ pub async fn put_config(
 pub async fn delete_config(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthState>,
-    _: AdminUser,
+    AdminUser(me): AdminUser,
+    ClientIp(ip): ClientIp,
     origin: Origin,
 ) -> AuthResult<Json<ConfigView>> {
     oidc::clear(&state.pool).await?;
     *auth.discovery_cache().lock().await = None;
     tracing::info!("OIDC settings cleared");
+    audit::record(&state.pool, Some(&me.username), "settings.oidc.cleared", None, ip).await;
     let resolved = oidc::resolve(&state.pool, &state.cipher, &state.config.oidc).await?;
     Ok(Json(view(&state, resolved, &origin.0)))
 }

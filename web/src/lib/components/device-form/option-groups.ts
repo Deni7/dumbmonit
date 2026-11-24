@@ -4,7 +4,7 @@ import { m } from '#lib/paraglide/messages.js';
  *
  * A collector kind with many settings (Proxmox VE has ~24) reads as one
  * unbroken column of toggles. The server can name an explicit `group` per
- * option (`CollectorOption.group`, see `crates/server/src/api/collectors.rs`);
+ * option (`CollectorOption.group`, see `crates/server/src/api/collectors/`);
  * when it does, that is authoritative. Most kinds don't bother — for those,
  * a generic fallback buckets options by the first underscore-separated token
  * of their key (`scan_backup_storage` → `scan`), which is nameless clutter

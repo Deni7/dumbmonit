@@ -10,19 +10,21 @@
 	 * the document from unsaved settings: both show exactly the same thing.
 	 * Nothing here names the product.
 	 */
-	import type { Snippet } from 'svelte';
+	import { tick, type Snippet } from 'svelte';
 	import { withBase } from '#lib/paths.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { getLocale } from '#lib/paraglide/runtime.js';
-	import { CalendarClock, ExternalLink, Megaphone } from 'lucide-svelte';
-	import type { PublicIncident, PublicStatus } from '#lib/api/index.js';
+	import { CalendarClock, ExternalLink, Megaphone, RefreshCw } from 'lucide-svelte';
+	import type { PublicIncident, PublicOlderIncidents, PublicStatus } from '#lib/api/index.js';
 	import { formatDateTime, formatRelative, parseServerDate } from '#lib/format.js';
-	import { EmptyState, Plate } from '#lib/ui/index.js';
+	import { Button, EmptyState, ErrorNotice, Plate } from '#lib/ui/index.js';
 	import IncidentCard from './IncidentCard.svelte';
 	import StatusUpdates from './StatusUpdates.svelte';
 	import CalendarHistory from './CalendarHistory.svelte';
 	import ServiceRow from './ServiceRow.svelte';
 	import { periodParts } from './period';
+	import { FILTER_THRESHOLD, filterGroups, incidentAnchor, incidentFromHash } from './incident-view';
+	import { clockWithZone, zoneName } from './timezone';
 	import { homepageHost, isClosed, overallBanner } from './words';
 
 	interface Props {
@@ -33,9 +35,15 @@
 		onselectday?: (day: string) => void;
 		/** Drawn under the services: the hour-by-hour detail of the opened day. */
 		day?: Snippet;
+		/** Reload the document now; absent (the editor's preview): no button. */
+		onrefresh?: () => void;
+		/** A reload is in flight. */
+		refreshing?: boolean;
+		/** Reads the next slice of incidents older than 30 days; absent: no "Show older" button. */
+		loadOlder?: (cursor?: string) => Promise<PublicOlderIncidents>;
 	}
 
-	let { status, lastChecked = null, onselectday, day }: Props = $props();
+	let { status, lastChecked = null, onselectday, day, onrefresh, refreshing = false, loadOlder }: Props = $props();
 
 	const banner = $derived(overallBanner(status));
 	const bannerTone = $derived(banner.tone);
@@ -52,11 +60,41 @@
 	const active = $derived<PublicIncident[]>([...status.maintenance, ...status.incidents].filter((i) => !isClosed(i.status)));
 	const past = $derived<PublicIncident[]>([...status.incidents, ...status.maintenance].filter((i) => isClosed(i.status)));
 
+	// "Show older": slices of resolved incidents beyond the 30 days of the document.
+	let older = $state<PublicIncident[]>([]);
+	let olderNext = $state<string | undefined>(undefined);
+	let olderStarted = $state(false);
+	let olderDone = $state(false);
+	let olderLoading = $state(false);
+	let olderError = $state<unknown>(null);
+
+	async function showOlder() {
+		if (!loadOlder || olderLoading) return;
+		olderLoading = true;
+		olderError = null;
+		try {
+			const slice = await loadOlder(olderStarted ? olderNext : undefined);
+			const known = new Set([...past, ...older].map((i) => i.anchor));
+			older = [...older, ...slice.incidents.filter((i) => !known.has(i.anchor))];
+			olderNext = slice.next;
+			olderStarted = true;
+			olderDone = !slice.next;
+		} catch (cause) {
+			olderError = cause;
+		} finally {
+			olderLoading = false;
+		}
+	}
+
+	// Services: a search and a "problems only" switch once the list is long.
+	let query = $state('');
+	let onlyProblems = $state(false);
+
 	// "Past incidents" grouped by the day they started, newest day first.
 	const pastByDay = $derived.by(() => {
 		const dayFormat = new Intl.DateTimeFormat(getLocale(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 		const groups = new Map<string, { label: string; incidents: PublicIncident[] }>();
-		for (const incident of past) {
+		for (const incident of [...past, ...older]) {
 			const date = parseServerDate(incident.starts_at);
 			const key = date ? date.toISOString().slice(0, 10) : incident.starts_at;
 			const label = date ? dayFormat.format(date) : incident.starts_at;
@@ -70,6 +108,24 @@
 	/** Services a subscriber may follow, by public key. */
 	const subscribeServices = $derived(status.groups.flatMap((g) => g.items.map((item) => ({ key: item.key, label: item.label }))));
 	const serviceCount = $derived(status.groups.reduce((n, g) => n + g.items.length, 0));
+	const filtering = $derived(serviceCount > FILTER_THRESHOLD);
+	const shownGroups = $derived(filtering ? filterGroups(status.groups, query, onlyProblems) : status.groups);
+
+	// A permalink (`#incident-<anchor>`) opened before the page was drawn: scroll to the card once it exists.
+	let scrolledToHash = false;
+	$effect(() => {
+		void past;
+		void active;
+		if (scrolledToHash || typeof location === 'undefined') return;
+		const id = incidentFromHash(location.hash);
+		if (id === null) return;
+		void tick().then(() => {
+			const card = document.getElementById(incidentAnchor(id));
+			if (!card) return;
+			scrolledToHash = true;
+			card.scrollIntoView({ block: 'start' });
+		});
+	});
 </script>
 
 <header class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
@@ -109,11 +165,25 @@
 		<Plate tone={bannerTone} label={banner.plate} />
 		<p class="text-base font-semibold tracking-tight text-ink">{banner.label}</p>
 	</div>
-	{#if lastChecked}
-		<p class="text-xs text-ink-2">
-			{m.status_public_checked()} <time class="tnum" datetime={lastChecked.toISOString()} title={formatDateTime(lastChecked)}>{formatRelative(lastChecked)}</time>
-		</p>
-	{/if}
+	<div class="flex flex-wrap items-center gap-x-2 text-xs text-ink-2">
+		{#if lastChecked}
+			<p>
+				{m.status_public_checked()} <time class="tnum" datetime={lastChecked.toISOString()} title={formatDateTime(lastChecked)}>{formatRelative(lastChecked)}</time>
+				<span class="tnum text-ink-3" title={zoneName()}>· {clockWithZone(lastChecked, getLocale())}</span>
+			</p>
+		{/if}
+		{#if onrefresh}
+			<button
+				type="button"
+				class="inline-flex min-h-10 items-center gap-1.5 rounded-md px-2 font-semibold text-ink-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-60"
+				onclick={onrefresh}
+				disabled={refreshing}
+			>
+				<RefreshCw class={`size-3.5 ${refreshing ? 'motion-safe:animate-spin' : ''}`} aria-hidden="true" />
+				{m.status_public_refresh()}
+			</button>
+		{/if}
+	</div>
 </section>
 
 {#if active.length > 0}
@@ -122,7 +192,7 @@
 			{active.length === 1 ? m.status_public_announcement_one() : m.status_public_announcement_many()}
 		</h2>
 		<div class="mt-2 grid gap-2">
-			{#each active as incident (incident.kind + incident.starts_at + incident.title)}
+			{#each active as incident (incident.anchor)}
 				<IncidentCard {incident} />
 			{/each}
 		</div>
@@ -137,8 +207,21 @@
 	{#if serviceCount === 0}
 		<EmptyState class="mt-2" icon={Megaphone} title={m.status_public_no_service_title()} description={m.status_public_no_service_description()} />
 	{:else}
+		{#if filtering}
+			<div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+				<label class="sr-only" for="service-search">{m.status_public_filter_label()}</label>
+				<input id="service-search" type="search" class="input min-w-0 flex-1 sm:max-w-xs" bind:value={query} placeholder={m.status_public_filter_placeholder()} autocomplete="off" />
+				<label class="inline-flex min-h-10 items-center gap-2 text-sm text-ink">
+					<input type="checkbox" class="size-4 accent-[var(--c-signal)]" bind:checked={onlyProblems} />
+					{m.status_public_filter_problems()}
+				</label>
+			</div>
+		{/if}
+		{#if shownGroups.length === 0}
+			<p class="mt-3 text-sm text-ink-2" role="status">{m.status_public_filter_none()}</p>
+		{/if}
 		<div class="mt-2 grid gap-3">
-			{#each status.groups as group (group.name)}
+			{#each shownGroups as group (group.name)}
 				<div class="rounded-[var(--radius-card)] border border-line bg-surface">
 					{#if group.name}
 						<h3 class="border-b border-line px-3 py-1.5 text-xs font-semibold text-ink-2 sm:px-4">{group.name}</h3>
@@ -172,13 +255,24 @@
 				<div>
 					<h3 class="border-b border-line pb-1 text-xs font-semibold text-ink-2">{group.label}</h3>
 					<div class="mt-1.5 grid gap-1.5">
-						{#each group.incidents as incident (incident.kind + incident.starts_at + incident.title)}
+						{#each group.incidents as incident (incident.anchor)}
 							<IncidentCard {incident} compact />
 						{/each}
 					</div>
 				</div>
 			{/each}
 		</div>
+	{/if}
+	{#if loadOlder}
+		{#if olderError}
+			<ErrorNotice class="mt-3" error={olderError} title={m.status_public_load_error()} onretry={() => void showOlder()} />
+		{:else if olderDone}
+			<p class="mt-3 text-center text-xs text-ink-3" role="status">{older.length > 0 ? m.status_public_older_end() : m.status_public_older_none()}</p>
+		{:else}
+			<div class="mt-3 flex justify-center">
+				<Button variant="secondary" size="sm" loading={olderLoading} onclick={() => void showOlder()}>{m.status_public_older_show()}</Button>
+			</div>
+		{/if}
 	{/if}
 </section>
 

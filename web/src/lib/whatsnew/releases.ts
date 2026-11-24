@@ -21,6 +21,80 @@ export interface Release {
 
 export const RELEASES: Release[] = [
 	{
+		version: '0.20.2',
+		date: '2026-11-24',
+		highlights: [
+			{
+				title: 'A new overview',
+				text: 'One screen, no scrolling: the three figures, what to act on now, what is coming up, services, fleet by site and recent events.'
+			},
+			{
+				title: 'Thresholds in days and hours',
+				text: 'Rules about an age or a duration are set in human units, and on/off rules say what makes them fire.'
+			},
+			{
+				title: 'Agent updates fixed',
+				text: 'Windows agents update themselves again from this version on (older ones need one reinstall), and older agents get signed builds.'
+			},
+			{
+				title: 'WordPress plugin 2.0',
+				text: 'Follows the visitor language, finds your status pages, and is configured from the WordPress settings.'
+			}
+		]
+	},
+	{
+		version: '0.20.1',
+		date: '2026-11-23',
+		highlights: [
+			{
+				title: 'Custom roles and wall accounts',
+				text: 'Build roles from a list of permissions, and give room displays an account that only sees the wall.'
+			},
+			{
+				title: 'Off-site backups',
+				text: 'Copy backups on a schedule to S3-compatible storage, SFTP or WebDAV.'
+			},
+			{
+				title: 'Quieter, better alerts',
+				text: 'Test a rule on past data, see the noisiest rules with MTTA and MTTR, mark changes on charts, and act from Slack or Telegram.'
+			},
+			{
+				title: 'Accounts and monitors',
+				text: 'Password reset and invitations by email, personal notifications, bulk edit and monitor templates.'
+			},
+			{
+				title: 'Five more languages',
+				text: 'The interface now speaks Japanese, Korean, Dutch, Polish and Turkish.'
+			}
+		]
+	},
+	{
+		version: '0.20.0',
+		date: '2026-11-22',
+		highlights: [
+			{
+				title: 'SLOs, post-mortems and multi-step HTTP checks',
+				text: 'Error budgets with burn-rate alerts, post-mortems on status page incidents, and HTTP scenarios that log in and follow several steps.'
+			},
+			{
+				title: 'Faster monitor lists',
+				text: 'Duplicate a monitor, quick actions on each row, tags on rows, notes, custom intervals, more sorts, and bulk silence.'
+			},
+			{
+				title: 'Maintenance and alerts, less clicking',
+				text: 'End, extend, edit or copy a maintenance window; switch channels on and off from the list; see when each rule last fired.'
+			},
+			{
+				title: 'Status pages and reports',
+				text: 'Links to each incident, older incidents, per-service feeds, badge styles, update templates and preview, SLA objectives per group.'
+			},
+			{
+				title: 'Accounts and operations',
+				text: 'Your open sessions, required 2FA, editable API tokens, a full audit log with export, backup schedule and downloads, and /api/ready.'
+			}
+		]
+	},
+	{
 		version: '0.17.1',
 		date: '2026-11-04',
 		highlights: [

@@ -6,8 +6,8 @@
 	 * probe stored, refreshed every minute; PBS itself is only asked when
 	 * someone opens a task log or a disk's SMART table.
 	 */
-	import { untrack } from 'svelte';
 	import { getPbsCalendar, getPbsHealth, getPbsJobs, listPbsFailures } from '#lib/api/pbs.js';
+	import { startPolling } from '#lib/poll.js';
 	import type { PbsCalendar, PbsFailure, PbsHealth, PbsJobs, Target } from '#lib/api/index.js';
 	import { ErrorNotice, Panel, Plate, Skeleton } from '#lib/ui/index.js';
 	import { m } from '#lib/paraglide/messages.js';
@@ -66,6 +66,7 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
+			return false;
 		} finally {
 			loading = false;
 		}
@@ -78,13 +79,7 @@
 		failures = [];
 		jobs = null;
 		health = null;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 </script>
 

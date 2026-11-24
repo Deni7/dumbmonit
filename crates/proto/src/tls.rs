@@ -100,6 +100,39 @@ pub const RELAY_TUNNEL_PROTOCOL: &str = "dumbmonit-tunnel/1";
 /// [yamux]: https://github.com/hashicorp/yamux/blob/master/spec.md
 pub const RELAY_MUX_PROTOCOL: &str = "dumbmonit-mux/1";
 
+/// Transport WebSocket du canal des agents, à l'adresse de l'interface.
+///
+/// Derrière Cloudflare Tunnel, un mandataire inverse qui termine TLS ou un
+/// mandataire d'entreprise qui ne laisse passer que HTTP, le port des agents
+/// est injoignable : seule l'adresse de l'interface l'est. L'agent y ouvre
+/// une WebSocket (`GET` de mise à niveau, sous-protocole
+/// [`AGENT_WS_PROTOCOL`]) et fait passer *dedans* sa session TLS habituelle —
+/// TLS 1.3, autorité épinglée, certificat client. Le serveur traite le flux
+/// comme une connexion neuve à son port des agents : mêmes routes, mêmes
+/// contrôles. L'intermédiaire ne voit que des messages binaires opaques ; le
+/// TLS extérieur ne prouve rien de l'agent.
+///
+/// Cadrage : des messages binaires, dans l'ordre, qui portent les octets de
+/// la session TLS tels quels ; un message texte est une faute, `Close` est la
+/// fin du flux. L'agent envoie un ping toutes les 20 s, pour qu'aucun
+/// intermédiaire ne coupe une connexion au repos.
+pub const AGENT_WS_PATH: &str = "/api/agent/ws";
+
+/// Sous-protocole WebSocket (`Sec-WebSocket-Protocol`) du canal des agents :
+/// un jeton HTTP, sans `/`.
+pub const AGENT_WS_PROTOCOL: &str = "dumbmonit-agent.v1";
+
+/// Octets au plus par message envoyé sur la WebSocket des agents.
+pub const AGENT_WS_CHUNK: usize = 64 * 1024;
+
+/// Taille maximale d'un message (et d'une trame) reçu : au-delà, la
+/// connexion est coupée. Le double de [`AGENT_WS_CHUNK`], pour qu'un
+/// intermédiaire qui regroupe deux messages ne casse rien.
+pub const AGENT_WS_MAX_MESSAGE: usize = 2 * AGENT_WS_CHUNK;
+
+// Un message envoyé doit toujours pouvoir être reçu.
+const _: () = assert!(AGENT_WS_MAX_MESSAGE >= AGENT_WS_CHUNK);
+
 /// Port d'écoute par défaut de la passerelle d'un relais (côté site).
 pub const DEFAULT_RELAY_GATEWAY_PORT: u16 = 8443;
 
@@ -299,6 +332,15 @@ mod tests {
             Some("https://[fd00::1]:8443")
         );
         assert_eq!(agent_channel_url("http://0.0.0.0:8080", 8443), None);
+    }
+
+    #[test]
+    fn the_agent_websocket_sits_under_the_api_and_names_a_valid_subprotocol() {
+        assert!(AGENT_WS_PATH.starts_with("/api/agent/"));
+        // Un jeton HTTP (RFC 9110) : ni séparateur ni blanc, sans quoi un
+        // mandataire peut refuser l'en-tête.
+        let token = |b: u8| b.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&b);
+        assert!(AGENT_WS_PROTOCOL.bytes().all(token), "{AGENT_WS_PROTOCOL}");
     }
 
     #[test]

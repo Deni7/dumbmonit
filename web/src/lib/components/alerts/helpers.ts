@@ -20,6 +20,7 @@ import { isDistinctiveLabel } from '#lib/metrics.js';
 import type { Tone } from '#lib/ui/index.js';
 import { formatDateTime, formatDuration, pad2 } from '#lib/format.js';
 import { m } from '#lib/paraglide/messages.js';
+import { durationBase, isFlagUnit } from './rules/units';
 import { getLocale } from '#lib/paraglide/runtime.js';
 
 /**
@@ -90,7 +91,9 @@ export function alertDetail(alert: Alert, rule: AlertRule | undefined): string {
 		if (!isDistinctiveLabel(key)) continue;
 		parts.push(value);
 	}
-	if (alert.value !== null && Number.isFinite(alert.value)) {
+	// An SLO burn alert is worth 1 or 2 (slow or fast burn): a level, not a measurement.
+	// An on/off rule is worth 1 when it fires: the value says nothing more.
+	if (alert.value !== null && Number.isFinite(alert.value) && rule?.kind !== 'slo_burn' && !isFlagUnit(rule?.unit)) {
 		parts.push(formatAlertValue(alert.value, rule?.unit));
 	}
 	return parts.join(' · ');
@@ -98,13 +101,15 @@ export function alertDetail(alert: Alert, rule: AlertRule | undefined): string {
 
 /**
  * A measured value with its rule's unit, the way every alert list shows it.
- * Seconds read as a duration past a minute: "45 d", not "3887999s".
+ * A duration (seconds, hours, days) reads as one past a minute: "45 d", not
+ * "3887999s"; an on/off signal has no suffix.
  */
 export function formatAlertValue(value: number, unit: string | null | undefined): string {
 	const suffix = unit?.trim() ?? '';
-	if (suffix === 's' && value >= 60) return formatDuration(value);
+	const base = durationBase(suffix);
+	if (base !== null && value * base >= 60) return formatDuration(value * base);
 	const rounded = Math.round(value * 100) / 100;
-	return `${rounded}${suffix}`;
+	return isFlagUnit(suffix) ? `${rounded}` : `${rounded}${suffix}`;
 }
 
 /** Builds the map from rule uid to its definition, for quick lookups. */

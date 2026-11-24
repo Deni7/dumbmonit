@@ -104,6 +104,13 @@ async fn require_read(State(state): State<AppState>, request: Request, next: Nex
     }
     match auth_middleware::current_session(&state.pool, request.headers()).await {
         Ok(Some((_, user))) => {
+            // Un écran mural ne lit que ce que montre le mur : pas les séries brutes.
+            if user.role.is_wall() {
+                return AuthError::Forbidden(
+                    "A wall display account cannot read raw metrics.".into(),
+                )
+                .into_response();
+            }
             if let Err(response) =
                 refuse_scoped(&state, &auth_middleware::Principal::User(user)).await
             {
@@ -157,11 +164,11 @@ fn unauthorized() -> Response {
 /// entière.
 async fn instance_metrics(State(state): State<AppState>) -> Response {
     let snapshot = stats().snapshot();
-    let (alerts, agents, database) = match read_database(&state).await {
-        Ok((alerts, agents)) => (alerts, agents, true),
+    let (alerts, agents, extra, database) = match read_database(&state).await {
+        Ok((alerts, agents, extra)) => (alerts, agents, extra, true),
         Err(error) => {
             tracing::warn!(?error, "the database did not answer a /metrics scrape");
-            (AlertCounts::default(), (0, 0), false)
+            (AlertCounts::default(), (0, 0), Extra::empty(), false)
         }
     };
     let database_bytes = crate::selfmon::database_bytes(&state.config.database_path()).await;
@@ -177,6 +184,7 @@ async fn instance_metrics(State(state): State<AppState>) -> Response {
             victoria,
             embedded: state.config.vm_embedded(),
             version: env!("CARGO_PKG_VERSION"),
+            extra,
         },
     );
 
@@ -185,8 +193,8 @@ async fn instance_metrics(State(state): State<AppState>) -> Response {
 
 /// Les deux relevés qui viennent de SQLite. Ensemble : l'un échoue, l'autre
 /// n'est pas plus fiable, et c'est la base qui est en cause.
-async fn read_database(state: &AppState) -> anyhow::Result<(AlertCounts, (u64, u64))> {
-    Ok((alert_counts(state).await?, agent_counts(state).await?))
+async fn read_database(state: &AppState) -> anyhow::Result<(AlertCounts, (u64, u64), Extra)> {
+    Ok((alert_counts(state).await?, agent_counts(state).await?, extra_counts(state).await?))
 }
 
 /// Ce que le contrôle de dépendances — le même que `/api/health` — rapporte.
@@ -196,6 +204,99 @@ struct Health {
     victoria: bool,
     embedded: bool,
     version: &'static str,
+    extra: Extra,
+}
+
+/// Fenêtre de `dumbmonit_api_tokens_expiring`, en jours.
+const TOKEN_EXPIRY_DAYS: i64 = 7;
+
+/// Relevés peu coûteux de la base : équipements par état, sessions, jetons,
+/// sauvegardes locales.
+#[derive(Debug, Default, PartialEq)]
+struct Extra {
+    /// Toujours les quatre états, dans cet ordre (voir [`target_states`]).
+    targets: [(&'static str, u64); 4],
+    sessions_active: u64,
+    tokens_expiring: u64,
+    /// Horodatage Unix de la dernière sauvegarde locale réussie.
+    backup_last_success: Option<i64>,
+    /// Résultat de la dernière tentative.
+    backup_last_ok: Option<bool>,
+    /// Dernier envoi réussi vers chaque destination hors site : (nom, horodatage
+    /// Unix). Les destinations jamais réussies n'y sont pas.
+    backup_offsite: Vec<(String, i64)>,
+}
+
+impl Extra {
+    fn empty() -> Self {
+        Self {
+            targets: [("ok", 0), ("error", 0), ("pending", 0), ("disabled", 0)],
+            ..Self::default()
+        }
+    }
+}
+
+/// Équipements par état : `disabled` (désactivé), `pending` (jamais interrogé),
+/// `error` (dernière interrogation en échec) et `ok`.
+async fn target_states(state: &AppState) -> anyhow::Result<[(&'static str, u64); 4]> {
+    let rows = sqlx::query(
+        "SELECT CASE
+                    WHEN enabled = 0 THEN 'disabled'
+                    WHEN last_probe_at IS NULL THEN 'pending'
+                    WHEN last_error IS NOT NULL THEN 'error'
+                    ELSE 'ok'
+                END AS state,
+                COUNT(*) AS total
+         FROM targets GROUP BY state",
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    let mut counts = Extra::empty().targets;
+    for row in &rows {
+        let name: String = row.try_get("state")?;
+        let total = read_u64(row, "total")?;
+        if let Some(slot) = counts.iter_mut().find(|(known, _)| *known == name) {
+            slot.1 = total;
+        }
+    }
+    Ok(counts)
+}
+
+async fn extra_counts(state: &AppState) -> anyhow::Result<Extra> {
+    let now = chrono::Utc::now();
+    let stamp =
+        |at: chrono::DateTime<chrono::Utc>| at.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+    let sessions: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM auth_sessions WHERE expires_at > ?")
+            .bind(stamp(now))
+            .fetch_one(&state.pool)
+            .await?;
+    // Les dates de jeton sont écrites en `…Z` à la seconde : même ordre lexical.
+    let horizon = (now + chrono::Duration::days(TOKEN_EXPIRY_DAYS))
+        .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let tokens: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM api_tokens
+         WHERE revoked_at IS NULL AND expires_at IS NOT NULL
+           AND expires_at > ? AND expires_at <= ?",
+    )
+    .bind(now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true))
+    .bind(horizon)
+    .fetch_one(&state.pool)
+    .await?;
+    let last = crate::backup::local::last_run(&state.pool).await?;
+    let success = crate::backup::local::last_success(&state.pool).await?;
+    Ok(Extra {
+        targets: target_states(state).await?,
+        sessions_active: sessions.max(0) as u64,
+        tokens_expiring: tokens.max(0) as u64,
+        backup_last_success: success.and_then(|run| {
+            chrono::NaiveDateTime::parse_from_str(&run.at, "%Y-%m-%d %H:%M:%S")
+                .ok()
+                .map(|at| at.and_utc().timestamp())
+        }),
+        backup_last_ok: last.map(|run| run.ok),
+        backup_offsite: crate::backup::offsite::store::last_successes(&state.pool).await?,
+    })
 }
 
 /// Alertes suivies, par phase et par état d'affichage.
@@ -401,6 +502,55 @@ fn render(snapshot: &Snapshot, alerts: &AlertCounts, agents: (u64, u64), health:
         "Agents that have not pushed anything for five minutes.",
     );
     out.value(agents.1 as f64);
+
+    out.metric(
+        "dumbmonit_targets",
+        "gauge",
+        "Devices by state: ok, error (last probe failed), pending (never probed), disabled.",
+    );
+    for (state, count) in &health.extra.targets {
+        out.sample(&[("state", state)], *count as f64);
+    }
+
+    out.metric("dumbmonit_sessions_active", "gauge", "Web sessions that have not expired.");
+    out.value(health.extra.sessions_active as f64);
+
+    out.metric(
+        "dumbmonit_api_tokens_expiring",
+        "gauge",
+        "API tokens, not revoked, that expire within seven days.",
+    );
+    out.value(health.extra.tokens_expiring as f64);
+
+    // Absentes tant qu'aucune sauvegarde locale n'a été tentée : zéro mentirait.
+    if let Some(timestamp) = health.extra.backup_last_success {
+        out.metric(
+            "dumbmonit_backup_last_success_timestamp_seconds",
+            "gauge",
+            "Unix time of the last successful scheduled local backup.",
+        );
+        out.value(timestamp as f64);
+    }
+    if let Some(ok) = health.extra.backup_last_ok {
+        out.metric(
+            "dumbmonit_backup_last_run_ok",
+            "gauge",
+            "1 when the last scheduled local backup succeeded, 0 when it failed.",
+        );
+        out.value(f64::from(u8::from(ok)));
+    }
+    // Une série par destination hors site qui a réussi au moins une fois ;
+    // l'étiquette est le nom donné par l'administrateur, une poignée au plus.
+    if !health.extra.backup_offsite.is_empty() {
+        out.metric(
+            "dumbmonit_backup_offsite_last_success_timestamp_seconds",
+            "gauge",
+            "Unix time of the last successful upload to each off-site backup destination.",
+        );
+        for (destination, timestamp) in &health.extra.backup_offsite {
+            out.sample(&[("destination", destination.as_str())], *timestamp as f64);
+        }
+    }
 
     out.metric(
         "dumbmonit_database_up",
@@ -790,6 +940,14 @@ mod tests {
                 victoria: true,
                 embedded: true,
                 version: "9.9.9",
+                extra: Extra {
+                    targets: [("ok", 7), ("error", 2), ("pending", 1), ("disabled", 0)],
+                    sessions_active: 3,
+                    tokens_expiring: 1,
+                    backup_last_success: Some(1_700_000_000),
+                    backup_last_ok: Some(false),
+                    backup_offsite: vec![("nas".to_string(), 1_700_000_100)],
+                },
             },
         )
     }
@@ -862,6 +1020,7 @@ mod tests {
             "dumbmonit_agents_stale 1",
             "dumbmonit_database_bytes 98304",
             "dumbmonit_victoriametrics_up 1",
+            "dumbmonit_backup_offsite_last_success_timestamp_seconds{destination=\"nas\"} 1700000100",
         ] {
             assert!(document.contains(expected), "absent : {expected}\n{document}");
         }
@@ -881,7 +1040,9 @@ mod tests {
             .collect();
         for label in &labels {
             assert!(
-                matches!(*label, "version" | "phase" | "kind"),
+                // `destination` : les noms des destinations hors site, choisis
+                // par l'administrateur et en nombre borné.
+                matches!(*label, "version" | "phase" | "kind" | "state" | "destination"),
                 "étiquette inattendue « {label} »"
             );
         }
@@ -931,9 +1092,11 @@ mod tests {
                 victoria: false,
                 embedded: true,
                 version: "9.9.9",
+                extra: Extra::empty(),
             },
         );
         check_exposition(&document);
+        assert!(!document.contains("dumbmonit_backup_last_run_ok"));
         assert!(document.contains("dumbmonit_alerts{phase=\"ok\"} 0"));
         assert!(document.contains("dumbmonit_database_up 0"));
         assert!(!document.contains("phase=\"\""));

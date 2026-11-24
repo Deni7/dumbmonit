@@ -17,6 +17,9 @@
 	} from '#lib/api/index.js';
 	import { Button, Field, Toggle } from '#lib/ui/index.js';
 	import { clearLabel } from './options';
+	import { durationText, thresholdShape, toStored, type DurationUnit } from './units';
+	import UnitInput from './UnitInput.svelte';
+	import { formatDuration } from '#lib/format.js';
 	import { m } from '#lib/paraglide/messages.js';
 
 	interface Props {
@@ -27,6 +30,11 @@
 
 	const prefix = $derived(`rule-${rule.id}-over`);
 	const unit = $derived(rule.unit);
+	// Same reading of the unit as the rule editor: a duration is typed in
+	// minutes, hours or days; an on/off rule has no threshold, only "turn off".
+	const shape = $derived(thresholdShape(rule.unit));
+	const durationBase = $derived(shape.kind === 'duration' ? shape.base : 1);
+	const durationChoices = $derived(shape.kind === 'duration' ? shape.choices : []);
 
 	// The list starts from what the rule carried when the editor opened; a
 	// background refresh must not overwrite what is being edited (hence untrack).
@@ -56,8 +64,22 @@
 
 	let adding = $state(false);
 	let targetId = $state<string>('');
-	let threshold = $state('');
-	let clear = $state('');
+	let threshold = $state<string | number | null>('');
+	let clear = $state<string | number | null>('');
+	const startUnit = untrack(() => {
+		const start = thresholdShape(rule.unit);
+		return start.kind === 'duration' ? durationText(rule.threshold, start.base, start.choices).unit : 'd';
+	});
+	let thresholdUnit = $state<DurationUnit>(startUnit);
+	let clearUnit = $state<DurationUnit>(startUnit);
+	/** The placeholder of a duration field: the rule's own value, in words. */
+	const durationHint = (stored: number | null) => (stored === null ? m.alerts_over_none_placeholder() : formatDuration(stored * durationBase));
+	const filled = (text: string | number | null) => text !== null && String(text).trim() !== '';
+	/** A typed value in the rule's stored unit; NaN when it is not a number. */
+	function parsed(text: string | number | null, typedUnit: DurationUnit): number {
+		if (shape.kind === 'duration') return toStored(text, typedUnit, durationBase) ?? Number.NaN;
+		return Number(text);
+	}
 	let disabled = $state(false);
 	let saving = $state(false);
 	let error = $state<string | null>(null);
@@ -67,7 +89,8 @@
 	function summary(o: RuleOverride): string {
 		if (o.enabled === false) return m.alerts_over_rule_off();
 		const parts: string[] = [];
-		const withUnit = (value: number) => `${value}${unit ? ` ${unit}` : ''}`;
+		const withUnit = (value: number) =>
+			shape.kind === 'duration' ? formatDuration(value * durationBase) : `${value}${unit ? ` ${unit}` : ''}`;
 		if (o.threshold !== null) parts.push(m.alerts_over_threshold({ value: withUnit(o.threshold) }));
 		if (o.clear_threshold !== null) {
 			parts.push(m.alerts_over_clear({ label: clearLabel(rule.operator), value: withUnit(o.clear_threshold) }));
@@ -87,16 +110,16 @@
 		if (disabled) {
 			payload.enabled = false;
 		} else {
-			if (threshold.trim() !== '') {
-				const n = Number(threshold);
+			if (filled(threshold)) {
+				const n = parsed(threshold, thresholdUnit);
 				if (!Number.isFinite(n)) {
 					error = m.alerts_rules_error_threshold();
 					return;
 				}
 				payload.threshold = n;
 			}
-			if (clear.trim() !== '') {
-				const n = Number(clear);
+			if (filled(clear)) {
+				const n = parsed(clear, clearUnit);
 				if (!Number.isFinite(n)) {
 					error = m.alerts_over_error_clear_number();
 					return;
@@ -190,12 +213,23 @@
 								{/each}
 							</select>
 						</Field>
-						<Field label={m.alerts_rules_threshold()} for={`${prefix}-threshold`} help={unit ? m.alerts_over_in_unit({ unit }) : undefined}>
-							<input id={`${prefix}-threshold`} type="number" step="any" class="input tnum" bind:value={threshold} placeholder={String(rule.threshold)} disabled={disabled} />
-						</Field>
-						<Field label={clearLabel(rule.operator)} for={`${prefix}-clear`}>
-							<input id={`${prefix}-clear`} type="number" step="any" class="input tnum" bind:value={clear} placeholder={rule.clear_threshold === null ? m.alerts_over_none_placeholder() : String(rule.clear_threshold)} disabled={disabled} />
-						</Field>
+						{#if shape.kind === 'duration'}
+							<Field label={m.alerts_rules_threshold()} for={`${prefix}-threshold`}>
+								<UnitInput id={`${prefix}-threshold`} bind:value={threshold} bind:unit={thresholdUnit} choices={durationChoices} label={m.alerts_rules_threshold()} placeholder={durationHint(rule.threshold)} {disabled} />
+							</Field>
+							<Field label={clearLabel(rule.operator)} for={`${prefix}-clear`}>
+								<UnitInput id={`${prefix}-clear`} bind:value={clear} bind:unit={clearUnit} choices={durationChoices} label={clearLabel(rule.operator)} placeholder={durationHint(rule.clear_threshold)} {disabled} />
+							</Field>
+						{:else if shape.kind === 'plain'}
+							<Field label={m.alerts_rules_threshold()} for={`${prefix}-threshold`} help={unit ? m.alerts_over_in_unit({ unit }) : undefined}>
+								<input id={`${prefix}-threshold`} type="number" step="any" class="input tnum" bind:value={threshold} placeholder={String(rule.threshold)} disabled={disabled} />
+							</Field>
+							<Field label={clearLabel(rule.operator)} for={`${prefix}-clear`}>
+								<input id={`${prefix}-clear`} type="number" step="any" class="input tnum" bind:value={clear} placeholder={rule.clear_threshold === null ? m.alerts_over_none_placeholder() : String(rule.clear_threshold)} disabled={disabled} />
+							</Field>
+						{:else}
+							<p class="self-end text-[0.8125rem] text-ink-2 sm:col-span-2">{m.w8rules_overrides_flag()}</p>
+						{/if}
 					</div>
 					<Field label={m.alerts_over_turn_off()} for={`${prefix}-off`} inline>
 						<Toggle id={`${prefix}-off`} bind:checked={disabled} label={m.alerts_over_turn_off()} />

@@ -20,6 +20,12 @@ below is shipped enabled on every instance.
 | Disk almost full | Filesystem 90% full or more, per mount point (SNMP, Proxmox storages and root filesystems); clears below 88 %. | ≥ 90 % | 15 min | Advisory (`warning`), escalates after 24 h | 6 h |
 | Filesystem almost full | At this rate, the filesystem will be full within four days (`predict_linear` over 6 h; rising filesystems only). | ≥ 100 % | 30 min | Advisory (`warning`) | 6 h |
 
+### Service level objectives
+
+| Rule | What | Default threshold | Hold | Severity | Reminder |
+|---|---|---|---|---|---|
+| Error budget burning | An [SLO](../using/slos.md) spends its error budget too fast: 6× the sustainable rate over 6 h and 30 min (slow burn, value 1), or 14.4× over 1 h and 5 min (fast burn, value 2, raised to Warning). One alert per SLO, attached to no monitor. | ≥ 1 | 1 min | Advisory (`warning`), Warning (`critical`) on a fast burn | 6 h |
+
 ### UPS
 
 | Rule | What | Default threshold | Hold | Severity | Reminder |
@@ -333,8 +339,9 @@ Reported by the agent; see [Agent](../devices/agent.md).
 | Active Backup task failed | The last run of an Active Backup for Business task failed, or backed up only part of its devices (`dumbmonit_abb_task_last_status == bool 0`). The notification names the task. | > 0 | 10 min | Warning (`critical`) | 24 h |
 | Active Backup too old | No successful Active Backup for Business run for this task for more than two days (`dumbmonit_abb_task_last_success_seconds`). The series does not exist for a task that has never succeeded; "Active Backup task failed" speaks then. | > 2 d | 1 h | Advisory (`warning`) | 24 h |
 | Active Backup task disabled | The task has no schedule, or its continuous backup is paused (`dumbmonit_abb_task_enabled == bool 0`): it will not back up anything until someone runs it. | > 0 | 1 h | Info (`info`) | 7 d |
-| Active Backup device overdue | A device has gone longer without a successful Active Backup for Business run than its own rhythm allows, off-days excluded (`dumbmonit_abb_device_overdue`, see [Synology](../devices/synology.md#how-overdue-is-judged)). | > 0 | 30 min | Advisory (`warning`) | 24 h |
+| Active Backup device overdue | Compared with the device's usual rhythm: it has gone longer without a successful Active Backup for Business run than its own habits allow, off-days excluded (`dumbmonit_abb_device_overdue`, see [Synology](../devices/synology.md#how-overdue-is-judged)). An on/off signal: nothing to set. | on/off | 30 min | Advisory (`warning`) | 24 h |
 | Active Backup device failing | The last two or more attempts of a device failed (`dumbmonit_abb_device_consecutive_failures`); a cancelled run counts as neither. | ≥ 2 | 10 min | Warning (`critical`) | 24 h |
+| Active Backup device backup too old | The last successful Active Backup for Business run of a device is older than the limit you set (`dumbmonit_abb_device_last_success_seconds`). Three days by default, enough to cross a weekend with the computer off; set one day for a server backed up every night. A device that never succeeded has no age and is not covered. | > 3 d | 30 min | Advisory (`warning`) | 24 h |
 | Synology system partition crashed | DSM reports its system partition as crashed: the NAS may not survive a reboot. Check Storage Manager (`dumbmonit_synology_system_crashed`). | > 0 | 5 min | Warning (`critical`) | 1 h |
 | Synology system partition needs repair | DSM says its system partition needs repair; Storage Manager offers to repair it (`dumbmonit_synology_system_need_repair`). | > 0 | 30 min | Advisory (`warning`) | 12 h |
 | Synology CPU sustained high | The processor of the NAS has stayed above 90 % for fifteen minutes; a data scrubbing or an indexing run usually ends well before. Clears below 85 % (`dumbmonit_synology_cpu_usage_percent`). | > 90 % | 15 min | Advisory (`warning`) | 6 h |
@@ -1101,6 +1108,7 @@ Raised from the scheduled network scans and their inventory (see [Scheduled scan
 | DumbMonit polls running late | Monitors stay overdue after every scheduling round (`min_over_time(dumbmonit_instance_scheduler_backlog[15m])`). | > 0 | 15 min | Advisory (`warning`) | 24 h |
 | DumbMonit metric writes failing | Batches refused by VictoriaMetrics or samples dropped in the last 15 minutes (`dumbmonit_instance_sample_writes_failed_total`, `dumbmonit_instance_samples_dropped_total`). | > 0 | 5 min | Advisory (`warning`) | 6 h |
 | DumbMonit database growing fast | `dumbmonit.db` more than doubled in a day and is over 100 MB (`dumbmonit_instance_database_bytes`). | > 2× | 1 h | Advisory (`warning`) | 24 h |
+| DumbMonit API token expiring soon | An API token expires within 7 days; extend it in **Settings → API & assistants** (`dumbmonit_instance_api_tokens_expiring`). | > 0 | 5 min | Advisory (`warning`) | 24 h |
 
 These rules and the outgoing heartbeat are explained in [Watching DumbMonit itself](../install/self-monitoring.md).
 
@@ -1114,11 +1122,93 @@ now. Each rule has:
 
 - a toggle to **enable or disable** it;
 - **Edit**, which unfolds an inline editor for name, description, operator,
-  threshold, hold (`for`), severity, reminder (`repeat every`) and escalation
+  threshold (in the rule's unit, see
+  [Thresholds you can set](#thresholds-you-can-set)), hold (**Must last
+  for**, `for`), severity, reminder (`repeat every`) and escalation
   (`escalate after`). The query of a built-in rule is shown but not editable;
   the query of your own rules is. Baseline rules show their detection
-  parameters read-only;
+  parameters read-only. **Test on history** replays the edited values on
+  stored measurements before you save (see
+  [Testing a rule on history](#test-on-history));
 - **Delete**, for your own rules only.
+
+### Thresholds you can set {#thresholds-you-can-set}
+
+How the editor shows a threshold depends only on the rule's unit:
+
+- **A duration** (an age, a delay, a time left; unit `s`, `min`, `h` or `d`)
+  is shown and typed as a number and a unit: seconds, minutes, hours or days.
+  "Backup too old" reads *more than 2 days*, not *172800*; type `36` and
+  *hours* if that suits you better. It is stored in the rule's own unit, and
+  notifications write it the same way ("2 d").
+- **An on/off signal** (unit `bool`: the series is `1` while the problem is
+  there, `0` otherwise) has no threshold to set. The editor says *when it
+  fires* in words instead of offering a meaningless "> 0"; notifications do not
+  print the value either. Per-monitor overrides can still turn it off for one
+  monitor.
+- **Anything else** (`%`, `°C`, `GiB`, a count) is a plain number next to its
+  unit.
+
+Every rule also has **Must last for** (the hold, `for`): how long the
+condition must hold before you are told, typed the same way, from `0` (at the
+first check that sees it) to as long as you like.
+
+What the built-in rules let you set:
+
+| Kind | Built-in rules | Default | You set |
+|---|---|---|---|
+| Backup or job age | Backup too old, PBS backup too old, Plakar, restic/Borg, Kopia, Duplicati, Veeam (and its configuration backup), Hetzner backup, Active Backup too old (per task), **Active Backup device backup too old** (per device), Synology Hyper Backup, Immich database backup, DumbMonit backup did not run | 2 to 8 days | The age, in hours or days |
+| Maintenance age | PBS garbage collection, PBS and Proxmox scheduled jobs, NAS and Synology scrub, Unraid parity check, NAS snapshots, Proxmox and vSphere snapshots, Pi-hole and AdGuard lists, mail gateway signatures, Jellyfin library scan, Nextcloud background jobs, krbtgt password | 2 to 200 days | The age, in hours or days |
+| Time left before expiry | Certificates (probes, proxies, Proxmox VE/PBS/PDM/PMG, Synology, TrueNAS, OPNsense, AdGuard, Cloudflare), domains, licences and support (GitLab, Veeam, FortiGate, Unraid), Tailscale keys, Entra secrets, Infomaniak products, PBS datastore filling up, Storage filling up | 7 to 30 days; `0` for "expired" | The time left, in hours or days |
+| Down, silent or stale for | Monitor unreachable (3 min), WireGuard peer silent and Tailscale device offline (15 min), DumbMonit scheduler stalled (2 min) | minutes | The delay, in seconds to days |
+| Delay or lag | Replication lag (Redis, MongoDB, PostgreSQL, Oracle Data Guard), blocked or long transactions, mail stuck in a queue (MDaemon, mailcow, mail gateway), Entra directory sync, Proxmox replication overdue, Frigate detector stuck, PostgreSQL restarted | 30 s to 6 h | The delay, in seconds to days |
+| Response time | Slow service, website slow, gateway slow (OPNsense), AdGuard and Pi-hole upstream | 0.3 to 5 s | Seconds (pfSense gateway latency stays in milliseconds) |
+| Client device stale | Client device stale (Immich, PBS, Veeam devices) | `0`: any time past the window | The window itself is set on each monitor (`device_stale_days`) |
+| Learned rhythm | Active Backup device overdue | the device's own habits | Nothing: an on/off signal. Use *Active Backup device backup too old* for a fixed limit |
+| On/off signal | 242 rules: service, gateway, tunnel or interface down, update available, maintenance mode, job last run failed, SMART failed, pool degraded, website changed… | fires while the signal is on | Nothing; only *Must last for*, severity, reminders and channels |
+
+A rule that counts something keeps a plain number even when it fires at
+`> 0` (pending updates, failed tasks, offline partitions, events in the
+Windows log): "more than 3" is a setting that makes sense there.
+
+## Testing a rule on history {#test-on-history}
+
+Before saving a change, the editor's **Test on history** replays the rule as
+the form stands (saved or not) on the measurements already stored: the last
+day, 7 or 30 days. It runs the query at the engine's evaluation step (every
+30 seconds by default) through the same threshold, clear threshold and hold
+logic as the live engine, then says what the rule would have done:
+
+- how many times it would have fired, and the notifications that means
+  (firing, reminders, escalation and resolution, with the reminder and
+  escalation delays of the form);
+- how many short breaches the hold duration absorbed;
+- for each series that fired, its monitor, a small timeline of the values with
+  the threshold and a mark for every firing period, and the periods in words
+  (start, end, peak value).
+
+Per-monitor overrides apply, and monitors that are removed, disabled or
+outside the rule's selector are left out, as in the engine. The count is the
+rule's alone: maintenance windows, dependencies, acknowledgements and the
+channels' own settings (quiet hours, cooldown, flapping hold) are not
+replayed, and neither are the repeated announcements of event rules (a website
+change found again).
+
+The test stays quick on large instances, and says so when a limit applied:
+
+- past 10,000 steps the step is widened: with the default 30-second
+  evaluation, 7 days are replayed every 1.5 minutes and 30 days every
+  4.5 minutes, so a very short hold duration is approximate;
+- past 100 series, only the 100 most often over the threshold are replayed;
+- the metrics read gives up after 20 seconds: try a shorter window.
+
+Anomaly, log pattern, forecast, drift and error budget rules cannot be replayed:
+they depend on learned baselines, log lines or values computed at evaluation
+time. The panel says so instead of a result.
+
+Through the API: `POST /api/alerts/rules/backtest` with
+`{ "rule": <rule body>, "rule_id": 12, "days": 7 }` (admins and `write`
+tokens; nothing is written).
 
 ## Per-monitor overrides {#per-device-overrides}
 
@@ -1153,7 +1243,7 @@ Click **New rule**. The form needs:
 | Operator | `>`, `>=`, `<` or `<=`. |
 | Threshold | The number the query result is compared with. |
 | Severity | Info, Advisory or Warning. |
-| Hold for | Seconds the condition must last before firing. A non-zero hold absorbs an isolated bad sample. |
+| Must last for | How long the condition must last before firing, as a number and a unit (seconds to days). A non-zero hold absorbs an isolated bad sample. |
 
 Every series returned by the query becomes one potential alert, attached to the
 monitor named by its `target` label. Aggregate with `avg by (target, host) (…)`

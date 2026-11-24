@@ -247,6 +247,7 @@ pub(super) async fn run(
             enabled: Some(item.enabled),
             tags: item.tags,
             group_name: Some(Some(item.folder)),
+            note: None,
             location_id: None,
             multisite: None,
             credential: None,

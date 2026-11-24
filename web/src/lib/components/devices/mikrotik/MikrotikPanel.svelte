@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { m } from '#lib/paraglide/messages.js';
+	import { startPolling } from '#lib/poll.js';
 	/**
 	 * A MikroTik router as the last probe saw it: versions and firmware, load,
 	 * sensors, then the interfaces. Read from the stored measurements, refreshed
 	 * every minute; opening the page never connects to the router. Every state
 	 * is a word as well as a colour, and an unknown value reads "—".
 	 */
-	import { untrack } from 'svelte';
 	import { queryInstant, type Target } from '#lib/api/index.js';
 	import { ErrorNotice, Panel, Plate, Skeleton } from '#lib/ui/index.js';
 	import Figure from '../Figure.svelte';
@@ -37,6 +37,7 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
+			return false;
 		} finally {
 			loading = false;
 		}
@@ -46,13 +47,7 @@
 		void target.id;
 		loading = true;
 		reading = EMPTY;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 
 	function percent(value: number | null): string | null {

@@ -21,6 +21,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::alerting::model::TargetId;
 
+mod occurrences;
+
 /// Nombre de minutes dans une journée, borne haute d'une heure de début.
 pub const MINUTES_PER_DAY: u32 = 24 * 60;
 

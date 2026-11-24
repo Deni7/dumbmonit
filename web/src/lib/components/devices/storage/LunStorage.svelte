@@ -9,8 +9,8 @@
 	 * here. A thin LUN shows its written share. Refreshed every minute; renders
 	 * nothing on a NAS without LUNs or on a server without the route.
 	 */
-	import { untrack } from 'svelte';
 	import { getTargetForecasts } from '#lib/api/forecasts.js';
+	import { startPolling } from '#lib/poll.js';
 	import { getTargetLuns, linkLunConsumer, unlinkLunConsumer } from '#lib/api/luns.js';
 	import type { CapacityForecast, Lun, LunVolume, Target, TargetLuns } from '#lib/api/index.js';
 	import { ApiError, listTargets } from '#lib/api/index.js';
@@ -77,6 +77,7 @@
 				return;
 			}
 			error = cause;
+			return false;
 		}
 	}
 
@@ -84,13 +85,7 @@
 		void target.id;
 		view = null;
 		editing = null;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 
 	const admin = $derived(auth.isAdmin);

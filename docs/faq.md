@@ -7,8 +7,15 @@ account sets a new password and shows it once, and **Reset 2FA** on the same
 row clears a second factor that locks you out. That is the everyday answer —
 an instance with two admin accounts never needs the rest of this page.
 
-When nobody can sign in any more, there is no recovery e-mail: start the
-server once with `DUMBMONIT_RESET_PASSWORD=1`, set in `docker-compose.yml`:
+When an email server is configured and your account has an email address,
+**Forgot password?** on the sign-in screen emails you a reset link (see
+[Forgot password by email](using/settings.md#forgot-password)); an admin can
+also send you one with **Reset link** in Settings → **Users**. Accounts that
+sign in through single sign-on or LDAP change their password with their
+provider.
+
+When nobody can sign in any more, start the server once with
+`DUMBMONIT_RESET_PASSWORD=1`, set in `docker-compose.yml`:
 
 ```yaml
     environment:

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { withBase } from '#lib/paths.js';
 	import { m } from '#lib/paraglide/messages.js';
 	/**
 	 * The device form, shared by "Add a device" and "Edit".
@@ -11,7 +10,7 @@
 	 * from `target` and the pages re-mount it (`{#key}`) when the subject changes.
 	 */
 	import { untrack } from 'svelte';
-	import { CheckCircle2, ChevronDown, PlugZap, XCircle } from 'lucide-svelte';
+	import { ChevronDown, PlugZap } from 'lucide-svelte';
 	import {
 		createTarget,
 		deleteRuleOverride,
@@ -41,8 +40,16 @@
 	import AgentLink from './AgentLink.svelte';
 	import OptionsFields from './OptionsFields.svelte';
 	import { firstRowError, parseRows, rowErrors, seedChecklists } from './option-values';
+	import { parseSteps, stepIssues } from './scenario-steps';
 	import TagsEditor from './TagsEditor.svelte';
+	import ChannelsField from './ChannelsField.svelte';
+	import { sameChannels, templateSeed } from './template-seed';
+	import type { MonitorTemplate } from '#lib/api/monitorTemplates.js';
 	import RequirementNotice from './RequirementNotice.svelte';
+	import NameAddressFields from './NameAddressFields.svelte';
+	import IntervalField from './IntervalField.svelte';
+	import ReachFields from './ReachFields.svelte';
+	import TestResult from './TestResult.svelte';
 	import MonitoredRules from './MonitoredRules.svelte';
 	import { overrideActions, pendingChanges } from './monitored-rules';
 	import { draftChanged, prefillDraft, secretPolicy, type SavedCredential } from './credential-edit';
@@ -56,13 +63,29 @@
 		type CredentialErrors
 	} from './credentials';
 	import { DEFAULT_INTERVAL, INTERVALS, SNMP_KIND, suggestName } from './kinds';
-	import { firstReason, identitySummary, testBlocker } from './test-connection';
+	import {
+		MIN_INTERVAL_SECS,
+		intervalProblem,
+		intervalSeconds,
+		splitInterval,
+		type IntervalUnit
+	} from './interval';
+	import { withoutSecretTags } from './discovery-prefill';
+	import { useDirtyTracker } from '#lib/settings/unsaved.svelte.js';
+	import { firstReason, testBlocker } from './test-connection';
 	import { seedFromPrefill, type Prefill } from './discovery-prefill';
 
 	interface Props {
 		collector: CollectorInfo;
 		/** Present on edit, absent on add. */
 		target?: Target;
+		/**
+		 * Add only: the monitor this one is copied from. Its settings seed the form
+		 * (the name gets " (copy)"); no secret comes along, they are typed again.
+		 */
+		duplicateOf?: Target;
+		/** Add only: the monitor template that seeds the form, as a copy would (no name, address or secret in it). */
+		template?: MonitorTemplate;
 		/** Candidates for "Parent device". The target itself is filtered out. */
 		targets?: Target[];
 		onsaved: (target: Target) => void;
@@ -76,17 +99,27 @@
 		folderDefault?: string;
 	}
 
-	let { collector, target, targets = [], onsaved, cancelHref, prefill = null, viaAgentDefault = null, locationDefault = null, folderDefault = '' }: Props = $props();
+	let { collector, target, duplicateOf, template, targets = [], onsaved, cancelHref, prefill = null, viaAgentDefault = null, locationDefault = null, folderDefault = '' }: Props = $props();
+
+	/** Value of the interval select that opens the number and unit fields. */
+	const CUSTOM_INTERVAL = 'custom';
 
 	// The scan's findings, folded into this kind's fields. Seeds once, like the rest.
-	const seed = untrack(() => seedFromPrefill(target ? null : prefill, collector));
+	const seed = untrack(() => seedFromPrefill(target || duplicateOf || template ? null : prefill, collector));
+	/** What the fields are seeded from: the edited monitor, the one being copied, or a template. */
+	const base = untrack(
+		() =>
+			target ??
+			duplicateOf ??
+			(template ? templateSeed(template, { viaAgent: viaAgentDefault, location: locationDefault, folder: folderDefault }) : undefined)
+	);
 
 	const editing = $derived(target !== undefined);
 	/** The credential families this kind accepts, field by field, from the server. */
 	const views = $derived(collector.credentials);
 
 	// --- Seed once from the target -------------------------------------------
-	const initialCredential: CredentialView = untrack(() => initialView(collector.credentials, target?.credential_kind));
+	const initialCredential: CredentialView = untrack(() => initialView(collector.credentials, base?.credential_kind));
 	/** The saved credential as the API describes it: kind, whether a secret is stored, its public parts. */
 	const saved: SavedCredential | null = untrack(() =>
 		target
@@ -101,33 +134,63 @@
 	const initialDraft: CredentialDraft = untrack(() =>
 		target
 			? prefillDraft(initialCredential, saved)
-			: {
+			: duplicateOf
+				? // The copy keeps the user name and token ID, never a secret.
+					prefillDraft(initialCredential, {
+						kind: kindFromLabel(duplicateOf.credential_kind, ''),
+						has_secret: false,
+						public: duplicateOf.credential_public ?? {}
+					})
+				: {
 					...emptyDraft(initialCredential),
 					// "public" is the factory community of nearly every device: pre-filled on add.
 					...(initialCredential.kind === 'snmp_community' ? { community: 'public' } : {})
 				}
 	);
 
-	let name = $state(untrack(() => target?.name ?? seed.name));
-	let address = $state(untrack(() => target?.address ?? seed.address));
-	let intervalSecs = $state(untrack(() => target?.interval_secs ?? DEFAULT_INTERVAL));
-	let parentId = $state<number | null>(untrack(() => target?.parent_id ?? null));
-	let viaAgent = $state<number | null>(untrack(() => (target ? target.via_agent : viaAgentDefault) ?? null));
+	let name = $state(untrack(() => (duplicateOf ? m.w1monitors_form_copy_name({ name: duplicateOf.name }) : (target?.name ?? seed.name))));
+	let address = $state(untrack(() => base?.address ?? seed.address));
+	// The interval: one of the presets, or a number and a unit ("Custom").
+	const initialInterval = untrack(() => base?.interval_secs ?? DEFAULT_INTERVAL);
+	const initialSplit = splitInterval(initialInterval);
+	let intervalChoice = $state(INTERVALS.some((o) => o.value === initialInterval) ? String(initialInterval) : CUSTOM_INTERVAL);
+	let customValue = $state(String(initialSplit.value));
+	let customUnit = $state<IntervalUnit>(initialSplit.unit);
+	/** Seconds between two checks; `null` while the custom value is not a number. */
+	const intervalSecs = $derived(intervalChoice === CUSTOM_INTERVAL ? intervalSeconds(customValue, customUnit) : Number(intervalChoice));
+	const intervalIssue = $derived(intervalProblem(intervalSecs));
+	const intervalError = $derived(
+		intervalIssue === 'min'
+			? m.w1monitors_form_interval_err_min({ min: MIN_INTERVAL_SECS })
+			: intervalIssue === 'max'
+				? m.w1monitors_form_interval_err_max()
+				: intervalIssue === 'invalid'
+					? m.w1monitors_form_interval_err_invalid()
+					: null
+	);
+	/** Free text for the team, shown on the monitor's page. */
+	let note = $state(untrack(() => base?.note ?? ''));
+	let parentId = $state<number | null>(untrack(() => base?.parent_id ?? null));
+	let viaAgent = $state<number | null>(untrack(() => (base ? base.via_agent : viaAgentDefault) ?? null));
 	// Probe from several locations (uptime kinds). Exclusive with `viaAgent`.
-	let msOn = $state(untrack(() => !!target?.multisite));
-	let msServer = $state(untrack(() => target?.multisite?.server ?? true));
-	let msAgents = $state<number[]>(untrack(() => [...(target?.multisite?.agents ?? [])]));
-	let msQuorum = $state<number | null>(untrack(() => target?.multisite?.quorum ?? null));
-	let enabled = $state(untrack(() => target?.enabled ?? true));
-	let cveScan = $state(untrack(() => target?.cve_scan ?? true));
-	let groupName = $state(untrack(() => target?.group_name ?? folderDefault));
+	let msOn = $state(untrack(() => !!base?.multisite));
+	let msServer = $state(untrack(() => base?.multisite?.server ?? true));
+	let msAgents = $state<number[]>(untrack(() => [...(base?.multisite?.agents ?? [])]));
+	let msQuorum = $state<number | null>(untrack(() => base?.multisite?.quorum ?? null));
+	let enabled = $state(untrack(() => base?.enabled ?? true));
+	let cveScan = $state(untrack(() => base?.cve_scan ?? true));
+	let groupName = $state(untrack(() => base?.group_name ?? folderDefault));
+	/** The monitor's own notification channels; empty: every channel its rules choose. */
+	let channels = $state<number[]>(untrack(() => [...(base?.channels ?? [])]));
+	/** Sent only when changed (or chosen for a new monitor): an unreadable list never clears them. */
+	const sendChannels = $derived(target ? !sameChannels(channels, target.channels ?? []) : channels.length > 0);
 	// MSP mode: the client of the target. Offered when there is a choice; only
 	// the MSP administrator moves an existing target (its dependents follow).
 	const clientChoices = $derived(auth.mspOn ? (auth.msp?.clients ?? []) : []);
 	const showClient = $derived(clientChoices.length > 1 || (auth.msp?.admin === true && clientChoices.length > 0));
 	const clientLocked = $derived(!!target && auth.msp?.admin !== true);
 	let clientId = $state<number | null>(untrack(() => target?.client_id ?? auth.currentClient ?? null));
-	let locationId = $state<number | null>(untrack(() => target ? (target.location_id ?? null) : locationDefault));
+	let locationId = $state<number | null>(untrack(() => base ? (base.location_id ?? null) : locationDefault));
 	/** Locations of the world map; the field only shows once there is one. */
 	let locations = $state<MapLocation[]>([]);
 	$effect(() => {
@@ -144,7 +207,15 @@
 	// (the major blocklists, say); an existing one keeps what it has, and no tag
 	// there means every box.
 	let tags = $state<Record<string, string>>(
-		untrack(() => (target ? { ...target.tags } : seedChecklists(collector.options, seed.tags)))
+		untrack(() =>
+			target
+				? { ...target.tags }
+				: duplicateOf
+					? withoutSecretTags(duplicateOf.tags)
+					: template
+						? { ...template.tags }
+						: seedChecklists(collector.options, seed.tags)
+		)
 	);
 	let credential = $state<CredentialView>(initialCredential);
 	let draft = $state<CredentialDraft>(untrack(() => ({ ...initialDraft })));
@@ -226,7 +297,7 @@
 	 * address, the relay or how the device is reached (these settings) means
 	 * typing the credential again. Mirrors `DESTINATION_TAGS` in `api/targets.rs`.
 	 */
-	const DESTINATION_TAGS = ['scheme', 'port', 'insecure_tls', 'tls', 'path', 'base_path', 'url', 'host'];
+	const DESTINATION_TAGS = ['scheme', 'port', 'insecure_tls', 'tls', 'path', 'base_path', 'url', 'host', 'steps'];
 	const destinationChanged = $derived.by(() => {
 		if (!target || target.credential_kind === 'None') return false;
 		const sentTag = (key: string) => (tags[key] ?? '').trim() || undefined;
@@ -264,6 +335,10 @@
 				// Shown line by line under the rows; here it only keeps the form from being sent.
 				if (problem) errors[option.key] = problem;
 			}
+			// Same for the steps of a scenario: each problem is said under its step.
+			if (option.input === 'steps' && stepIssues(parseSteps(tags[option.key])).size > 0) {
+				errors[option.key] = m.deviceform_steps_invalid();
+			}
 			if (!option.required) continue;
 			if ((tags[option.key] ?? '').trim() || option.default.trim()) continue;
 			errors[option.key] = m.deviceform_form_option_required({ label: option.label });
@@ -272,7 +347,7 @@
 	});
 
 	const valid = $derived(
-		!nameError && !addressError && Object.keys(credentialErrors).length === 0 && Object.keys(optionErrors).length === 0
+		!nameError && !addressError && !intervalError && Object.keys(credentialErrors).length === 0 && Object.keys(optionErrors).length === 0
 	);
 
 	function shown(field: string, error: string | null | undefined): string | undefined {
@@ -327,29 +402,11 @@
 			.catch(() => (relays = []));
 		return () => controller.abort();
 	});
-	const relayCandidates = $derived(relays);
 	// --- Several locations -----------------------------------------------------
 	const canMultisite = $derived(isMultisiteKind(collector.kind));
 	const multisiteAgentsKey = (ids: number[]) => [...ids].sort((a, b) => a - b).join(',');
 	const msTotal = $derived((msServer ? 1 : 0) + msAgents.length);
 	const msTooFew = $derived(msOn && msTotal < 2);
-	/** An unknown agent id (deleted since) stays listed so it can be unticked. */
-	const msUnknownAgents = $derived(msAgents.filter((id) => !relays.some((r) => r.id === id)));
-	const msNotReady = $derived(msOn && relays.some((r) => msAgents.includes(r.id) && !r.relay));
-	function toggleMsAgent(id: number, on: boolean) {
-		msAgents = on ? [...msAgents.filter((x) => x !== id), id] : msAgents.filter((x) => x !== id);
-	}
-	// The quorum cannot exceed the number of locations left.
-	$effect(() => {
-		if (msQuorum !== null && msQuorum > Math.max(msTotal, 1)) msQuorum = null;
-	});
-	/** The chosen relay, when it has not declared `relay: true`: probes would wait forever. */
-	const relayNotReady = $derived(
-		viaAgent !== null && relays.some((r) => r.id === viaAgent && !r.relay)
-	);
-	function relayLabel(relay: RelayAgent): string {
-		return relay.site ? m.deviceform_form_relay_site({ name: relay.name, site: relay.site }) : relay.name;
-	}
 
 	function buildPayload(): TargetPayload {
 		const payload: TargetPayload = {
@@ -363,11 +420,13 @@
 			...(canMultisite && (msOn || target?.multisite)
 				? { multisite: msOn ? { server: msServer, agents: msAgents, quorum: msQuorum } : null }
 				: {}),
-			interval_secs: intervalSecs,
+			interval_secs: intervalSecs ?? DEFAULT_INTERVAL,
+			note: note.trim(),
 			enabled,
 			cve_scan: cveScan,
 			group_name: groupName.trim(),
 			location_id: locationId,
+			...(sendChannels ? { channels } : {}),
 			...(showClient && clientId !== null && !clientLocked ? { client_id: clientId } : {}),
 			// No empty tag: a blank setting means "server default".
 			tags: Object.fromEntries(Object.entries(tags).filter(([, v]) => v.trim()))
@@ -380,6 +439,37 @@
 	let ruleChoices = $state<Record<number, boolean>>({});
 	let monitoredRules = $state<TargetRule[]>([]);
 	let rulesError = $state<unknown>(null);
+
+	// Leaving with edits not saved asks first (navigation and tab close alike).
+	// The switches of the monitored alerts count too.
+	const tracker = useDirtyTracker(() => ({
+		name,
+		address,
+		intervalChoice,
+		customValue,
+		customUnit,
+		note,
+		parentId,
+		viaAgent,
+		msOn,
+		msServer,
+		msAgents,
+		msQuorum,
+		enabled,
+		cveScan,
+		groupName,
+		channels,
+		clientId,
+		locationId,
+		tags,
+		credential: credential.kind,
+		draft,
+		rules: ruleChoices
+	}));
+	// The form starts clean: the baseline is taken once the seed and the first effects have run.
+	$effect(() => {
+		untrack(() => tracker.markClean());
+	});
 
 	/** Saves the moved switches as overrides; each one that lands is folded into the loaded state. */
 	async function saveRuleChoices(targetId: number) {
@@ -456,6 +546,7 @@
 			: firstReason([
 					nameError,
 					addressError,
+					intervalError,
 					...Object.values(credentialErrors),
 					...Object.values(optionErrors)
 				])
@@ -480,6 +571,8 @@
 					return;
 				}
 			}
+			// Saved: the page may now navigate away without asking.
+			tracker.markClean();
 			onsaved(saved);
 		} catch (cause) {
 			serverError = cause;
@@ -490,52 +583,20 @@
 </script>
 
 <form onsubmit={submit} class="grid gap-5" novalidate>
+	{#if duplicateOf}
+		<p class="rounded-[var(--radius-card)] border border-line bg-surface-2/60 px-3 py-2 text-sm text-ink-2" role="note">
+			{m.w1monitors_form_copy_notice({ name: duplicateOf.name })}
+		</p>
+	{:else if template}
+		<p class="rounded-[var(--radius-card)] border border-line bg-surface-2/60 px-3 py-2 text-sm text-ink-2" role="note">
+			{m.w5monitors_form_template_notice({ name: template.name })}
+		</p>
+	{/if}
 	<RequirementNotice requirements={collector.requirements} />
 	{#if agentOption}
 		<AgentLink {collector} option={agentOption} {targets} value={tags[agentOption.key] ?? ''} guessed={agentGuessed} onchange={chooseAgent} />
 	{/if}
-	<div class="grid gap-4 sm:grid-cols-2">
-		<Field label={m.deviceform_form_name_label()} for="target-name" required error={shown('name', nameError)} help={m.deviceform_form_name_help()}>
-			<input
-				id="target-name"
-				class="input"
-				type="text"
-				autocomplete="off"
-				bind:value={name}
-				placeholder={suggestName(address) || m.deviceform_form_name_placeholder()}
-				aria-invalid={shown('name', nameError) ? 'true' : undefined}
-				onblur={() => touch('name')}
-			/>
-		</Field>
-
-		<Field label={m.deviceform_form_address_label()} for="target-address" required error={shown('address', addressError)} help={addressHelp}>
-			<div class="relative">
-				<input
-					id="target-address"
-					class={`input font-mono text-[0.8125rem] ${collector.default_port > 0 ? 'pr-16' : ''}`}
-					type="text"
-					autocomplete="off"
-					spellcheck="false"
-					bind:value={address}
-					placeholder={collector.address_hint || m.deviceform_form_address_placeholder()}
-					aria-invalid={shown('address', addressError) ? 'true' : undefined}
-					onblur={() => {
-						touch('address');
-						// Naming a switch is not a prerequisite to watching it.
-						if (!name.trim()) name = suggestName(address);
-					}}
-				/>
-				{#if collector.default_port > 0 && !/:\d+$/.test(address.trim())}
-					<span
-						class="tnum pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 font-mono text-[0.8125rem] text-ink-3"
-						aria-hidden="true"
-					>
-						:{collector.default_port}
-					</span>
-				{/if}
-			</div>
-		</Field>
-	</div>
+	<NameAddressFields {collector} bind:name bind:address {nameError} {addressError} {addressHelp} {shown} {touch} />
 
 	{#if !(views.length <= 1 && credential.fields.length === 0)}
 		<CredentialFields
@@ -586,16 +647,7 @@
 			{/if}
 
 			<div class="grid gap-4 sm:grid-cols-2">
-				<Field label={m.deviceform_form_interval_label()} for="target-interval" help={m.deviceform_form_interval_help()}>
-					<select id="target-interval" class="input tnum" bind:value={intervalSecs}>
-						{#each INTERVALS as option (option.value)}
-							<option value={option.value}>{option.label}</option>
-						{/each}
-						{#if !INTERVALS.some((o) => o.value === intervalSecs)}
-							<option value={intervalSecs}>{m.deviceform_interval_seconds({ value: intervalSecs })}</option>
-						{/if}
-					</select>
-				</Field>
+				<IntervalField bind:intervalChoice bind:customValue bind:customUnit {intervalSecs} {intervalError} {CUSTOM_INTERVAL} />
 
 				{#if showClient}
 					<Field label={m.deviceform_form_client_label()} for="target-client" help={target ? m.deviceform_form_client_help_edit() : m.deviceform_form_client_help()}>
@@ -646,91 +698,23 @@
 					</select>
 				</Field>
 
-				{#if canRelay && !(canMultisite && msOn) && (relayCandidates.length > 0 || viaAgent !== null)}
-					<Field
-						label={m.deviceform_form_relay_label()}
-						for="target-relay"
-						help={relayNotReady ? m.deviceform_form_relay_not_ready() : undefined}
-					>
-						<select id="target-relay" class="input" bind:value={viaAgent}>
-							<option value={null}>{m.deviceform_form_relay_direct()}</option>
-							{#each relayCandidates as relay (relay.id)}
-								<option value={relay.id}>{relay.relay ? relayLabel(relay) : m.deviceform_form_relay_off({ label: relayLabel(relay) })}</option>
-							{/each}
-							{#if viaAgent !== null && !relayCandidates.some((r) => r.id === viaAgent)}
-								<option value={viaAgent}>{m.deviceform_form_relay_agent_n({ id: viaAgent })}</option>
-							{/if}
-						</select>
-					</Field>
-				{:else if canRelay && relaysRead && !editing}
-					<!-- No relay yet: say once that a device on another network is reachable too. -->
-					<p class="text-[0.8125rem] leading-relaxed text-ink-2 sm:col-span-2">
-						<a href={withBase('/targets/new?kind=agent&via=relay')} class="font-semibold text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink">{m.deviceform_form_remote_link()}</a>
-					</p>
-				{/if}
-
-				{#if canMultisite && (relayCandidates.length > 0 || msOn)}
-					<div class="grid gap-3 sm:col-span-2">
-						<Field
-							label={m.deviceform_multisite_label()}
-							for="target-multisite"
-							inline
-							help={viaAgent !== null && !msOn ? m.deviceform_multisite_exclusive() : undefined}
-						>
-							<Toggle
-								id="target-multisite"
-								bind:checked={msOn}
-								disabled={viaAgent !== null && !msOn}
-								label={m.deviceform_multisite_label()}
-								onchange={(on) => {
-									if (on) viaAgent = null;
-								}}
-							/>
-						</Field>
-						{#if msOn}
-							<fieldset class="grid gap-1 rounded-[var(--radius-card)] border border-line p-3">
-								<legend class="px-1 text-sm font-semibold text-ink">{m.deviceform_multisite_locations()}</legend>
-								<label class="flex min-h-10 items-center gap-3 text-sm text-ink">
-									<input type="checkbox" class="size-4 accent-[var(--color-signal)]" bind:checked={msServer} />
-									{m.deviceform_multisite_server()}
-								</label>
-								{#each relayCandidates as relay (relay.id)}
-									<label class="flex min-h-10 items-center gap-3 text-sm text-ink">
-										<input
-											type="checkbox"
-											class="size-4 accent-[var(--color-signal)]"
-											checked={msAgents.includes(relay.id)}
-											onchange={(e) => toggleMsAgent(relay.id, e.currentTarget.checked)}
-										/>
-										<span class="min-w-0 break-words">{relay.relay ? relayLabel(relay) : m.deviceform_form_relay_off({ label: relayLabel(relay) })}</span>
-									</label>
-								{/each}
-								{#each msUnknownAgents as id (id)}
-									<label class="flex min-h-10 items-center gap-3 text-sm text-ink">
-										<input type="checkbox" class="size-4 accent-[var(--color-signal)]" checked onchange={(e) => toggleMsAgent(id, e.currentTarget.checked)} />
-										{m.deviceform_form_relay_agent_n({ id })}
-									</label>
-								{/each}
-								{#if msTooFew}
-									<p class="text-[0.8125rem] text-warning" role="alert">{m.deviceform_multisite_too_few()}</p>
-								{:else if msNotReady}
-									<p class="text-[0.8125rem] text-ink-2">{m.deviceform_multisite_not_ready()}</p>
-								{/if}
-							</fieldset>
-							<Field label={m.deviceform_multisite_quorum_label()} for="target-quorum" help={m.deviceform_multisite_quorum_help()}>
-								<select id="target-quorum" class="input" bind:value={msQuorum}>
-									<option value={null}>{m.deviceform_multisite_quorum_majority()}</option>
-									{#each Array.from({ length: Math.max(msTotal, 1) }, (_, i) => i + 1) as n (n)}
-										<option value={n}>{m.deviceform_multisite_quorum_n({ n, total: msTotal })}</option>
-									{/each}
-								</select>
-							</Field>
-						{/if}
-					</div>
-				{/if}
+				<ReachFields {collector} {canRelay} {canMultisite} {relays} {relaysRead} {editing} bind:viaAgent bind:msOn bind:msServer bind:msAgents bind:msQuorum />
 			</div>
 
 			<TagsEditor tags={freeTags} reserved={optionKeys} onchange={setFreeTags} />
+
+			<ChannelsField bind:value={channels} />
+
+			<Field label={m.w1monitors_form_note_label()} for="target-note" help={m.w1monitors_form_note_help()}>
+				<textarea
+					id="target-note"
+					class="input min-h-24 resize-y"
+					rows="3"
+					maxlength="2000"
+					bind:value={note}
+					placeholder={m.w1monitors_form_note_placeholder()}
+				></textarea>
+			</Field>
 
 			<Field label={m.deviceform_form_enabled_label()} for="target-enabled" inline help={m.deviceform_form_enabled_help()}>
 				<Toggle id="target-enabled" bind:checked={enabled} label={m.deviceform_form_enabled_label()} />
@@ -791,29 +775,6 @@
 		<p id="target-test-why" class="text-[0.8125rem] text-ink-2">{blockerText}</p>
 	{/if}
 	{#if canTest}
-		<div aria-live="polite" class="grid gap-1">
-			{#if testReport?.ok}
-				{@const identity = identitySummary(testReport.sysname, testReport.sysdescr)}
-				<p class="flex items-start gap-2 text-sm font-medium text-ink">
-					<CheckCircle2 class="mt-0.5 size-4 shrink-0 text-signal-ink" aria-hidden="true" />
-					<span>
-						{identity ? m.deviceform_test_ok_identity({ identity }) : m.deviceform_test_ok()}
-					</span>
-				</p>
-				{#if testReport.profile_id}
-					<p class="pl-6 text-[0.8125rem] text-ink-2">{m.deviceform_test_profile({ profile: testReport.profile_id })}</p>
-				{/if}
-			{:else if testReport}
-				<p class="flex items-start gap-2 text-sm font-medium text-warning-ink">
-					<XCircle class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-					<span>{m.deviceform_test_failed({ error: testReport.error ?? '' })}</span>
-				</p>
-				<p class="pl-6 text-[0.8125rem] text-ink-2">
-					{testReport.unreachable ? m.deviceform_test_hint_down() : m.deviceform_test_hint_config()}
-				</p>
-			{:else if testError}
-				<ErrorNotice error={testError} title={m.deviceform_test_error()} />
-			{/if}
-		</div>
+		<TestResult report={testReport} error={testError} />
 	{/if}
 </form>

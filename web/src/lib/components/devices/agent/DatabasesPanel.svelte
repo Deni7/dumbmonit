@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { m } from '#lib/paraglide/messages.js';
+	import { startPolling } from '#lib/poll.js';
 	/**
 	 * Databases the agent found on its machine (PostgreSQL, MySQL/MariaDB,
 	 * SQL Server, HFSQL, MongoDB), one line each: whether the service runs and
@@ -11,7 +12,6 @@
 	 * is unknown shows a calm advisory, not a warning: nothing is known to be
 	 * wrong. The built-in rule fires on the agent's own `overdue` verdict.
 	 */
-	import { untrack } from 'svelte';
 	import { queryInstant, type Target } from '#lib/api/index.js';
 	import { ErrorNotice, Panel, Plate, type Tone } from '#lib/ui/index.js';
 	import { formatAge, formatBytes } from '../docker/api';
@@ -98,6 +98,7 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
+			return false;
 		} finally {
 			loading = false;
 		}
@@ -107,13 +108,7 @@
 		void target.id;
 		loading = true;
 		databases = [];
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 
 	const failing = $derived(databases.filter((d) => plateOf(d).tone === 'warning').length);

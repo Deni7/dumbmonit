@@ -97,13 +97,38 @@ async fn places(
     if q.chars().count() < 2 || q.chars().count() > 80 || q.chars().any(char::is_control) {
         return Err(ApiError::BadRequest("Type at least two letters of a city name.".into()));
     }
-    let lang = query
-        .lang
-        .as_deref()
-        .filter(|l| (2..=5).contains(&l.len()) && l.chars().all(|c| c.is_ascii_alphabetic()))
-        .unwrap_or("en");
-    let found = hub.search(q, lang).await.ok_or_else(|| {
-        ApiError::BadGateway("The weather service did not answer. Try again in a moment.".into())
+    let lang = language(query.lang.as_deref());
+    let found = hub.search(q, &lang).await.map_err(|why| {
+        tracing::warn!(%why, "météo du mur : recherche de ville en échec");
+        ApiError::BadGateway(format!("The weather service failed ({why}). Try again later."))
     })?;
     Ok(no_store(Json(found)))
+}
+
+/// La langue des noms de lieux : la sous-étiquette principale de la langue de
+/// l'interface (`pt-BR` → `pt`, `zh-Hans` → `zh`), anglais à défaut.
+fn language(lang: Option<&str>) -> String {
+    let primary = lang.and_then(|l| l.split(['-', '_']).next()).unwrap_or("");
+    let primary = primary.to_ascii_lowercase();
+    if primary.len() == 2 && primary.bytes().all(|b| b.is_ascii_lowercase()) {
+        primary
+    } else {
+        "en".into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::language;
+
+    #[test]
+    fn la_langue_des_lieux_suit_celle_de_l_interface() {
+        assert_eq!(language(Some("fr")), "fr");
+        assert_eq!(language(Some("pt-BR")), "pt");
+        assert_eq!(language(Some("zh-Hans")), "zh");
+        assert_eq!(language(Some("DE")), "de");
+        assert_eq!(language(Some("x")), "en");
+        assert_eq!(language(Some("fr;drop")), "en");
+        assert_eq!(language(None), "en");
+    }
 }

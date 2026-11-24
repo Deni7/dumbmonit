@@ -14,6 +14,7 @@
 	 * still here — as "unknown", which is exactly what they are.
 	 */
 	import { page } from '$app/state';
+	import { startPolling } from '#lib/poll.js';
 	import { queryRange, type MetricSeries, type ProxmoxGuest, type Target } from '#lib/api/index.js';
 	import { listProxmoxGuests } from '#lib/api/proxmox.js';
 	import { formatDuration } from '#lib/format.js';
@@ -46,6 +47,7 @@
 		} catch (cause) {
 			if (signal?.aborted) return;
 			error = cause;
+			return false;
 		} finally {
 			if (!signal?.aborted) loading = false;
 		}
@@ -53,14 +55,8 @@
 
 	// First load, then a refresh at the cadence the probes write at.
 	$effect(() => {
-		const controller = new AbortController();
 		loading = true;
-		void load(controller.signal);
-		const timer = setInterval(() => void load(controller.signal), 30_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 30_000);
 	});
 
 	// --- Filters and sort ---------------------------------------------------------

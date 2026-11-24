@@ -5,8 +5,8 @@
 	 * rebuilt from them). Renders nothing until the target has stored some, so
 	 * a device without the series shows no empty frame.
 	 */
-	import { untrack } from 'svelte';
 	import { queryRange, type Target } from '#lib/api/index.js';
+	import { startPolling } from '#lib/poll.js';
 	import { ErrorNotice, Panel } from '#lib/ui/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import BackupMatrix from './BackupMatrix.svelte';
@@ -48,6 +48,7 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
+			return false;
 		} finally {
 			loading = false;
 		}
@@ -58,13 +59,7 @@
 		void spec;
 		loading = true;
 		jobs = [];
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 300_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 300_000);
 	});
 </script>
 

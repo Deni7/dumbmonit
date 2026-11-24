@@ -49,6 +49,14 @@ jobs:
           - run: b
             path: another/checkout/path
     steps:
+      # The server and the agents (four targets, fat LTO) build side by side: without more
+      # swap the runner ran out of memory and was shut down. Swap changes no output.
+      - name: Free disk space and add swap
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo swapoff -a && sudo rm -f /mnt/swapfile /swapfile
+          sudo fallocate -l 10G /swapfile && sudo chmod 600 /swapfile
+          sudo mkswap /swapfile >/dev/null && sudo swapon /swapfile && free -h && df -h /
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: ${{ matrix.path }}

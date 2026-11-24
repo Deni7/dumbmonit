@@ -198,6 +198,22 @@ pub struct Config {
     /// connexion d'agent du site, qu'elle passe par son propre tunnel ou par un
     /// flux de la connexion multiplexée du relais.
     pub relay_max_tunnels: usize,
+    /// Canal des agents par WebSocket à l'adresse de l'interface
+    /// (`DUMBMONIT_AGENT_WEBSOCKET`, ouvert par défaut ; `off` le ferme) :
+    /// `GET /api/agent/ws`, pour les agents derrière Cloudflare Tunnel, un
+    /// mandataire inverse qui termine TLS ou un mandataire d'entreprise. Il
+    /// suppose le port des agents ouvert : c'est sa session TLS (certificat
+    /// client compris) qui passe à l'intérieur.
+    pub agent_websocket: bool,
+    /// Connexions WebSocket d'agents simultanées au plus par adresse
+    /// (`DUMBMONIT_AGENT_WS_MAX_PER_IP`, 256 par défaut, de 1 à 65536). Derrière
+    /// un mandataire non déclaré dans `DUMBMONIT_TRUSTED_PROXIES`, l'adresse
+    /// est la sienne : tout le parc compte alors pour une.
+    pub agent_ws_max_per_ip: usize,
+    /// Débit entrant de chaque connexion WebSocket d'agent, en Kio/s
+    /// (`DUMBMONIT_AGENT_WS_RATE_KIB`, 16384 par défaut, au moins 64). La
+    /// connexion multiplexée d'un relais porte tout son site : de la marge.
+    pub agent_ws_rate_kib: u32,
     /// Certificat fourni (`DUMBMONIT_TLS_CERT`, chaîne PEM) et sa clé
     /// (`DUMBMONIT_TLS_KEY`). Absents : un certificat autosigné est créé au
     /// premier démarrage et gardé, clé chiffrée, dans la base.
@@ -210,6 +226,138 @@ pub struct Config {
     /// Serveur de secours (`DUMBMONIT_HA_*`, voir [`crate::ha`]). `None` : un
     /// serveur seul, comme toujours.
     pub ha: Option<crate::ha::HaConfig>,
+}
+
+/// Une valeur de la configuration effective, telle que l'interface et
+/// `--check-config` la montrent. Jamais un secret.
+#[derive(Debug, Clone, serde::Serialize, PartialEq, Eq)]
+pub struct EffectiveSetting {
+    /// Identifiant stable, anglais : l'interface en tire le libellé.
+    pub key: &'static str,
+    pub value: String,
+    /// Variable d'environnement qui la règle, quand il y en a une.
+    pub env: Option<&'static str>,
+}
+
+/// `scheme://hôte:port` d'une URL, sans identifiants, chemin ni requête : ce qu'on
+/// peut montrer d'une adresse qui a pu en contenir.
+pub fn redact_url(raw: &str) -> String {
+    match reqwest::Url::parse(raw) {
+        Ok(url) => match (url.host_str(), url.port()) {
+            (Some(host), Some(port)) => format!("{}://{host}:{port}", url.scheme()),
+            (Some(host), None) => format!("{}://{host}", url.scheme()),
+            _ => "(unreadable URL)".to_string(),
+        },
+        Err(_) => "(unreadable URL)".to_string(),
+    }
+}
+
+impl Config {
+    /// Les réglages effectifs hors secrets : de quoi vérifier une installation
+    /// sans lire le fichier Compose. Le secret d'instance, les mots de passe, les
+    /// jetons et les identifiants d'URL n'y figurent jamais.
+    pub fn effective(&self) -> Vec<EffectiveSetting> {
+        let set = |key, value: String, env| EffectiveSetting { key, value, env };
+        let toggle = |on: bool| if on { "on" } else { "off" }.to_string();
+        let log = env_var("DUMBMONIT_LOG").unwrap_or_else(|| "info,sqlx=warn,hyper=warn".into());
+        vec![
+            set("version", env!("CARGO_PKG_VERSION").to_string(), None),
+            set("data_dir", self.data_dir.display().to_string(), Some("DUMBMONIT_DATA_DIR")),
+            set("bind", self.bind.to_string(), Some("DUMBMONIT_BIND")),
+            set(
+                "agent_listen",
+                self.agent_listen.map_or_else(|| "off".to_string(), |a| a.to_string()),
+                Some("DUMBMONIT_AGENT_LISTEN"),
+            ),
+            set(
+                "single_port",
+                self.single_listen.map_or_else(|| "off".to_string(), |a| a.to_string()),
+                Some("DUMBMONIT_SINGLE_PORT"),
+            ),
+            set(
+                "victoria_metrics",
+                match &self.victoria_url {
+                    Some(url) => format!("external ({})", redact_url(url)),
+                    None => format!("embedded ({})", self.vm_listen),
+                },
+                Some("DUMBMONIT_VM_URL"),
+            ),
+            set("vm_retention", self.vm_retention.clone(), Some("DUMBMONIT_VM_RETENTION")),
+            set("log_filter", log, Some("DUMBMONIT_LOG")),
+            set("workers", self.workers.to_string(), Some("DUMBMONIT_WORKERS")),
+            set("db_pool_size", self.db_pool_size.to_string(), Some("DUMBMONIT_DB_POOL")),
+            set(
+                "max_concurrent_probes",
+                self.max_concurrent_probes.to_string(),
+                Some("DUMBMONIT_MAX_CONCURRENT_PROBES"),
+            ),
+            set("probe_timeout", format!("{} s", self.probe_timeout.as_secs()), None),
+            set("trusted_proxies", self.trusted_proxies.len().to_string(), None),
+            set(
+                "secret_source",
+                if self.secret.is_some() { "environment" } else { "file" }.to_string(),
+                Some("DUMBMONIT_SECRET"),
+            ),
+            set(
+                "tls_certificate",
+                if self.tls_cert.is_some() { "provided" } else { "self-signed" }.to_string(),
+                Some("DUMBMONIT_TLS_CERT"),
+            ),
+            set("metrics_public", toggle(self.metrics_public), Some("DUMBMONIT_METRICS_PUBLIC")),
+            set("backup_enabled", toggle(self.backup_enabled), Some("DUMBMONIT_BACKUP_ENABLED")),
+            set(
+                "backup_interval",
+                format!("{} h", self.backup_interval.as_secs() / 3600),
+                Some("DUMBMONIT_BACKUP_INTERVAL_HOURS"),
+            ),
+            set("backup_keep", self.backup_keep.to_string(), Some("DUMBMONIT_BACKUP_KEEP")),
+            set(
+                "backup_dir",
+                self.backup_path().display().to_string(),
+                Some("DUMBMONIT_BACKUP_DIR"),
+            ),
+            set("audit_keep", crate::auth::audit::keep().to_string(), Some("DUMBMONIT_AUDIT_KEEP")),
+            set(
+                "config_dir",
+                self.config_dir.as_ref().map_or_else(|| "-".into(), |d| d.display().to_string()),
+                Some("DUMBMONIT_CONFIG_DIR"),
+            ),
+            set("high_availability", toggle(self.ha.is_some()), None),
+            set("demo", toggle(self.demo), Some("DUMBMONIT_DEMO")),
+        ]
+    }
+
+    /// Les problèmes que `from_env` ne rejette pas mais qu'un opérateur veut
+    /// connaître : une variable en désaccord avec ce qui sera réellement utilisé.
+    pub fn warnings(&self) -> Vec<String> {
+        use crate::auth::audit::{MAX_KEEP, MIN_KEEP, parse_keep};
+        let mut found = Vec::new();
+        let raw = env_var("DUMBMONIT_AUDIT_KEEP");
+        let asked = raw.as_deref().and_then(|raw| raw.trim().parse::<i64>().ok());
+        match (parse_keep(raw.as_deref()), asked) {
+            (Err(problem), _) => found.push(problem),
+            (Ok(_), Some(asked)) if !(MIN_KEEP..=MAX_KEEP).contains(&asked) => {
+                found.push(format!(
+                    "DUMBMONIT_AUDIT_KEEP: {asked} is outside {MIN_KEEP} to {MAX_KEEP}, \
+                     the nearest bound is used"
+                ));
+            }
+            _ => {}
+        }
+        if !self.data_dir.is_dir() {
+            found.push(format!(
+                "{} does not exist yet (it is created at startup)",
+                self.data_dir.display()
+            ));
+        }
+        if let (Some(cert), None) = (&self.tls_cert, &self.tls_key) {
+            found.push(format!(
+                "DUMBMONIT_TLS_CERT is set ({}) without DUMBMONIT_TLS_KEY",
+                cert.display()
+            ));
+        }
+        found
+    }
 }
 
 /// Réglages d'instance du collecteur `website`.
@@ -344,6 +492,10 @@ impl Config {
             single_listen,
             relay_max_tunnels: env_parsed::<usize>("DUMBMONIT_RELAY_MAX_TUNNELS", "1024")?
                 .clamp(1, MAX_RELAY_TUNNELS),
+            agent_websocket: env_flag_or("DUMBMONIT_AGENT_WEBSOCKET", true),
+            agent_ws_max_per_ip: env_parsed::<usize>("DUMBMONIT_AGENT_WS_MAX_PER_IP", "256")?
+                .clamp(1, 65_536),
+            agent_ws_rate_kib: env_parsed::<u32>("DUMBMONIT_AGENT_WS_RATE_KIB", "16384")?.max(64),
             agent_legacy_days: env_var("DUMBMONIT_AGENT_LEGACY_DAYS")
                 .map(|raw| {
                     raw.trim().parse::<u32>().with_context(|| {
@@ -601,9 +753,7 @@ pub fn is_https_url(url: &str) -> bool {
     url.len() > 8 && url.get(..8).is_some_and(|scheme| scheme.eq_ignore_ascii_case("https://"))
 }
 
-/// Lecture d'une variable `DUMBMONIT_*`, avec repli sur `EZYMONIT_*` (voir
-/// [`dumbmonit_proto::env`]). Tout le serveur passe par ici : c'est ce qui
-/// garantit que l'ancien nom est accepté partout, et signalé une seule fois.
+/// Lecture d'une variable `DUMBMONIT_*` (voir [`dumbmonit_proto::env`]).
 pub fn env_var(key: &str) -> Option<String> {
     dumbmonit_proto::env::var(key)
 }
@@ -695,6 +845,31 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_shown_url_loses_its_credentials_and_path() {
+        assert_eq!(
+            redact_url("https://user:pass@vm.lan:8428/prometheus?x=1"),
+            "https://vm.lan:8428"
+        );
+        assert_eq!(redact_url("http://vm"), "http://vm");
+        assert_eq!(redact_url("pas une url"), "(unreadable URL)");
+    }
+
+    #[test]
+    fn the_effective_settings_never_hold_a_secret() {
+        let config = Config::from_env().expect("default environment");
+        let settings = config.effective();
+        assert!(settings.iter().any(|s| s.key == "data_dir"));
+        let keys: Vec<&str> = settings.iter().map(|s| s.key).collect();
+        let mut unique = keys.clone();
+        unique.sort_unstable();
+        unique.dedup();
+        assert_eq!(keys.len(), unique.len(), "a key appears twice");
+        for key in keys {
+            assert!(!["secret", "password", "token"].contains(&key), "{key} must not be listed");
+        }
+    }
 
     #[test]
     fn the_agent_channel_listens_on_8443_unless_told_otherwise() {

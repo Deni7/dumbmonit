@@ -190,10 +190,10 @@ pub use truenas::TruenasCollector;
 pub use unifi::UnifiCollector;
 pub use unraid::UnraidCollector;
 pub use uptime::{
-    DnsCollector, GrpcCollector, HttpCollector, ImapCollector, MqttCollector, MysqlCollector,
-    NtpCollector, PingCollector, Pop3Collector, PostgresCollector, ProviderCollector,
-    RadiusCollector, SmtpCollector, SnmpOidCollector, SshCollector, TcpCollector, TlsCollector,
-    UdpCollector, WebsocketCollector,
+    DnsCollector, GrpcCollector, HttpCollector, HttpStepsCollector, ImapCollector, MqttCollector,
+    MysqlCollector, NtpCollector, PingCollector, Pop3Collector, PostgresCollector,
+    ProviderCollector, RadiusCollector, SmtpCollector, SnmpOidCollector, SshCollector,
+    TcpCollector, TlsCollector, UdpCollector, WebsocketCollector,
 };
 pub use veeam::VeeamCollector;
 pub use vsphere::VsphereCollector;
@@ -314,6 +314,7 @@ impl Registry {
         registry.register(Arc::new(CephCollector::new()));
         registry.register(Arc::new(MinioCollector::new()));
         registry.register(Arc::new(HttpCollector::new()));
+        registry.register(Arc::new(HttpStepsCollector::new()));
         registry.register(Arc::new(TcpCollector::new()));
         registry.register(Arc::new(DnsCollector::new()));
         registry.register(Arc::new(PingCollector::new()));
@@ -566,7 +567,9 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    // Horloge de tokio arrêtée : la sonde (300 ms) et les délais (100 ms, 1 s)
+    // se départagent sur le temps simulé, pas sur la charge de la machine.
+    #[tokio::test(start_paused = true)]
     async fn le_delai_propre_a_la_cible_releve_celui_du_registre() {
         let mut registry = Registry::new();
         registry.register(Arc::new(Lent));

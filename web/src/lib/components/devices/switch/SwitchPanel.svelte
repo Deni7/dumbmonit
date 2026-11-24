@@ -11,6 +11,7 @@
 	 * nothing at all.
 	 */
 	import { untrack } from 'svelte';
+	import { startPolling } from '#lib/poll.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { getLocale } from '#lib/paraglide/runtime.js';
 	import { queryInstant, queryRange, type Target } from '#lib/api/index.js';
@@ -69,6 +70,7 @@
 		} catch (cause) {
 			// The panel is an addition to the page: a failed read leaves it as it was.
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
+			return false;
 		}
 	}
 
@@ -78,13 +80,7 @@
 		units = [];
 		unitKey = null;
 		selected = null;
-		const controller = new AbortController();
-		void untrack(() => load(controller.signal));
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 
 	// Heatmap of the unit on screen: one row per port, half-hour columns.
@@ -331,7 +327,7 @@
 					</dl>
 
 					<div class="min-w-0">
-						<h4 class="mb-2 text-[0.8125rem] font-medium text-ink-2">{m.devices_switch_traffic()}</h4>
+						<h4 class="mb-2 text-sm font-semibold text-ink">{m.devices_switch_traffic()}</h4>
 						{#if traffic.length === 2}
 							<Chart series={traffic} unit="Mbit/s" height={180} pair />
 						{:else if trafficLoaded}

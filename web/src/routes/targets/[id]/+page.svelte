@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { withBase } from '#lib/paths.js';
 	import { kindLabel as kindLabelOf } from '#lib/kind-label.js';
 	import { m } from '#lib/paraglide/messages.js';
 	/**
@@ -35,73 +34,56 @@
 	} from '#lib/api/index.js';
 	import {
 		displayState,
-		formatDateTime,
-		formatDuration,
-		formatFailureReason,
-		formatLatency,
-		formatPercent,
-		formatRelative,
 		isUptimeKind,
-		STATE_LABEL,
 		STATE_TONE,
 		type ProbeStatus
 	} from '#lib/format.js';
 	import {
-		HISTORY_SLOTS,
 		loadProbeStatuses,
 		loadResponseTimesWindow,
 		loadHttpPhases,
 		loadResponseTimes,
-		PHASE_TOKENS,
 		loadUptimeHistory,
 		loadUptimeSummary,
+		loadScenarioSamples,
 		RANGES,
 		type HistorySlot,
 		type RangeId,
+		type ScenarioSamples,
 		type UptimeSummary
 	} from '#lib/metrics.js';
-	import Chart, { type Serie } from '#lib/components/Chart.svelte';
+	import { lastRun, parseSteps } from '#lib/components/device-form/scenario-steps.js';
+	import type { ChartEvent, Serie } from '#lib/components/Chart.svelte';
+	import AnnotationsPanel from '#lib/components/annotations/AnnotationsPanel.svelte';
 	import { eventsFromHistory, eventsFromRestarts, thresholdsFor } from '#lib/chart-context.js';
 	import { CONTAINER_RESTART_METRIC, UPTIME_METRIC, restartEvents, type RestartEvent } from '#lib/restart-events.js';
-	import Readout from '#lib/components/Readout.svelte';
-	import Figure from '#lib/components/devices/Figure.svelte';
 	import Segmented from '#lib/components/devices/Segmented.svelte';
-	import PhaseBreakdown from '#lib/components/devices/PhaseBreakdown.svelte';
 	import ProbeLocationsCard from '#lib/components/devices/ProbeLocationsCard.svelte';
-	import UptimeBar from '#lib/components/devices/UptimeBar.svelte';
 	import DeviceTimeline from '#lib/components/devices/DeviceTimeline.svelte';
-	import FoldSection from '#lib/components/devices/FoldSection.svelte';
-	import AlertBell from '#lib/components/devices/AlertBell.svelte';
 	import { countAlertsByTarget } from '#lib/alerts-attention.js';
-	import SecurityBadge from '#lib/components/devices/SecurityBadge.svelte';
 	import CveDeviceCard from '#lib/components/cves/CveDeviceCard.svelte';
 	import MachineHealthCard from '#lib/components/devices/agent/MachineHealthCard.svelte';
 	import TargetRemediation from '#lib/components/remediation/TargetRemediation.svelte';
 	import SecurityReport from '#lib/components/devices/SecurityReport.svelte';
 	import { getTargetSecurity } from '#lib/api/security.js';
 	import type { SecurityReport as SecurityReportData } from '#lib/api/index.js';
-	import { hasKindPanel, loadKindPanel, type KindPanel } from '#lib/components/devices/kinds.js';
-	import FoldRow from '#lib/components/devices/FoldRow.svelte';
+	import { hasKindPanel } from '#lib/components/devices/kinds.js';
 	import {
-		formatRate,
-		isVirtualInterface,
-		lastValue,
 		loadDeviceMetrics,
 		loadDeviceMetricsWindow,
 		sectionize,
-		steadyValue,
-		type DeviceMetricGroup,
-		type MetricRow
+		type DeviceMetricGroup
 	} from '#lib/components/devices/metrics.js';
 	import { catalogLayout, ratedFamilies, withCatalogUnits } from '#lib/components/devices/catalog.js';
-	import CatalogViews from '#lib/components/devices/CatalogViews.svelte';
-	import SilenceControl from '#lib/components/devices/SilenceControl.svelte';
-	import TargetMenu from '#lib/components/devices/TargetMenu.svelte';
-	import ManagedNotice from '#lib/components/devices/ManagedNotice.svelte';
-	import { auth } from '#lib/stores/auth.svelte.js';
+	import MaintenanceWindows from '#lib/components/devices/MaintenanceWindows.svelte';
+	import { neighbours } from '#lib/components/devices/neighbours.js';
+	import { buildRack } from '#lib/components/devices/rack.js';
+	import { buildFolders } from '#lib/components/devices/folders.js';
+	import { splitDisabled, freeTags } from '#lib/components/devices/listState.js';
+	import { alertsStore } from '#lib/stores/alerts.svelte.js';
+	import { startPolling } from '#lib/poll.js';
+	import { tagChip } from '#lib/tag-chip.js';
 	import { dismissals } from '#lib/stores/dismissals.svelte.js';
-	import DockerPanel from '#lib/components/devices/docker/DockerPanel.svelte';
-	import AgentRemoveNotice from '#lib/components/devices/agent/AgentRemoveNotice.svelte';
 	import DockerStrip from '#lib/components/devices/docker/DockerStrip.svelte';
 	import { isDockerDevice } from '#lib/components/devices/agent/services.js';
 	import TargetDeadlines from '#lib/components/deadlines/TargetDeadlines.svelte';
@@ -109,15 +91,18 @@
 		Button,
 		EmptyState,
 		ErrorNotice,
-		Led,
-		Panel,
-		Plate,
 		Skeleton,
 		confetti,
 		type Tone
 	} from '#lib/ui/index.js';
-	import { Activity, ArrowUpRight, ChevronDown, ExternalLink, PowerOff, Search, ServerOff } from 'lucide-svelte';
-	import KindIcon from '#lib/components/KindIcon.svelte';
+	import { PowerOff, ServerOff } from 'lucide-svelte';
+	import DetailNav from '#lib/components/devices/detail/DetailNav.svelte';
+	import DeviceFolds from '#lib/components/devices/detail/DeviceFolds.svelte';
+	import HeaderActions from '#lib/components/devices/detail/HeaderActions.svelte';
+	import HeaderIdentity from '#lib/components/devices/detail/HeaderIdentity.svelte';
+	import HeaderNotices from '#lib/components/devices/detail/HeaderNotices.svelte';
+	import KindPanelSection from '#lib/components/devices/detail/KindPanelSection.svelte';
+	import ServiceInstruments from '#lib/components/devices/detail/ServiceInstruments.svelte';
 
 	const id = $derived(Number(page.params.id));
 
@@ -125,30 +110,6 @@
 
 	let target = $state<Target | null>(null);
 	let loading = $state(true);
-
-	// --- Kind-specific panel ----------------------------------------------
-	// Dynamically imported (`kinds.ts`): loaded once per kind, not on every poll.
-
-	let kindPanelComponent = $state<KindPanel | null>(null);
-	let kindPanelLoadedFor = $state<string | null>(null);
-	$effect(() => {
-		const kind = target?.kind;
-		if (!kind || !hasKindPanel(kind)) {
-			kindPanelComponent = null;
-			kindPanelLoadedFor = null;
-			return;
-		}
-		if (kindPanelLoadedFor === kind) return;
-		let cancelled = false;
-		loadKindPanel(kind)?.then((component) => {
-			if (cancelled) return;
-			kindPanelComponent = component;
-			kindPanelLoadedFor = kind;
-		});
-		return () => {
-			cancelled = true;
-		};
-	});
 
 	// The very first device of the instance: a burst of confetti, once, as its
 	// page opens (the add form says so in the navigation state).
@@ -186,6 +147,34 @@
 		return target.kind === 'agent' ? (hostname ?? '') : target.address;
 	});
 
+	// --- Free tags, and the monitors around this one in the list ------------
+	/** Free tags (not the options of the type) as chips; the options live in the form. */
+	const tagChips = $derived.by(() => {
+		if (!target) return [];
+		const keys = new Set((collector?.options ?? []).map((o) => o.key));
+		return freeTags(target.tags, keys)
+			.map((pair) => {
+				const at = pair.indexOf('=');
+				return tagChip(pair.slice(0, at), pair.slice(at + 1));
+			})
+			.sort((a, b) => a.label.localeCompare(b.label, 'en'));
+	});
+
+	/** The list's default order (folders, state tier, manual position, name), disabled monitors last. */
+	const listOrder = $derived.by(() => {
+		const all = alertsStore.targets;
+		if (all.length === 0) return [];
+		const stateOf = (t: Target) => displayState(t, alertsStore.probes.get(t.id));
+		const { active, disabled } = splitDisabled(all, stateOf);
+		return [...buildFolders(all, stateOf, active).flatMap((section) => section.rows), ...buildRack(all, stateOf, disabled)].map(
+			(row) => row.target
+		);
+	});
+	const around = $derived.by(() => {
+		const at = listOrder.findIndex((t) => t.id === id);
+		return at === -1 ? { prev: null, next: null } : neighbours(listOrder, listOrder[at]);
+	});
+
 	// --- Security score (opt-in in Settings) ---------------------------------
 	// A badge in the header when the score is on and this kind is rated; the
 	// report opens under the header, straight away when the link said so
@@ -201,17 +190,16 @@
 		const targetId = id;
 		security = null;
 		securityOpen = untrack(() => page.url.hash === '#security');
-		const controller = new AbortController();
-		const load = () =>
-			getTargetSecurity(targetId, controller.signal)
-				.then((report) => (security = report))
-				.catch(() => {});
-		void load();
-		const timer = setInterval(() => void load(), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(
+			(signal) =>
+				getTargetSecurity(targetId, signal)
+					.then((report) => {
+						security = report;
+						return true;
+					})
+					.catch(() => false),
+			60_000
+		);
 	});
 
 	/** Scrolls the report into view once it is there (opened from a link or the badge). */
@@ -258,29 +246,10 @@
 	const tail = $derived(layout ? sections.rest : sections.other);
 
 	/** Interface rows unfolded by the user; the search over the long tail. */
+	/** Interface rows unfolded by the user; the search over the long tail; flat families folded. */
 	let openInterfaces = $state<Record<string, boolean>>({});
 	let otherQuery = $state('');
-	const otherShown = $derived.by(() => {
-		const q = otherQuery.trim().toLowerCase();
-		if (!q) return tail;
-		return tail.filter(
-			(g) => g.name.toLowerCase().includes(q) || g.title.toLowerCase().includes(q)
-		);
-	});
-
-	/** Flat families fold into one line; only the ones that move get a chart. */
 	let showSteady = $state(false);
-	const otherMoving = $derived(otherShown.filter((g) => steadyValue(g) === undefined));
-	const otherSteady = $derived(otherShown.filter((g) => steadyValue(g) !== undefined));
-
-	/** "↓ 13 kB/s · ↑ 505 kB/s" for the folded interface line. */
-	function interfaceLine(row: MetricRow): string {
-		const octets = row.charts.find((c) => c.name.endsWith('_octets'));
-		if (!octets) return '';
-		const of = (dir: string) => lastValue(octets.series.find((s) => s.label === dir));
-		return `↓ ${formatRate(of('in'), 'B/s')} · ↑ ${formatRate(of('out'), 'B/s')}`;
-	}
-	const physicalCount = $derived(sections.interfaces.filter((r) => !isVirtualInterface(r.key)).length);
 
 	// --- Service instruments --------------------------------------------------
 
@@ -288,6 +257,13 @@
 	let history = $state<HistorySlot[]>([]);
 	let responseTimes = $state<Serie[]>([]);
 	let phaseTimes = $state<Serie[]>([]);
+	/** Per-step series of an HTTP scenario; `null` for any other kind. */
+	let scenarioSamples = $state<ScenarioSamples | null>(null);
+	const scenarioRuns = $derived(
+		scenarioSamples && target
+			? lastRun(scenarioSamples.results, scenarioSamples.statuses, scenarioSamples.durations, parseSteps(target.tags.steps))
+			: []
+	);
 	let checks = $state<number | null>(null);
 	let loadingUptime = $state(true);
 	let uptimeError = $state<unknown>(null);
@@ -304,13 +280,6 @@
 		summary ? (range === '7d' ? summary.availability.week : summary.availability.day) : null
 	);
 	const availabilityWindow = $derived(range === '7d' ? m.devices_target_window_7d() : m.devices_target_window_24h());
-	function availabilityTone(value: number | null): 'ink' | 'signal' | 'advisory' | 'warning' {
-		if (value === null) return 'ink';
-		if (value >= 99) return 'signal';
-		if (value >= 95) return 'advisory';
-		return 'warning';
-	}
-
 	/** Certificate plate: expired is a warning, under two weeks an advisory. */
 	const certificate = $derived.by(() => {
 		const days = summary?.certExpiryDays ?? null;
@@ -331,8 +300,10 @@
 	let chartRules = $state.raw<AlertRule[]>([]);
 	let chartHistory = $state.raw<AlertHistoryEntry[]>([]);
 	let chartRestarts = $state.raw<RestartEvent[]>([]);
+	/** Change markers (deployments, updates) of this device, from the panel above the charts. */
+	let annotationEvents = $state.raw<ChartEvent[]>([]);
 	const chartEvents = $derived(
-		[...eventsFromHistory(chartHistory, chartRules, id), ...eventsFromRestarts(chartRestarts)].sort((a, b) => a.at - b.at)
+		[...eventsFromHistory(chartHistory, chartRules, id), ...eventsFromRestarts(chartRestarts), ...annotationEvents].sort((a, b) => a.at - b.at)
 	);
 	/** One cursor for every chart of this device page. */
 	const syncKey = $derived(`target-${id}`);
@@ -512,6 +483,7 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
+			return false;
 		} finally {
 			loading = false;
 		}
@@ -557,7 +529,8 @@
 	async function loadUptime(signal?: AbortSignal) {
 		uptimeError = null;
 		try {
-			const [s, h, r, c, p] = await Promise.all([
+			const scenario = target?.kind === 'http_steps';
+			const [s, h, r, c, p, steps] = await Promise.all([
 				loadUptimeSummary(id, signal),
 				loadUptimeHistory(id, rangeSeconds, signal),
 				loadResponseTimes(id, rangeSeconds, signal),
@@ -566,12 +539,20 @@
 				loadHttpPhases(id, rangeSeconds, signal).catch((cause) => {
 					if (cause instanceof DOMException && cause.name === 'AbortError') throw cause;
 					return [] as Serie[];
-				})
+				}),
+				// Same for the steps of a scenario.
+				scenario
+					? loadScenarioSamples(id, signal).catch((cause) => {
+							if (cause instanceof DOMException && cause.name === 'AbortError') throw cause;
+							return null;
+						})
+					: Promise.resolve(null)
 			]);
 			summary = s;
 			history = h;
 			responseTimes = r;
 			phaseTimes = p;
+			scenarioSamples = steps;
 			const count = Number(c[0]?.values?.[0]?.[1]);
 			checks = Number.isFinite(count) ? count : 0;
 		} catch (cause) {
@@ -596,23 +577,24 @@
 		history = [];
 		responseTimes = [];
 		phaseTimes = [];
+		scenarioSamples = null;
 		alerts = [];
 		osInfo = null;
 		probeResult = null;
 		probeError = null;
-		const controller = new AbortController();
-		void loadTarget(controller.signal);
-		void loadContext(controller.signal);
-		const timer = setInterval(() => {
-			void loadTarget(controller.signal);
-			void loadContext(controller.signal);
-			void loadInstruments(controller.signal);
-			refreshKey += 1;
+		// The instruments load in their own effect at first, then here with the
+		// rest; only the device itself decides whether the page backs off.
+		let first = true;
+		return startPolling(async (signal) => {
+			const reads: Promise<unknown>[] = [loadTarget(signal), loadContext(signal)];
+			if (!first) {
+				reads.push(loadInstruments(signal));
+				refreshKey += 1;
+			}
+			first = false;
+			const [targetOk] = await Promise.all(reads);
+			return targetOk !== false;
 		}, 30_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
 	});
 
 	// Instruments need the kind (service or device) and follow the range.
@@ -644,9 +626,7 @@
 
 <svelte:head><title>{m.devices_target_page_title({ name: target?.name ?? m.devices_target_title_fallback() })}</title></svelte:head>
 
-<nav class="mb-4 text-sm max-sm:-mt-1 max-sm:mb-1">
-	<a href={withBase('/targets')} class="inline-flex min-h-10 items-center gap-1 text-ink-2 hover:text-ink hover:underline sm:min-h-0">{m.devices_target_back()}</a>
-</nav>
+<DetailNav {around} />
 
 {#if missing}
 	<EmptyState icon={ServerOff} title={m.devices_target_gone_title()} description={m.devices_target_gone_desc()}>
@@ -666,141 +646,24 @@
 	</div>
 {:else}
 	<!-- Header band: flat surface, identity on the left, one main action on the right. -->
-	<section class="rise-in overflow-x-clip rounded-[var(--radius-card)] border border-line bg-surface px-5 py-5 max-sm:px-4 max-sm:py-4 sm:px-6" aria-labelledby="device-name">
+	<section class="rise-in overflow-x-clip rounded-[var(--radius-card)] border border-line bg-surface px-4 py-4 shadow-lift sm:px-6 sm:py-5" aria-labelledby="device-name">
 		<div class="flex flex-col gap-5 max-sm:gap-3 lg:flex-row lg:items-start lg:justify-between">
-			<div class="flex min-w-0 gap-4">
-				<Led {tone} {blink} size="lg" class="mt-2.5" label={STATE_LABEL[stateNow]} />
-				<div class="min-w-0 flex-1">
-					<h1 id="device-name" class="display text-3xl break-words text-ink max-sm:text-2xl sm:text-4xl">{target.name}</h1>
-					<!-- Quiet identity line: what it is, where it answers, how often, behind whom. -->
-					<div class="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-ink-2">
-						<span class="inline-flex items-center gap-1.5">
-							<KindIcon kind={target.kind} class="size-4 text-ink-3" />
-							<span class="label-tape">{kindLabel}</span>
-						</span>
-						{#if identity}
-							<span class="text-ink-3" aria-hidden="true">·</span>
-							<span class="tnum break-all" title={target.address}>{identity}</span>
-						{/if}
-						<span class="text-ink-3" aria-hidden="true">·</span>
-						<span class="tnum text-ink-3">{m.devices_target_every({ interval: formatDuration(target.interval_secs) })}</span>
-						{#if target.parent_id !== null}
-							<span class="text-ink-3" aria-hidden="true">·</span>
-							<a href={withBase(`/targets/${target.parent_id}`)} class="inline-flex items-center gap-1 hover:text-ink hover:underline">
-								{m.devices_target_behind({ name: parent?.name ?? m.devices_target_behind_unknown({ id: target.parent_id }) })}
-								<ArrowUpRight class="size-3.5" aria-hidden="true" />
-							</a>
-						{/if}
-						{#if target.via_agent !== null}
-							<span class="text-ink-3" aria-hidden="true">·</span>
-							<a
-								href={withBase(`/targets/${target.via_agent}`)}
-								class="inline-flex items-center gap-1 hover:text-ink hover:underline"
-								title={m.devices_target_via_title()}
-							>
-								{m.devices_target_via({ name: relay?.name ?? m.devices_target_via_unknown({ id: target.via_agent }) })}
-								<ArrowUpRight class="size-3.5" aria-hidden="true" />
-							</a>
-						{/if}
-					</div>
-					<div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-						<Plate {tone} label={STATE_LABEL[stateNow]} size="md" pulse={blink} />
-						{#if certificate}
-							<Plate tone={certificate.tone} label={certificate.label} size="md" title={summary?.tlsVersion ?? undefined} />
-						{/if}
-						{#if securityShown}
-							<SecurityBadge
-								size="md"
-								grade={securityShown.grade}
-								score={securityShown.score}
-								expanded={securityOpen}
-								controls="security-report"
-								onclick={() => (securityOpen = !securityOpen)}
-								class="-my-2"
-							/>
-						{/if}
-						<AlertBell targetId={id} counts={headerAlertCounts} class="-my-2" />
-						<p class="tnum min-w-0 text-sm text-ink-2" title={formatDateTime(target.last_probe_at)}>
-							{#if target.last_error}
-								<span class={`break-words ${target.error_kind === 'config' ? 'text-advisory-ink' : 'text-warning-ink'}`}>{target.last_error}</span>
-							{:else if stateNow === 'down'}
-								<span class="text-warning-ink">{formatFailureReason(summary?.status?.reason)}</span>
-								<span class="text-ink-3" aria-hidden="true">·</span>
-								{m.devices_target_last_seen({ when: formatRelative(target.last_probe_at) })}
-							{:else}
-								{m.devices_target_last_seen({ when: formatRelative(target.last_probe_at) })}
-							{/if}
-						</p>
-					</div>
-				</div>
-			</div>
+			<HeaderIdentity {target} {id} {parent} {relay} {tone} {blink} {stateNow} {kindLabel} {identity} {tagChips} {certificate} {summary} {securityShown} bind:securityOpen {headerAlertCounts} />
 
-			<!-- One main action, then the gear: enable, snooze, logs, delete and Settings sit in its menu. -->
-			<div class="flex min-w-0 max-w-full flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end">
-				{#if target.enabled}
-					<Button variant="primary" onclick={probe} loading={probing}>
-						<Activity class="size-4" aria-hidden="true" />
-						{m.devices_target_probe_now()}
-					</Button>
-				{:else if auth.isAdmin}
-					<Button variant="primary" onclick={() => void setEnabled(true)} loading={savingEnabled}>
-						{m.devices_target_enable()}
-					</Button>
-				{/if}
-				{#if auth.isAdmin}
-					<TargetMenu
-						{target}
-						{refreshKey}
-						{savingEnabled}
-						{deleting}
-						onsetenabled={(value) => void setEnabled(value)}
-						ondelete={remove}
-						onasktoremove={() => (askAgentRemoval = true)}
-					/>
-				{:else}
-					{#if auth.canOperate && target.enabled}
-						<SilenceControl {target} {refreshKey} />
-					{/if}
-					<Plate tone="ghost" label={auth.readOnlyLabel} size="md" />
-				{/if}
-			</div>
+			<HeaderActions {target} {refreshKey} {probing} {savingEnabled} {deleting} {probe} {setEnabled} {remove} askRemoval={() => (askAgentRemoval = true)} />
 		</div>
 
-		<div aria-live="polite" class="empty:hidden">
-			{#if probeResult}
-				<div class="mt-4 flex flex-wrap items-center gap-2">
-					<Plate tone="signal" label={m.devices_target_probe_done({ samples: probeResult.sample_count, series: probeResult.series.length })} size="md" />
-					{#if probeResult.sample_count === 0}
-						<span class="text-sm text-ink-2">{m.devices_target_probe_empty()}</span>
-					{/if}
-				</div>
-			{/if}
-		</div>
-		{#if probeError}
-			<ErrorNotice error={probeError} title={m.devices_target_err_probe()} onretry={probe} class="mt-4" />
-		{/if}
-		{#if enabledError}
-			<ErrorNotice error={enabledError} title={m.devices_target_err_enabled()} class="mt-4" />
-		{/if}
-		{#if target?.managed}
-			<ManagedNotice {target} canRelease={auth.isAdmin} onreleased={() => void loadTarget()} class="mt-4" />
-		{/if}
-		{#if askAgentRemoval && target}
-			<AgentRemoveNotice {target} {deleting} ondelete={remove} oncancel={() => (askAgentRemoval = false)} />
-		{/if}
-		{#if deleteError}
-			<ErrorNotice error={deleteError} title={m.devices_target_err_delete()} class="mt-4" />
-		{/if}
-		{#if collector?.setup.doc_url && target.last_error}
-			<p class="mt-3 text-sm text-ink-2">
-				{m.devices_target_check_reachable()}
-				<a href={withBase(collector.setup.doc_url)} class="inline-flex min-h-10 items-center gap-1 text-ink hover:underline sm:min-h-0" target="_blank" rel="noreferrer">
-					{m.devices_target_setup_notes({ kind: kindLabel })}
-					<ExternalLink class="size-3.5" aria-hidden="true" />
-				</a>
-			</p>
-		{/if}
+		<HeaderNotices {target} {collector} {kindLabel} {probeResult} {probeError} {enabledError} {deleteError} {deleting} bind:askAgentRemoval {probe} {remove} {loadTarget} />
 	</section>
+
+	{#if target.note}
+		<section class="mt-4 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 sm:px-6" aria-labelledby="monitor-note-title">
+			<h2 id="monitor-note-title" class="label-tape">{m.w1monitors_detail_note_title()}</h2>
+			<p class="mt-1 text-sm break-words whitespace-pre-wrap text-ink">{target.note}</p>
+		</section>
+	{/if}
+
+	<MaintenanceWindows {target} {refreshKey} class="mt-4" />
 
 	{#if idle}
 		<!-- One line instead of a stack of empty panels. -->
@@ -857,14 +720,7 @@
 
 	<!-- What this kind of device has to show beyond charts (guests, backup calendar, disks…) -->
 	{#if hasKindPanel(target.kind) && !idle}
-		<section class="mt-6 flex flex-col gap-6" aria-label={m.devices_target_details()}>
-			{#if kindPanelComponent && kindPanelLoadedFor === target.kind}
-				{@const Panel = kindPanelComponent}
-				<Panel {target} />
-			{:else}
-				<Skeleton class="h-40 w-full rounded-[var(--radius-card)]" />
-			{/if}
-		</section>
+		<KindPanelSection {target} />
 	{/if}
 
 	<!-- Instruments: a website-change watcher already says everything in its own panel -->
@@ -880,6 +736,8 @@
 			<Segmented options={rangeOptions} value={range} onchange={setRange} label={m.devices_target_time_range()} size="sm" />
 		</div>
 
+		<AnnotationsPanel targetId={id} seconds={rangeSeconds} bind:events={annotationEvents} />
+
 		{#if service}
 			{#if uptimeError}
 				<ErrorNotice error={uptimeError} title={m.devices_target_err_availability()} onretry={() => void loadUptime()} />
@@ -890,49 +748,7 @@
 					<Skeleton class="h-64 w-full rounded-[var(--radius-card)]" />
 				</div>
 			{:else}
-				<div class="graticule grid grid-cols-1 gap-4 pb-1 sm:grid-cols-3">
-					<Figure
-						label={m.devices_target_availability()}
-						value={availability === null ? null : formatPercent(availability)}
-						tone={availabilityTone(availability)}
-						hint={availabilityWindow}
-					/>
-					<Figure
-						label={m.devices_target_response_time()}
-						value={summary?.responseSeconds == null ? null : formatLatency(summary.responseSeconds)}
-						hint={m.devices_target_avg_hour()}
-					/>
-					<Readout label={m.devices_target_checks()} value={checks} hint={m.devices_target_last_range({ range: rangeLabel })} />
-				</div>
-
-				<Panel title={m.devices_target_history()} description={m.devices_target_history_desc({ slots: HISTORY_SLOTS, range: rangeLabel })} class="mt-6">
-					<UptimeBar slots={history} reason={summary?.status?.reason ?? null} />
-				</Panel>
-
-				<Panel title={m.devices_target_response_time()} class="mt-4">
-					{#snippet aside()}<span class="label-tape label-tape-unit">ms</span>{/snippet}
-					{#if responseTimes.length > 0}
-						<Chart series={responseTimes} unit="ms" height={220} {syncKey} events={chartEvents} thresholds={thresholdsOf('dumbmonit_probe_duration_seconds', 'ms', 1000)} loadPrevious={previousResponse} />
-					{:else}
-						<EmptyState title={m.devices_target_no_check_title()} description={target.enabled ? m.devices_target_no_check_desc() : m.devices_target_disabled_empty()}>
-							{#snippet action()}
-								{#if monitorOn}
-									<Button variant="secondary" size="sm" onclick={probe} loading={probing}>{m.devices_target_probe_now()}</Button>
-								{/if}
-							{/snippet}
-						</EmptyState>
-					{/if}
-				</Panel>
-
-				{#if phaseTimes.length > 0}
-					<Panel title={m.monitor_phases_title()} description={m.monitor_phases_desc()} class="mt-4">
-						{#snippet aside()}<span class="label-tape label-tape-unit">ms</span>{/snippet}
-						<Chart series={phaseTimes} unit="ms" height={220} stacked colorTokens={[...PHASE_TOKENS]} {syncKey} events={chartEvents} />
-						<div class="mt-4 border-t border-line pt-4">
-							<PhaseBreakdown series={phaseTimes} />
-						</div>
-					</Panel>
-				{/if}
+				<ServiceInstruments {target} {summary} {availability} {availabilityWindow} {rangeLabel} {checks} {history} {responseTimes} {phaseTimes} {scenarioRuns} {syncKey} {chartEvents} {thresholdsOf} {previousResponse} {monitorOn} {probing} {probe} />
 			{/if}
 		{:else if metricsError}
 			<ErrorNotice error={metricsError} title={m.devices_target_err_metrics()} onretry={() => void loadMetrics()} />
@@ -949,141 +765,7 @@
 				{/snippet}
 			</EmptyState>
 		{:else}
-			<div class="flex flex-col gap-4">
-				<!-- Essentials: the handful of charts that answer "is it fine?" — the ones the
-				     kind's catalogue declares, or the generic cpu / memory / disk / network -->
-				{#if layout}
-					<FoldSection kind="essentials" title={m.devices_target_essentials()} defaultOpen summary={layout.charts.length === 1 ? m.devices_target_charts_one({ count: 1 }) : m.devices_target_charts_other({ count: layout.charts.length })} class="rise-in">
-						<CatalogViews {layout} />
-					</FoldSection>
-				{:else if sections.essentials.length > 0}
-					<FoldSection kind="essentials" title={m.devices_target_essentials()} defaultOpen summary={sections.essentials.length === 1 ? m.devices_target_charts_one({ count: 1 }) : m.devices_target_charts_other({ count: sections.essentials.length })} class="rise-in">
-						<div class="grid gap-4 px-4 py-4 sm:px-5 lg:grid-cols-2">
-							{#each sections.essentials as group, i (group.name)}
-								<div class="rise-in" style="--rise-delay: {Math.min(i, 8) * 40}ms">
-									<div class="flex items-center justify-between gap-2 pb-1">
-										<h3 class="text-sm font-semibold text-ink">{group.title}</h3>
-										{#if group.unit}<span class="label-tape label-tape-unit">{group.unit}</span>{/if}
-									</div>
-									<Chart series={group.series} unit={group.unit} height={200} {syncKey} events={chartEvents} thresholds={thresholdsOf(group.name, group.unit)} loadPrevious={previousOf(group.name)} />
-								</div>
-							{/each}
-						</div>
-					</FoldSection>
-				{/if}
-
-				<!-- Containers: the Docker panel folds, one row per container -->
-				{#if isDockerDevice(target)}
-					<DockerPanel {target} metrics={sections.containers} {loadingMetrics} />
-				{/if}
-
-				<!-- Interfaces: one row each, physical ones first -->
-				{#if sections.interfaces.length > 0}
-					<FoldSection
-						kind="interfaces"
-						title={m.devices_target_interfaces()}
-						summary={physicalCount < sections.interfaces.length ? m.devices_target_interfaces_summary({ count: sections.interfaces.length, physical: physicalCount }) : `${sections.interfaces.length}`}
-						class="rise-in"
-					>
-						<ul class="divide-y divide-line">
-							{#each sections.interfaces as row, i (row.key)}
-								<FoldRow id={`interface-${i}`} bind:open={openInterfaces[row.key]}>
-									{#snippet header()}
-										<span class="flex min-w-0 items-center gap-2">
-											<span class="truncate font-semibold text-ink">{row.key}</span>
-											{#if isVirtualInterface(row.key)}
-												<Plate tone="ghost" bare label={m.devices_target_virtual()} />
-											{/if}
-										</span>
-										<span class="tnum truncate text-[0.8125rem] text-ink-2">{interfaceLine(row)}</span>
-									{/snippet}
-									<div class="grid gap-3 lg:grid-cols-2">
-										{#each row.charts as chart (chart.name)}
-											<div class="rounded-lg border border-line px-3 pt-2 pb-1">
-												<div class="flex items-center justify-between gap-2">
-													<span class="text-sm font-semibold text-ink">{chart.title}</span>
-													{#if chart.unit}<span class="label-tape label-tape-unit">{chart.unit}</span>{/if}
-												</div>
-												<Chart series={chart.series} unit={chart.unit} height={140} pair={chart.series.length === 2 && chart.series[0].label === m.devices_metrics_in() && chart.series[1].label === m.devices_metrics_out()} {syncKey} events={chartEvents} thresholds={thresholdsOf(chart.name, chart.unit)} />
-											</div>
-										{/each}
-									</div>
-								</FoldRow>
-							{/each}
-						</ul>
-					</FoldSection>
-				{/if}
-
-				<!-- The long tail, alphabetical, searchable -->
-				{#if tail.length > 0}
-					<FoldSection
-						kind={layout ? 'all-measurements' : 'other'}
-						title={layout ? m.devices_target_all_measurements() : m.devices_target_everything_else()}
-						defaultOpen={!layout && sections.essentials.length === 0}
-						summary={otherQuery.trim() ? m.devices_target_families_filtered({ shown: otherShown.length, total: tail.length }) : tail.length === 1 ? m.devices_target_families_one({ count: 1 }) : m.devices_target_families_other({ count: tail.length })}
-						class="rise-in"
-					>
-						{#snippet aside()}
-							<label class="relative block w-full sm:w-56">
-								<span class="sr-only">{m.devices_target_search_families()}</span>
-								<Search class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-ink-3" aria-hidden="true" />
-								<input class="input h-10 w-full text-sm" style="padding-left: 2rem" type="search" placeholder={m.devices_target_filter_families()} bind:value={otherQuery} />
-							</label>
-						{/snippet}
-						{#if otherShown.length === 0}
-							<p class="px-5 py-4 text-sm text-ink-2">{m.devices_target_no_family({ query: otherQuery })}</p>
-						{:else}
-							{#if otherMoving.length > 0}
-								<div class="grid gap-4 px-4 py-4 sm:px-5 lg:grid-cols-2">
-									{#each otherMoving as group (group.name)}
-										<div>
-											<div class="flex items-center justify-between gap-2 pb-1">
-												<h3 class="text-sm font-semibold text-ink" title={group.name}>{group.title}</h3>
-												{#if group.unit}<span class="label-tape label-tape-unit">{group.unit}</span>{/if}
-											</div>
-											<Chart series={group.series} unit={group.unit} height={180} {syncKey} events={chartEvents} thresholds={thresholdsOf(group.name, group.unit)} loadPrevious={previousOf(group.name)} />
-										</div>
-									{/each}
-								</div>
-							{/if}
-							{#if otherSteady.length > 0}
-								<div class={otherMoving.length > 0 ? 'border-t border-line' : ''}>
-									<button
-										type="button"
-										class="flex min-h-10 w-full items-center gap-2 px-4 py-2 text-left text-sm font-medium text-ink-2 hover:text-ink sm:px-5"
-										aria-expanded={showSteady || otherQuery.trim() !== ''}
-										aria-controls="steady-families"
-										onclick={() => (showSteady = !showSteady)}
-									>
-										<ChevronDown class={`size-4 transition-transform ${showSteady || otherQuery.trim() ? 'rotate-180' : ''}`} aria-hidden="true" />
-										{m.devices_target_steady({ count: otherSteady.length })}
-									</button>
-									{#if showSteady || otherQuery.trim()}
-										<ul id="steady-families" class="grid gap-x-6 px-4 pb-3 sm:px-5 md:grid-cols-2 lg:grid-cols-3">
-											{#each otherSteady as group (group.name)}
-												<li class="flex items-baseline justify-between gap-3 border-t border-line py-1.5 text-[0.8125rem]" title={group.name}>
-													<span class="min-w-0 truncate text-ink-2">{group.title}</span>
-													<span class="tnum shrink-0 font-medium text-ink">{Number(Number(steadyValue(group)).toPrecision(4))}{group.unit && group.unit !== '0/1' ? ` ${group.unit}` : ''}</span>
-												</li>
-											{/each}
-										</ul>
-									{/if}
-								</div>
-							{/if}
-						{/if}
-					</FoldSection>
-				{/if}
-
-				{#if groups.length === 0}
-					<EmptyState title={m.devices_target_no_data_title()} description={target.enabled ? m.devices_target_no_data_desc() : m.devices_target_disabled_empty()}>
-						{#snippet action()}
-							{#if monitorOn}
-								<Button variant="secondary" onclick={probe} loading={probing}>{m.devices_target_probe_now()}</Button>
-							{/if}
-						{/snippet}
-					</EmptyState>
-				{/if}
-			</div>
+			<DeviceFolds {target} {layout} {sections} {tail} {groups} {loadingMetrics} {monitorOn} {probing} {probe} {syncKey} {chartEvents} {thresholdsOf} {previousOf} bind:openInterfaces bind:otherQuery bind:showSteady />
 		{/if}
 	</section>
 {/if}

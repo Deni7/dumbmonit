@@ -72,7 +72,7 @@ impl Level {
     /// Le plafond qu'impose un rôle global.
     pub fn ceiling(role: Role) -> Self {
         match role {
-            Role::Viewer => Self::Read,
+            Role::Viewer | Role::Wall => Self::Read,
             Role::Operator | Role::Admin => Self::Manage,
         }
     }
@@ -345,7 +345,8 @@ async fn team_access_for_user(pool: &SqlitePool, user: &User) -> Result<Access> 
         return Ok(match settings(pool).await?.unassigned_access {
             UnassignedAccess::All => Access::All,
             UnassignedAccess::None => {
-                Access::Scoped(Arc::new(Scope::nothing(Level::ceiling(user.role))))
+                let ceiling = crate::auth::permissions::team_ceiling(user);
+                Access::Scoped(Arc::new(Scope::nothing(ceiling)))
             }
         });
     }
@@ -364,7 +365,7 @@ async fn team_access_for_user(pool: &SqlitePool, user: &User) -> Result<Access> 
         }
     }
     Ok(Access::Scoped(Arc::new(Scope {
-        ceiling: Level::ceiling(user.role),
+        ceiling: crate::auth::permissions::team_ceiling(user),
         grants,
         teams,
         clients: None,
@@ -442,19 +443,44 @@ pub const SCOPED_ROUTES: &[(&str, &str, RouteRule)] = &[
     ("GET", "/geoip", RouteRule::Open),
     ("GET", "/locations", RouteRule::Open),
     ("GET", "/locations/basemap", RouteRule::Open),
+    // Le nom de l'instance et la météo du mode mur : aucune donnée
+    // d'équipement. Un écran mural limité à une équipe en a besoin (voir
+    // `wall::WALL_ROUTES`).
+    ("GET", "/instance/settings", RouteRule::Open),
+    ("GET", "/wall/weather", RouteRule::Open),
     // Filtrées par le gestionnaire.
     ("GET", "/targets", RouteRule::Open),
     ("POST", "/targets", RouteRule::Open),
+    // Lot : le gestionnaire exige `manage` sur chaque moniteur et sur le dossier
+    // d'arrivée (`api/targets_bulk.rs`).
+    ("PATCH", "/targets/bulk", RouteRule::Open),
     ("GET", "/metrics/query", RouteRule::Open),
     ("GET", "/metrics/query_range", RouteRule::Open),
     ("GET", "/metrics/catalog", RouteRule::Open),
     ("GET", "/alerts", RouteRule::Open),
     ("GET", "/alerts/history", RouteRule::Open),
+    ("GET", "/alerts/noise", RouteRule::Open),
+    // Tableaux de bord de la vue d'ensemble : moniteurs, séries et historique
+    // filtrés par le gestionnaire.
+    ("GET", "/overview/widgets", RouteRule::Open),
     ("GET", "/alerts/rules", RouteRule::Open),
     ("GET", "/alerts/silences", RouteRule::Open),
     ("POST", "/alerts/silences", RouteRule::Open),
     ("GET", "/topology", RouteRule::Open),
+    // Repères de changement : le gestionnaire filtre la lecture et exige le
+    // niveau `operate` sur chaque moniteur concerné pour écrire.
+    ("GET", "/annotations", RouteRule::Open),
+    ("POST", "/annotations", RouteRule::Open),
+    ("PATCH", "/annotations/*", RouteRule::Open),
+    ("DELETE", "/annotations/*", RouteRule::Open),
     ("GET", "/status-pages", RouteRule::Open),
+    // SLO : le gestionnaire ne montre et n'accepte que ceux dont tous les
+    // moniteurs sont dans les équipes du compte.
+    ("GET", "/slos", RouteRule::Open),
+    ("POST", "/slos", RouteRule::Open),
+    ("GET", "/slos/*", RouteRule::Open),
+    ("PUT", "/slos/*", RouteRule::Open),
+    ("DELETE", "/slos/*", RouteRule::Open),
     ("GET", "/security/cves", RouteRule::Open),
     ("GET", "/security/cves/summary", RouteRule::Open),
     ("GET", "/security/cves/inventory", RouteRule::Open),
@@ -482,6 +508,11 @@ pub const MANAGE_TARGET_ROUTES: &[(&str, &str)] = &[
     ("DELETE", "/targets/*"),
     ("POST", "/targets/*/probe"),
     ("POST", "/targets"),
+    ("PATCH", "/targets/bulk"),
+    // SLO : le gestionnaire exige `manage` sur chacun des moniteurs couverts.
+    ("POST", "/slos"),
+    ("PUT", "/slos/*"),
+    ("DELETE", "/slos/*"),
 ];
 
 const NOT_FOR_TEAMS: &str = "This page is not available to team-restricted accounts: ask an \
@@ -511,12 +542,17 @@ fn method_matches(wanted: &str, method: &Method) -> bool {
     wanted == "*" || wanted == method.as_str() || (wanted == "GET" && *method == Method::HEAD)
 }
 
+/// Vrai si `method path` figure dans `routes` (méthode, gabarit), chemin pris
+/// avec ou sans `/api` et sans `/` final, `GET` valant aussi pour `HEAD`.
+/// Partagé par les listes blanches de rôle (mur, permissions).
+pub fn route_listed(routes: &[(&str, &str)], method: &Method, path: &str) -> bool {
+    let path = strip(path);
+    routes.iter().any(|(m, pattern)| method_matches(m, method) && path_matches(pattern, path))
+}
+
 /// Vrai si l'écriture fait partie de ce que `manage` ouvre à un opérateur.
 pub fn is_manage_route(method: &Method, path: &str) -> bool {
-    let path = strip(path);
-    MANAGE_TARGET_ROUTES
-        .iter()
-        .any(|(m, pattern)| method_matches(m, method) && path_matches(pattern, path))
+    route_listed(MANAGE_TARGET_ROUTES, method, path)
 }
 
 /// `/targets/{id}` ou `/targets/{id}/…` : l'identifiant, s'il est numérique.
@@ -1078,6 +1114,25 @@ mod tests {
         assert!(!is_manage_route(&Method::POST, "/targets/3/commands"));
         assert!(!is_manage_route(&Method::POST, "/targets/import"));
         assert!(!is_manage_route(&Method::PUT, "/targets/3/agent/modules/x"));
+        // SLO : ouvertes, le gestionnaire vérifie chaque moniteur couvert.
+        assert!(is_manage_route(&Method::POST, "/api/slos"));
+        assert!(is_manage_route(&Method::PUT, "/slos/4"));
+        assert!(is_manage_route(&Method::DELETE, "/slos/4"));
+        assert!(!is_manage_route(&Method::POST, "/slos/4"));
+    }
+
+    #[test]
+    fn slo_routes_are_open_to_team_accounts() {
+        for (method, path) in
+            [("GET", "/slos"), ("POST", "/slos"), ("GET", "/slos/4"), ("PUT", "/slos/4")]
+        {
+            assert!(
+                SCOPED_ROUTES
+                    .iter()
+                    .any(|(m, pattern, _)| *m == method && path_matches(pattern, path)),
+                "{method} {path}"
+            );
+        }
     }
 
     #[test]

@@ -36,9 +36,16 @@ export function publicApi(origin: string, slug: string, componentKey?: string): 
 	return componentKey ? `${base}/components/${encodeURIComponent(componentKey)}` : base;
 }
 
-export function badgeUrl(origin: string, slug: string, kind: BadgeKind, componentKey = '', days = 30): string {
+/** Shapes a badge can take (`?style=`); `flat` is the server's default and is left out of the address. */
+export type BadgeStyle = 'flat' | 'flat-square' | 'for-the-badge';
+
+export function badgeUrl(origin: string, slug: string, kind: BadgeKind, componentKey = '', days = 30, style: BadgeStyle = 'flat'): string {
 	const base = publicApi(origin, slug, componentKey || undefined);
-	return kind === 'uptime' ? `${base}/uptime.svg?days=${days}` : `${base}/${kind}.svg`;
+	const query = new URLSearchParams();
+	if (kind === 'uptime') query.set('days', String(days));
+	if (style !== 'flat') query.set('style', style);
+	const qs = query.toString();
+	return `${base}/${kind === 'uptime' ? 'uptime.svg' : `${kind}.svg`}${qs ? `?${qs}` : ''}`;
 }
 
 export function badgeMarkdown(alt: string, image: string, link: string): string {

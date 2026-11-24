@@ -6,8 +6,8 @@
 	 * Nothing is shown on a machine that is not a Synology: the agent only
 	 * emits `dumbmonit_agent_dsm_info` on DSM. One query, refreshed every minute.
 	 */
-	import { untrack } from 'svelte';
 	import { m } from '#lib/paraglide/messages.js';
+	import { startPolling } from '#lib/poll.js';
 	import { queryInstant, type Target } from '#lib/api/index.js';
 	import { formatDuration } from '#lib/format.js';
 	import { ErrorNotice, Panel, Plate, type Tone } from '#lib/ui/index.js';
@@ -35,6 +35,7 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
+			return false;
 		} finally {
 			loading = false;
 		}
@@ -45,13 +46,7 @@
 		loading = true;
 		view = null;
 		known = false;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 
 	const health = $derived.by((): { tone: Tone; label: string } | null => {

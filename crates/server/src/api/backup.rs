@@ -11,10 +11,10 @@
 //! l'en-tête `Referer` de la page suivante.
 
 use axum::Json;
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post};
+use axum::routing::{get, post, put};
 use axum::{Extension, Router};
 use serde::{Deserialize, Serialize};
 
@@ -31,10 +31,14 @@ pub fn routes() -> Router<AppState> {
         .route("/backup", get(status).post(create))
         .route("/backup/restore", post(restore))
         .route("/backup/local", post(run_local))
+        .route("/backup/local/files", get(local_files))
+        .route("/backup/local/files/{name}", get(download_local))
+        .route("/backup/schedule", put(set_schedule))
+        .merge(super::backup_destinations::routes())
 }
 
 /// Un lot n'est délivré qu'à un administrateur connecté dans l'interface.
-fn admin(principal: &Principal) -> ApiResult<&User> {
+pub(super) fn admin(principal: &Principal) -> ApiResult<&User> {
     match principal {
         Principal::User(user) if user.role.is_admin() => Ok(user),
         Principal::User(_) => {
@@ -86,7 +90,7 @@ pub async fn status(
     let collected =
         export::collect(&state.pool, &state.cipher, export::ExportOptions::default()).await?;
     let counts = collected.summary();
-    let settings = local::Settings::from_config(&state.config);
+    let settings = local::Settings::load(&state.pool, &state.config).await;
 
     Ok(Json(BackupStatus {
         bundle_version: bundle::VERSION,
@@ -247,9 +251,101 @@ pub async fn run_local(
     ClientIp(ip): ClientIp,
 ) -> ApiResult<Json<local::Status>> {
     let me = admin(&principal)?.username.clone();
-    let settings = local::Settings::from_config(&state.config);
+    let settings = local::Settings::load(&state.pool, &state.config).await;
     let record = local::run_once(&state.pool, &settings).await;
     local::publish(&state).await;
+    // Les copies hors site partent en tâche de fond ; `GET /backup/destinations`
+    // dit quand elles sont faites.
+    crate::backup::offsite::after_local_backup(&state, &settings, &record).await;
     audit::record(&state.pool, Some(&me), "backup.local_run", Some(&record.file), ip).await;
     Ok(Json(local::status(&state.pool, &settings).await?))
+}
+
+// --------------------------------------------------------------------------
+// PUT /api/backup/schedule — la planification, depuis l'interface
+// --------------------------------------------------------------------------
+
+/// Les trois réglages de la planification. Ce que l'environnement impose
+/// (`DUMBMONIT_BACKUP_*`) l'emporte, et la réponse le dit (`env_managed`).
+#[derive(Debug, Deserialize)]
+pub struct SchedulePayload {
+    pub enabled: bool,
+    pub interval_hours: u64,
+    pub keep: usize,
+}
+
+pub async fn set_schedule(
+    State(state): State<AppState>,
+    Extension(CurrentPrincipal(principal)): Extension<CurrentPrincipal>,
+    ClientIp(ip): ClientIp,
+    Json(payload): Json<SchedulePayload>,
+) -> ApiResult<Json<local::Status>> {
+    let me = admin(&principal)?.username.clone();
+    if payload.interval_hours == 0 || payload.keep == 0 {
+        return Err(ApiError::BadRequest(
+            "The interval and the number of backups to keep must be at least 1.".into(),
+        ));
+    }
+    let stored = local::ScheduleOverride {
+        enabled: Some(payload.enabled),
+        interval_hours: Some(payload.interval_hours),
+        keep: Some(payload.keep),
+    }
+    .clamped();
+    local::save_override(&state.pool, &stored).await?;
+    let subject = format!(
+        "{}, every {} h, keep {}",
+        if payload.enabled { "on" } else { "off" },
+        payload.interval_hours.clamp(1, 8760),
+        payload.keep.clamp(1, 365)
+    );
+    audit::record(&state.pool, Some(&me), "settings.backup", Some(&subject), ip).await;
+    let settings = local::Settings::load(&state.pool, &state.config).await;
+    Ok(Json(local::status(&state.pool, &settings).await?))
+}
+
+// --------------------------------------------------------------------------
+// GET /api/backup/local/files[/{name}] — les copies locales
+// --------------------------------------------------------------------------
+
+pub async fn local_files(
+    State(state): State<AppState>,
+    Extension(CurrentPrincipal(principal)): Extension<CurrentPrincipal>,
+) -> ApiResult<Json<Vec<local::BackupFile>>> {
+    admin(&principal)?;
+    let settings = local::Settings::load(&state.pool, &state.config).await;
+    Ok(Json(local::list_files(&settings.directory).await?))
+}
+
+/// Télécharge une copie locale (la base SQLite seule, jamais `secret.key`).
+/// Le nom est validé strictement avant toute lecture : voir [`local::is_backup_name`].
+pub async fn download_local(
+    State(state): State<AppState>,
+    Extension(CurrentPrincipal(principal)): Extension<CurrentPrincipal>,
+    ClientIp(ip): ClientIp,
+    Path(name): Path<String>,
+) -> ApiResult<Response> {
+    let me = admin(&principal)?.username.clone();
+    if !local::is_backup_name(&name) {
+        return Err(ApiError::BadRequest("This is not the name of a local backup.".into()));
+    }
+    let settings = local::Settings::load(&state.pool, &state.config).await;
+    let body = match tokio::fs::read(settings.directory.join(&name)).await {
+        Ok(body) => body,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Err(ApiError::NotFound(format!("No local backup named {name}.")));
+        }
+        Err(error) => return Err(anyhow::Error::from(error).into()),
+    };
+    audit::record(&state.pool, Some(&me), "backup.downloaded", Some(&name), ip).await;
+    Ok((
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, "application/vnd.sqlite3".to_string()),
+            (header::CONTENT_DISPOSITION, format!("attachment; filename=\"{name}\"")),
+            (header::CACHE_CONTROL, "no-store".to_string()),
+        ],
+        body,
+    )
+        .into_response())
 }

@@ -1,6 +1,7 @@
 <script lang="ts">
 	/** The escalation log: pages in progress and recent ones, each opening onto what happened step by step. */
 	import { ChevronRight, ScrollText } from 'lucide-svelte';
+	import { startPolling } from '#lib/poll.js';
 	import {
 		listEscalations,
 		type Escalation,
@@ -26,20 +27,15 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
+			return false;
 		} finally {
 			loading = false;
 		}
 	}
 	$effect(() => {
 		void filter;
-		const controller = new AbortController();
 		loading = true;
-		void load(controller.signal);
-		const timer = setInterval(() => void load(controller.signal), 15_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 15_000);
 	});
 
 	const STATUS: Record<EscalationStatus, { tone: Tone; label: () => string }> = {

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { m } from '#lib/paraglide/messages.js';
+	import { startPolling } from '#lib/poll.js';
 	/**
 	 * The state of a commercial appliance or service as its last probe left it
 	 * (pfSense, Unraid, Veeam, Tailscale, FortiGate, Sophos), or of a Hyper-V
@@ -12,7 +13,6 @@
 	 * the device. Renders nothing until a probe has stored something, so an
 	 * agent without Hyper-V shows no empty box.
 	 */
-	import { untrack } from 'svelte';
 	import { queryInstant, type Target } from '#lib/api/index.js';
 	import { ErrorNotice, Panel, Plate } from '#lib/ui/index.js';
 	import BackupHistory from '../backup/BackupHistory.svelte';
@@ -53,6 +53,7 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
+			return false;
 		} finally {
 			loading = false;
 		}
@@ -63,13 +64,7 @@
 		void fold;
 		loading = true;
 		view = null;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 
 	const VERDICT_INK = { signal: 'text-ink-2', advisory: 'text-advisory-ink', warning: 'text-warning-ink' };

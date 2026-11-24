@@ -1,6 +1,6 @@
 //! Catalogue des empreintes de découverte, par produit.
 //!
-//! Comme les notices et options des types (`api/collectors.rs` côté serveur),
+//! Comme les notices et options des types (`api/collectors/` côté serveur),
 //! ce catalogue est des *données* indexées par `kind` : il ne connaît aucun type
 //! Rust concret, seulement les chaînes de `kind` et les signaux à reconnaître.
 //! Chaque empreinte a été vérifiée contre le code source ou la documentation du

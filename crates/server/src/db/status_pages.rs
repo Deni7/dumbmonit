@@ -6,7 +6,7 @@
 
 use anyhow::{Context, Result};
 use dumbmonit_proto::TargetId;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqlitePool};
 
 /// Une page telle qu'enregistrée.
@@ -60,6 +60,9 @@ pub struct StatusPage {
     pub hide_branding: bool,
     /// Abonnement par courriel ouvert aux visiteurs (migration 0246).
     pub subscribe_email: bool,
+    /// Figure dans l'annuaire public `GET /api/public/status` (migration 0303),
+    /// si la page est aussi publiée et publique.
+    pub listed: bool,
 }
 
 impl StatusPage {
@@ -137,7 +140,7 @@ macro_rules! select_page {
             "SELECT id, slug, title, description, published, theme, show_uptime_days, ",
             "created_at, updated_at, accent, scenes, scene_rotation, simple, show_calendar, show_latency, footer_text, homepage_url, ",
             "logo_type, subscribe_channel_id, link_origin, domain, seo, access_mode, ",
-            "(access_password_hash IS NOT NULL) AS has_password, hide_branding, subscribe_email ",
+            "(access_password_hash IS NOT NULL) AS has_password, hide_branding, subscribe_email, listed ",
             "FROM status_pages ",
             $tail
         )
@@ -170,6 +173,8 @@ pub struct StatusPageInput {
     pub seo: crate::status_seo::Seo,
     pub hide_branding: bool,
     pub subscribe_email: bool,
+    /// Figure dans l'annuaire public (migration 0303).
+    pub listed: bool,
     /// Groupes cochés, dans l'ordre ; `None` : inchangés.
     pub groups: Option<Vec<String>>,
     /// Noms publics des membres de groupes ; `None` : inchangés.
@@ -268,8 +273,9 @@ pub async fn create_page(pool: &SqlitePool, input: &StatusPageInput) -> Result<i
     let (id,): (i64,) = sqlx::query_as(
         "INSERT INTO status_pages (slug, title, description, published, theme, show_uptime_days,
              accent, scenes, scene_rotation, simple, show_calendar, show_latency, footer_text, homepage_url,
-             subscribe_channel_id, link_origin, domain, seo, hide_branding, subscribe_email)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             subscribe_channel_id, link_origin, domain, seo, hide_branding, subscribe_email,
+             listed)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          RETURNING id",
     )
     .bind(&input.slug)
@@ -292,6 +298,7 @@ pub async fn create_page(pool: &SqlitePool, input: &StatusPageInput) -> Result<i
     .bind(input.seo.to_json())
     .bind(i64::from(input.hide_branding))
     .bind(i64::from(input.subscribe_email))
+    .bind(i64::from(input.listed))
     .fetch_one(pool)
     .await
     .context("création de la page de statut")?;
@@ -367,7 +374,7 @@ pub async fn update_page(pool: &SqlitePool, id: i64, input: &StatusPageInput) ->
              show_uptime_days = ?, accent = ?, scenes = ?, scene_rotation = ?, simple = ?,
              show_calendar = ?, show_latency = ?,
              footer_text = ?, homepage_url = ?, subscribe_channel_id = ?, link_origin = ?,
-             domain = ?, seo = ?, hide_branding = ?, subscribe_email = ?,
+             domain = ?, seo = ?, hide_branding = ?, subscribe_email = ?, listed = ?,
              updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
          WHERE id = ?",
     )
@@ -391,6 +398,7 @@ pub async fn update_page(pool: &SqlitePool, id: i64, input: &StatusPageInput) ->
     .bind(input.seo.to_json())
     .bind(i64::from(input.hide_branding))
     .bind(i64::from(input.subscribe_email))
+    .bind(i64::from(input.listed))
     .bind(id)
     .execute(pool)
     .await
@@ -715,6 +723,32 @@ pub async fn incidents_for_page(
     .fetch_all(pool)
     .await
     .context("incidents d'une page de statut")
+}
+
+/// Annonces terminées avant un curseur `(fin, id)`, les plus récentes d'abord :
+/// la suite de la liste des incidents passés d'une page. `limit` lignes au plus.
+pub async fn older_incidents_for_page(
+    pool: &SqlitePool,
+    page_id: i64,
+    before_end: &str,
+    before_id: i64,
+    limit: i64,
+) -> Result<Vec<Incident>> {
+    sqlx::query_as(
+        "SELECT id, page_id, title, kind, status, severity, starts_at, ends_at, created_at, updated_at FROM incidents
+         WHERE (page_id IS NULL OR page_id = ?1)
+           AND ends_at IS NOT NULL
+           AND (ends_at < ?2 OR (ends_at = ?2 AND id < ?3))
+         ORDER BY ends_at DESC, id DESC
+         LIMIT ?4"
+    )
+    .bind(page_id)
+    .bind(before_end)
+    .bind(before_id)
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+    .context("incidents plus anciens d'une page de statut")
 }
 
 pub async fn get_incident(pool: &SqlitePool, id: i64) -> Result<Option<Incident>> {
@@ -1268,6 +1302,160 @@ pub async fn subscriber_by_id(pool: &SqlitePool, id: i64) -> Result<Option<Subsc
         .fetch_optional(pool)
         .await
         .context("lecture d'un abonné")
+}
+
+// --------------------------------------------------------------------------
+// Post-mortems
+// --------------------------------------------------------------------------
+
+/// Une étape de la chronologie d'un post-mortem.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TimelineEntry {
+    /// Horodatage UTC (`%Y-%m-%dT%H:%M:%SZ`).
+    pub at: String,
+    pub text: String,
+}
+
+/// Une action décidée après l'incident.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ActionItem {
+    pub text: String,
+    #[serde(default)]
+    pub done: bool,
+}
+
+/// Le post-mortem d'un incident (migration 0261).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Postmortem {
+    pub incident_id: i64,
+    pub summary: String,
+    pub impact: String,
+    pub root_cause: String,
+    pub timeline: Vec<TimelineEntry>,
+    pub actions: Vec<ActionItem>,
+    pub published: bool,
+    pub published_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Post-mortem validé, prêt à être écrit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PostmortemInput {
+    pub summary: String,
+    pub impact: String,
+    pub root_cause: String,
+    pub timeline: Vec<TimelineEntry>,
+    pub actions: Vec<ActionItem>,
+    pub published: bool,
+}
+
+const SELECT_POSTMORTEM: &str = "SELECT incident_id, summary, impact, root_cause, timeline, \
+                                 actions, published, published_at, created_at, updated_at \
+                                 FROM incident_postmortems";
+
+fn postmortem_from_row(row: &sqlx::sqlite::SqliteRow) -> Result<Postmortem> {
+    use sqlx::Row;
+    let timeline: String = row.try_get("timeline")?;
+    let actions: String = row.try_get("actions")?;
+    Ok(Postmortem {
+        incident_id: row.try_get("incident_id")?,
+        summary: row.try_get("summary")?,
+        impact: row.try_get("impact")?,
+        root_cause: row.try_get("root_cause")?,
+        timeline: serde_json::from_str(&timeline).unwrap_or_default(),
+        actions: serde_json::from_str(&actions).unwrap_or_default(),
+        published: row.try_get::<i64, _>("published")? != 0,
+        published_at: row.try_get("published_at")?,
+        created_at: row.try_get("created_at")?,
+        updated_at: row.try_get("updated_at")?,
+    })
+}
+
+pub async fn get_postmortem(pool: &SqlitePool, incident_id: i64) -> Result<Option<Postmortem>> {
+    let row =
+        sqlx::query(sqlx::AssertSqlSafe(format!("{SELECT_POSTMORTEM} WHERE incident_id = ?")))
+            .bind(incident_id)
+            .fetch_optional(pool)
+            .await
+            .context("lecture d'un post-mortem")?;
+    row.as_ref().map(postmortem_from_row).transpose()
+}
+
+/// Les post-mortems de plusieurs incidents, par incident.
+pub async fn postmortems_for(
+    pool: &SqlitePool,
+    incident_ids: &[i64],
+) -> Result<std::collections::HashMap<i64, Postmortem>> {
+    let mut found = std::collections::HashMap::new();
+    for &id in incident_ids {
+        if let Some(postmortem) = get_postmortem(pool, id).await? {
+            found.insert(id, postmortem);
+        }
+    }
+    Ok(found)
+}
+
+/// Crée ou remplace le post-mortem d'un incident. La date de publication est
+/// posée à la première publication, gardée tant qu'il reste publié, effacée
+/// quand il repasse en brouillon.
+pub async fn save_postmortem(
+    pool: &SqlitePool,
+    incident_id: i64,
+    input: &PostmortemInput,
+) -> Result<()> {
+    sqlx::query(
+        "INSERT INTO incident_postmortems
+             (incident_id, summary, impact, root_cause, timeline, actions, published, published_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?,
+                 CASE WHEN ? THEN strftime('%Y-%m-%dT%H:%M:%SZ', 'now') END)
+         ON CONFLICT (incident_id) DO UPDATE SET
+             summary = excluded.summary,
+             impact = excluded.impact,
+             root_cause = excluded.root_cause,
+             timeline = excluded.timeline,
+             actions = excluded.actions,
+             published = excluded.published,
+             published_at = CASE
+                 WHEN excluded.published = 0 THEN NULL
+                 WHEN incident_postmortems.published = 1 THEN incident_postmortems.published_at
+                 ELSE excluded.published_at
+             END,
+             updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')",
+    )
+    .bind(incident_id)
+    .bind(&input.summary)
+    .bind(&input.impact)
+    .bind(&input.root_cause)
+    .bind(serde_json::to_string(&input.timeline)?)
+    .bind(serde_json::to_string(&input.actions)?)
+    .bind(input.published)
+    .bind(input.published)
+    .execute(pool)
+    .await
+    .context("enregistrement d'un post-mortem")?;
+    Ok(())
+}
+
+/// Tous les post-mortems publiés, par incident (la page publique en filtre
+/// ensuite les siens).
+pub async fn published_postmortems(
+    pool: &SqlitePool,
+) -> Result<std::collections::HashMap<i64, Postmortem>> {
+    let rows = sqlx::query(sqlx::AssertSqlSafe(format!("{SELECT_POSTMORTEM} WHERE published = 1")))
+        .fetch_all(pool)
+        .await
+        .context("lecture des post-mortems publiés")?;
+    rows.iter().map(|row| postmortem_from_row(row).map(|p| (p.incident_id, p))).collect()
+}
+
+pub async fn delete_postmortem(pool: &SqlitePool, incident_id: i64) -> Result<bool> {
+    let done = sqlx::query("DELETE FROM incident_postmortems WHERE incident_id = ?")
+        .bind(incident_id)
+        .execute(pool)
+        .await
+        .context("suppression d'un post-mortem")?;
+    Ok(done.rows_affected() > 0)
 }
 
 #[cfg(test)]

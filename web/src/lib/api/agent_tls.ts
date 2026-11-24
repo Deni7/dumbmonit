@@ -3,7 +3,7 @@
  * post-quantum key exchange. Administrator session only.
  */
 import { request } from './client';
-import type { AgentChannelCheck, AgentChannelOverview } from './types';
+import type { AgentChannelCheck, AgentChannelOverview, AgentTransportWish } from './types';
 
 export function getAgentChannel(signal?: AbortSignal): Promise<AgentChannelOverview> {
 	return request<AgentChannelOverview>('/agent/tls', { signal });
@@ -32,7 +32,7 @@ export function cancelAgentCaRotation(): Promise<void> {
  * command.
  */
 export function checkAgentChannel(
-	body: { base_url: string; relay_id?: number; relay_host?: string | null },
+	body: { base_url: string; relay_id?: number; relay_host?: string | null; transport?: AgentTransportWish },
 	signal?: AbortSignal
 ): Promise<AgentChannelCheck> {
 	return request<AgentChannelCheck>('/agent/tls/check', { method: 'POST', body, signal });

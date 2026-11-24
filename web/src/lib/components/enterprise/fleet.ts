@@ -6,17 +6,18 @@
  * Every series carries the `target` label (the target id); multi-location
  * monitors have one series per place, folded here with the worst value.
  */
-import { queryInstant, queryRange, type MetricSeries, type TargetId } from '#lib/api/index.js';
+import { queryInstant, queryRange, type MetricSeries, type Target, type TargetId } from '#lib/api/index.js';
+import { hasProbeState } from '#lib/format.js';
+import { riverCells, silenceMeansDown, type RiverCell } from '#lib/components/enterprise/river.js';
 
-/** One slot of a monitor's bar: every check passed, some failed, all failed, nothing measured. */
-export type RiverCell = 'up' | 'warn' | 'down' | 'none';
+export type { RiverCell } from '#lib/components/enterprise/river.js';
 
 export const RIVER_SLOTS = 72;
 /** What the overview's 24 hour bars cover, whatever range the console is on. */
 export const DAY_SECONDS = 86400;
 export const SPARK_POINTS = 28;
 
-/** Probes publish `probe_success`; devices only `up`. Both are 1 when healthy. */
+/** Probes publish `probe_success`; devices only `up`, and only when they answer. Both are 1 when healthy. */
 const HEALTH = '{__name__=~"dumbmonit_probe_success|dumbmonit_up"}';
 
 function targetOf(serie: MetricSeries): TargetId | null {
@@ -44,20 +45,23 @@ function instant(series: MetricSeries[]): Map<TargetId, number> {
 	return out;
 }
 
-export function cellOf(value: number | undefined): RiverCell {
-	if (value === undefined) return 'none';
-	if (value >= 0.999) return 'up';
-	if (value <= 0.001) return 'down';
-	return 'warn';
-}
-
-/** Every monitor's health over `rangeSeconds`, in `slots` equal slots (default `RIVER_SLOTS`), oldest first. */
+/**
+ * Every monitor's health over `rangeSeconds`, in `slots` equal slots (default `RIVER_SLOTS`), oldest first.
+ *
+ * `monitors` tells a device's silent slot (it did not answer: red) from an
+ * empty one (nothing measured: grey); see `river.ts`. Without it, every
+ * empty slot stays grey.
+ */
 export async function loadRiver(
 	rangeSeconds: number,
 	signal?: AbortSignal,
-	slots: number = RIVER_SLOTS
+	slots: number = RIVER_SLOTS,
+	monitors: readonly Pick<Target, 'id' | 'kind' | 'enabled' | 'interval_secs'>[] = []
 ): Promise<Map<TargetId, RiverCell[]>> {
 	const step = Math.max(15, Math.round(rangeSeconds / slots));
+	const silent = new Set(
+		monitors.filter((t) => silenceMeansDown(t, hasProbeState(t.kind), step)).map((t) => t.id)
+	);
 	const end = Date.now();
 	const start = end - step * slots * 1000;
 	const series = await queryRange(
@@ -75,9 +79,7 @@ export async function loadRiver(
 			const known = bySlot.get(slot);
 			bySlot.set(slot, known === undefined ? value : Math.min(known, value));
 		}
-		const cells: RiverCell[] = [];
-		for (let i = 1; i <= slots; i += 1) cells.push(cellOf(bySlot.get(i)));
-		out.set(id, cells);
+		out.set(id, riverCells(bySlot, slots, silent.has(id)));
 	}
 	return out;
 }

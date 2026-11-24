@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { m } from '#lib/paraglide/messages.js';
+	import { startPolling } from '#lib/poll.js';
 	/**
 	 * What an Active Directory domain has to show beyond charts, in the order
 	 * an administrator should look: the findings first (who can be roasted,
@@ -9,7 +10,6 @@
 	 * One read of what the probe stored, refreshed every minute; the domain
 	 * controller is never asked because a page was opened.
 	 */
-	import { untrack } from 'svelte';
 	import { getAdOverview } from '#lib/api/activedirectory.js';
 	import type { AdFindingSeverity, AdOverview, Target } from '#lib/api/index.js';
 	import { ErrorNotice, Panel, Plate, Skeleton } from '#lib/ui/index.js';
@@ -84,6 +84,7 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
+			return false;
 		} finally {
 			loading = false;
 		}
@@ -93,13 +94,7 @@
 		void target.id;
 		loading = true;
 		overview = null;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 
 	function days(seconds: number | null): string {

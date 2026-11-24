@@ -13,6 +13,7 @@
 	 * Rows come from `GET /api/targets/{id}/proxmox/ceph`.
 	 */
 	import { readProxmoxCeph } from '#lib/api/proxmox.js';
+	import { startPolling } from '#lib/poll.js';
 	import type { ProxmoxCeph, Target } from '#lib/api/index.js';
 	import { ErrorNotice, Led, Plate, Skeleton } from '#lib/ui/index.js';
 	import { m } from '#lib/paraglide/messages.js';
@@ -36,20 +37,15 @@
 		} catch (cause) {
 			if (signal?.aborted) return;
 			error = cause;
+			return false;
 		} finally {
 			if (!signal?.aborted) loading = false;
 		}
 	}
 
 	$effect(() => {
-		const controller = new AbortController();
 		loading = true;
-		void load(controller.signal);
-		const timer = setInterval(() => void load(controller.signal), 30_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 30_000);
 	});
 
 	const health = $derived(cephHealth(ceph?.health ?? null, ceph?.health_status ?? null));
@@ -74,11 +70,11 @@
 </script>
 
 {#if loading && !ceph}
-	<section class="rounded-[var(--radius-card)] border border-line bg-surface px-5 py-4 shadow-lift" aria-busy="true" aria-label={m.devicesb_proxmox_ceph_loading()}>
+	<section class="rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 shadow-lift sm:px-5" aria-busy="true" aria-label={m.devicesb_proxmox_ceph_loading()}>
 		<Skeleton class="h-16 w-full" rows={1} />
 	</section>
 {:else if error}
-	<section class="rounded-[var(--radius-card)] border border-line bg-surface px-5 py-4 shadow-lift">
+	<section class="rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 shadow-lift sm:px-5">
 		<ErrorNotice {error} title={m.devicesb_proxmox_ceph_load_error()} onretry={() => void load()} />
 	</section>
 {:else if ceph?.available}

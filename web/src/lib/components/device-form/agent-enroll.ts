@@ -14,9 +14,17 @@ export interface InstallOptions {
 	caPin: string | null;
 	/** `--pinned-key`: public key of a self-signed server certificate, the agent keeps it. */
 	serverPin: string | null;
+	/**
+	 * `--transport`: `websocket` when the agent reaches its channel through the
+	 * web address (Cloudflare Tunnel, a reverse proxy that terminates TLS).
+	 */
+	transport?: string | null;
 }
 
-/** Reads `--url=`, `--tls-url=`, `--ca-pin=` and `--pinned-key=` from the Unix install command. */
+/**
+ * Reads `--url=`, `--tls-url=`, `--ca-pin=`, `--pinned-key=` and `--transport=`
+ * from the Unix install command.
+ */
 export function installOptions(command: string): InstallOptions {
 	const value = (flag: string) => {
 		const match = command.match(new RegExp(`(?:^|\\s)--${flag}=(\\S+)`));
@@ -26,7 +34,8 @@ export function installOptions(command: string): InstallOptions {
 		base: value('url') ?? '',
 		tlsUrl: value('tls-url'),
 		caPin: value('ca-pin'),
-		serverPin: value('pinned-key')
+		serverPin: value('pinned-key'),
+		transport: value('transport')
 	};
 }
 
@@ -50,6 +59,7 @@ export function dockerRun(options: InstallOptions, token: string, hostname: stri
 	if (options.tlsUrl) env.push(['DUMBMONIT_AGENT_TLS_URL', options.tlsUrl]);
 	if (options.caPin) env.push(['DUMBMONIT_AGENT_CA_PIN', options.caPin]);
 	if (options.serverPin) env.push(['DUMBMONIT_AGENT_SERVER_PIN', options.serverPin]);
+	if (options.transport) env.push(['DUMBMONIT_AGENT_TRANSPORT', options.transport]);
 	if (hostname) env.push(['DUMBMONIT_AGENT_HOSTNAME', hostname]);
 	env.push(['DUMBMONIT_AGENT_SECRET_FILE', '/var/lib/dumbmonit-agent/agent-secret']);
 	return [
@@ -73,6 +83,7 @@ export function dockerCompose(options: InstallOptions, token: string, hostname: 
 	if (options.tlsUrl) env.push(['DUMBMONIT_AGENT_TLS_URL', options.tlsUrl]);
 	if (options.caPin) env.push(['DUMBMONIT_AGENT_CA_PIN', options.caPin]);
 	if (options.serverPin) env.push(['DUMBMONIT_AGENT_SERVER_PIN', options.serverPin]);
+	if (options.transport) env.push(['DUMBMONIT_AGENT_TRANSPORT', options.transport]);
 	if (hostname) env.push(['DUMBMONIT_AGENT_HOSTNAME', hostname]);
 	env.push(['DUMBMONIT_AGENT_SECRET_FILE', '/var/lib/dumbmonit-agent/agent-secret']);
 	return [

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { withBase } from '#lib/paths.js';
+	import { startPolling } from '#lib/poll.js';
 	import { m } from '#lib/paraglide/messages.js';
 	/**
 	 * Plakar backups seen by the agent: one block per kloset, one line per
@@ -16,7 +17,6 @@
 	 * the detection or a bare trace of Plakar: hidden too. With klosets but no
 	 * binary, the klosets show as unreadable with a hint about `plakar_bin`.
 	 */
-	import { untrack } from 'svelte';
 	import { ExternalLink } from 'lucide-svelte';
 	import { queryInstant, type Target } from '#lib/api/index.js';
 	import { ErrorNotice, Panel, Plate, type Tone } from '#lib/ui/index.js';
@@ -147,6 +147,7 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
+			return false;
 		} finally {
 			loading = false;
 		}
@@ -156,13 +157,7 @@
 		void target.id;
 		loading = true;
 		klosets = [];
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 </script>
 

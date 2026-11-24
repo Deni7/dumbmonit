@@ -172,6 +172,7 @@
 					<select id="scim-role" class="input max-w-xs" bind:value={role} disabled={saving}>
 						<option value="viewer">{m.settings_scim_role_viewer()}</option>
 						<option value="operator">{m.settings_scim_role_operator()}</option>
+						<option value="wall">{m.settings_users_role_wall()}</option>
 					</select>
 				</Field>
 				{#if actionError}<ErrorNotice error={actionError} title={m.settings_scim_action_error()} />{/if}

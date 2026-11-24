@@ -5,8 +5,8 @@
 	 * (`collectors/vsphere/metrics.rs`). Read from the latest stored
 	 * measurement; opening the page never connects to vCenter or the host.
 	 */
-	import { untrack } from 'svelte';
 	import { queryInstant, type Target } from '#lib/api/index.js';
+	import { startPolling } from '#lib/poll.js';
 	import { ErrorNotice, Panel, Plate, type Tone } from '#lib/ui/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { formatBytes, formatCount, formatSpan } from '../truenas/format';
@@ -162,6 +162,7 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
+			return false;
 		} finally {
 			loading = false;
 		}
@@ -172,13 +173,7 @@
 		loading = true;
 		view = EMPTY;
 		showAllVms = false;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 
 	function health(code: number | null): [string, Tone] {

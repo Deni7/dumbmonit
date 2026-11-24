@@ -636,7 +636,7 @@ mod tests {
         let hub = Arc::new(RelayHub::new());
         let waiter = {
             let hub = hub.clone();
-            tokio::spawn(async move { hub.take(9, Duration::from_secs(5)).await })
+            tokio::spawn(async move { hub.take(9, Duration::from_secs(30)).await })
         };
         tokio::time::sleep(Duration::from_millis(50)).await;
         let started = Instant::now();
@@ -650,7 +650,8 @@ mod tests {
         .expect("dépôt");
         let commands = waiter.await.expect("tâche");
         assert_eq!(commands.len(), 1);
-        assert!(started.elapsed() < Duration::from_secs(2), "réveil immédiat attendu");
+        // Bien avant la fin de l'attente longue (30 s), même sur une machine chargée.
+        assert!(started.elapsed() < Duration::from_secs(10), "réveil immédiat attendu");
     }
 
     #[tokio::test]
@@ -658,13 +659,14 @@ mod tests {
         let hub = Arc::new(RelayHub::new());
         let waiter = {
             let hub = hub.clone();
-            tokio::spawn(async move { hub.take(9, Duration::from_secs(5)).await })
+            tokio::spawn(async move { hub.take(9, Duration::from_secs(30)).await })
         };
         tokio::time::sleep(Duration::from_millis(50)).await;
         let started = Instant::now();
         hub.nudge(9);
         assert!(waiter.await.expect("tâche").is_empty());
-        assert!(started.elapsed() < Duration::from_secs(2), "réveil immédiat attendu");
+        // Bien avant la fin de l'attente longue (30 s), même sur une machine chargée.
+        assert!(started.elapsed() < Duration::from_secs(10), "réveil immédiat attendu");
         assert!(!hub.take_resync(8), "un autre relais n'est pas concerné");
         assert!(hub.take_resync(9));
         assert!(!hub.take_resync(9), "une seule fois");

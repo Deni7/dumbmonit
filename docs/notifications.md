@@ -13,6 +13,9 @@ token to copy, and what to type into the form.
 - [Settings or secrets: the difference](#settings-or-secrets-the-difference)
 - [Self-signed certificates](#self-signed-certificates)
 - [Acknowledge or snooze from the notification](#acknowledge-or-snooze-from-the-notification)
+  - [Interactive buttons (Slack, Telegram, Teams)](#interactive-buttons-slack-telegram-teams)
+- [Message templates](#message-templates)
+- [Personal notifications](#personal-notifications)
 - [The custom channel](#the-custom-channel)
   - [Available variables](#available-variables)
   - [Example 1 — an internal JSON API](#example-1--an-internal-json-api)
@@ -54,6 +57,17 @@ Three principles apply to every channel:
 The test message takes **exactly the same path** as a real alert: same request,
 same token, same formatting. If it arrives, the channel works. If it fails, the
 error message names the setting to fix.
+
+A successful test also says whether a real alert would have been held back by
+this channel's own settings: the channel is disabled, its severity floor, its quiet
+hours (when they are active at that moment) or its filter. A test message carries no
+severity, monitor or rule, so only these settings can be read; what a filter would
+let through depends on the alert.
+
+In the list, a switch enables or disables a channel without opening it, and
+**Duplicate** (in the ⋮ menu) opens the form prefilled from the channel. Secrets are
+never copied: type them again. Disabling or deleting the last enabled channel asks
+for confirmation, since no alert would reach anyone afterwards.
 
 > **A token is never shown again.** Once saved, it is encrypted in the database and
 > the interface only says "configured". To edit a channel without retyping its
@@ -114,6 +128,7 @@ How they show up depends on the channel:
 | Channel | Shown as |
 |---|---|
 | ntfy, Telegram, Web Push | Buttons under the notification |
+| Slack, Microsoft Teams with **Interactive buttons** on | Buttons in the message (see below) |
 | Discord, Slack, email and every other channel | Links at the end of the message |
 | Custom webhook | Links in `{{message}}`, and the `{{dismiss_url}}` / `{{ack_url}}` / `{{snooze_url}}` variables |
 | PagerDuty, Opsgenie, Grafana OnCall, SIGNL4 | Nothing: acknowledge in the service itself |
@@ -142,6 +157,156 @@ other invalid link, and repeated attempts from one address are slowed down.
 Turn **Acknowledge and snooze from notifications** off in the notification policy
 to stop adding them; this also invalidates the links already sent. Clearing the
 public URL has the same effect.
+
+### Interactive buttons (Slack, Telegram, Teams)
+
+Slack, Telegram and Microsoft Teams channels have an **Interactive buttons**
+switch. With it on, messages carry three buttons — **Acknowledge**, **Snooze 1 h**
+and **Open** (the device in DumbMonit) — and, on Slack and Telegram, pressing one
+acts right away, without opening a page. The message is then updated: the two
+action buttons give way to "Acknowledged by alice" (Open stays). The alert shows
+"acknowledged by slack:alice" (or `telegram:bob`), and the audit log records the
+same name.
+
+Interactive buttons need the instance's **public URL in https** (with a domain
+name, not an IP address). Without it, messages keep their links.
+
+| Channel | What a press does | What to set up |
+|---|---|---|
+| Slack | Acts in Slack, updates the message | The app's signing secret, and its Interactivity Request URL (below) |
+| Telegram | Acts in Telegram, replaces the buttons | Nothing: DumbMonit registers the bot's webhook when you save |
+| Microsoft Teams | Opens the confirmation page | Nothing |
+
+**Slack.** Buttons need a Slack app, the one that gave you the incoming webhook:
+
+1. In <https://api.slack.com/apps>, open the app → **Basic Information → App
+   Credentials** and copy the **Signing Secret** into the channel's secrets
+   (`signing_secret`). Turn **Interactive buttons** on and save.
+2. The form then shows the channel's **Interactivity Request URL**, of the form
+   `https://<public URL>/api/public/chat/slack/<id>`. In the app, open
+   **Interactivity & Shortcuts**, turn it on and paste that address as the
+   **Request URL**.
+
+DumbMonit checks Slack's signature (`X-Slack-Signature`) on every press and refuses
+any request older than five minutes, so a captured request cannot be replayed.
+
+**Telegram.** When you save the channel with the switch on, DumbMonit registers
+itself as the bot's webhook (`setWebhook`, at
+`https://<public URL>/api/public/chat/telegram/<id>`, with a secret that Telegram
+sends back on every press). If that fails — no https public URL, or a port other
+than 443, 80, 88 or 8443 — the channel shows the error and messages keep their
+link buttons. A bot has a single webhook: once it is set, another tool can no longer
+read the bot with `getUpdates`. Turning the switch off (or deleting the channel)
+removes the webhook.
+
+**Microsoft Teams.** A Workflows webhook cannot send a press back to the sender
+(`Action.Submit` and `Action.Execute` need a bot, `Action.Http` only works in
+Outlook). The buttons are therefore `Action.OpenUrl` buttons that open the signed
+links: you confirm on DumbMonit's page, as with any other link.
+
+The buttons carry the same signed, single-use, 24-hour permission as the links. The
+platform's signature only proves where the press comes from; it authorises nothing
+on its own. A second press, or a retry by the platform, does nothing more and says
+so ("Already done").
+
+---
+
+## Message templates
+
+Every channel that sends a message (all but the custom webhook, which has its own
+[body template](#the-custom-channel), the DumbMonit on-call channel and the ticket
+channels) can rewrite the **title** and the **body** of its messages: open
+**Message template** in the channel form. Leave a field empty to keep the usual
+text; **Reset to default** empties both. A channel without a template sends exactly
+what it sent before.
+
+The form shows a **preview on a sample alert**, rendered by the server exactly as a
+real message would be, and refuses to save a template with an unknown variable or
+unclosed braces, naming the culprit.
+
+The default templates give the usual message:
+
+- title: `{{title}}`
+- body: `{{summary}}` then, on the next line, `{{url}}`
+
+| Variable | Value |
+|---|---|
+| `{{title}}` | The built-in title, for example "nas — Disk full" |
+| `{{monitor}}` | Name of the monitored device |
+| `{{severity}}` | advisory, warning or critical |
+| `{{state}}` | firing or resolved |
+| `{{summary}}` | The built-in body: one line per alert, without the link |
+| `{{value}}` | Measured value with its unit; empty if the alert carries none |
+| `{{threshold}}` | Crossed threshold with its unit |
+| `{{rule}}` | Name of the alert rule |
+| `{{url}}` | Link to the device in DumbMonit; empty without a public URL |
+| `{{started_at}}` | When the alert started firing, for example 2026-09-01 14:32 UTC |
+| `{{duration}}` | How long it has been firing when the message leaves, for example 12 min |
+| `{{site}}` | The device's `site` tag, or its `location` tag |
+| `{{count}}` | Number of alerts in the message |
+| `{{date}}` | When the message was sent, in UTC |
+| `{{tags.<key>}}` | Any tag of the device, for example `{{tags.room}}` |
+
+The engine only substitutes variables: no loops, no conditions, nothing that runs.
+A message that groups several alerts uses the first one for `{{rule}}`, `{{value}}`
+and the like; `{{summary}}` lists them all. A variable with nothing to say (no
+public URL, no such tag) is empty, and an empty last line is dropped.
+
+**Formatting.** Values are escaped for the service, so a device called
+`<!channel>` or `DESKTOP_01 (v2.1)` can never add formatting or break the message;
+the text you write is kept as you wrote it.
+
+| Channel | Your text is | Values are |
+|---|---|---|
+| Slack | Slack `mrkdwn`: `*bold*`, `_italics_`, `<https://…\|text>` | `&`, `<`, `>` escaped |
+| Telegram | MarkdownV2: `*bold*`, `_italics_`, `[text](https://…)` | Every reserved character escaped |
+| Email (SMTP) | HTML for the body (a plain-text copy is sent too); the subject is plain text | HTML-escaped |
+| Every other channel | Plain text | Inserted as they are |
+
+On Telegram, full stops, dashes, `!`, `=`, `+`, `#` and braces in your own text are
+escaped for you; put a backslash before `( ) [ ] * _ ~ | >` when you mean the
+character itself rather than formatting, for example `Disk \(sda\) full`. If
+Telegram still refuses the message ("can't parse entities"), the channel's error
+says so: check the template.
+
+A test message from the channel uses its template too.
+
+---
+
+## Personal notifications
+
+Channels belong to the instance; each person can also receive alerts
+personally, in Settings → **My account → My notifications** (see
+[Settings](using/settings.md#my-notifications)): by email, to the address of
+the account, through the [email server](#email-server) of the instance, and/or
+by [Web Push](#web-push) on the devices that account has subscribed — no
+channel to create.
+
+They go through the same steps as a channel, after it in each evaluation
+cycle:
+
+1. **What the account sees.** An alert on a monitor its teams do not show
+   never reaches it; alerts without a monitor reach it only with the scope
+   *Everything I see*.
+2. **Its scope.** Everything it sees, the folders opened by its teams, or the
+   folders (sub-folders included) and tags (`key=value`, or `key` alone) it
+   picked.
+3. **Its minimum severity**, and whether it wants recoveries. A recovery is
+   only sent for an alert that was announced to that account.
+4. **Its minimum delay** between two messages for the same alert, on top of
+   the rule's own reminders.
+5. **Quiet hours**, in its time zone: only critical alerts (*Warning*) get
+   through; the rest is not sent to it, and stays in the alert list.
+6. **Flapping and the hourly cap** of the global policy: an alert held back
+   for flapping is not sent, and an account receives at most the policy's
+   messages per hour.
+
+One message per monitor, without the grouping window: a person wants to know
+at once. Maintenance windows, suppression by dependency and silences apply
+before, as for every channel. A failed delivery is logged by the server and
+not retried. Action links (acknowledge, snooze) are not added to personal
+messages. **Send me a test** sends a test message through each means saved
+as on.
 
 ---
 
@@ -410,7 +575,9 @@ On <https://api.slack.com/apps>, create an app, enable **Incoming Webhooks**, th
 **Add New Webhook to Workspace** and pick the channel. Copy the
 `https://hooks.slack.com/services/…` URL.
 
-- **Secrets** — `webhook_url`
+- **Settings** — `interactive` (Interactive buttons, see
+  [above](#interactive-buttons-slack-telegram-teams))
+- **Secrets** — `webhook_url`, `signing_secret` (only for interactive buttons)
 
 ### Telegram
 
@@ -504,7 +671,8 @@ https://api.telegram.org/bot<TOKEN>/sendMessage?chat_id=<CHAT_ID>&text=test123
 
 - **Settings** — `chat_id` (required), `message_thread_id` (topic, optional),
   `api_base` (default `https://api.telegram.org`, change it only to go through a
-  relay)
+  relay), `interactive` (Interactive buttons, see
+  [above](#interactive-buttons-slack-telegram-teams))
 - **Secrets** — `bot_token`
 
 > **"Telegram cannot find this chat"** — for a private chat, the bot has never received a message
@@ -525,6 +693,8 @@ The current procedure:
 2. Choose the **"Post to a channel when a webhook request is received"** template.
 3. Confirm the steps, then **copy the HTTPS POST URL** shown at the end.
 
+- **Settings** — `interactive` (Acknowledge, Snooze and Open as card buttons, see
+  [above](#interactive-buttons-slack-telegram-teams))
 - **Secrets** — `webhook_url`
 
 DumbMonit sends a wrapped *Adaptive Card*, the only format these flows display
@@ -719,8 +889,10 @@ message DumbMonit prepared.
 **Settings → Notifications → Email server** sets one SMTP server for the
 instance: host, port, encryption (STARTTLS, TLS or none), username, password
 and the sender's address and name. It sends what has no channel of its own:
-[status page subscribers](using/status-pages.md#email-subscribers), and
-[scheduled reports](using/reports.md) when no email channel is enabled.
+[status page subscribers](using/status-pages.md#email-subscribers),
+[scheduled reports](using/reports.md) when no email channel is enabled,
+[personal notifications](#personal-notifications), and the password reset
+links and invitations of [accounts](using/settings.md#invitations).
 **Send a test email** tries the form as it is, before saving, and shows the
 SMTP server's answer when it fails.
 

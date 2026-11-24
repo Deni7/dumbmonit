@@ -209,6 +209,7 @@ pub async fn push_agent_batch(
         self_update: None,
         relay_gateway: host.gateway,
         relay_gateway_check: None,
+        relay_gateway_state: None,
         server_link: None,
         remediation: None,
     };
@@ -365,6 +366,7 @@ async fn seed_status_pages(
                 seo: Default::default(),
                 hide_branding: false,
                 subscribe_email: false,
+                listed: true,
                 groups: None,
                 group_labels: None,
             },

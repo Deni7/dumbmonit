@@ -6,9 +6,11 @@
 	 * its first alert, kept on the instance only.
 	 */
 	import { BookOpen } from 'lucide-svelte';
+	import { startPolling } from '#lib/poll.js';
 	import { m } from '#lib/paraglide/messages.js';
-	import { getHealth, getOnboarding, type ComponentHealth, type FirstRunTimings, type Health } from '#lib/api/index.js';
-	import { formatDateTime, formatDuration, parseServerDate } from '#lib/format.js';
+	import { getHealth, getOnboarding, type ComponentHealth, type EffectiveSetting, type FirstRunTimings, type Health } from '#lib/api/index.js';
+	import { getEffectiveConfig } from '#lib/api/instance.js';
+	import { formatBinaryBytes, formatDateTime, formatDuration, parseServerDate } from '#lib/format.js';
 	import { firstRunSteps } from '#lib/components/wizard/quickstart.js';
 	import { Button, ErrorNotice, Panel, Plate, Skeleton } from '#lib/ui/index.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
@@ -28,19 +30,14 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
+			return false;
 		} finally {
 			loading = false;
 		}
 	}
 
 	$effect(() => {
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void load(controller.signal), 15_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 15_000);
 	});
 
 	// The configuration changes an update asked for (administrators): the list
@@ -49,6 +46,45 @@
 	$effect(() => {
 		if (upgradeNotesShown) upgradeNotes.load({ quiet: true }).catch(() => {});
 	});
+
+	// Effective configuration (administrators): read once, it only changes on a restart.
+	let config = $state<EffectiveSetting[] | null>(null);
+	let configError = $state<unknown>(null);
+	$effect(() => {
+		if (!auth.isAdmin) return;
+		const controller = new AbortController();
+		getEffectiveConfig(controller.signal)
+			.then((list) => (config = list.filter((setting) => setting.key !== 'version')))
+			.catch((cause) => {
+				if (!(cause instanceof DOMException && cause.name === 'AbortError')) configError = cause;
+			});
+		return () => controller.abort();
+	});
+	const CONFIG_LABEL: Record<string, () => string> = {
+		data_dir: () => m.w2ops_about_cfg_data_dir(),
+		bind: () => m.w2ops_about_cfg_bind(),
+		agent_listen: () => m.w2ops_about_cfg_agent_listen(),
+		single_port: () => m.w2ops_about_cfg_single_port(),
+		victoria_metrics: () => m.w2ops_about_cfg_victoria_metrics(),
+		vm_retention: () => m.w2ops_about_cfg_vm_retention(),
+		log_filter: () => m.w2ops_about_cfg_log_filter(),
+		workers: () => m.w2ops_about_cfg_workers(),
+		db_pool_size: () => m.w2ops_about_cfg_db_pool_size(),
+		max_concurrent_probes: () => m.w2ops_about_cfg_max_concurrent_probes(),
+		probe_timeout: () => m.w2ops_about_cfg_probe_timeout(),
+		trusted_proxies: () => m.w2ops_about_cfg_trusted_proxies(),
+		secret_source: () => m.w2ops_about_cfg_secret_source(),
+		tls_certificate: () => m.w2ops_about_cfg_tls_certificate(),
+		metrics_public: () => m.w2ops_about_cfg_metrics_public(),
+		backup_enabled: () => m.w2ops_about_cfg_backup_enabled(),
+		backup_interval: () => m.w2ops_about_cfg_backup_interval(),
+		backup_keep: () => m.w2ops_about_cfg_backup_keep(),
+		backup_dir: () => m.w2ops_about_cfg_backup_dir(),
+		audit_keep: () => m.w2ops_about_cfg_audit_keep(),
+		config_dir: () => m.w2ops_about_cfg_config_dir(),
+		high_availability: () => m.w2ops_about_cfg_high_availability(),
+		demo: () => m.w2ops_about_cfg_demo()
+	};
 
 	// The first-run stopwatch, read once: it only ever moves forward on a new step.
 	let firstRun = $state<FirstRunTimings | null>(null);
@@ -90,6 +126,17 @@
 				{health.version}{#if health.build}<span class="text-ink-3"> · {m.settings_about_build()} <span class="font-mono">{health.build}</span></span>{/if}
 			</dd>
 
+			{#if health.data_disk}
+				<dt class="font-semibold text-ink">{m.w2ops_about_disk()}</dt>
+				<dd class="tnum text-ink-2">
+					{m.w2ops_about_disk_value({
+						free: formatBinaryBytes(health.data_disk.free_bytes),
+						total: formatBinaryBytes(health.data_disk.total_bytes),
+						database: formatBinaryBytes(health.data_disk.database_bytes)
+					})}
+				</dd>
+			{/if}
+
 			{#each COMPONENTS as component (component.key)}
 				{@const state: ComponentHealth = health[component.key]}
 				<dt class="font-semibold text-ink">{component.name()}</dt>
@@ -112,6 +159,25 @@
 	{/if}
 
 	<UpdateNotice onSeeWhatsNew={() => whatsNew.reopen()} />
+
+	{#if auth.isAdmin && (config || configError)}
+		<details class="mt-5 border-t border-line pt-4 text-sm" data-testid="effective-config">
+			<summary class="flex min-h-10 cursor-pointer items-center font-semibold text-ink">{m.w2ops_about_config_title()}</summary>
+			{#if configError}
+				<div class="mt-2"><ErrorNotice error={configError} title={m.w2ops_about_config_error()} /></div>
+			{:else if config}
+				<p class="mt-1 max-w-[65ch] text-ink-2">{m.w2ops_about_config_help()}</p>
+				<dl class="mt-3 grid gap-y-2 sm:grid-cols-[14rem_minmax(0,1fr)] sm:gap-x-6">
+					{#each config as setting (setting.key)}
+						<dt class="text-ink">{CONFIG_LABEL[setting.key]?.() ?? setting.key}</dt>
+						<dd class="min-w-0 break-words font-mono text-[0.8125rem] text-ink-2">
+							{setting.value}{#if setting.env}<span class="text-ink-3"> · {setting.env}</span>{/if}
+						</dd>
+					{/each}
+				</dl>
+			{/if}
+		</details>
+	{/if}
 
 	{#if firstRunLines.length > 0}
 		<details class="mt-5 border-t border-line pt-4 text-sm" data-testid="first-run">

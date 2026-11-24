@@ -102,6 +102,8 @@ pub struct LdapConfig {
     pub admin_groups: Vec<String>,
     pub operator_groups: Vec<String>,
     pub viewer_groups: Vec<String>,
+    /// Groupes qui donnent le rôle `wall` (écran mural, le mode mur seul).
+    pub wall_groups: Vec<String>,
     pub timeout_seconds: u64,
 }
 
@@ -125,6 +127,7 @@ impl Default for LdapConfig {
             admin_groups: Vec::new(),
             operator_groups: Vec::new(),
             viewer_groups: Vec::new(),
+            wall_groups: Vec::new(),
             timeout_seconds: DEFAULT_TIMEOUT_SECONDS,
         }
     }
@@ -190,6 +193,7 @@ impl LdapConfig {
         self.admin_groups = split_groups(&self.admin_groups);
         self.operator_groups = split_groups(&self.operator_groups);
         self.viewer_groups = split_groups(&self.viewer_groups);
+        self.wall_groups = split_groups(&self.wall_groups);
         self
     }
 
@@ -272,6 +276,7 @@ impl LdapEnv {
             admin_groups: vec![var("DUMBMONIT_LDAP_ADMIN_GROUPS")],
             operator_groups: vec![var("DUMBMONIT_LDAP_OPERATOR_GROUPS")],
             viewer_groups: vec![var("DUMBMONIT_LDAP_VIEWER_GROUPS")],
+            wall_groups: vec![var("DUMBMONIT_LDAP_WALL_GROUPS")],
             timeout_seconds: var("DUMBMONIT_LDAP_TIMEOUT_SECONDS")
                 .trim()
                 .parse()

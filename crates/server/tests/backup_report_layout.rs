@@ -32,7 +32,9 @@ fn bundle() -> Bundle {
               "attach_csv": false, "objective": 99.9, "page": "acme",
               "layout": { "template": "summary", "paper": "letter", "title": "Board pack",
                           "notes": "Quiet month.", "show_logo": false,
-                          "sections": { "chart": false } },
+                          "sections": { "chart": false },
+                          "objectives": { "groups": { "Edge": 99.5 },
+                                          "monitors": { "Web": 99.99 } } },
               "scope_targets": ["dummy|10.0.0.1", "dummy|fantome"],
               "scope_groups": ["Edge"] },
             { "name": "Weekly SLA", "enabled": false, "frequency": "weekly", "kind": "sla" },
@@ -65,6 +67,8 @@ async fn the_layout_and_the_scope_of_a_report_survive_a_backup() {
     assert_eq!(board.layout.notes, "Quiet month.");
     assert!(!board.layout.show_logo);
     assert!(!board.layout.sections.chart && board.layout.sections.incidents);
+    assert_eq!(board.layout.objectives.groups.get("Edge"), Some(&99.5), "per-group objective");
+    assert_eq!(board.layout.objectives.for_monitor("Web", "Edge"), Some(99.99));
     assert_eq!(board.scope.targets.len(), 1, "the unknown monitor is left out");
     assert_eq!(board.scope.groups, vec!["Edge".to_string()]);
     let old = schedules.iter().find(|s| s.name == "Old digest").expect("Old digest");

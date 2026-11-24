@@ -1,13 +1,17 @@
 <script lang="ts">
-	import { withBase } from '#lib/paths.js';
-	import { kindLabel } from '#lib/kind-label.js';
 	import { m } from '#lib/paraglide/messages.js';
 	/**
 	 * Monitors › List — the first tab of /targets (the other tabs are the map, the logs and security).
 	 *
-	 * One sober toolbar (search, Filter, List/Tiles, New folder, Select, Add);
-	 * the filters, the sort and the tags fold behind "Filter". Children are
-	 * listed under their parent, in folders.
+	 * One sober toolbar, at the size and in the manner of the Alerts list
+	 * (`ListToolbar`): search and Filter on the left; the Compact/Tiles switch,
+	 * a quiet "Create folder" and "Select" on the right. "Add a monitor", the
+	 * one primary, sits in the page header (`routes/targets`). The filters, the
+	 * sort and the tags fold behind "Filter" (`ListFilters`). Children are
+	 * folded inside their parent (`nesting.ts`), in folders drawn as the groups
+	 * of the Alerts list; the column names are written once, over the whole
+	 * list (`ColumnHeader`). Selecting shows `ListBulkBar`; the manual order
+	 * lives in `reorder.svelte.ts`, the pure filtering in `list.ts`.
 	 * Targets and probe states come from the shared store (polled app-wide by
 	 * the root layout, see `alertsStore`); this page only adds the sparklines,
 	 * from one batched query refreshed every 30 s.
@@ -16,41 +20,45 @@
 	import { page } from '$app/state';
 	import { goto } from '#lib/navigation.js';
 	import {
-		deleteTarget,
-		listCollectors,
+		probeTarget,
 		reorderTargets,
 		renameTargetFolder,
 		updateTarget,
 		type Target,
-		type TargetId,
-		type TargetPayload
+		type TargetId
 	} from '#lib/api/index.js';
 	import { displayState } from '#lib/format.js';
-	import { loadSparklines } from '#lib/metrics.js';
-	import { loadLatency, loadRiver, DAY_SECONDS, type RiverCell } from '#lib/components/enterprise/fleet.js';
-	import { getSecuritySummary } from '#lib/api/security.js';
-	import type { SecurityGrade } from '#lib/api/index.js';
-	import type { Serie } from '#lib/components/Chart.svelte';
+	import { tagChip } from '#lib/tag-chip.js';
+	import type { RowActionHandlers } from '#lib/components/devices/RowActions.svelte';
+	import type {  } from '#lib/api/index.js';
+	import type {  } from '#lib/components/Chart.svelte';
 	import { countAlertsByTarget } from '#lib/alerts-attention.js';
 	import { alertsStore } from '#lib/stores/alerts.svelte.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import ReviewNotice from '#lib/components/device-form/ReviewNotice.svelte';
-	import { Button, ClickSpark, Confirm, EmptyState, ErrorNotice, Menu, SelectionBar, Skeleton, Toast } from '#lib/ui/index.js';
-	import TagFilter from './TagFilter.svelte';
+	import { Button, EmptyState, ErrorNotice, Skeleton, Toast } from '#lib/ui/index.js';
+	import ColumnHeader from '#lib/components/devices/ColumnHeader.svelte';
 	import RackList from '#lib/components/devices/RackList.svelte';
-	import type { ReorderControls, RowSelection } from '#lib/components/devices/RackList.svelte';
+	import type { RowSelection } from '#lib/components/devices/RackList.svelte';
 	import FolderHeader from '#lib/components/devices/FolderHeader.svelte';
-	import Segmented from '#lib/components/devices/Segmented.svelte';
-	import ViewSwitcher from '#lib/components/devices/ViewSwitcher.svelte';
 	import { loadRackView, saveRackView, type RackView } from '#lib/components/devices/view.js';
-	import { buildRack, nearestRow, needsAttention, type RackRow } from '#lib/components/devices/rack.js';
+	import { buildRack, type RackRow } from '#lib/components/devices/rack.js';
+	import {
+		foldRack,
+		inferHosts,
+		loadOpenChoices,
+		markContext,
+		nestSorted,
+		saveOpenChoices,
+		withAncestors
+	} from '#lib/components/devices/nesting.js';
 	import {
 		SORT_KEYS,
-		cveScanChanges,
-		hasAllTags,
-		matchesSite,
+		availabilityOf,
+		freeTags,
+		loadListQuery,
+		saveListQuery,
 		parseListQuery,
-		runBulk,
 		serializeListQuery,
 		sortTargets,
 		splitDisabled,
@@ -63,49 +71,45 @@
 		buildFolders,
 		knownFolders,
 		compareFolderSections,
-		folderKeyOf,
-		moveWithinScope,
-		reorderByDrop,
-		reorderScope,
 		rootOf,
 		worstState
 	} from '#lib/components/devices/folders.js';
+	import { ChevronRight, PowerOff } from 'lucide-svelte';
+	import { listLocations } from '#lib/api/locations.js';
+	import type { MapLocation } from '#lib/api/types.js';
+	import ListToolbar from './ListToolbar.svelte';
+	import ListFilters from './ListFilters.svelte';
+	import ListBulkBar from './ListBulkBar.svelte';
+	import ListEmpty from './ListEmpty.svelte';
+	import BulkSection from './BulkSection.svelte';
+	import { ListDecor } from './decor.svelte.js';
+	import { ListReorder } from './reorder.svelte.js';
+	import type {  } from '#lib/api/targetsBulk.js';
 	import {
-		ArrowUpDown,
-		ChevronRight,
-		EllipsisVertical,
-		FolderInput,
-		FolderPlus,
-		ListChecks,
-		Plus,
-		Power,
-		PowerOff,
-		Search,
-		SlidersHorizontal,
-		Trash2,
-		MapPin,
-		RadioTower,
-		ShieldCheck
-	} from 'lucide-svelte';
-	import { setCveScanTargets } from '#lib/api/cves.js';
-	import { assignLocation, listLocations } from '#lib/api/locations.js';
-	import { listRelays } from '#lib/api/relay.js';
-	import { locationForSite } from '#lib/components/devices/relay/relay-site.js';
-	import type { MapLocation, RelayAgent } from '#lib/api/types.js';
+		countActiveFilters,
+		countSegments,
+		kindChoices,
+		matchCount,
+		narrowTargets,
+		restoreOverrides,
+		targetToPayload,
+		toggled,
+		troubleCount,
+		visibleIds,
+		withOverrides
+	} from './list.js';
 
 	const targets = $derived(alertsStore.targets);
 	const probes = $derived(alertsStore.probes);
 	/** One pass over the shared alert list, not a request per monitor. */
 	const alertCounts = $derived(countAlertsByTarget(alertsStore.alerts));
-	let sparklines = $state<Map<TargetId, Serie[]>>(new Map());
-	/** Last 24 hours per monitor, one cell per hour, and the latest response time (ms): the table's columns. */
-	let river = $state<Map<TargetId, RiverCell[]>>(new Map());
-	let latency = $state<Map<TargetId, number>>(new Map());
-	/** Security badges: empty while the score is off in Settings, or for unrated kinds. */
-	let security = $state<Map<TargetId, { grade: SecurityGrade | null; score: number | null }>>(new Map());
-	let kindLabels = $state<Map<string, string>>(new Map());
+	const decor = new ListDecor(() => targets, () => view);
+	const sparklines = $derived(decor.sparklines);
+	const river = $derived(decor.river);
+	const security = $derived(decor.security);
+	const kindLabels = $derived(decor.kindLabels);
 	/** Option keys per device type: what is not an option of its type is a free tag. */
-	let optionKeys = $state<Map<string, Set<string>>>(new Map());
+	const optionKeys = $derived(decor.optionKeys);
 	const NO_KEYS: ReadonlySet<string> = new Set();
 	const optionKeysOf = (kind: string) => optionKeys.get(kind) ?? NO_KEYS;
 	const firstLoad = $derived(alertsStore.loading && targets.length === 0);
@@ -114,7 +118,11 @@
 	// Filters, sort and layout live in the URL (`?q=&state=&kind=&sort=&dir=&view=`):
 	// a filtered view is linkable and survives a reload. The URL is read once
 	// here, then kept in step in both directions by the two effects below.
-	const initial = untrack(() => parseListQuery(page.url.searchParams));
+	// Opened with no parameter at all, the list comes back as this viewer left it
+	// (view, filters and sort, never the search text); `saveListQuery` below keeps it.
+	const initial = untrack(() =>
+		page.url.search === '' ? (loadListQuery() ?? parseListQuery(page.url.searchParams)) : parseListQuery(page.url.searchParams)
+	);
 	let search = $state(initial.search);
 	let segment = $state<Segment>(initial.segment);
 	let kind = $state(initial.kind);
@@ -143,6 +151,9 @@
 			view: view === 'compact' ? null : view
 		})
 	);
+	$effect(() => {
+		saveListQuery({ search: '', segment, kind, tags: tagFilter, site, sort, dir: sortDir, view: view === 'compact' ? null : view });
+	});
 	// Writes still in flight: when one lands, the URL differs from a newer
 	// state for a moment, which must not be mistaken for an outside navigation.
 	const inflight = new Set<string>();
@@ -155,8 +166,15 @@
 			reset: false
 		}).finally(() => inflight.delete(want));
 	});
+	// The first run only sees the URL this page was opened on: when the state was
+	// restored from this browser (no parameter in the URL), it must not be undone.
+	let firstSync = true;
 	$effect(() => {
 		const have = page.url.search;
+		if (firstSync) {
+			firstSync = false;
+			return;
+		}
 		if (have === untrack(() => urlSearch) || inflight.has(have)) return;
 		const next = parseListQuery(page.url.searchParams);
 		search = next.search;
@@ -177,55 +195,18 @@
 	// reorder scope, so a sibling-local index is all an override needs. ---
 	let positionOverride = $state<Map<TargetId, number>>(new Map());
 	let groupOverride = $state<Map<TargetId, string>>(new Map());
-	const effectiveTargets = $derived.by(() => {
-		if (positionOverride.size === 0 && groupOverride.size === 0) return targets;
-		return targets.map((t) => {
-			const pos = positionOverride.get(t.id);
-			const grp = groupOverride.get(t.id);
-			if (pos === undefined && grp === undefined) return t;
-			return { ...t, position: pos ?? t.position, group_name: grp ?? t.group_name };
-		});
-	});
+	const effectiveTargets = $derived(withOverrides(targets, positionOverride, groupOverride));
 
 	/** Kinds offered by the filter: only those a monitor uses (plus the one in the URL), never an empty choice. */
-	const kinds = $derived.by(() => {
-		const seen = new Map<string, string>();
-		for (const target of targets) seen.set(target.kind, kindLabels.get(target.kind) ?? target.kind);
-		if (kind && !seen.has(kind)) seen.set(kind, kindLabels.get(kind) ?? kind);
-		return [...seen].sort((a, b) => a[1].localeCompare(b[1], 'en'));
-	});
+	const kinds = $derived(kindChoices(targets, kind, kindLabels));
 
 	/** Free tags in use (with their device count), offered in the tag filter. */
 	const tagChips = $derived(tagCounts(targets, optionKeysOf));
 
 	/** Devices matching the search box, the kind select and the tags, before the segment. */
-	const narrowed = $derived.by(() => {
-		const term = search.trim().toLowerCase();
-		return targets.filter((target) => {
-			if (kind && target.kind !== kind) return false;
-			if (!matchesSite(target.location_id, site)) return false;
-			if (!hasAllTags(target.tags, tagFilter, optionKeysOf(target.kind))) return false;
-			if (!term) return true;
-			const label = kindLabels.get(target.kind) ?? '';
-			return (
-				target.name.toLowerCase().includes(term) ||
-				target.address.toLowerCase().includes(term) ||
-				target.kind.toLowerCase().includes(term) ||
-				label.toLowerCase().includes(term)
-			);
-		});
-	});
+	const narrowed = $derived(narrowTargets(targets, { search, kind, site, tags: tagFilter }, kindLabels, optionKeysOf));
 
-	const counts = $derived.by(() => {
-		const c = { all: narrowed.length, attention: 0, reporting: 0, disabled: 0 };
-		for (const target of narrowed) {
-			const state = stateOf(target);
-			if (needsAttention(state)) c.attention += 1;
-			else if (state === 'online') c.reporting += 1;
-			else if (state === 'disabled') c.disabled += 1;
-		}
-		return c;
-	});
+	const counts = $derived(countSegments(narrowed, stateOf));
 
 	const segments = $derived([
 		{ id: 'all' as const, label: m.devices_targets_seg_all(), count: counts.all },
@@ -234,19 +215,7 @@
 		{ id: 'disabled' as const, label: m.devices_targets_seg_disabled(), count: counts.disabled }
 	]);
 
-	const visible = $derived.by(() => {
-		const ids = new Set<TargetId>();
-		for (const target of narrowed) {
-			const state = stateOf(target);
-			const keep =
-				segment === 'all' ||
-				(segment === 'attention' && needsAttention(state)) ||
-				(segment === 'reporting' && state === 'online') ||
-				(segment === 'disabled' && state === 'disabled');
-			if (keep) ids.add(target.id);
-		}
-		return ids;
-	});
+	const visible = $derived(visibleIds(narrowed, segment, stateOf));
 
 	// A folder just created in-app, with no device in it yet: there is no
 	// server-side folder entity (a folder is only `Target.group_name`), so an
@@ -258,27 +227,50 @@
 	);
 	const sorted = $derived(sort !== 'default');
 	/** What "Filter" hides that is not at its default: the count on the button. */
-	const activeFilters = $derived((segment !== 'all' ? 1 : 0) + (kind ? 1 : 0) + (site ? 1 : 0) + tagFilter.length + (sorted ? 1 : 0));
+	const activeFilters = $derived(countActiveFilters({ segment, kind, site, tags: tagFilter, sorted }));
 	let filtersOpen = $state(false);
 	/** Reordering hit-tests rows top to bottom: offered in the compact layout only, on the unfiltered rack order. */
-	const canReorder = $derived(auth.isAdmin && !filtered && !sorted && view === 'compact');
+	const canReorder = $derived(auth.can('monitors.manage') && !filtered && !sorted && view === 'compact');
 	// Disabled devices leave the rack proper for a collapsible section at the bottom.
 	const split = $derived(splitDisabled(targets, stateOf));
 	const activeVisible = $derived(new Set([...visible].filter((id) => split.active.has(id))));
 	const disabledVisible = $derived(new Set([...visible].filter((id) => split.disabled.has(id))));
+	// In the table, a sub-monitor that matches the filters is shown inside its
+	// parents, brought along as context (not counted, not in "select all").
+	// Unfiltered, nothing is added; the tiles stay flat.
+	const nested = $derived(view === 'compact');
+	// A database or a web check aimed at a server of the list goes inside it,
+	// for display only (`inferHosts`): saves and bulk actions keep reading
+	// `effectiveTargets`, the order and the tree on screen read `shownTargets`.
+	const hosted = $derived(nested ? inferHosts(effectiveTargets) : { targets: effectiveTargets, inferred: new Set<TargetId>() });
+	const shownTargets = $derived(hosted.targets);
+	const activeListed = $derived(nested ? withAncestors(shownTargets, activeVisible, split.active) : activeVisible);
+	const disabledListed = $derived(nested ? withAncestors(shownTargets, disabledVisible, split.disabled) : disabledVisible);
+	const nest = (rows: RackRow[]): RackRow[] => (nested ? nestSorted(rows) : rows);
 	const kindText = (value: string) => kindLabels.get(value) ?? value;
+	/** Availability over the last day, from the bars of the list; `null` without data. */
+	const availabilityFor = (target: Target) => availabilityOf(river.get(target.id));
 	const folderSections = $derived.by(() => {
 		if (sorted) {
-			const rows = sortTargets(
-				effectiveTargets.filter((t) => activeVisible.has(t.id)),
-				stateOf,
-				kindText,
-				sort as Exclude<SortKey, 'default'>,
-				sortDir
+			const rows = markContext(
+				nest(
+					sortTargets(
+						shownTargets.filter((t) => activeListed.has(t.id)),
+						stateOf,
+						kindText,
+						sort as Exclude<SortKey, 'default'>,
+						sortDir,
+						availabilityFor
+					)
+				),
+				activeVisible
 			);
 			return rows.length > 0 ? [{ key: '', label: '', rows }] : [];
 		}
-		const base = buildFolders(effectiveTargets, stateOf, activeVisible);
+		const base = buildFolders(shownTargets, stateOf, activeListed, hosted.inferred).map((section) => ({
+			...section,
+			rows: markContext(section.rows, activeVisible)
+		}));
 		if (filtered || pendingEmptyFolders.size === 0) return base;
 		const extra = [...pendingEmptyFolders]
 			.filter((key) => !base.some((s) => s.key === key))
@@ -287,22 +279,62 @@
 		return [...base, ...extra].sort(compareFolderSections);
 	});
 	const disabledRows = $derived.by((): RackRow[] =>
-		sorted
-			? sortTargets(
-					effectiveTargets.filter((t) => disabledVisible.has(t.id)),
-					stateOf,
-					kindText,
-					sort as Exclude<SortKey, 'default'>,
-					sortDir
-				)
-			: buildRack(effectiveTargets, stateOf, disabledVisible)
+		markContext(
+			sorted
+				? nest(
+						sortTargets(
+							shownTargets.filter((t) => disabledListed.has(t.id)),
+							stateOf,
+							kindText,
+							sort as Exclude<SortKey, 'default'>,
+							sortDir,
+							availabilityFor
+						)
+					)
+				: buildRack(shownTargets, stateOf, disabledListed, hosted.inferred),
+			disabledVisible
+		)
 	);
+	const disabledCount = $derived(matchCount(disabledRows));
 	let disabledOpen = $state(false);
 	/** The "Disabled" segment is about nothing else: no point folding it. */
 	const disabledExpanded = $derived(segment === 'disabled' || disabledOpen);
-	const totalRows = $derived(folderSections.reduce((n, s) => n + s.rows.length, 0) + disabledRows.length);
+	const totalRows = $derived(folderSections.reduce((n, s) => n + matchCount(s.rows), 0) + disabledCount);
 	/** A single, group-less section looks exactly like the old flat list — no header shown. */
 	const showFolderHeaders = $derived(folderSections.length > 1 || (folderSections[0]?.key ?? '') !== '');
+
+	// --- Sub-monitors folded inside their parent (compact layout; the tiles
+	// stay flat). Unfiltered, a parent opens by itself when something below it
+	// needs attention, and a parent opened or closed by hand stays so for this
+	// viewer. Filtered, every parent of a match opens; a toggle then lasts
+	// until the filters change. ---
+	let openChoices = $state<Map<TargetId, boolean>>(untrack(() => loadOpenChoices()));
+	let filterOpenChoices = $state<Map<TargetId, boolean>>(new Map());
+	const listNarrowed = $derived(filtered || site !== '');
+	$effect(() => {
+		void urlSearch;
+		untrack(() => {
+			if (filterOpenChoices.size > 0) filterOpenChoices = new Map();
+		});
+	});
+	function isOpen(id: TargetId, trouble: number): boolean {
+		if (listNarrowed) return filterOpenChoices.get(id) ?? true;
+		return openChoices.get(id) ?? trouble > 0;
+	}
+	function toggleOpen(id: TargetId, open: boolean) {
+		if (listNarrowed) {
+			filterOpenChoices = new Map(filterOpenChoices).set(id, !open);
+			return;
+		}
+		const next = new Map(openChoices).set(id, !open);
+		openChoices = next;
+		// Monitors deleted since are forgotten rather than kept for ever.
+		saveOpenChoices(new Map([...next].filter(([key]) => names.has(key))));
+	}
+	const fold = (rows: RackRow[]): RackRow[] => (nested ? foldRack(rows, isOpen) : rows);
+	/** What is drawn: each section's rows with closed parents' sub-monitors left out. */
+	const shownSections = $derived(folderSections.map((section) => ({ ...section, shown: fold(section.rows) })));
+	const shownDisabledRows = $derived(fold(disabledRows));
 
 	function clearFilters() {
 		search = '';
@@ -314,19 +346,18 @@
 		sortDir = 'asc';
 	}
 
-	// "New folder" and "Select" are quiet buttons beside the view switch.
-	let folderFormOpen = $state(false);
-	function toggleFolderForm() {
-		folderFormOpen = !folderFormOpen;
-		newFolderDraft = '';
-		if (folderFormOpen) queueMicrotask(() => newFolderInput?.focus());
-	}
+	// "Create folder" and "Select" are quiet buttons beside the view switch;
+	// the folder's name is typed in a small popover under the first.
 
 	// Sites (locations of the world map): a badge on each monitor and a filter.
 	let siteLocations = $state<MapLocation[]>([]);
 	const sites = $derived(new Map(siteLocations.map((l) => [l.id, { code: l.code, name: l.name }])));
-	/** Filtered to one site, every line would carry the same badge: none does. */
-	const showSite = $derived(site === '');
+	/**
+	 * The site badge and column only tell monitors apart with two locations or
+	 * more; filtered to one site, every line would carry the same badge. In
+	 * both cases the table has no site column at all.
+	 */
+	const showSite = $derived(site === '' && siteLocations.length >= 2);
 	$effect(() => {
 		const controller = new AbortController();
 		listLocations(controller.signal)
@@ -345,41 +376,58 @@
 				name: m.devices_list_sort_name(),
 				status: m.devices_list_sort_status(),
 				kind: m.devices_list_sort_kind(),
-				checked: m.devices_list_sort_checked()
+				checked: m.devices_list_sort_checked(),
+				availability: m.w1monitors_list_sort_availability(),
+				created: m.w1monitors_list_sort_created()
 			}[id]
 		}))
 	);
+
+	/** Free tags of each monitor as chips on its line (the options of its type are not tags). */
+	const rowTags = $derived(
+		new Map(
+			targets.map((target) => [
+				target.id,
+				freeTags(target.tags, optionKeysOf(target.kind)).map((pair) => {
+					const at = pair.indexOf('=');
+					return tagChip(pair.slice(0, at), pair.slice(at + 1));
+				})
+			])
+		)
+	);
+
+	// --- Quick actions of a row: check now, enable or disable. A failure is shown
+	// above the list like any other action's; the result of a check is a toast. ---
+	let rowToast = $state<{ key: number; message: string } | null>(null);
+	let rowToastKey = 0;
+	const rowActions: RowActionHandlers = {
+		probe: async (target) => {
+			try {
+				await probeTarget(target.id);
+				actionError = null;
+				await alertsStore.refresh();
+				rowToast = { key: ++rowToastKey, message: m.w1monitors_row_probe_done({ name: target.name }) };
+			} catch (cause) {
+				actionError = cause;
+			}
+		},
+		setEnabled: async (target, enabled) => {
+			try {
+				await updateTarget(target.id, targetToPayload(target, { enabled }));
+				actionError = null;
+				await alertsStore.refresh();
+			} catch (cause) {
+				actionError = cause;
+			}
+		}
+	};
 
 	// --- Folders & manual order (admin only, and only while unfiltered: the
 	// reorder scope is computed from the full fleet, not the narrowed view) ---
 
 	let collapsedFolders = $state<Set<string>>(new Set());
 	function toggleFolder(key: string) {
-		const next = new Set(collapsedFolders);
-		if (next.has(key)) next.delete(key);
-		else next.add(key);
-		collapsedFolders = next;
-	}
-
-	// "Create folder" in the "More" menu: an in-app inline name field, never
-	// `window.prompt`.
-	let newFolderDraft = $state('');
-	let newFolderInput = $state<HTMLInputElement | null>(null);
-
-	/** Builds the payload a save needs to echo every field the server does not keep by itself. */
-	function targetToPayload(target: Target, patch: Partial<TargetPayload> = {}): TargetPayload {
-		return {
-			name: target.name,
-			address: target.address,
-			kind: target.kind,
-			parent_id: target.parent_id,
-			via_agent: target.via_agent,
-			interval_secs: target.interval_secs,
-			enabled: target.enabled,
-			tags: target.tags,
-			group_name: target.group_name,
-			...patch
-		};
+		collapsedFolders = toggled(collapsedFolders, key);
 	}
 
 	// A failed move, folder edit or reorder is shown above the list, in-app
@@ -404,10 +452,7 @@
 			cleared.delete(target.id);
 			groupOverride = cleared;
 		} catch (cause) {
-			const rolled = new Map(groupOverride);
-			if (prev === undefined) rolled.delete(target.id);
-			else rolled.set(target.id, prev);
-			groupOverride = rolled;
+			groupOverride = restoreOverrides(groupOverride, new Map([[target.id, prev]]));
 			actionError = cause;
 		} finally {
 			moving = false;
@@ -436,12 +481,7 @@
 			for (const t of rows) cleared.delete(t.id);
 			groupOverride = cleared;
 		} catch (cause) {
-			const rolled = new Map(groupOverride);
-			for (const [id, v] of prevValues) {
-				if (v === undefined) rolled.delete(id);
-				else rolled.set(id, v);
-			}
-			groupOverride = rolled;
+			groupOverride = restoreOverrides(groupOverride, prevValues);
 			actionError = cause;
 		} finally {
 			moving = false;
@@ -477,12 +517,7 @@
 			for (const t of rows) cleared.delete(t.id);
 			groupOverride = cleared;
 		} catch (cause) {
-			const rolled = new Map(groupOverride);
-			for (const [id, v] of prevValues) {
-				if (v === undefined) rolled.delete(id);
-				else rolled.set(id, v);
-			}
-			groupOverride = rolled;
+			groupOverride = restoreOverrides(groupOverride, prevValues);
 			actionError = cause;
 		} finally {
 			moving = false;
@@ -499,7 +534,7 @@
 		if (rows.length > 0) void bulkSetGroup(rows, '');
 	}
 
-	/** "Create folder" in the "More" menu: an empty folder with nowhere to drop a
+	/** "Create folder": an empty folder with nowhere to drop a
 	 *  device yet, until the user drags one in (there is no server-side
 	 *  folder entity to create — see `pendingEmptyFolders` above). */
 	function createFolder(name: string) {
@@ -525,197 +560,31 @@
 		selecting = false;
 		selected = new Set();
 	}
-	let bulkBusy = $state(false);
-	let bulkReport = $state<{ failed: { name: string; error: unknown }[]; total: number } | null>(null);
-	let bulkFolderDraft = $state('');
-
-	/** Ids on screen in an unfolded list: what "select all" and the bulk actions can reach. */
+	/**
+	 * Ids on screen in an unfolded list, inside open parents: what "select all"
+	 * and the bulk actions can reach. A parent shown only as the context of a
+	 * matching sub-monitor is left out.
+	 */
 	const shownIds = $derived.by(() => {
 		const ids: TargetId[] = [];
-		for (const section of folderSections) {
+		for (const section of shownSections) {
 			if (showFolderHeaders && collapsedFolders.has(section.key)) continue;
-			for (const row of section.rows) ids.push(row.target.id);
+			for (const row of section.shown) if (!row.context) ids.push(row.target.id);
 		}
-		if (disabledExpanded) for (const row of disabledRows) ids.push(row.target.id);
+		if (disabledExpanded) for (const row of shownDisabledRows) if (!row.context) ids.push(row.target.id);
 		return ids;
 	});
-	const shownSet = $derived(new Set(shownIds));
-	/** Selected devices still on screen: a filter change quietly drops the others from the actions. */
-	const selectedTargets = $derived(effectiveTargets.filter((t) => selected.has(t.id) && shownSet.has(t.id)));
-	const allShownSelected = $derived(shownIds.length > 0 && shownIds.every((id) => selected.has(id)));
 	const selection = $derived<RowSelection | null>(
-		auth.isAdmin && selecting
+		auth.can('monitors.manage') && selecting
 			? {
 					selected,
 					toggle: (id) => {
-						const next = new Set(selected);
-						if (next.has(id)) next.delete(id);
-						else next.add(id);
-						selected = next;
+						selected = toggled(selected, id);
 					}
 				}
 			: null
 	);
 	const folderChoices = $derived([...new Set([...knownFolders(targets), ...pendingEmptyFolders])]);
-
-	function toggleAllShown() {
-		const next = new Set(selected);
-		if (allShownSelected) for (const id of shownIds) next.delete(id);
-		else for (const id of shownIds) next.add(id);
-		selected = next;
-	}
-
-	async function bulk(subjects: Target[], action: (target: Target) => Promise<unknown>) {
-		if (bulkBusy || subjects.length === 0) return;
-		bulkBusy = true;
-		bulkReport = null;
-		try {
-			const outcome = await runBulk(subjects, action);
-			await alertsStore.refresh();
-			// What went through leaves the selection; what failed stays for a retry.
-			selected = new Set(outcome.failed.map((f) => f.id));
-			if (outcome.failed.length > 0) {
-				bulkReport = {
-					failed: outcome.failed.map((f) => ({ name: f.name, error: f.error })),
-					total: subjects.length
-				};
-			}
-		} finally {
-			bulkBusy = false;
-		}
-	}
-
-	const bulkSetEnabled = (enabled: boolean) =>
-		bulk(
-			selectedTargets.filter((t) => t.enabled !== enabled),
-			(t) => updateTarget(t.id, targetToPayload(t, { enabled }))
-		);
-	const bulkMove = (group: string) =>
-		bulk(
-			selectedTargets.filter((t) => (t.group_name || '') !== group),
-			(t) => updateTarget(t.id, targetToPayload(t, { group_name: group }))
-		);
-	const bulkDelete = () => bulk(selectedTargets, (t) => deleteTarget(t.id));
-
-	// Menu rows of the selection bar.
-	const bulkItem = 'flex min-h-10 w-full items-center rounded-lg px-3 text-left text-[0.8125rem] text-ink hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-signal';
-	const bulkHeading = 'flex items-center gap-1.5 px-2 pt-1 pb-0.5 text-[0.75rem] font-semibold text-ink-3';
-
-	// CVE check in bulk: one request for the whole selection. Turning it off is
-	// armed first (second click in the menu); the result comes back as a toast
-	// with Undo, and the selection mode is left so the toast is not hidden
-	// behind the action bar.
-	let cveArmed = $state(false);
-	let cveToast = $state<{ key: number; message: string; undo: { ids: TargetId[]; enabled: boolean } | null } | null>(null);
-	let cveToastKey = 0;
-	const cveUndo = $derived(cveToast?.undo ?? null);
-
-	async function bulkCve(enabled: boolean) {
-		const picked = selectedTargets;
-		if (bulkBusy || picked.length === 0) return;
-		const ids = cveScanChanges(picked, enabled);
-		if (ids.length === 0) {
-			cveToast = { key: ++cveToastKey, message: m.devices_list_bulk_cve_none(), undo: null };
-			return;
-		}
-		bulkBusy = true;
-		bulkReport = null;
-		try {
-			const { updated } = await setCveScanTargets(ids, enabled);
-			await alertsStore.refresh();
-			cveToast = {
-				key: ++cveToastKey,
-				message: (enabled ? m.devices_list_bulk_cve_done_on : m.devices_list_bulk_cve_done_off)({ count: updated }),
-				undo: updated > 0 ? { ids, enabled: !enabled } : null
-			};
-			stopSelecting();
-		} catch (error) {
-			bulkReport = { failed: picked.map((t) => ({ name: t.name, error })), total: picked.length };
-		} finally {
-			bulkBusy = false;
-		}
-	}
-
-	async function undoCve(undo: { ids: TargetId[]; enabled: boolean }) {
-		try {
-			await setCveScanTargets(undo.ids, undo.enabled);
-			await alertsStore.refresh();
-		} catch (error) {
-			actionError = error;
-		}
-	}
-
-	// Locations of the world map, offered in bulk once selecting starts.
-	let bulkLocations = $state<MapLocation[]>([]);
-	$effect(() => {
-		if (!selecting) return;
-		const controller = new AbortController();
-		listLocations(controller.signal)
-			.then((found) => (bulkLocations = found.locations))
-			.catch(() => (bulkLocations = []));
-		return () => controller.abort();
-	});
-	// Relay agents, offered as "Reached through" in bulk.
-	let bulkRelays = $state<RelayAgent[]>([]);
-	$effect(() => {
-		if (!selecting) return;
-		const controller = new AbortController();
-		listRelays(controller.signal)
-			.then((list) => (bulkRelays = list.filter((r) => r.relay || r.relayed > 0)))
-			.catch(() => (bulkRelays = []));
-		return () => controller.abort();
-	});
-	/** Agents push their own metrics: they are never reached through a relay. */
-	const relayable = (t: Target) => t.kind !== 'agent' && t.kind !== 'agent_service';
-	/** Monitors of the selection left out of "Reached through", said out loud. */
-	let relaySkipped = $state(0);
-	/** After a move to a relay whose site is a location: offer to place them there. */
-	let relayPlace = $state<{ location: MapLocation; ids: TargetId[] } | null>(null);
-
-	async function bulkRelay(agent: RelayAgent | null) {
-		const viaAgent = agent ? agent.id : null;
-		const subjects = selectedTargets.filter((t) => relayable(t) && t.id !== viaAgent);
-		relaySkipped = selectedTargets.length - subjects.length;
-		relayPlace = null;
-		const moving = subjects.filter((t) => t.via_agent !== viaAgent);
-		await bulk(moving, (t) => updateTarget(t.id, targetToPayload(t, { via_agent: viaAgent })));
-		const location = locationForSite(bulkLocations, agent?.site);
-		if (location && subjects.length > 0) relayPlace = { location, ids: subjects.map((t) => t.id) };
-	}
-
-	async function placeRelayed(): Promise<boolean> {
-		if (!relayPlace || bulkBusy) return false;
-		const { location, ids } = relayPlace;
-		bulkBusy = true;
-		try {
-			await assignLocation(location.id, ids);
-			await alertsStore.refresh();
-			relayPlace = null;
-			return true;
-		} catch (error) {
-			bulkReport = { failed: [{ name: location.name, error }], total: ids.length };
-			return false;
-		} finally {
-			bulkBusy = false;
-		}
-	}
-
-	/** One request for the whole selection: the server places them all at once. */
-	async function bulkPlace(location: number | null) {
-		const subjects = selectedTargets;
-		if (bulkBusy || subjects.length === 0) return;
-		bulkBusy = true;
-		bulkReport = null;
-		try {
-			await assignLocation(location, subjects.map((t) => t.id));
-			await alertsStore.refresh();
-			selected = new Set();
-		} catch (error) {
-			bulkReport = { failed: subjects.map((t) => ({ name: t.name, error })), total: subjects.length };
-		} finally {
-			bulkBusy = false;
-		}
-	}
 
 	async function persistOrder(order: TargetId[]) {
 		const prev = new Map(positionOverride);
@@ -735,519 +604,54 @@
 		}
 	}
 
-	// --- Drag-and-drop, pointer-based (mouse and touch — HTML5 drag-and-drop
-	// does not work on touch). A drag handle's pointerdown starts it straight
-	// away for a mouse or a pen; a touch needs a short press first, so a plain
-	// tap still just taps. Row and folder-header elements are reported by the
-	// components themselves and hit-tested on every pointer move; rows never
-	// reflow mid-drag, so their rects stay valid for the whole gesture. ---
-
-	type DropSlot = { kind: 'row'; id: TargetId; before: boolean } | { kind: 'folder'; key: string };
-
-	let dragging = $state<TargetId | null>(null);
-	let dragLabel = $state('');
-	let pointerPos = $state<{ x: number; y: number } | null>(null);
-	let dropSlot = $state<DropSlot | null>(null);
-	const rowDropSlot = $derived(dropSlot?.kind === 'row' ? dropSlot : null);
-
-	/** Devices needing attention float to the top regardless of a manual drop: shown as a hint on the ghost. */
-	const dropBlockedHint = $derived.by(() => {
-		const slot = dropSlot;
-		if (dragging === null || !slot || slot.kind !== 'row' || slot.id === dragging) return false;
-		const dragged = effectiveTargets.find((t) => t.id === dragging);
-		if (!dragged) return false;
-		if (!reorderScope(effectiveTargets, dragged).some((t) => t.id === slot.id)) return false;
-		return reorderByDrop(effectiveTargets, stateOf, dragging, slot.id) === null;
+	// --- Manual order, by pointer and by keyboard (`reorder.svelte.ts`). ---
+	const reorder = new ListReorder({
+		enabled: () => canReorder,
+		shown: () => shownTargets,
+		saved: () => effectiveTargets,
+		stateOf,
+		persistOrder,
+		moveToFolder
 	});
+	$effect(() => reorder.listen());
 
-	const rowEls = new Map<TargetId, HTMLElement>();
-	const headerEls = new Map<string, HTMLElement>();
-	function registerRow(id: TargetId, el: HTMLElement | null) {
-		if (el) rowEls.set(id, el);
-		else rowEls.delete(id);
-	}
-	function registerHeader(key: string, el: HTMLElement | null) {
-		if (el) headerEls.set(key, el);
-		else headerEls.delete(key);
-	}
-
-	function computeDropSlot(x: number, y: number): DropSlot | null {
-		for (const [key, el] of headerEls) {
-			const r = el.getBoundingClientRect();
-			if (y >= r.top && y <= r.bottom) return { kind: 'folder', key };
-		}
-		const rects = [...rowEls.entries()].map(([id, el]) => {
-			const r = el.getBoundingClientRect();
-			return { id, top: r.top, height: r.height };
-		});
-		const slot = nearestRow(rects, y);
-		return slot ? { kind: 'row', ...slot } : null;
-	}
-
-	let longPressTimer: ReturnType<typeof setTimeout> | null = null;
-	// Set the moment a pointer drag actually starts (threshold crossed, or the
-	// touch long-press fired), so the click that follows the pointerup — if
-	// the browser still fires one over the same row — can be swallowed
-	// instead of opening the device.
-	let justDragged = false;
-
-	/**
-	 * The row itself is the drag surface, pressed anywhere on it (no handle).
-	 * A mouse/pen only arms a drag once the pointer has moved past a small
-	 * threshold, so a plain click still opens the device; a touch needs a
-	 * short hold first (so a tap, or a scroll starting on the row, still
-	 * works) and is disarmed by any early movement.
-	 */
-	function onRowPointerDown(id: TargetId, event: PointerEvent) {
-		if (!canReorder) return;
-		if (event.button !== 0) return;
-		const startX = event.clientX;
-		const startY = event.clientY;
-		const touch = event.pointerType === 'touch';
-		const threshold = touch ? 10 : 6;
-		let settled = false;
-
-		const onmove = (e: PointerEvent) => {
-			if (settled) return;
-			if (Math.hypot(e.clientX - startX, e.clientY - startY) <= threshold) return;
-			if (touch) {
-				// Moved too soon: this is a scroll, not a hold. Disarm.
-				settle();
-			} else {
-				settle();
-				beginDrag(id, e);
-			}
-		};
-		const onup = () => settle();
-		function settle() {
-			settled = true;
-			if (longPressTimer) clearTimeout(longPressTimer);
-			longPressTimer = null;
-			window.removeEventListener('pointermove', onmove);
-			window.removeEventListener('pointerup', onup);
-		}
-		window.addEventListener('pointermove', onmove);
-		window.addEventListener('pointerup', onup, { once: true });
-
-		if (touch) {
-			longPressTimer = setTimeout(() => {
-				if (settled) return;
-				settle();
-				beginDrag(id, event);
-			}, 350);
-		}
-	}
-
-	function beginDrag(id: TargetId, event: PointerEvent) {
-		event.preventDefault();
-		const target = targets.find((t) => t.id === id);
-		if (!target) return;
-		justDragged = true;
-		dragging = id;
-		dragLabel = target.name;
-		pointerPos = { x: event.clientX, y: event.clientY };
-		dropSlot = computeDropSlot(event.clientX, event.clientY);
-	}
-
-	/** Swallows the click a pointer drag leaves in its wake (see `justDragged`). */
-	function onRowClick(_id: TargetId, event: MouseEvent) {
-		if (!justDragged) return;
-		justDragged = false;
-		event.preventDefault();
-		event.stopPropagation();
-	}
-
-	function onPointerMove(e: PointerEvent) {
-		pointerPos = { x: e.clientX, y: e.clientY };
-		dropSlot = computeDropSlot(e.clientX, e.clientY);
-	}
-
-	function cancelDrag() {
-		dragging = null;
-		pointerPos = null;
-		dropSlot = null;
-		// Safety net: a click should follow the pointerup within the same
-		// task, if the browser fires one at all — drop the flag afterwards so
-		// it never lingers onto some later, unrelated click.
-		setTimeout(() => (justDragged = false), 0);
-	}
-
-	function finishDrag() {
-		const draggedId = dragging;
-		const slot = dropSlot;
-		cancelDrag();
-		if (draggedId !== null && slot) void applyDrop(draggedId, slot);
-	}
-
-	async function applyDrop(draggedId: TargetId, slot: DropSlot) {
-		const dragged = effectiveTargets.find((t) => t.id === draggedId);
-		if (!dragged) return;
-		if (slot.kind === 'row') {
-			if (slot.id === draggedId) return;
-			const order = reorderByDrop(effectiveTargets, stateOf, draggedId, slot.id);
-			if (order) {
-				void persistOrder(order);
-				return;
-			}
-			// Not reorderable in place (a different folder, parent or state tier):
-			// fall back to a folder-level move, root devices only — a child's
-			// folder is its parent's, dragging it onto another one is a no-op.
-			if (dragged.parent_id !== null) return;
-			const over = effectiveTargets.find((t) => t.id === slot.id);
-			if (!over) return;
-			const key = folderKeyOf(effectiveTargets, over);
-			if (key !== (dragged.group_name || '')) void moveToFolder(dragged, key);
-			return;
-		}
-		if (dragged.parent_id !== null) return;
-		if ((dragged.group_name || '') !== slot.key) void moveToFolder(dragged, slot.key);
-	}
-
-	let autoScrollRaf: number | null = null;
-	function startAutoScroll() {
-		const EDGE = 72;
-		const MAX_SPEED = 16;
-		const tick = () => {
-			if (dragging === null) {
-				autoScrollRaf = null;
-				return;
-			}
-			if (pointerPos) {
-				const { y } = pointerPos;
-				const h = window.innerHeight;
-				if (y < EDGE) window.scrollBy(0, -MAX_SPEED * (1 - y / EDGE));
-				else if (y > h - EDGE) window.scrollBy(0, MAX_SPEED * (1 - (h - y) / EDGE));
-			}
-			autoScrollRaf = requestAnimationFrame(tick);
-		};
-		autoScrollRaf = requestAnimationFrame(tick);
-	}
-	function stopAutoScroll() {
-		if (autoScrollRaf !== null) cancelAnimationFrame(autoScrollRaf);
-		autoScrollRaf = null;
-	}
-
-	$effect(() => {
-		if (dragging === null) return;
-		const onpointerup = () => finishDrag();
-		const onpointercancel = () => cancelDrag();
-		const onkeydown = (e: KeyboardEvent) => {
-			if (e.key === 'Escape') cancelDrag();
-		};
-		window.addEventListener('pointermove', onPointerMove);
-		window.addEventListener('pointerup', onpointerup);
-		window.addEventListener('pointercancel', onpointercancel);
-		window.addEventListener('keydown', onkeydown);
-		startAutoScroll();
-		return () => {
-			window.removeEventListener('pointermove', onPointerMove);
-			window.removeEventListener('pointerup', onpointerup);
-			window.removeEventListener('pointercancel', onpointercancel);
-			window.removeEventListener('keydown', onkeydown);
-			stopAutoScroll();
-		};
-	});
-
-	// --- Keyboard reorder: Space picks a row up, arrows move it within its
-	// scope (persisted immediately, same as a drag), Space/Enter drops it,
-	// Escape restores the scope's original order. No separate handle: the
-	// row itself is the one focus stop, with an aria-live announcement. ---
-
-	let pickedUp = $state<TargetId | null>(null);
-	let pickedSnapshot = $state<TargetId[] | null>(null);
-	let announce = $state('');
-
-	function onRowKeyDown(id: TargetId, event: KeyboardEvent) {
-		if (!canReorder) return;
-		const target = targets.find((t) => t.id === id);
-		if (!target) return;
-		if (event.key === ' ' || event.key === 'Enter') {
-			event.preventDefault();
-			if (pickedUp === id) {
-				pickedUp = null;
-				pickedSnapshot = null;
-				announce = m.devices_targets_announce_dropped({ name: target.name });
-			} else {
-				pickedUp = id;
-				pickedSnapshot = reorderScope(effectiveTargets, target).map((t) => t.id);
-				announce = m.devices_targets_announce_picked({ name: target.name });
-			}
-			return;
-		}
-		if (pickedUp !== id) return;
-		if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-			event.preventDefault();
-			const delta = event.key === 'ArrowUp' ? -1 : 1;
-			const order = moveWithinScope(effectiveTargets, stateOf, id, delta);
-			if (order) {
-				void persistOrder(order);
-				announce = m.devices_targets_announce_moved({ name: target.name, position: order.indexOf(id) + 1, total: order.length });
-			} else {
-				announce = m.devices_targets_announce_blocked({ name: target.name });
-			}
-			return;
-		}
-		if (event.key === 'Escape') {
-			event.preventDefault();
-			pickedUp = null;
-			if (pickedSnapshot) void persistOrder(pickedSnapshot);
-			pickedSnapshot = null;
-			announce = m.devices_targets_announce_cancelled({ name: target.name });
-		}
-	}
-
-	function reorderControls(): ReorderControls {
-		return {
-			dragging,
-			pickedUp,
-			dropSlot: rowDropSlot,
-			onRowPointerDown,
-			onRowKeyDown,
-			onRowClick,
-			registerRow
-		};
-	}
-
-	async function load(signal?: AbortSignal) {
-		// Decoration on top of the list the shared store already holds: a
-		// failure here must not take the rack down with it.
-		const next = await loadSparklines(24 * 3600, signal).catch(() => null);
-		if (next) sparklines = next;
-		const [cells, times] = await Promise.all([
-			loadRiver(DAY_SECONDS, signal, 24).catch(() => null),
-			loadLatency(1800, signal).catch(() => null)
-		]);
-		if (cells) river = cells;
-		if (times) latency = new Map([...times].filter(([, v]) => v.length > 0).map(([id, v]) => [id, v[v.length - 1]]));
-	}
-
-	async function loadSecurity(signal?: AbortSignal) {
-		// Decoration too: no badge rather than an error when it cannot be read.
-		const summary = await getSecuritySummary(signal).catch(() => null);
-		if (!summary) return;
-		security = new Map(
-			summary.enabled ? summary.devices.map((d) => [d.target_id, { grade: d.grade, score: d.score }]) : []
-		);
-	}
-
-	async function loadKinds(signal?: AbortSignal) {
-		try {
-			const collectors = await listCollectors(signal);
-			kindLabels = new Map(collectors.map((c) => [c.kind, kindLabel(c.kind, c.label)]));
-			optionKeys = new Map(collectors.map((c) => [c.kind, new Set(c.options.map((o) => o.key))]));
-		} catch {
-			// The raw kind is a fine label until the server describes it.
-		}
-	}
-
-	$effect(() => {
-		const controller = new AbortController();
-		void loadKinds(controller.signal);
-		void loadSecurity(controller.signal);
-		// Scores move slowly (recomputed every 15 min server-side).
-		const securityTimer = setInterval(() => void loadSecurity(controller.signal), 120_000);
-		return () => {
-			controller.abort();
-			clearInterval(securityTimer);
-		};
-	});
-
-	// Sparklines are drawn by the tiles only: the compact list (the default)
-	// never shows them, so it does not pay for a range query over every
-	// device's series every 30 s — several megabytes with a few hundred devices.
-	$effect(() => {
-		if (view !== 'tiles') return;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void load(controller.signal), 30_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
-	});
+	$effect(() => decor.listenStatic());
+	$effect(() => decor.listenBars());
+	$effect(() => decor.listenSparklines());
 </script>
 
 <ReviewNotice />
 
-{#if auth.isAdmin && (firstLoad || pageError)}
-	<!-- Loading or failed: the toolbar is not there yet, the add button still is. The empty state carries its own. -->
-	<div class="mb-4 flex justify-end">
-		<Button variant="primary" href="/targets/new">
-			<Plus class="size-4" aria-hidden="true" />
-			{m.devices_targets_add()}
-		</Button>
-	</div>
-{/if}
-
 {#if !firstLoad && !pageError && targets.length > 0}
-	<!-- Phones: the toolbar stays put while the list scrolls under it. -->
-	<div class="mb-4 flex flex-wrap items-center gap-2 max-sm:sticky max-sm:top-[calc(var(--safe-top)_+_var(--tabs-h,0px))] max-sm:z-10 max-sm:-mx-4 max-sm:mb-2 max-sm:border-b max-sm:border-line max-sm:bg-canvas max-sm:px-4 max-sm:py-2">
-		<label class="relative order-1 min-w-0 flex-1 sm:max-w-sm">
-			<span class="sr-only">{m.devices_targets_search_label()}</span>
-			<Search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3" aria-hidden="true" />
-			<input
-				type="search"
-				class="input !pl-9"
-				placeholder={m.devices_targets_search_placeholder()}
-				bind:value={search}
-				autocomplete="off"
-			/>
-		</label>
-
-		<div class="order-3 flex w-full min-w-0 items-center gap-2 sm:order-2 sm:w-auto sm:flex-1">
-			<Button
-				variant="secondary"
-				data-filter-toggle
-				aria-expanded={filtersOpen}
-				aria-controls="monitors-filters"
-				aria-label={activeFilters > 0 ? m.devices_targets_filter_aria({ count: activeFilters }) : undefined}
-				class={filtersOpen ? '!border-ink-3 bg-surface-2' : ''}
-				onclick={() => (filtersOpen = !filtersOpen)}
-			>
-				<SlidersHorizontal class="size-4" aria-hidden="true" />
-				{m.devices_targets_filter()}
-				{#if activeFilters > 0}
-					<span class="tnum -mr-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-ink px-1.5 text-[0.6875rem] text-surface">{activeFilters}</span>
-				{/if}
-			</Button>
-			<ViewSwitcher value={view} onchange={setView} />
-			<span class="flex-1" aria-hidden="true"></span>
-			{#if auth.isAdmin}
-				<Button
-					variant="ghost"
-					aria-pressed={folderFormOpen}
-					aria-expanded={folderFormOpen}
-					aria-controls="monitors-new-folder"
-					aria-label={m.devices_targets_create_folder()}
-					title={m.devices_targets_create_folder()}
-					class={`max-sm:!w-10 max-sm:!px-0 ${folderFormOpen ? 'bg-surface-2 text-ink' : 'text-ink-2'}`}
-					onclick={toggleFolderForm}
-				>
-					<FolderPlus class="size-4" aria-hidden="true" />
-					<span class="max-lg:sr-only">{m.devices_targets_create_folder()}</span>
-				</Button>
-				<Button
-					variant="ghost"
-					aria-pressed={selecting}
-					aria-label={m.devices_list_select()}
-					title={m.devices_list_select()}
-					class={`max-sm:!w-10 max-sm:!px-0 ${selecting ? 'bg-surface-2 text-ink' : 'text-ink-2'}`}
-					onclick={() => (selecting ? stopSelecting() : (selecting = true))}
-				>
-					<ListChecks class="size-4" aria-hidden="true" />
-					<span class="max-lg:sr-only">{m.devices_list_select()}</span>
-				</Button>
-			{/if}
-		</div>
-
-		{#if auth.isAdmin}
-			<ClickSpark class="order-2 sm:order-3">
-				<Button variant="primary" href="/targets/new" class="max-sm:w-10 max-sm:!px-0" aria-label={m.devices_targets_add()}>
-					<Plus class="size-4" aria-hidden="true" />
-					<span class="max-sm:sr-only">{m.devices_targets_add()}</span>
-				</Button>
-			</ClickSpark>
-		{/if}
-	</div>
-
-	{#if folderFormOpen && auth.isAdmin}
-		<form
-			id="monitors-new-folder"
-			class="mb-4 flex max-w-md items-center gap-2"
-			onsubmit={(e) => {
-				e.preventDefault();
-				if (!newFolderDraft.trim()) return;
-				createFolder(newFolderDraft);
-				newFolderDraft = '';
-				folderFormOpen = false;
-			}}
-		>
-			<input
-				bind:this={newFolderInput}
-				bind:value={newFolderDraft}
-				class="input min-w-0 flex-1"
-				placeholder={m.devices_targets_folder_placeholder()}
-				maxlength="80"
-				aria-label={m.devices_targets_folder_aria()}
-				autocomplete="off"
-				onkeydown={(e) => {
-					if (e.key === 'Escape') {
-						e.preventDefault();
-						folderFormOpen = false;
-					}
-				}}
-			/>
-			<Button type="submit" variant="secondary" disabled={!newFolderDraft.trim()}>{m.devices_targets_folder_create()}</Button>
-		</form>
-	{/if}
+	<ListToolbar
+		bind:search
+		bind:filtersOpen
+		{activeFilters}
+		{view}
+		onviewchange={setView}
+		{selecting}
+		ontoggleselect={() => (selecting ? stopSelecting() : (selecting = true))}
+		oncreatefolder={createFolder}
+	/>
 
 	{#if filtersOpen}
-		<section
-			id="monitors-filters"
-			aria-label={m.devices_targets_filter_panel()}
-			class="mb-4 flex flex-col gap-4 rounded-[var(--radius-card)] border border-line bg-surface p-4"
-		>
-			<div class="flex flex-col gap-1.5">
-				<span class="label-tape">{m.devices_list_sort_status()}</span>
-				<Segmented options={segments} value={segment} onchange={(v) => (segment = v)} label={m.devices_targets_filter_state()} class="self-start max-sm:w-full max-sm:flex-wrap" />
-			</div>
-			<div class="flex flex-wrap gap-4">
-				<label class="flex min-w-0 flex-col gap-1.5 max-sm:w-full">
-					<span class="label-tape">{m.devices_list_sort_kind()}</span>
-					<select class="input !min-h-10 !w-auto max-w-full !py-1.5 text-sm max-sm:!w-full" bind:value={kind} aria-label={m.devices_targets_filter_kind()}>
-						<option value="">{m.devices_targets_all_kinds()}</option>
-						{#each kinds as [value, label] (value)}
-							<option {value}>{label}</option>
-						{/each}
-					</select>
-				</label>
-				{#if showSiteFilter}
-					<label class="flex min-w-0 flex-col gap-1.5 max-sm:w-full">
-						<span class="label-tape">{m.devices_targets_filter_site_label()}</span>
-						<select class="input !min-h-10 !w-auto max-w-full !py-1.5 text-sm max-sm:!w-full" bind:value={site} aria-label={m.devices_targets_filter_site()}>
-							<option value="">{m.devices_targets_all_sites()}</option>
-							{#each siteLocations as location (location.id)}
-								<option value={String(location.id)}>{location.name}</option>
-							{/each}
-							<option value="none">{m.devices_targets_no_site()}</option>
-						</select>
-					</label>
-				{/if}
-				{#if tagChips.length > 0 || tagFilter.length > 0}
-					<div class="flex min-w-0 flex-col gap-1.5 max-sm:w-full">
-						<span class="label-tape">{m.devices_targets_filter_tags_label()}</span>
-						<TagFilter chips={tagChips} value={tagFilter} onchange={(next) => (tagFilter = next)} />
-					</div>
-				{/if}
-				<div class="flex min-w-0 flex-col gap-1.5">
-					<label class="label-tape" for="monitors-sort">{m.devices_list_sort_label()}</label>
-					<div class="flex items-center gap-1">
-						<select id="monitors-sort" class="input !min-h-10 !w-auto max-w-full !py-1.5 text-sm" bind:value={sort}>
-							{#each sortOptions as option (option.id)}
-								<option value={option.id}>{option.label}</option>
-							{/each}
-						</select>
-						{#if sorted}
-							<button
-								type="button"
-								class="inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-line text-ink-2 hover:bg-surface-2 hover:text-ink"
-								aria-pressed={sortDir === 'desc'}
-								aria-label={m.devices_list_sort_reverse()}
-								title={m.devices_list_sort_reverse()}
-								onclick={() => (sortDir = sortDir === 'asc' ? 'desc' : 'asc')}
-							>
-								<ArrowUpDown class="size-4" aria-hidden="true" />
-							</button>
-						{/if}
-					</div>
-				</div>
-			</div>
-			{#if activeFilters > 0}
-				<div>
-					<Button variant="ghost" class="-ml-3" onclick={clearFilters}>{m.devices_targets_clear_filters()}</Button>
-				</div>
-			{/if}
-		</section>
+		<ListFilters
+			bind:segment
+			bind:kind
+			bind:site
+			bind:tags={tagFilter}
+			bind:sort
+			bind:sortDir
+			{segments}
+			{kinds}
+			{siteLocations}
+			{showSiteFilter}
+			{tagChips}
+			{sortOptions}
+			{sorted}
+			{activeFilters}
+			onclear={clearFilters}
+		/>
 	{/if}
 {/if}
 
@@ -1263,32 +667,10 @@
 	/>
 {:else if firstLoad}
 	<div class="flex flex-col gap-2" aria-busy="true" aria-label={m.devices_targets_loading()}>
-		<Skeleton class="h-[66px] w-full rounded-[var(--radius-card)]" rows={5} />
+		<Skeleton class="h-14 w-full rounded-[var(--radius-card)]" rows={5} />
 	</div>
 {:else if targets.length === 0}
-	<EmptyState
-		mascot="watch"
-		title={m.devices_targets_empty_title()}
-		description={auth.isAdmin ? m.devices_targets_empty_admin() : m.devices_targets_empty_viewer()}
-	>
-		{#snippet action()}
-			{#if auth.isAdmin}
-				{@const linkClass = 'font-semibold text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink'}
-				<ClickSpark>
-					<Button variant="primary" href="/targets/new">{m.devices_targets_add()}</Button>
-				</ClickSpark>
-				<p class="mt-4 text-sm text-ink-2">
-					{#each m.devices_targets_empty_or({ agent: '\u0001', relay: '\u0002' }).split(/(\u0001|\u0002)/) as part, i (i)}
-						{#if part === '\u0001'}
-							<a href={withBase('/targets/new?kind=agent')} class={linkClass}>{m.devices_targets_empty_agent_link()}</a>
-						{:else if part === '\u0002'}
-							<a href={withBase('/targets/new?kind=agent&via=relay')} class={linkClass}>{m.devices_targets_empty_relay_link()}</a>
-						{:else}{part}{/if}
-					{/each}
-				</p>
-			{/if}
-		{/snippet}
-	</EmptyState>
+	<ListEmpty />
 {:else if totalRows === 0}
 	<EmptyState title={m.devices_targets_nomatch_title()} description={m.devices_targets_nomatch_desc()}>
 		{#snippet action()}
@@ -1297,224 +679,103 @@
 	</EmptyState>
 {:else}
 	<p class="sr-only" aria-live="polite">{m.devices_targets_shown({ shown: totalRows, total: targets.length })}</p>
-	{#if filtered || (sorted && auth.isAdmin)}
+	{#if filtered || (sorted && auth.can('monitors.manage'))}
 		<!-- One quiet line: what the filters leave, and why dragging is off while sorted. -->
 		<p class="mb-2 flex flex-wrap items-center gap-x-3 text-[0.8125rem] text-ink-2">
 			{#if filtered}
 				<span class="tnum">{m.devices_targets_shown({ shown: totalRows, total: targets.length })}</span>
 			{/if}
-			{#if sorted && auth.isAdmin}
+			{#if sorted && auth.can('monitors.manage')}
 				<span class="text-ink-3">{m.devices_list_sort_no_reorder()}</span>
 			{/if}
 			<button type="button" class="inline-flex min-h-10 items-center text-ink-2 underline hover:text-ink" onclick={clearFilters}>{m.devices_targets_clear_filters()}</button>
 		</p>
 	{/if}
-	{#if selection}
-		<SelectionBar
-			label={m.devices_list_bulk_aria()}
-			countLabel={m.devices_list_selected({ count: selectedTargets.length })}
-			selectAllLabel={m.devices_list_select_all()}
-			exitLabel={m.devices_list_select_done()}
-			selection={selectedTargets.length === 0 ? 'none' : allShownSelected ? 'all' : 'some'}
-			empty={shownIds.length === 0}
-			onselectall={(on) => {
-				if (on !== allShownSelected) toggleAllShown();
-			}}
-			onexit={stopSelecting}
-		>
-			<Button size="sm" variant="ghost" disabled={bulkBusy || selectedTargets.length === 0} onclick={() => void bulkSetEnabled(true)}>
-				<Power class="size-4" aria-hidden="true" />
-				{m.devices_list_bulk_enable()}
-			</Button>
-			<Button size="sm" variant="ghost" disabled={bulkBusy || selectedTargets.length === 0} onclick={() => void bulkSetEnabled(false)}>
-				<PowerOff class="size-4" aria-hidden="true" />
-				{m.devices_list_bulk_disable()}
-			</Button>
-			<Menu label={m.devices_list_bulk_move()} align="left" placement="up">
-				{#snippet trigger({ toggle, open })}
-					<Button size="sm" variant="ghost" disabled={bulkBusy || selectedTargets.length === 0} aria-haspopup="menu" aria-expanded={open} onclick={() => { bulkFolderDraft = ''; toggle(); }}>
-						<FolderInput class="size-4" aria-hidden="true" />
-						{m.devices_list_bulk_move()}
-					</Button>
-				{/snippet}
-				{#snippet children({ close })}
-					<ul class="flex min-w-48 flex-col gap-0.5">
-						<li>
-							<button type="button" role="menuitem" class={bulkItem} onclick={() => { close(); void bulkMove(''); }}>
-								{m.devices_list_bulk_no_folder()}
-							</button>
-						</li>
-						{#each folderChoices as folder (folder)}
-							<li>
-								<button type="button" role="menuitem" class={bulkItem} onclick={() => { close(); void bulkMove(folder); }}>
-									{folder}
-								</button>
-							</li>
-						{/each}
-					</ul>
-					<form
-						class="mt-1 flex items-center gap-1 border-t border-line p-0.5 pt-1.5"
-						onsubmit={(e) => {
-							e.preventDefault();
-							const name = bulkFolderDraft.trim();
-							if (!name) return;
-							close();
-							void bulkMove(name);
-						}}
-					>
-						<input class="input !h-10 min-w-0 flex-1 text-[0.8125rem]" bind:value={bulkFolderDraft} placeholder={m.devices_list_bulk_folder_placeholder()} aria-label={m.devices_list_bulk_folder_placeholder()} maxlength="80" />
-						<Button type="submit" size="sm" variant="secondary" disabled={!bulkFolderDraft.trim()}>{m.devices_list_bulk_folder_apply()}</Button>
-					</form>
-				{/snippet}
-			</Menu>
-			<!-- Location, relay and CVE check: rarer, so they share one menu. -->
-			<Menu label={m.devices_list_bulk_more()} align="left" placement="up">
-				{#snippet trigger({ toggle, open })}
-					<Button size="sm" variant="ghost" disabled={bulkBusy || selectedTargets.length === 0} aria-haspopup="menu" aria-expanded={open} onclick={() => { cveArmed = false; toggle(); }}>
-						<EllipsisVertical class="size-4" aria-hidden="true" />
-						{m.devices_list_bulk_more()}
-					</Button>
-				{/snippet}
-				{#snippet children({ close })}
-					<div class="flex w-64 max-w-full flex-col gap-0.5">
-						{#if bulkLocations.length > 0}
-							<p class={bulkHeading}><MapPin class="size-3.5" aria-hidden="true" />{m.devices_list_bulk_location()}</p>
-							<button type="button" role="menuitem" class={bulkItem} onclick={() => { close(); void bulkPlace(null); }}>
-								{m.devices_list_bulk_location_auto()}
-							</button>
-							{#each bulkLocations as location (location.id)}
-								<button type="button" role="menuitem" class={bulkItem} onclick={() => { close(); void bulkPlace(location.id); }}>
-									{location.name}
-								</button>
-							{/each}
-						{/if}
-						{#if bulkRelays.length > 0}
-							<p class={`${bulkHeading} ${bulkLocations.length > 0 ? 'mt-1 border-t border-line pt-2' : ''}`}><RadioTower class="size-3.5" aria-hidden="true" />{m.devices_list_bulk_relay()}</p>
-							<button type="button" role="menuitem" class={bulkItem} onclick={() => { close(); void bulkRelay(null); }}>
-								{m.devices_list_bulk_relay_direct()}
-							</button>
-							{#each bulkRelays as relay (relay.id)}
-								<button type="button" role="menuitem" class={bulkItem} onclick={() => { close(); void bulkRelay(relay); }}>
-									{relay.site ? m.deviceform_form_relay_site({ name: relay.name, site: relay.site }) : relay.name}
-								</button>
-							{/each}
-						{/if}
-						<p class={`${bulkHeading} ${bulkLocations.length > 0 || bulkRelays.length > 0 ? 'mt-1 border-t border-line pt-2' : ''}`}><ShieldCheck class="size-3.5" aria-hidden="true" />{m.devices_list_bulk_cve()}</p>
-						<button type="button" role="menuitem" class={bulkItem} onclick={() => { close(); void bulkCve(true); }}>
-							{m.devices_list_bulk_cve_on()}
-						</button>
-						<button
-							type="button"
-							role="menuitem"
-							class={`${bulkItem} ${cveArmed ? 'font-semibold text-warning-ink' : ''}`}
-							onclick={() => {
-								if (!cveArmed) {
-									cveArmed = true;
-									return;
-								}
-								cveArmed = false;
-								close();
-								void bulkCve(false);
-							}}
-						>
-							{cveArmed ? m.devices_list_bulk_cve_off_confirm({ count: selectedTargets.length }) : m.devices_list_bulk_cve_off()}
-						</button>
-					</div>
-				{/snippet}
-			</Menu>
-			<span class="flex-1 max-sm:hidden" aria-hidden="true"></span>
-			<Confirm confirmLabel={m.devices_list_bulk_delete_confirm({ count: selectedTargets.length })} loading={bulkBusy} disabled={bulkBusy || selectedTargets.length === 0} onconfirm={bulkDelete}>
-				<Trash2 class="size-4" aria-hidden="true" />
-				{m.devices_list_bulk_delete()}
-			</Confirm>
-		</SelectionBar>
-	{/if}
-	{#if relaySkipped > 0 || relayPlace}
-		<div class="mb-3 flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface px-3 py-2 text-sm text-ink-2" role="status">
-			{#if relaySkipped > 0}
-				<p>{m.devices_list_bulk_relay_skipped({ count: relaySkipped })}</p>
-			{/if}
-			{#if relayPlace}
-				<p>{m.devices_list_bulk_relay_place({ count: relayPlace.ids.length, location: relayPlace.location.name })}</p>
-				<Button size="sm" variant="secondary" loading={bulkBusy} onclick={() => placeRelayed()}>{m.devices_list_bulk_relay_place_apply()}</Button>
-			{/if}
-			<Button size="sm" variant="ghost" onclick={() => { relaySkipped = 0; relayPlace = null; }}>{m.devices_list_bulk_dismiss()}</Button>
-		</div>
-	{/if}
-	{#if cveToast}
-		{#key cveToast.key}
-			<Toast
-				message={cveToast.message}
-				actionLabel={cveUndo ? m.devices_list_bulk_cve_undo() : undefined}
-				onaction={cveUndo ? () => void undoCve(cveUndo) : undefined}
-				onclose={() => (cveToast = null)}
-				durationMs={8000}
-			/>
+	<BulkSection
+		targets={effectiveTargets}
+		{shownIds}
+		{folderChoices}
+		{optionKeysOf}
+		bind:selecting
+		bind:selected
+		onnotify={(message) => (rowToast = { key: ++rowToastKey, message })}
+		onerror={(cause) => (actionError = cause)}
+	/>
+	{#if rowToast}
+		{#key rowToast.key}
+			<Toast message={rowToast.message} onclose={() => (rowToast = null)} durationMs={6000} />
 		{/key}
 	{/if}
-	{#if bulkReport}
-		<div class="mb-3">
-			<ErrorNotice error={bulkReport.failed[0].error} title={m.devices_list_bulk_partial_title({ failed: bulkReport.failed.length, total: bulkReport.total })}>
-				<p class="text-sm text-ink-2">{m.devices_list_bulk_partial_names({ names: bulkReport.failed.map((f) => f.name).join(', ') })}</p>
-				<Button size="sm" variant="ghost" class="mt-1" onclick={() => (bulkReport = null)}>{m.devices_list_bulk_dismiss()}</Button>
-			</ErrorNotice>
-		</div>
+	{#if view === 'compact'}
+		<!-- The column names, once over every folder, on the grid of the rows. -->
+		<ColumnHeader {showSite} selecting={selection !== null} class="-mb-1" />
 	{/if}
-	<div class={`flex flex-col ${view === 'compact' ? 'gap-3' : 'gap-4'}`}>
-		{#each folderSections as section (section.key)}
+	<!-- Folders apart, each header close over its own rows (as the groups of the Alerts list). -->
+	<div class="flex flex-col gap-5">
+		{#each shownSections as section (section.key)}
 			{@const collapsed = collapsedFolders.has(section.key)}
-			{#if showFolderHeaders}
-				<FolderHeader
-					label={section.label}
-					folderKey={section.key}
-					count={section.rows.length}
-					worst={worstState(section.rows)}
-					{collapsed}
-					ontoggle={() => toggleFolder(section.key)}
-					canManage={auth.isAdmin && !filtered && section.key !== ''}
-					busy={moving}
-					onrename={(next) => renameFolder(section.key, next)}
-					ondelete={() => deleteFolder(section.key)}
-					dropActive={canReorder && dragging !== null}
-					dropHover={dragging !== null && dropSlot?.kind === 'folder' && dropSlot.key === section.key}
-					onheaderref={(el) => registerHeader(section.key, el)}
-				/>
-			{/if}
-			{#if !collapsed}
-				<RackList
-					rows={section.rows}
-					{sparklines}
-					{kindLabels}
-					{sites}
-					{showSite}
-					reorder={canReorder ? reorderControls() : null}
-					layout={view}
-					{names}
-					{security}
-					{alertCounts}
-					{selection}
-					{river}
-					{latency}
-				/>
-			{/if}
+			<div class={`flex flex-col ${view === 'compact' ? 'gap-1.5' : 'gap-2'}`}>
+				{#if showFolderHeaders}
+					<FolderHeader
+						label={section.label}
+						folderKey={section.key}
+						count={matchCount(section.rows)}
+						trouble={troubleCount(section.rows)}
+						worst={worstState(section.rows)}
+						{collapsed}
+						ontoggle={() => toggleFolder(section.key)}
+						canManage={auth.can('monitors.manage') && !filtered && section.key !== ''}
+						busy={moving}
+						onrename={(next) => renameFolder(section.key, next)}
+						ondelete={() => deleteFolder(section.key)}
+						dropActive={canReorder && reorder.dragging !== null}
+						dropHover={reorder.dragging !== null && reorder.dropSlot?.kind === 'folder' && reorder.dropSlot.key === section.key}
+						onheaderref={(el) => reorder.registerHeader(section.key, el)}
+					/>
+				{/if}
+				{#if !collapsed}
+					<RackList
+						rows={section.shown}
+						{sparklines}
+						{kindLabels}
+						{sites}
+						{showSite}
+						reorder={canReorder ? reorder.controls() : null}
+						layout={view}
+						{names}
+						{security}
+						{alertCounts}
+						{selection}
+						{river}
+						ontoggle={toggleOpen}
+						tags={rowTags}
+						{rowActions}
+					/>
+				{/if}
+			</div>
 		{/each}
 		{#if disabledRows.length > 0}
-			<section aria-label={m.devices_list_disabled_section({ count: disabledRows.length })}>
+			<!-- A quiet group, as the folded ones of the Alerts list: same header, ink-2. -->
+			<section class={`flex flex-col ${view === 'compact' ? 'gap-1.5' : 'gap-2'}`} aria-label={m.devices_list_disabled_section({ count: disabledCount })}>
 				{#if segment === 'disabled'}
-					<h2 class="mb-2 text-sm font-semibold text-ink-2">{m.devices_list_disabled_section({ count: disabledRows.length })}</h2>
+					<h2 class="flex min-h-10 items-center gap-2 text-[0.9375rem] font-semibold text-ink-2">
+						<PowerOff class="size-4 shrink-0 text-ink-3" aria-hidden="true" />
+						{m.devices_list_disabled_section({ count: disabledCount })}
+					</h2>
 				{:else}
 					<button
 						type="button"
-						class="mb-2 flex min-h-10 items-center gap-1.5 rounded-lg text-sm font-semibold text-ink-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-signal"
+						class="-ml-2 flex min-h-10 items-center gap-2 self-start rounded-md px-2 text-[0.9375rem] font-semibold text-ink-2 hover:bg-surface-2/60 hover:text-ink focus-visible:outline-2 focus-visible:outline-signal"
 						aria-expanded={disabledOpen}
 						onclick={() => (disabledOpen = !disabledOpen)}
 					>
-						<ChevronRight class={`size-4 transition-transform motion-reduce:transition-none ${disabledOpen ? 'rotate-90' : ''}`} aria-hidden="true" />
-						{m.devices_list_disabled_section({ count: disabledRows.length })}
+						<ChevronRight class={`size-4 shrink-0 text-ink-3 transition-transform duration-200 motion-reduce:transition-none ${disabledOpen ? 'rotate-90' : ''}`} aria-hidden="true" />
+						<PowerOff class="size-4 shrink-0 text-ink-3" aria-hidden="true" />
+						{m.devices_list_disabled_section({ count: disabledCount })}
 					</button>
 				{/if}
 				{#if disabledExpanded}
-					<RackList rows={disabledRows} {sparklines} {kindLabels} {sites} {showSite} layout={view} {names} {alertCounts} {selection} {river} {latency} />
+					<RackList rows={shownDisabledRows} {sparklines} {kindLabels} {sites} {showSite} layout={view} {names} {alertCounts} {selection} {river} ontoggle={toggleOpen} tags={rowTags} {rowActions} />
 				{/if}
 			</section>
 		{/if}
@@ -1525,15 +786,15 @@
 	{/if}
 {/if}
 
-{#if dragging !== null && pointerPos}
+{#if reorder.dragging !== null && reorder.pointerPos}
 	<div
 		class="pointer-events-none fixed z-50 flex -translate-y-1/2 items-center gap-2 rounded-[var(--radius-card)] border border-line-strong bg-surface px-3 py-2 text-sm font-semibold text-ink shadow-float"
-		style={`left: ${pointerPos.x + 18}px; top: ${pointerPos.y}px;`}
+		style={`left: ${reorder.pointerPos.x + 18}px; top: ${reorder.pointerPos.y}px;`}
 	>
-		{dragLabel}
-		{#if dropBlockedHint}
+		{reorder.dragLabel}
+		{#if reorder.dropBlockedHint}
 			<span class="text-[0.75rem] font-normal text-ink-2">{m.devices_targets_stays_above()}</span>
 		{/if}
 	</div>
 {/if}
-<p class="sr-only" aria-live="polite">{announce}</p>
+<p class="sr-only" aria-live="polite">{reorder.announce}</p>

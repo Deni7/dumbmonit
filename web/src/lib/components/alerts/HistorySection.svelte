@@ -20,7 +20,7 @@
 	import { Button, Confirm, EmptyState, Plate, Toggle, reducedMotion } from '#lib/ui/index.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
 	import Segmented from '#lib/components/devices/Segmented.svelte';
-	import { History, Download, X, ChevronLeft, ChevronRight } from 'lucide-svelte';
+	import { History, Download, X, ChevronLeft, ChevronRight, Search } from 'lucide-svelte';
 	import { formatDateTime, parseServerDate } from '#lib/format.js';
 	import { formatAlertValue, severityTone, severityWord } from './helpers';
 	import { m } from '#lib/paraglide/messages.js';
@@ -166,15 +166,19 @@
 	let deviceFilter = $state(untrack(() => page.url.searchParams.get('monitor') ?? 'all'));
 	let severityFilter = $state<SeverityFilter>('all');
 	let onlyNotified = $state(false);
+	let ruleFilter = $state('all');
+	let search = $state('');
 	function clearFilters() {
 		deviceFilter = 'all';
 		severityFilter = 'all';
 		onlyNotified = false;
+		ruleFilter = 'all';
+		search = '';
 	}
 	// A page index is meaningless once the filters change: start over.
 	let pageIndex = $state(0);
 	$effect(() => {
-		void [deviceFilter, severityFilter, onlyNotified, showCleared];
+		void [deviceFilter, severityFilter, onlyNotified, showCleared, ruleFilter, search];
 		pageIndex = 0;
 	});
 
@@ -187,8 +191,34 @@
 			.sort((a, b) => a.label.localeCompare(b.label, getLocale()));
 	});
 
+	/** Rules that appear in the log, so the select offers only useful choices. */
+	const ruleOptions = $derived.by(() => {
+		const uids = new Set<string>();
+		for (const entry of all) uids.add(entry.rule_uid);
+		return [...uids]
+			.map((uid) => ({ uid, label: ruleName(uid) }))
+			.sort((a, b) => a.label.localeCompare(b.label, getLocale()));
+	});
+
+	/** Free text over the rule, the device, the reason and the phases. */
+	function matchesSearch(entry: AlertHistoryEntry, term: string): boolean {
+		const haystack = [
+			ruleName(entry.rule_uid),
+			entry.target_id === null ? '' : deviceName(entry.target_id),
+			entry.reason,
+			entry.from_phase,
+			entry.to_phase
+		]
+			.join(' ')
+			.toLowerCase();
+		return haystack.includes(term);
+	}
+
 	const filtered = $derived(
 		all.filter((entry) => {
+			if (ruleFilter !== 'all' && entry.rule_uid !== ruleFilter) return false;
+			const term = search.trim().toLowerCase();
+			if (term && !matchesSearch(entry, term)) return false;
 			if (!showCleared && (entry.dismissed || clearedIds.has(entry.id))) return false;
 			if (deviceFilter !== 'all') {
 				const key = entry.target_id === null ? 'none' : String(entry.target_id);
@@ -303,6 +333,26 @@
 {:else}
 	<!-- Filter row -->
 	<div id="history-top" class="mb-4 flex scroll-mt-20 flex-wrap items-center gap-x-4 gap-y-3">
+		<label class="relative w-full sm:w-56">
+			<span class="sr-only">{m.w1alerts_history_search_label()}</span>
+			<Search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3" aria-hidden="true" />
+			<input
+				type="search"
+				class="input !min-h-10 !pl-9 py-0 text-[0.8125rem] sm:!min-h-8"
+				placeholder={m.w1alerts_history_search_placeholder()}
+				bind:value={search}
+				autocomplete="off"
+			/>
+		</label>
+		<div class="w-full sm:w-56">
+			<label class="sr-only" for="history-rule">{m.w1alerts_history_rule()}</label>
+			<select id="history-rule" class="input !min-h-10 py-0 text-[0.8125rem] sm:!min-h-8" bind:value={ruleFilter}>
+				<option value="all">{m.w1alerts_history_all_rules()}</option>
+				{#each ruleOptions as option (option.uid)}
+					<option value={option.uid}>{option.label}</option>
+				{/each}
+			</select>
+		</div>
 		<div class="w-full sm:w-56">
 			<label class="sr-only" for="history-device">{m.alerts_history_device()}</label>
 			<select id="history-device" class="input !min-h-10 py-0 text-[0.8125rem] sm:!min-h-8" bind:value={deviceFilter}>
@@ -373,7 +423,16 @@
 									{timeOf(entry)}
 								</time>
 								<div class="min-w-0 flex-1 basis-48">
-									<span class="font-medium text-ink">{ruleName(entry.rule_uid)}</span>
+									{#if rules.has(entry.rule_uid)}
+										<a
+											href={withBase(`/alerts?tab=rules&rule=${encodeURIComponent(entry.rule_uid)}`)}
+											class="font-medium text-ink hover:underline"
+											title={m.w1alerts_history_open_rule()}
+											>{ruleName(entry.rule_uid)}</a
+										>
+									{:else}
+										<span class="font-medium text-ink">{ruleName(entry.rule_uid)}</span>
+									{/if}
 									{#if entry.target_id !== null}
 										<span class="text-ink-3" aria-hidden="true"> · </span>
 										{#if targets.has(entry.target_id)}

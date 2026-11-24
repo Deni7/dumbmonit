@@ -54,12 +54,6 @@ image, and configuration and state live in an embedded SQLite database. There
 is no database container. An external VictoriaMetrics can be used instead
 (`DUMBMONIT_VM_URL`).
 
-!!! note "About the name"
-    DumbMonit was called EzyMonit until September 2026. Commands, environment
-    variables, image names and paths were renamed with it; the old
-    `EZYMONIT_*` variables and `ezym_` agent tokens are still accepted. See
-    [Upgrading](install/docker.md#upgrading).
-
 DumbMonit is 100% open source under the MIT license, dependencies
 included: no feature is held back for a paid edition. DumbMonit is free and will stay free.
 

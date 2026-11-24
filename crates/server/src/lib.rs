@@ -6,6 +6,7 @@
 
 pub mod agent_tls;
 pub mod alerting;
+pub mod annotations;
 pub mod api;
 pub mod auth;
 pub mod backup;
@@ -38,6 +39,7 @@ pub mod scheduler;
 pub mod security;
 pub mod selfmon;
 pub mod single_port;
+pub mod slo;
 pub mod state;
 pub mod stats;
 pub mod status_host;

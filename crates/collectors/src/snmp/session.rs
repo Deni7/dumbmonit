@@ -801,10 +801,19 @@ mod tests {
         assert!(matches!(map_snmp_error(snmp2::Error::CommunityMismatch), ProbeError::Auth(_)));
     }
 
-    /// Ouvre une session v1 vers l'agent factice.
-    async fn session_v1(agent: &super::super::testutil::FakeAgent, retries: u32) -> Session {
+    /// Délai par requête des tests : large, pour qu'une réponse de la boucle
+    /// locale ne le dépasse jamais sur une machine chargée. Un datagramme perdu
+    /// coûte ce délai une fois.
+    const REQUEST: Duration = Duration::from_secs(2);
+
+    /// Ouvre une session v1 vers l'agent factice, `timeout` par requête.
+    async fn session_v1(
+        agent: &super::super::testutil::FakeAgent,
+        retries: u32,
+        timeout: Duration,
+    ) -> Session {
         let credential = Credential::SnmpCommunity { community: "public".to_string() };
-        Session::open(&agent.address, &credential, Duration::from_millis(300), CommunityVersion::V1)
+        Session::open(&agent.address, &credential, timeout, CommunityVersion::V1)
             .await
             .unwrap()
             .with_retries(retries)
@@ -817,7 +826,7 @@ mod tests {
             let agent =
                 FakeAgent::spawn(vec![("1.3.6.1.2.1.1.3.0", 42), ("1.3.6.1.2.1.1.7.0", 72)], 0)
                     .await;
-            let mut session = session_v1(&agent, 0).await;
+            let mut session = session_v1(&agent, 0, REQUEST).await;
             let oids =
                 [oid("1.3.6.1.2.1.1.3.0"), oid("1.3.6.1.2.1.1.4.0"), oid("1.3.6.1.2.1.1.7.0")];
             let values = session.get_many(&oids).await.unwrap();
@@ -839,7 +848,7 @@ mod tests {
         use super::super::testutil::{FakeAgent, block_on_large_stack};
         let (values, requests) = block_on_large_stack(async {
             let agent = FakeAgent::spawn(vec![], 0).await;
-            let mut session = session_v1(&agent, 0).await;
+            let mut session = session_v1(&agent, 0, REQUEST).await;
             let oids = [oid("1.3.6.1.2.1.1.3.0"), oid("1.3.6.1.2.1.1.4.0")];
             let values = session.get_many(&oids).await.unwrap();
             (values, agent.requests.load(std::sync::atomic::Ordering::SeqCst))
@@ -853,7 +862,7 @@ mod tests {
         use super::super::testutil::{FakeAgent, block_on_large_stack};
         let values = block_on_large_stack(async {
             let agent = FakeAgent::spawn(vec![("1.3.6.1.2.1.1.3.0", 7)], 1).await;
-            let mut session = session_v1(&agent, 1).await;
+            let mut session = session_v1(&agent, 1, REQUEST).await;
             session.get_many(&[oid("1.3.6.1.2.1.1.3.0")]).await
         });
         assert_eq!(values.unwrap(), vec![(oid("1.3.6.1.2.1.1.3.0"), SnmpValue::Integer(7))]);
@@ -863,18 +872,19 @@ mod tests {
     fn une_reponse_tardive_ne_decale_pas_les_requetes_suivantes() {
         use super::super::testutil::{FakeAgent, block_on_large_stack};
         let (first, second) = block_on_large_stack(async {
-            // La première réponse arrive après l'abandon de la requête (300 ms) mais
-            // avant la requête suivante : sans socket neuve, elle serait lue à la
-            // place de la réponse suivante, et la session resterait décalée d'un cran.
+            // La première réponse arrive après l'abandon de la requête (1 s) mais
+            // avant la requête suivante (vers 3 s) : sans socket neuve, elle serait
+            // lue à la place de la réponse suivante, et la session resterait
+            // décalée d'un cran. Une seconde de marge de part et d'autre.
             let agent = FakeAgent::spawn_late(
                 vec![("1.3.6.1.2.1.1.3.0", 7), ("1.3.6.1.2.1.1.7.0", 72)],
                 1,
-                Duration::from_millis(400),
+                Duration::from_secs(2),
             )
             .await;
-            let mut session = session_v1(&agent, 2).await;
+            let mut session = session_v1(&agent, 2, Duration::from_secs(1)).await;
             let first = session.get_many(&[oid("1.3.6.1.2.1.1.3.0")]).await;
-            tokio::time::sleep(Duration::from_millis(300)).await;
+            tokio::time::sleep(Duration::from_secs(2)).await;
             let second = session.get_many(&[oid("1.3.6.1.2.1.1.7.0")]).await;
             (first, second)
         });
@@ -887,7 +897,7 @@ mod tests {
         use super::super::testutil::{FakeAgent, block_on_large_stack};
         let error = block_on_large_stack(async {
             let agent = FakeAgent::spawn(vec![("1.3.6.1.2.1.1.3.0", 7)], 1).await;
-            let mut session = session_v1(&agent, 0).await;
+            let mut session = session_v1(&agent, 0, REQUEST).await;
             session.get_many(&[oid("1.3.6.1.2.1.1.3.0")]).await.unwrap_err()
         });
         assert!(matches!(error, ProbeError::Timeout(_)), "{error}");

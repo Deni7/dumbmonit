@@ -91,8 +91,7 @@ In scope, roughly in order of how much we care:
   tokens and passwords, the derivation of the key from `/data/secret.key` or
   `DUMBMONIT_SECRET`, and any path by which a secret is returned by the API
   (`credential` / `secrets` must never round-trip).
-- **Agent ingest** — the `dmon_…` tokens (and the `ezym_…` ones still accepted
-  from before the rename), `/api/ingest`, `install.sh` /
+- **Agent ingest** — the `dmon_…` tokens, `/api/ingest`, `install.sh` /
   `install.ps1`, the binaries served under `/download/…`, and anything a
   malicious agent or a spoofed server could do to the other side.
 - **Encrypted agent channel** — the agent port (TLS 1.3, X25519MLKEM768, client

@@ -178,11 +178,17 @@ mod tests {
         vec![Sample::new("probe_up", 1.0, MetricKind::Gauge, 0)]
     }
 
+    /// Le compteur de pertes est global : les tests qui le lisent passent l'un
+    /// après l'autre, sinon une perte de l'un compterait dans l'écart de l'autre.
+    static DROP_COUNTER: std::sync::LazyLock<tokio::sync::Mutex<()>> =
+        std::sync::LazyLock::new(|| tokio::sync::Mutex::new(()));
+
     /// `send` ne doit jamais attendre après de la place : un tampon saturé fait
     /// perdre le lot plutôt que de bloquer l'appelant, qui tient encore le jeton
     /// du sémaphore du planificateur.
     #[tokio::test]
     async fn send_drops_without_blocking_when_the_buffer_is_full() {
+        let _serial = DROP_COUNTER.lock().await;
         let (tx, _rx) = mpsc::channel::<Vec<Sample>>(1);
         let (flush_tx, _flush_rx) = mpsc::channel(1);
         let sink = SampleSink { tx, flush_tx };
@@ -202,6 +208,7 @@ mod tests {
     /// l'appelant : le lot est simplement abandonné.
     #[tokio::test]
     async fn send_drops_without_blocking_when_the_buffer_is_closed() {
+        let _serial = DROP_COUNTER.lock().await;
         let (tx, rx) = mpsc::channel::<Vec<Sample>>(4);
         drop(rx);
         let (flush_tx, _flush_rx) = mpsc::channel(1);

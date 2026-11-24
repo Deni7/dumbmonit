@@ -304,6 +304,22 @@ pub struct MessageAction {
     pub path: String,
 }
 
+impl MessageAction {
+    /// Le jeton signé seul, tel qu'un bouton interactif le renvoie (Slack).
+    pub fn token(&self) -> &str {
+        self.path.split_once('#').map_or("", |(_, token)| token)
+    }
+}
+
+/// Aléa d'un jeton, en hexadécimal, lu *sans* vérifier la signature : il ne
+/// sert qu'à nommer le jeton (référence courte d'un bouton Telegram), jamais à
+/// l'accepter — le jeton retrouvé par ce nom est vérifié comme les autres.
+pub fn nonce_hex_unverified(token: &str) -> Option<String> {
+    let (payload, _) = token.split_once('.')?;
+    let payload = URL_SAFE_NO_PAD.decode(payload).ok()?;
+    (payload.len() > HEADER_LEN).then(|| hex::encode(&payload[10..HEADER_LEN]))
+}
+
 /// Les boutons d'un message portant ces alertes, ou rien quand il n'y en a
 /// aucune ou trop ([`MAX_FINGERPRINTS`]).
 pub fn build(
@@ -462,6 +478,17 @@ mod tests {
         assert!(!alert.same_episode(Some(since + TimeDelta::milliseconds(1))), "re-fired");
         assert!(!alert.same_episode(None));
         assert!(AlertRef::from("cpu@1").same_episode(None));
+    }
+
+    #[test]
+    fn the_nonce_names_a_token_without_trusting_it() {
+        let claims = claims();
+        let token = key().sign(&claims);
+        assert_eq!(nonce_hex_unverified(&token), Some(claims.nonce_hex()));
+        assert_eq!(nonce_hex_unverified("garbage"), None);
+        assert_eq!(nonce_hex_unverified("AAAA.BBBB"), None);
+        let link = &build(&key(), "https://m.lan", &["a@1".into()], now())[0];
+        assert!(key().verify(link.token(), now()).is_ok());
     }
 
     #[test]

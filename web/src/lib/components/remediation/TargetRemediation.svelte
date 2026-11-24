@@ -35,7 +35,7 @@
 				</Disclosure>
 			{/each}
 			{#if data.runs.length > 0}
-				<div class="rounded-[var(--radius-card)] border border-line bg-surface px-4 py-2">
+				<div class="rounded-[var(--radius-card)] border border-line bg-surface px-4 py-2 shadow-lift sm:px-5">
 					<RunList runs={data.runs} showTarget={false} />
 				</div>
 			{/if}

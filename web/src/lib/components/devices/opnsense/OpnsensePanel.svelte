@@ -7,8 +7,8 @@
 	 * minute; the firewall — which is routing every packet in the house — is
 	 * never asked because a page was opened.
 	 */
-	import { untrack } from 'svelte';
 	import { getOpnsenseGateways, getOpnsenseHealth, getOpnsenseTraffic } from '#lib/api/opnsense.js';
+	import { startPolling } from '#lib/poll.js';
 	import type { OpnsenseGateways, OpnsenseHealth, OpnsenseTraffic, Target } from '#lib/api/index.js';
 	import { ErrorNotice, Panel, Plate, Skeleton } from '#lib/ui/index.js';
 	import { m } from '#lib/paraglide/messages.js';
@@ -51,6 +51,7 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			error = cause;
+			return false;
 		} finally {
 			loading = false;
 		}
@@ -62,13 +63,7 @@
 		gateways = null;
 		traffic = null;
 		health = null;
-		const controller = new AbortController();
-		void load(controller.signal);
-		const timer = setInterval(() => void untrack(() => load(controller.signal)), 60_000);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, 60_000);
 	});
 </script>
 

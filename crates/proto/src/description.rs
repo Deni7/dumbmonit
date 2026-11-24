@@ -2,7 +2,7 @@
 //!
 //! C'est le format envoyé à l'interface pour tous les types. Ceux qui sont
 //! compilés dans le serveur sont écrits dans ses propres tables
-//! (`api/collectors.rs`) puis convertis sans copier leurs textes
+//! (`api/collectors/`) puis convertis sans copier leurs textes
 //! ([`Text::Borrowed`]) ; un collecteur défini à l'exécution — un paquet
 //! d'intégration, par exemple — n'y figure pas : il se décrit lui-même avec ces
 //! structures ([`Text::Owned`]), via

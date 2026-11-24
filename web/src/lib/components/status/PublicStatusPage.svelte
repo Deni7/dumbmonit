@@ -12,15 +12,20 @@
 	 * carries the page's title and, for a white-label page (`hide_branding`), its
 	 * logo as icon or none, never the product's.
 	 */
+	import { onMount } from 'svelte';
 	import { m } from '#lib/paraglide/messages.js';
+	import { getLocale, locales, setLocale, type Locale } from '#lib/paraglide/runtime.js';
+	import { startPolling } from '#lib/poll.js';
 	import { FileQuestion } from 'lucide-svelte';
-	import { getPublicStatus, getPublicStatusDay, toApiError, type PublicDayDetail, type PublicStatus } from '#lib/api/index.js';
+	import { getPublicOlderIncidents, getPublicStatus, getPublicStatusDay, toApiError, type PublicDayDetail, type PublicStatus } from '#lib/api/index.js';
 	import { theme } from '#lib/stores/theme.svelte.js';
 	import { EmptyState, ErrorNotice, Skeleton } from '#lib/ui/index.js';
 	import AccessGate from '#lib/components/status/AccessGate.svelte';
 	import DayDetail from '#lib/components/status/DayDetail.svelte';
 	import StatusPageBody from '#lib/components/status/StatusPageBody.svelte';
 	import { accentClass } from '#lib/components/status/words.js';
+	import LanguageSelect from '#lib/components/LanguageSelect.svelte';
+	import { AUTO_FLAG, LOCALE_KEY, fallbackLocale } from '#lib/components/status/public-locale.js';
 
 	const REFRESH_MS = 60_000;
 
@@ -40,33 +45,64 @@
 	let loading = $state(true);
 	let error = $state<unknown>(null);
 	let lastChecked = $state<Date | null>(null);
+	let refreshing = $state(false);
 
 	async function load(signal?: AbortSignal) {
+		refreshing = true;
 		try {
-			status = await getPublicStatus(slug, signal);
+			status = await getPublicStatus(slug, signal, getLocale());
 			error = null;
 			lastChecked = new Date();
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			// A failed refresh keeps the last good document on screen.
 			if (!status) error = cause;
+			return false;
 		} finally {
 			loading = false;
+			refreshing = false;
 		}
 	}
+
+	// A visitor whose browser speaks none of our languages gets the page's default one.
+	// The switch is not kept as a personal choice: the flag lets the next load forget it.
+	let defaultApplied = false;
+	$effect(() => {
+		const wanted = status?.page.default_lang;
+		if (defaultApplied || wanted === undefined) return;
+		defaultApplied = true;
+		let stored: string | null = null;
+		try {
+			stored = localStorage.getItem(LOCALE_KEY);
+		} catch {
+			/* storage blocked: no stored choice */
+		}
+		const target = fallbackLocale({ stored, languages: navigator.languages ?? [], locales, current: getLocale(), defaultLang: wanted });
+		if (!target) return;
+		try {
+			sessionStorage.setItem(AUTO_FLAG, '1');
+		} catch {
+			/* without it the choice just stays stored */
+		}
+		setLocale(target as Locale);
+	});
+	onMount(() => {
+		try {
+			if (sessionStorage.getItem(AUTO_FLAG)) {
+				sessionStorage.removeItem(AUTO_FLAG);
+				localStorage.removeItem(LOCALE_KEY);
+			}
+		} catch {
+			/* storage blocked: nothing to forget */
+		}
+	});
 
 	$effect(() => {
 		const current = slug;
 		if (!current) return;
-		const controller = new AbortController();
 		loading = true;
 		status = null;
-		void load(controller.signal);
-		const timer = setInterval(() => void load(controller.signal), REFRESH_MS);
-		return () => {
-			controller.abort();
-			clearInterval(timer);
-		};
+		return startPolling(load, REFRESH_MS);
 	});
 
 	// The page decides its light: a fixed theme overrides whatever the visitor
@@ -183,7 +219,21 @@
 				<Skeleton class="h-24 w-full" />
 			</div>
 		{:else}
-			<StatusPageBody {status} {lastChecked} onselectday={showDay} day={dayPanel} />
+			<StatusPageBody
+				{status}
+				{lastChecked}
+				{refreshing}
+				onrefresh={() => void load()}
+				loadOlder={(cursor) => getPublicOlderIncidents(slug, cursor)}
+				onselectday={showDay}
+				day={dayPanel}
+			/>
+		{/if}
+		{#if status}
+			<div class="mt-8 flex items-center justify-end gap-2 text-[0.8125rem] text-ink-2">
+				<label for="status-language">{m.w5calendar_public_language()}</label>
+				<LanguageSelect id="status-language" />
+			</div>
 		{/if}
 	</main>
 </div>

@@ -570,6 +570,7 @@ mod tests {
             has_password: false,
             hide_branding: false,
             subscribe_email: false,
+            listed: true,
         }
     }
 

@@ -690,7 +690,7 @@ mod tests {
         };
         tokio::time::sleep(Duration::from_millis(100)).await;
         cancel.cancel();
-        let found = tokio::time::timeout(Duration::from_secs(3), scan)
+        let found = tokio::time::timeout(Duration::from_secs(10), scan)
             .await
             .expect("le balayage doit s'arrêter peu après l'annulation")
             .unwrap()

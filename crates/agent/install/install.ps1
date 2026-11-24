@@ -5,8 +5,7 @@
 .DESCRIPTION
     Downloads the binary, writes the configuration with the token, registers the
     service and starts it. Running the script again updates the agent: it is also
-    the upgrade procedure. A machine still running the agent under its former
-    name (EzyMonitAgent) is migrated in place by the same command.
+    the upgrade procedure.
 
 .EXAMPLE
     & ([scriptblock]::Create((irm https://serveur:8080/install.ps1))) -Token dmon_xxx -Url https://serveur:8080 -Sha256 windows-x86_64:<hex>
@@ -32,6 +31,12 @@ param(
     # Fingerprint (SHA-256) of the server's certificate authority: the agent then only talks to
     # that server, over TLS 1.3 with its own client certificate, never in clear.
     [string]$CaPin,
+    # How the agent reaches its encrypted channel: auto (default: the agent port, then the server
+    # URL if that port is unreachable), direct (the agent port only) or websocket (through the
+    # server URL: Cloudflare Tunnel, a reverse proxy that terminates TLS, a corporate proxy). The
+    # agent's own TLS session, with its client certificate, goes inside a WebSocket.
+    [ValidateSet('auto', 'direct', 'websocket')]
+    [string]$Transport,
     [int]$Interval = 0,
     [string[]]$Services = @(),
     [hashtable]$Tags = @{},
@@ -62,6 +67,11 @@ param(
     [string]$Sha256,
     # Install a downloaded binary without verifying it (air-gapped or manual setups only).
     [switch]$InsecureSkipChecksum,
+    # Install only if the agent binary is exactly this version (x.y.z): the server ships its own,
+    # and this refuses anything else, for example after a server upgrade.
+    [string]$Version,
+    # Say what would be done, then stop: nothing is downloaded, written or started.
+    [switch]$DryRun,
     [switch]$Uninstall
 )
 
@@ -81,13 +91,6 @@ $InstallDir  = Join-Path $env:ProgramFiles 'DumbMonit'
 $ConfigDir   = Join-Path $env:ProgramData 'DumbMonit'
 $ExePath     = Join-Path $InstallDir 'dumbmonit-agent.exe'
 $ConfigPath  = Join-Path $ConfigDir 'agent.yaml'
-
-# Noms d'avant le renommage EzyMonit → DumbMonit. Une installation qui les porte
-# encore est migrée sur place à l'installation, et -Uninstall en fait aussi le
-# ménage.
-$LegacyServiceName = 'EzyMonitAgent'
-$LegacyInstallDir  = Join-Path $env:ProgramFiles 'EzyMonit'
-$LegacyConfigDir   = Join-Path $env:ProgramData 'EzyMonit'
 
 function Write-Etape($message) { Write-Host "==> $message" }
 
@@ -194,23 +197,6 @@ function Test-CanalAgents {
     }
 }
 
-# Arrête et retire le service et le dossier d'installation de l'ancien agent.
-# Ne touche pas à sa configuration. Silencieux quand rien d'ancien n'est
-# présent ; renvoie $true si quelque chose a été retiré.
-function Remove-AncienAgent {
-    $retire = $false
-    if (Get-Service -Name $LegacyServiceName -ErrorAction SilentlyContinue) {
-        Stop-Service -Name $LegacyServiceName -Force -ErrorAction SilentlyContinue
-        & sc.exe delete $LegacyServiceName | Out-Null
-        $retire = $true
-    }
-    if (Test-Path $LegacyInstallDir) {
-        Remove-Item -Path $LegacyInstallDir -Recurse -Force -ErrorAction SilentlyContinue
-        $retire = $true
-    }
-    return $retire
-}
-
 # Propriétaires admis pour le dossier de configuration et ce qu'il contient :
 # SYSTEM, les administrateurs, TrustedInstaller, et le compte qui exécute
 # l'installateur (déjà administrateur, contrôlé plus bas).
@@ -263,33 +249,27 @@ function Protect-ConfigDir {
     }
 }
 
-# Migration sur place d'une installation d'avant le renommage : l'ancien service
-# est arrêté et retiré, et sa configuration reprend sa place sous le nouveau nom.
-# Elle est réécrite juste après depuis -Token/-Url, mais les clés qu'un
-# utilisateur y aurait ajoutées restent à portée de main. Sans rien d'ancien,
-# ne fait rien et ne dit rien.
-function Migrate-Legacy {
-    $migre = Remove-AncienAgent
-    if ((Test-Path $LegacyConfigDir) -and -not (Test-Path $ConfigDir)) {
-        # Sur un même volume, Move-Item est un renommage : les droits posés par
-        # icacls sur l'ancien fichier de configuration sont conservés.
-        Move-Item -Path $LegacyConfigDir -Destination $ConfigDir
-        $migre = $true
-    }
-    if ($migre) { Write-Etape "Migrating the $LegacyServiceName install to $ServiceName" }
-}
-
 # --------------------------------------------------------------- privilèges
 
 $identite = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principal = New-Object Security.Principal.WindowsPrincipal($identite)
-if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+if ($Version -and $Version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$') {
+    Stop-Sur "Invalid -Version value (expected x.y.z): $Version"
+}
+if (-not $DryRun -and -not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     Stop-Sur "This installer needs a PowerShell console running as administrator."
 }
 
 # ------------------------------------------------------------ désinstallation
 
 if ($Uninstall) {
+    if ($DryRun) {
+        Write-Etape "Dry run: nothing is changed. The uninstall would:"
+        Write-Etape "  - stop and delete the service $ServiceName"
+        Write-Etape "  - delete $InstallDir and the configuration $ConfigDir (it holds the token)"
+        Write-Etape "  - remove the firewall rule of the relay gateway, if any"
+        exit 0
+    }
     Write-Etape "Stopping the service"
     if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
         Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
@@ -301,9 +281,6 @@ if ($Uninstall) {
     Remove-Item -Path $ConfigDir -Recurse -Force -ErrorAction SilentlyContinue
     # La règle du pare-feu de la passerelle, si ce relais en avait une.
     Remove-RegleParefeu
-    # Les restes d'une installation d'avant le renommage partent aussi.
-    Remove-AncienAgent | Out-Null
-    Remove-Item -Path $LegacyConfigDir -Recurse -Force -ErrorAction SilentlyContinue
     Write-Etape "Agent uninstalled"
     exit 0
 }
@@ -334,6 +311,27 @@ $architecture = switch ($env:PROCESSOR_ARCHITECTURE) {
         'x86_64'
     }
     default { Stop-Sur "Unsupported architecture: $env:PROCESSOR_ARCHITECTURE" }
+}
+
+if ($DryRun) {
+    Write-Etape "Dry run: nothing is downloaded, written or started. The install would:"
+    Write-Etape "  - system: windows-$architecture, service: $ServiceName"
+    if ($BinPath) {
+        Write-Etape "  - install the binary $BinPath to $ExePath"
+    } else {
+        Write-Etape "  - download $Url/download/dumbmonit-agent-windows-$architecture.exe and install it to $ExePath"
+        if ($InsecureSkipChecksum) {
+            Write-Etape "  - NOT verify its checksum (-InsecureSkipChecksum)"
+        } elseif ($Sha256) {
+            Write-Etape "  - verify its SHA-256 against -Sha256"
+        } else {
+            Write-Etape "  - REFUSE it: no expected SHA-256 (-Sha256 missing)"
+        }
+    }
+    if ($Version) { Write-Etape "  - refuse any binary that is not version $Version" }
+    Write-Etape "  - write the configuration in $ConfigDir (server $Url, token hidden)"
+    Write-Etape "  - register and start the service $ServiceName"
+    exit 0
 }
 
 New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
@@ -394,16 +392,23 @@ if ($BinPath) {
     }
 }
 
+# Version imposée : un autre binaire n'est pas installé, l'agent en place reste tel quel.
+if ($Version) {
+    $obtenue = ''
+    try { $obtenue = ((& $exeTemporaire --version) -join ' ').Trim() -replace '^dumbmonit-agent\s+', '' } catch { }
+    if ($obtenue -ne $Version) {
+        Remove-Item -Path $exeTemporaire -Force -ErrorAction SilentlyContinue
+        Stop-Sur "The agent binary is version '$obtenue', not the requested $Version: nothing was installed."
+    }
+    Write-Etape "Version $obtenue confirmed"
+}
+
 if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
     Write-Etape "Stopping the existing service before replacing it"
     Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
 }
 Move-Item -Path $exeTemporaire -Destination $ExePath -Force
 
-# Le nouveau binaire est en place : l'ancien agent, s'il est là, peut être
-# arrêté et sa configuration déplacée avant que la nouvelle ne soit écrite. Pas
-# avant — un téléchargement raté ne doit pas laisser la machine sans agent.
-Migrate-Legacy
 Protect-ConfigDir
 
 # ------------------------------------------------------------ configuration
@@ -416,6 +421,7 @@ $lignes.Add("token: $Token")
 if ($PinnedKey) { $lignes.Add("server_pin: $PinnedKey") }
 if ($TlsUrl) { $lignes.Add("tls_url: $TlsUrl") }
 if ($CaPin)  { $lignes.Add("ca_pin: $CaPin") }
+if ($Transport) { $lignes.Add("transport: $($Transport.ToLowerInvariant())") }
 # Entre apostrophes : des identifiants peuvent contenir « : » ou « # ».
 if ($Proxy)   { $lignes.Add("proxy: '$($Proxy -replace "'", "''")'") }
 if ($NoProxy) { $lignes.Add("no_proxy: '$($NoProxy -replace "'", "''")'") }
@@ -466,7 +472,13 @@ Write-Etape "Checking the connection to $Url"
 if ($LASTEXITCODE -ne 0) {
     $etat, $cible = Test-CanalAgents
     $port = $cible.Port
-    if ($etat -eq 'refused') {
+    if ($Transport -eq 'websocket') {
+        Write-Host @"
+The agent goes through $Url/api/agent/ws (WebSocket). The tunnel or reverse proxy in front
+of DumbMonit must forward WebSockets to it (Upgrade and Connection headers, no buffering):
+see "Agents behind a proxy" in the documentation.
+"@ -ForegroundColor Red
+    } elseif ($etat -eq 'refused') {
         Write-Host @"
 The encrypted agent channel $($cible.Host):$port refuses the connection: port $port is
 not published or not open on the server.

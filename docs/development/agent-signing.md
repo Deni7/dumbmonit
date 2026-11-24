@@ -67,6 +67,34 @@ The signatures are separate files so that the binaries stay
 [reproducible](reproducible-builds.md); the `.sig` layer is the only difference
 with the published image.
 
+## The first key {#the-first-key}
+
+The first key was added in 0.15.0, but its private half was lost before it
+signed any release: no build was ever signed with it. 0.20.1 added a new key to
+`release-keys.pem` (the first one is still listed, harmlessly) and every build
+since is signed with the new one. Agents compiled before 0.20.1 only know the
+first key and reject those signatures.
+
+The server therefore applies one compatibility rule
+(`crates/server/src/collectors/agent/selfupdate_compat.rs`):
+
+- an agent whose version is 0.20.1 or later always receives the signature, and
+  verifies it, whatever the settings;
+- an agent before 0.20.1 is held (status *Unknown signing key*) while
+  *Accept unsigned builds (development)* is off; when it is on, it receives the
+  offer **without** the signature. The agent then applies its own rule for
+  unsigned builds: accepted only over the encrypted agent channel, with the
+  server authenticated by its pinned CA. That is no weaker than what the
+  setting already allows for an unsigned build.
+
+The same file holds the Windows rule: agents up to 0.20.1 synced the copy of
+their binary through a read-only handle, which Windows refuses (`os error 5`),
+so they are never offered an update and are reported as *Reinstall needed*.
+
+When a key is rotated normally (below), agents learn the new key before it signs
+anything, and no such rule is needed. Keep an offline backup of every private
+key.
+
 ## Rotation
 
 1. Add the new public key to `release-keys.pem` (keep the old one) and release:

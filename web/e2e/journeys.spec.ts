@@ -79,11 +79,15 @@ test('2. add an HTTP monitor: it goes up', async ({ page, env }) => {
 	await page.locator('[data-kind="http"]').first().click();
 	await expect(page).toHaveURL(/kind=http/);
 
-	await page.getByLabel('Name', { exact: true }).fill(NAMES.monitor);
-	await page.getByLabel('Address', { exact: true }).fill(env.targetUrl());
-	// 30 s is the shortest interval the form offers.
-	await page.getByRole('button', { name: 'More options' }).click();
-	await page.getByLabel('Check interval').selectOption({ label: '30 s' });
+	// By role, not by label text: a required field's label ends with a "*" that
+	// only the eye reads (aria-hidden), so its text is "Name*" but its name "Name".
+	await page.getByRole('textbox', { name: 'Name', exact: true }).fill(NAMES.monitor);
+	await page.getByRole('textbox', { name: 'Address', exact: true }).fill(env.targetUrl());
+	// 30 s is the shortest interval the form offers. "More options" opens with the
+	// form: a click would fold it, so open it only when it is folded.
+	const more = page.getByRole('button', { name: 'More options' });
+	if ((await more.getAttribute('aria-expanded')) !== 'true') await more.click();
+	await page.getByRole('combobox', { name: 'Check interval', exact: true }).selectOption({ label: '30 s' });
 	await expectNoHorizontalOverflow(page);
 	await page.getByRole('button', { name: 'Add monitor', exact: true }).click();
 
@@ -104,7 +108,7 @@ test('3. notification channel and public status page, both healthy', async ({ pa
 	const form = page.getByRole('region', { name: 'Add channel' });
 	await form.getByRole('searchbox', { name: 'Search channel types' }).fill('webhook');
 	await form.getByRole('button', { name: /^Custom webhook/ }).click();
-	await form.getByLabel('Name', { exact: true }).fill(NAMES.channel);
+	await form.getByRole('textbox', { name: 'Name', exact: true }).fill(NAMES.channel);
 	await form.getByLabel('Address to call').fill(env.hookUrl());
 	await expectNoHorizontalOverflow(page);
 	await form.getByRole('button', { name: 'Add channel' }).click();
@@ -117,8 +121,8 @@ test('3. notification channel and public status page, both healthy', async ({ pa
 
 	// --- A published status page with the monitor ------------------------------
 	await page.goto('/status/new');
-	await page.getByLabel('Title', { exact: true }).fill(NAMES.statusTitle);
-	await page.getByLabel('Address', { exact: true }).fill(NAMES.statusSlug);
+	await page.getByRole('textbox', { name: 'Title', exact: true }).fill(NAMES.statusTitle);
+	await page.getByRole('textbox', { name: 'Address', exact: true }).fill(NAMES.statusSlug);
 	await page.getByRole('switch', { name: 'Published' }).click();
 	await page.getByRole('combobox', { name: /^Add monitors to/ }).first().click();
 	await page.getByRole('option', { name: NAMES.monitor }).click();
@@ -131,7 +135,11 @@ test('3. notification channel and public status page, both healthy', async ({ pa
 	await visitor.goto(`/s/${NAMES.statusSlug}`);
 	await expect(visitor.getByRole('heading', { level: 1 })).toContainText(NAMES.statusTitle);
 	await expect(visitor.getByText(NAMES.monitor).first()).toBeVisible();
-	await expect(visitor.getByRole('region', { name: 'Current status' })).toContainText('All systems operational');
+	// The public document is cached for a few seconds: reload until it is the fresh one.
+	await expect(async () => {
+		await visitor.reload();
+		await expect(visitor.getByRole('region', { name: 'Current status' })).toContainText('All systems operational', { timeout: 5_000 });
+	}).toPass({ timeout: 60_000, intervals: [5_000] });
 	await expectNoHorizontalOverflow(visitor);
 });
 
@@ -217,13 +225,14 @@ test('6. the wall displays with no console error', async ({ page }) => {
 
 test('7. sign out, then sign in again', async ({ page }) => {
 	await page.goto('/');
-	await page.getByRole('button', { name: /Account menu for/ }).first().click();
+	// The rail holds the menu on a wide screen, the header on a phone: take the one shown.
+	await page.getByRole('button', { name: /Account menu for/ }).filter({ visible: true }).first().click();
 	await page.getByRole('menuitem', { name: 'Sign out' }).click();
 	await expect(page).toHaveURL(/\/login/);
 	await expectNoHorizontalOverflow(page);
 
 	// A wrong password is refused with a clear message ...
-	await page.getByLabel('Username', { exact: true }).fill(ADMIN.username);
+	await page.getByRole('textbox', { name: 'Username', exact: true }).fill(ADMIN.username);
 	await page.getByLabel('Password', { exact: true }).fill('not the right password');
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 	await expect(page.getByText('Wrong username or password.')).toBeVisible();

@@ -12,7 +12,8 @@ use crate::notify::Notifier;
 use crate::notify::channel::ChannelConfig;
 use crate::notify::error::NotifyError;
 use crate::notify::http::{self, Request};
-use crate::notify::message::Message;
+use crate::notify::interactive::{self, slack, telegram};
+use crate::notify::message::{Message, MessageAction};
 use crate::notify::secret::SecretString;
 
 /// Discord. L'URL de webhook contient le jeton : elle est stockée chiffrée et
@@ -92,13 +93,16 @@ impl Notifier for Discord {
 pub struct Slack {
     http: reqwest::Client,
     webhook_url: SecretString,
+    /// Boutons Block Kit (voir [`crate::notify::interactive::slack`]).
+    interactive: bool,
 }
 
 impl Slack {
     /// Texte de la pièce jointe, liens d'action compris dans la syntaxe de
-    /// Slack (`<url|libellé>`). Des liens plutôt que des boutons : un bouton
-    /// de webhook entrant renvoie aussi un événement à une application Slack,
-    /// et sans application il s'affiche en erreur.
+    /// Slack (`<url|libellé>`). Des liens plutôt que des boutons par défaut :
+    /// un bouton de webhook entrant renvoie un événement à l'application
+    /// Slack, et sans adresse d'interactivité il s'affiche en erreur. Les
+    /// boutons sont l'option « Interactive buttons ».
     fn text(message: &Message) -> String {
         let mut out = message.text.clone();
         if !message.actions.is_empty() {
@@ -115,7 +119,33 @@ impl Slack {
     pub fn new(http: reqwest::Client, channel: &ChannelConfig) -> Result<Self, NotifyError> {
         let webhook_url = channel.secret("webhook_url")?;
         http::check_url(webhook_url.expose(), "webhook_url")?;
-        Ok(Self { http, webhook_url })
+        let interactive = interactive::enabled(channel);
+        if interactive && channel.secret_opt(slack::SIGNING_SECRET_KEY).is_none() {
+            return Err(NotifyError::Config(
+                "interactive buttons need the Slack app's signing secret (\"signing_secret\", \
+                 under Basic Information → App Credentials)"
+                    .to_string(),
+            ));
+        }
+        Ok(Self { http, webhook_url, interactive })
+    }
+
+    fn body(&self, message: &Message) -> Value {
+        if self.interactive
+            && let Some(actions) = slack::actions_block(message)
+        {
+            return slack::payload(message, actions);
+        }
+        json!({
+            "text": message.title,
+            "attachments": [{
+                // Slack attend une couleur hexadécimale, là où Discord veut un entier.
+                "color": format!("#{:06x}", message.color()),
+                "title": message.title,
+                "text": Self::text(message),
+                "ts": message.at.timestamp(),
+            }]
+        })
     }
 
     fn explain(status: u16, _body: &str) -> Option<String> {
@@ -143,20 +173,10 @@ impl Notifier for Slack {
     }
 
     async fn send(&self, message: &Message) -> Result<(), NotifyError> {
-        let body = json!({
-            "text": message.title,
-            "attachments": [{
-                // Slack attend une couleur hexadécimale, là où Discord veut un entier.
-                "color": format!("#{:06x}", message.color()),
-                "title": message.title,
-                "text": Self::text(message),
-                "ts": message.at.timestamp(),
-            }]
-        });
         http::send(
             &self.http,
             Request::post(self.webhook_url.expose())
-                .json(body)
+                .json(self.body(message))
                 .secret(&self.webhook_url)
                 .explain(Self::explain),
         )
@@ -313,6 +333,8 @@ pub struct Telegram {
     /// le fil général du groupe.
     message_thread_id: Option<u64>,
     token: SecretString,
+    /// Boutons à rappel (voir [`crate::notify::interactive::telegram`]).
+    interactive: bool,
 }
 
 impl Telegram {
@@ -326,6 +348,7 @@ impl Telegram {
             url: format!("{}/bot{}/sendMessage", api_base.trim_end_matches('/'), token.expose()),
             chat_id: channel.setting("chat_id")?.trim().to_string(),
             message_thread_id: Self::thread_id(channel)?,
+            interactive: interactive::enabled(channel),
             token,
             http,
         })
@@ -380,7 +403,8 @@ impl Telegram {
     /// domaine, `localhost`) : seuls les noms de domaine en `https` y ont droit,
     /// les autres restent des liens dans le texte.
     fn keyboard(message: &Message) -> Option<Value> {
-        if message.actions.is_empty() || !message.actions.iter().all(|a| button_url_ok(&a.url)) {
+        let usable = |link: &MessageAction| telegram::button_url_ok(&link.url);
+        if message.actions.is_empty() || !message.actions.iter().all(usable) {
             return None;
         }
         let row: Vec<Value> = message
@@ -402,6 +426,11 @@ impl Telegram {
                     "Telegram cannot find this chat: check \"chat_id\", and that the bot has \
                      received at least one message from you"
                 }
+                400 if body.contains("can't parse entities") => {
+                    "Telegram could not read the message's formatting: check the MarkdownV2 of \
+                     the message template (escape ( ) [ ] * _ ~ ` > | with a backslash when they \
+                     are plain text)"
+                }
                 400 => "Telegram rejected the message: invalid \"chat_id\" or formatting",
                 401 => "Telegram bot token invalid",
                 403 => "the Telegram bot was blocked or removed from the chat",
@@ -411,14 +440,6 @@ impl Telegram {
             .to_string(),
         )
     }
-}
-
-/// Adresse acceptée par Telegram dans un bouton : `https`, nom de domaine
-/// avec un point, ni IP ni `localhost`.
-fn button_url_ok(url: &str) -> bool {
-    let Ok(parsed) = reqwest::Url::parse(url) else { return false };
-    let Some(host) = parsed.domain() else { return false };
-    parsed.scheme() == "https" && host.contains('.') && !host.ends_with(".localhost")
 }
 
 #[async_trait]
@@ -432,16 +453,27 @@ impl Notifier for Telegram {
     }
 
     async fn send(&self, message: &Message) -> Result<(), NotifyError> {
+        // Boutons à rappel quand le canal les a demandés et que leurs jetons
+        // sont rangés ; sinon des boutons-liens, ou des liens dans le texte.
+        let keyboard = match telegram::keyboard(message) {
+            Some(keyboard) if self.interactive => Some(keyboard),
+            _ => Self::keyboard(message),
+        };
+        // Un gabarit Telegram est écrit en MarkdownV2 ; le message habituel en HTML.
+        let (text, mode) = match telegram::markdown_v2_text(message, keyboard.is_none()) {
+            Some(text) => (text, "MarkdownV2"),
+            None => (Self::html(message), "HTML"),
+        };
         let mut body = json!({
             "chat_id": self.chat_id,
-            "text": Self::html(message),
-            "parse_mode": "HTML",
+            "text": text,
+            "parse_mode": mode,
             "disable_web_page_preview": true,
         });
         if let Some(thread) = self.message_thread_id {
             body["message_thread_id"] = json!(thread);
         }
-        if let Some(keyboard) = Self::keyboard(message) {
+        if let Some(keyboard) = keyboard {
             body["reply_markup"] = keyboard;
         }
         http::send(
@@ -644,5 +676,50 @@ mod tests {
         )
         .unwrap();
         assert_eq!(slack.kind(), "slack");
+    }
+
+    #[test]
+    fn slack_buttons_need_the_signing_secret_and_replace_the_links() {
+        let hook = "https://hooks.slack.com/services/x";
+        let without = channel("slack", json!({"interactive": true}), json!({"webhook_url": hook}));
+        let Err(error) = Slack::new(client(), &without) else { panic!("accepted") };
+        assert!(error.to_string().contains("signing_secret"), "{error}");
+
+        let config = channel(
+            "slack",
+            json!({"interactive": true}),
+            json!({"webhook_url": hook, "signing_secret": "s3cr3t"}),
+        );
+        let slack = Slack::new(client(), &config).expect("valid");
+        let mut message = with_actions("https://monit.example.org");
+        message.link = Some("https://monit.example.org/targets/42".into());
+        let body = slack.body(&message);
+        let blocks = &body["attachments"][0]["blocks"];
+        assert_eq!(blocks[1]["elements"][0]["action_id"], "dumbmonit_ack");
+        assert!(!body.to_string().contains("<https://"), "no duplicate links");
+        // Sans liens d'action : la pièce jointe habituelle.
+        let plain = slack.body(&crate::notify::message::sample_message(false));
+        assert!(plain["attachments"][0].get("blocks").is_none());
+    }
+
+    #[test]
+    fn telegram_buttons_call_back_only_when_asked_and_registered() {
+        let config = |interactive: bool| {
+            channel(
+                "telegram",
+                json!({"chat_id": "1", "interactive": interactive}),
+                json!({"bot_token": "123456:AAEjeton"}),
+            )
+        };
+        let mut message = with_actions("https://monit.example.org");
+        message.context.callbacks = vec![
+            (crate::notify::action_link::Action::Ack, "dm:aaaaaaaaaaaaaaaaaaaaaaaa".into()),
+            (crate::notify::action_link::Action::Snooze, "dm:bbbbbbbbbbbbbbbbbbbbbbbb".into()),
+        ];
+        let on = Telegram::new(client(), &config(true)).unwrap();
+        assert!(on.interactive);
+        assert!(telegram::keyboard(&message).is_some());
+        let off = Telegram::new(client(), &config(false)).unwrap();
+        assert!(!off.interactive, "the stored references are not enough");
     }
 }

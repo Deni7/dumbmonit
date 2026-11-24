@@ -84,6 +84,10 @@ export const test = base.extend<Fixtures, { env: Env }>({
 						setupCode,
 						hostName
 					});
+			// Starting the container adds a network interface on the runner; Chromium, already
+			// running, then aborts its in-flight loads once with ERR_NETWORK_CHANGED. Let that
+			// happen before the first page is opened.
+			if (!external) await new Promise((resolve) => setTimeout(resolve, 5_000));
 			const env: Env = {
 				baseURL: instance.baseURL,
 				hostName,
@@ -160,15 +164,13 @@ export const test = base.extend<Fixtures, { env: Env }>({
 			reducedMotion,
 			ignoreHTTPSErrors
 		});
-		await context.tracing.start({ screenshots: true, snapshots: true });
+		// No tracing of our own: the config's `trace: 'retain-on-failure'` already records this
+		// context, and a second start/stop pair breaks its close.
 		const page = await context.newPage();
 		guard.watch(page);
 		await use(page);
 		if (testInfo.status !== testInfo.expectedStatus) {
 			await page.screenshot({ path: testInfo.outputPath('visitor.png'), fullPage: true }).catch(() => {});
-			await context.tracing.stop({ path: testInfo.outputPath('visitor-trace.zip') }).catch(() => {});
-		} else {
-			await context.tracing.stop().catch(() => {});
 		}
 		await context.close();
 	}

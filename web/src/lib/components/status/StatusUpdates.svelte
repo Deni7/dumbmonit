@@ -228,6 +228,25 @@
 			{m.status_updates_rss()}
 		</a>
 	</p>
+	{#if services.length > 1}
+		<details class="mt-1 text-sm text-ink-2">
+			<summary class="inline-flex min-h-10 cursor-pointer items-center hover:text-ink">{m.status_updates_rss_services()}</summary>
+			<ul class="grid gap-x-4 sm:grid-cols-2" role="list">
+				{#each services as service (service.key)}
+					<li>
+						<a
+							class="inline-flex min-h-10 items-center gap-1.5 text-accent underline decoration-accent/40 underline-offset-4 hover:decoration-accent"
+							href={withBase(`${rss}?component=${encodeURIComponent(service.key)}`)}
+							aria-label={m.status_updates_rss_service_aria({ service: service.label })}
+						>
+							<Rss class="size-4 shrink-0" aria-hidden="true" />
+							<span class="min-w-0 break-words">{service.label}</span>
+						</a>
+					</li>
+				{/each}
+			</ul>
+		</details>
+	{/if}
 	<p class="mt-2 text-sm text-ink-2">
 		<a class="inline-flex items-center gap-1.5 font-semibold text-accent underline decoration-accent/40 underline-offset-4 hover:decoration-accent" href={withBase(ical)}>
 			<CalendarDays class="size-4" aria-hidden="true" />
