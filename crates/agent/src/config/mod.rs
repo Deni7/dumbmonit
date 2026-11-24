@@ -567,7 +567,6 @@ impl Config {
     fn merge(file: FileConfig, env: EnvSource) -> Result<Self> {
         Self::merge_at(file, env, None)
     }
-
 }
 
 /// Source des surcharges. Indirection volontaire : elle rend la fusion testable
