@@ -49,10 +49,16 @@ kept in the browser, so a wall screen and your laptop can show different ones.
 - **NOC**: site first, then category, then monitor. A sunburst and a
   site × category matrix show where things break; problems are grouped by
   site, and CPU, memory, disk and network each get a top 5.
-- **Hybrid**: a dark band on top, the same in both themes, holds the figures,
-  what to act on now and the next 14 days (maintenance windows, expiries, disk
-  forecasts, vulnerabilities, updates); under it, one card per site and the
-  rest of the widgets.
+- **Hybrid**: everything on one screen, without scrolling the page. The
+  figures, then what to act on now; beside it what is coming up (maintenance
+  windows, expiries, disk forecasts, vulnerabilities, updates, in one list)
+  and the fleet by site, one line per category; under it the service checks
+  (paused ones folded into one line) and the recent events. On a wide screen
+  each panel scrolls on its own; on a narrow one the panels stack.
+
+In every dashboard, **Open problems** counts the same rows as the problems
+table: monitors down, unreachable or misconfigured and firing warning or
+critical alerts.
 
 A site is the set of monitors reached through one [relay](../install/remote-site.md);
 monitors watched directly by the server form one site named after the

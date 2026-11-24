@@ -56,19 +56,10 @@
 	const age = $derived(since ? durationText(Math.max(0, (now - since.getTime()) / 1000)) : '');
 	const who = $derived(actorName(problem.acked?.by));
 	const notifiedAt = $derived(row.kind === 'alert' ? row.alert.last_notified_at : null);
-	const edge = $derived(
-		problem.acked || problem.muted
-			? ''
-			: tone === 'warning'
-				? 'shadow-[inset_3px_0_0_var(--color-warning)]'
-				: tone === 'advisory'
-					? 'shadow-[inset_3px_0_0_var(--color-advisory)]'
-					: ''
-	);
 	const meta = 'block truncate text-[0.8125rem] text-ink-2';
 </script>
 
-<li class={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-1 border-t border-line px-4 py-2.5 @3xl:grid-cols-[6.5rem_minmax(0,1.15fr)_minmax(0,1.7fr)_4.75rem_minmax(0,1.15fr)_auto] ${edge}`}>
+<li class={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-1 border-t border-line px-4 py-2 @3xl:grid-cols-[6.5rem_minmax(0,1.15fr)_minmax(0,1.7fr)_4.75rem_minmax(0,1.15fr)_auto] ${problem.acked || problem.muted ? 'bg-surface-2/40' : ''}`}>
 	<div class="order-1 min-w-0 @3xl:order-none">
 		<Plate {tone} label={plate} class="max-w-full min-w-0 truncate" />
 	</div>
@@ -87,7 +78,7 @@
 	</div>
 	<div class="order-2 min-w-0 text-right @3xl:order-none @3xl:text-left">
 		{#if since}
-			<span class="block font-mono text-[0.9375rem] font-semibold whitespace-nowrap text-ink tabular-nums">{age}</span>
+			<span class="block font-mono text-sm font-medium whitespace-nowrap text-ink tabular-nums">{age}</span>
 			<span class={meta}>{m.w9dash_problems_since({ time: clockText(since) })}</span>
 		{/if}
 	</div>

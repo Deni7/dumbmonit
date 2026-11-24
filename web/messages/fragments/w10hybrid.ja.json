@@ -1,0 +1,9 @@
+{
+	"w10hybrid_kpi_problems": "未解決の問題",
+	"w10hybrid_kpi_oldest": "最も古いもの：{age}",
+	"w10hybrid_kpi_budget_spent": "エラーバジェットを使い切りました",
+	"w10hybrid_kpi_budget_low": "残りバジェット：{pct}%",
+	"w10hybrid_kpi_budget_left": "残りのエラーバジェット：{pct}%",
+	"w10hybrid_coming_empty": "予定や近く期限を迎えるものはありません。",
+	"w10hybrid_services_p95": "p95 {value}"
+}

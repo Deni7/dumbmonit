@@ -9,7 +9,10 @@
 	 * and the changes around them (agent installs, edits, maintenance). One
 	 * line each: when, a glyph in the event's tone, what happened (the
 	 * server's sentence). A small filter keeps only alerts or only changes.
-	 * From the dashboards' store.
+	 * The time column is as wide as its longest entry ("Wed 10:19 PM"), the
+	 * same for every line, so a time never runs into its glyph. `fill`: the
+	 * card takes its parent's height and scrolls inside. From the dashboards'
+	 * store.
 	 */
 	import { m } from '#lib/paraglide/messages.js';
 	import { auth } from '#lib/stores/auth.svelte.js';
@@ -21,7 +24,7 @@
 	import { clockText } from '../parts/words.js';
 
 	type Span = 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 12;
-	let { span = 8, limit = 8 }: { span?: Span; limit?: number } = $props();
+	let { span = 8, limit = 8, fill = false }: { span?: Span; limit?: number; fill?: boolean } = $props();
 
 	const name = `dash-events-${(instances += 1)}`;
 	let filter = $state('all');
@@ -37,10 +40,10 @@
 	);
 </script>
 
-<WidgetCard title={m.w9dash_events_title()} {span}>
+<WidgetCard title={m.w9dash_events_title()} {span} {fill}>
 	{#snippet right()}
 		{#if events && events.length > 0}
-			<Segmented legend={m.w9dash_events_filter()} hideLegend {options} bind:value={filter} {name} />
+			<Segmented legend={m.w9dash_events_filter()} hideLegend {options} bind:value={filter} {name} class={fill ? '-my-1.5' : ''} />
 		{/if}
 	{/snippet}
 	{#if !events && widgetsStore.loading}
@@ -50,9 +53,9 @@
 	{:else if shown.length === 0}
 		<p class="m-0 py-3 text-sm text-ink-2">{events.length === 0 ? m.w9dash_events_empty() : m.w9dash_events_empty_filter()}</p>
 	{:else}
-		<ul class="m-0 list-none p-0">
+		<ul class="m-0 grid list-none grid-cols-[max-content_1.125rem_minmax(0,1fr)] gap-x-2.5 p-0">
 			{#each shown as event, i (`${event.at}-${i}`)}
-				<li class={`grid grid-cols-[3.75rem_1.125rem_minmax(0,1fr)] items-start gap-2 py-[7px] text-[0.8125rem] ${i > 0 ? 'border-t border-line' : ''}`}>
+				<li class={`col-span-3 grid grid-cols-subgrid items-start py-[7px] text-[0.8125rem] ${i > 0 ? 'border-t border-line' : ''}`}>
 					<time class="pt-px text-xs whitespace-nowrap text-ink-3 tabular-nums" datetime={event.at}>{clockText(event.at)}</time>
 					<span class={`grid size-[1.125rem] place-items-center rounded-[5px] ${TONE_SOFT[EVENT_TONE[event.kind]]}`}>
 						<Glyph name={EVENT_GLYPH[event.kind]} class="size-[11px]" />
@@ -68,6 +71,6 @@
 	{/if}
 	{#snippet foot()}
 		<a href={withBase('/alerts?tab=history')}>{m.w9dash_events_history()}</a>
-		{#if auth.isAdmin}<a href={withBase('/settings/team#audit')}>{m.w9dash_events_audit()}</a>{/if}
+		{#if auth.isAdmin && !fill}<a href={withBase('/settings/team#audit')}>{m.w9dash_events_audit()}</a>{/if}
 	{/snippet}
 </WidgetCard>

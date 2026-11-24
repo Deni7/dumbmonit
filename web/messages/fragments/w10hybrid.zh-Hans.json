@@ -1,0 +1,9 @@
+{
+	"w10hybrid_kpi_problems": "未解决的问题",
+	"w10hybrid_kpi_oldest": "最早：{age}",
+	"w10hybrid_kpi_budget_spent": "错误预算已用完",
+	"w10hybrid_kpi_budget_low": "剩余预算：{pct}%",
+	"w10hybrid_kpi_budget_left": "剩余错误预算：{pct}%",
+	"w10hybrid_coming_empty": "近期没有计划或到期的事项。",
+	"w10hybrid_services_p95": "p95 {value}"
+}

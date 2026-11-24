@@ -8,6 +8,9 @@
 	 * what. `bySite` groups the rows under their site. With nothing broken:
 	 * "Nothing needs you", and the last alerts that resolved.
 	 *
+	 * `fill` (Hybrid): the card takes its parent's height and scrolls inside,
+	 * lists more rows and leaves the count to the figure above it.
+	 *
 	 * Monitors and alerts come from the app-wide store; sites and kinds from
 	 * the dashboards' store; the history from the fleet store.
 	 */
@@ -33,12 +36,13 @@
 		span?: Span;
 		title?: string;
 		bySite?: boolean;
+		fill?: boolean;
 	}
 
-	let { span = 8, title, bySite = false }: Props = $props();
+	let { span = 8, title, bySite = false, fill = false }: Props = $props();
 
-	/** Rows drawn; the rest is one link away. */
-	const LIMIT = 8;
+	/** Rows drawn; the rest is one link away. A card that scrolls inside can hold more. */
+	const LIMIT = $derived(fill ? 30 : 8);
 
 	$effect(() => untrack(() => fleetStore.start()));
 
@@ -133,7 +137,8 @@
 
 	const reading = $derived(alertsStore.loading && alertsStore.targets.length === 0);
 	const broken = $derived(!alertsStore.available && alertsStore.targets.length === 0 && alertsStore.lastError);
-	const sub = $derived(rows.length > 0 ? m.w9dash_problems_sub({ count: rows.length }) : undefined);
+	// The Hybrid layout's "Open problems" figure already says how many: no second count.
+	const sub = $derived(rows.length > 0 && !fill ? m.w9dash_problems_sub({ count: rows.length }) : undefined);
 </script>
 
 {#snippet line(problem: ProblemRow)}
@@ -156,7 +161,7 @@
 	/>
 {/snippet}
 
-<WidgetCard title={title ?? m.w9dash_problems_title()} {sub} {span} flush>
+<WidgetCard title={title ?? m.w9dash_problems_title()} {sub} {span} {fill} flush>
 	{#if reading}
 		<div class="flex flex-col gap-2.5 px-4 pb-4" aria-hidden="true">
 			<Skeleton class="h-9 w-full" rows={3} />
@@ -200,7 +205,7 @@
 		</div>
 	{:else}
 		<div class="@container">
-			<div class="hidden gap-3.5 px-4 pb-1.5 text-xs font-medium text-ink-3 @3xl:grid @3xl:grid-cols-[6.5rem_minmax(0,1.15fr)_minmax(0,1.7fr)_4.75rem_minmax(0,1.15fr)_auto]" aria-hidden="true">
+			<div class={`hidden gap-3.5 px-4 pb-1.5 text-xs font-medium text-ink-3 @3xl:grid ${fill ? 'sticky top-0 z-[1] bg-surface' : ''} @3xl:grid-cols-[6.5rem_minmax(0,1.15fr)_minmax(0,1.7fr)_4.75rem_minmax(0,1.15fr)_auto]`} aria-hidden="true">
 				<span>{m.w9dash_problems_col_severity()}</span>
 				<span>{m.w9dash_problems_col_monitor()}</span>
 				<span>{m.w9dash_problems_col_problem()}</span>
@@ -229,6 +234,6 @@
 	{/if}
 	{#snippet foot()}
 		<a href={withBase('/alerts')}>{rows.length > LIMIT ? m.overview_needs_more({ count: rows.length }) : m.w9dash_common_all_alerts()}</a>
-		<a href={withBase('/alerts?tab=now&maintenance=1')}>{m.w9dash_problems_maintenance_link()}</a>
+		{#if !fill}<a href={withBase('/alerts?tab=now&maintenance=1')}>{m.w9dash_problems_maintenance_link()}</a>{/if}
 	{/snippet}
 </WidgetCard>
