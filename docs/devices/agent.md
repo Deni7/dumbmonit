@@ -472,14 +472,6 @@ service. That is the upgrade procedure. Take the command from the current
 server (add a monitor, **Server with the agent**): its `--sha256` must match the binaries of the
 server version you upgraded to.
 
-The same command migrates a machine still running the EzyMonit agent, on Linux
-and on Windows. The installer stops and removes the old service
-(`ezymonit-agent`, or `EzyMonitAgent` on Windows), moves the configuration to
-the new path (`/etc/dumbmonit/agent.yaml`, `C:\ProgramData\DumbMonit\agent.yaml`)
-and installs `dumbmonit-agent` in its place. The old `ezym_…` token stays
-valid, so the command shown when the token was created still works; nothing
-has to be revoked first.
-
 ## Automatic updates {#automatic-updates}
 
 From this version on, the agent updates itself from your server: after you
@@ -1502,7 +1494,7 @@ Automatic actions show in "Recent actions" as requested by `policy`.
   uses.
 - An update that does not come back healthy is rolled back to the previous
   container, and the old image is only removed once the new container runs.
-- Containers named `dumbmonit*` or `ezymonit*` are refused, by hand or by
+- Containers named `dumbmonit*` are refused, by hand or by
   policy: the monitor never acts on its own containers. The check is made twice
   — the server refuses to queue the command, and the agent refuses to run it —
   and the agent makes it again on the name Docker reports after inspecting the

@@ -523,7 +523,6 @@ impl Config {
             secret_path: Self::resolve_secret_path(&env, config_path),
             log_level,
             proxy,
-            deprecated_env: env.deprecated(),
         })
     }
 

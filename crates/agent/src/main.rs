@@ -79,7 +79,6 @@ fn main() -> Result<()> {
 
     let config = Config::load(&args.config_path())?;
     init_tracing(config.log_level);
-    config.warn_deprecated_env();
 
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()

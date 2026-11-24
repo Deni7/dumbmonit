@@ -180,8 +180,6 @@ you need under `environment:` of the service, as shown in
 | `DUMBMONIT_BACKUP_ENABLED` | on | Scheduled local backups of the database into `/data/backups/`. `DUMBMONIT_BACKUP_DIR`, `_INTERVAL_HOURS` (24) and `_KEEP` (7) tune them; see [Backup and restore](backup.md). |
 
 The full list, with details, is in the [configuration reference](../reference/configuration.md).
-`EZYMONIT_*` names from before the rename are still read as a fallback; see
-[Upgrading](#upgrading).
 
 ## Back up the secret key
 
@@ -220,48 +218,6 @@ An existing `docker-compose.yml` keeps working as it is: the image still runs
 as user 65532. The new file adds `user: "0:0"` and a `cap_add` line so that a
 host directory works without preparation ([Permissions](#permissions)); copy
 these two lines if you want to move to a bind mount.
-
-### From EzyMonit, and from the two-container setup
-
-DumbMonit was called EzyMonit until September 2026, and ran as two containers,
-the server and a separate `victoriametrics` service. Upgrading needs the data
-of the old project moved into the new volume once. The old project was named
-`ezymonit` (its volumes `ezymonit_ezymonit-data` and `ezymonit_vm-data`;
-`docker volume ls` confirms). From the old directory:
-
-```bash
-docker compose down
-```
-
-Then, with the new `docker-compose.yml`:
-
-```bash
-docker volume create dumbmonit-data
-docker run --rm -v ezymonit_ezymonit-data:/from -v dumbmonit-data:/to alpine cp -a /from/. /to/
-docker run --rm -v ezymonit_vm-data:/from -v dumbmonit-data:/to alpine sh -c 'mkdir -p /to/vm && cp -a /from/. /to/vm/'
-docker compose up -d
-```
-
-The old VictoriaMetrics data directory has the layout the embedded one uses:
-nothing to convert. The alternative is to keep the external VictoriaMetrics and
-point `DUMBMONIT_VM_URL` at it.
-
-What the server handles on its own at the first start:
-
-- `EZYMONIT_*` variables are still read as a fallback, with one startup warning
-  per variable (`EZYMONIT_X is deprecated, use DUMBMONIT_X`).
-- `/data/ezymonit.db` is renamed to `dumbmonit.db`.
-- Agent tokens `ezym_…` keep working; new enrolment secrets start with `dmon_`. Agents keep
-  pushing; re-run the install command on each machine when convenient, it
-  [migrates the old service in place](../devices/agent.md#upgrade).
-- The session cookie changed name: everyone logs in again once. The browser's
-  theme preference is carried over.
-
-What it does not handle: the metric prefix changed from `ezymonit_` to
-`dumbmonit_` with no compatibility. The old series stay in VictoriaMetrics under
-the old name and age out with the retention; graphs and built-in rules restart
-from the upgrade. Custom alert rules that name `ezymonit_…` metrics must be
-edited.
 
 ## Backup and restore
 

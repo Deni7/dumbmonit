@@ -47,20 +47,6 @@ fn the_server_is_reached_over_https_or_the_loopback_only() {
 }
 
 #[test]
-fn the_old_variable_names_are_still_read_and_reported() {
-    let config = Config::merge(
-        FileConfig::default(),
-        env(&[("EZYMONIT_AGENT_URL", "https://old:8080"), ("DUMBMONIT_AGENT_TOKEN", "dmon_x")]),
-    )
-    .expect("configuration");
-    assert_eq!(config.server_url, "https://old:8080");
-    assert_eq!(
-        config.deprecated_env,
-        vec![("EZYMONIT_AGENT_URL".to_string(), "DUMBMONIT_AGENT_URL".to_string())]
-    );
-}
-
-#[test]
 fn the_encrypted_channel_comes_from_the_install_command() {
     let pin = "AB:".repeat(31) + "AB";
     let file = FileConfig {
